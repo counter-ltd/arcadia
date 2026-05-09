@@ -28,6 +28,21 @@ impl AssetSource for EmbeddedAssets {
             "icons/tools.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/tools.svg"
             )))),
+            "icons/network.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/network.svg"
+            )))),
+            "icons/chat.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/chat.svg"
+            )))),
+            "icons/music.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/music.svg"
+            )))),
+            "icons/flask.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/flask.svg"
+            )))),
+            "icons/coffee.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/coffee.svg"
+            )))),
             "icons/app-icon.png" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../../Resources/Icons/Production/Final-1-appicon.png"
             )))),

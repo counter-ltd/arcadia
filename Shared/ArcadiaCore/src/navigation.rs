@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::config::modules::{LAN_MODULE_NAME, LATE_MODULE_NAME, NET_MODULE_NAME, SHELL_MODULE_NAME};
+use crate::config::modules::{LAN_MODULE_NAME, LATE_MODULE_NAME, NET_MODULE_NAME, TERMINAL_MODULE_NAME};
 
 #[derive(Clone, Copy, Serialize)]
 pub struct NavigationPageDefinition {
@@ -114,12 +114,12 @@ impl From<&NavigationGroupDefinition> for NavigationGroupOwned {
 pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
     NavigationPageDefinition {
         id: "utility.shell",
-        title: "Shell",
-        description: "Run and manage shell utility actions.",
+        title: "Terminal",
+        description: "Run and manage terminal commands.",
         glyph: "terminal",
         system_image: "terminal",
         accent: "emerald",
-        required_module: Some(SHELL_MODULE_NAME),
+        required_module: Some(TERMINAL_MODULE_NAME),
     },
     NavigationPageDefinition {
         id: "global.dashboard",
@@ -179,8 +179,17 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         id: "late.now_playing",
         title: "Late.sh",
         description: "Live chat, now playing, votes, visualizer, and bonsai in one view.",
-        glyph: "music",
-        system_image: "music.note",
+        glyph: "coffee",
+        system_image: "cup.and.saucer.fill",
+        accent: "violet",
+        required_module: Some(LATE_MODULE_NAME),
+    },
+    NavigationPageDefinition {
+        id: "late.experimental",
+        title: "Experimental",
+        description: "Profile, notifications, RSS, articles, showcase, games, artboard, work profiles, DMs, and chips.",
+        glyph: "flask",
+        system_image: "flask.fill",
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
     },
@@ -208,7 +217,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
         label: "Social",
         glyph: "chat",
         system_image: "bubble.left.and.bubble.right.fill",
-        pages: &["late.now_playing"],
+        pages: &["late.now_playing", "late.experimental"],
         accent: "teal",
     },
 ];
@@ -271,7 +280,7 @@ mod tests {
         assert_eq!(page.id, "utility.shell");
         assert_eq!(
             page.required_module,
-            Some(crate::config::modules::SHELL_MODULE_NAME)
+            Some(crate::config::modules::TERMINAL_MODULE_NAME)
         );
     }
 

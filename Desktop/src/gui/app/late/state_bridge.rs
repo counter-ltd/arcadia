@@ -4,7 +4,7 @@ use gpui::{Context, Timer, Window};
 
 use crate::gui::app::ArcadiaRoot;
 
-const LATE_PAGES: &[&str] = &["late.now_playing"];
+const LATE_PAGES: &[&str] = &["late.now_playing", "late.experimental"];
 
 impl ArcadiaRoot {
     pub fn ensure_late_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {

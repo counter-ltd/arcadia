@@ -4,13 +4,15 @@ use std::collections::BTreeMap;
 use crate::config::ConfigFile;
 
 const LEGACY_LAN_MODULE_NAME: &str = "lan-module";
+const LEGACY_TERMINAL_MODULE_NAME: &str = "shell";
+const LEGACY_TERMINAL_MOTD_MODULE_NAME: &str = "shell-motd";
 pub const LAN_MODULE_NAME: &str = "lan";
 pub const LATE_MODULE_NAME: &str = "late";
 pub const NET_MODULE_NAME: &str = "net";
 pub const SURFACE_MODULE_NAME: &str = "surface";
 pub const REMOTE_SESSION_MODULE_NAME: &str = "remote-session";
-pub const SHELL_MODULE_NAME: &str = "shell";
-pub const SHELL_MOTD_MODULE_NAME: &str = "shell-motd";
+pub const TERMINAL_MODULE_NAME: &str = "terminal";
+pub const TERMINAL_MOTD_MODULE_NAME: &str = "terminal-motd";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -48,16 +50,16 @@ static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_modules: &[NET_MODULE_NAME, LAN_MODULE_NAME],
     },
     ModuleManifest {
-        name: SHELL_MODULE_NAME,
+        name: TERMINAL_MODULE_NAME,
         version: "1.0.0",
-        description: "Interactive shell command execution for Arcadia surfaces.",
+        description: "Interactive terminal command execution for Arcadia surfaces.",
         required_modules: &[],
     },
     ModuleManifest {
-        name: SHELL_MOTD_MODULE_NAME,
+        name: TERMINAL_MOTD_MODULE_NAME,
         version: "1.0.0",
-        description: "Fastfetch-style banner when opening the Arcadia shell (requires shell).",
-        required_modules: &[SHELL_MODULE_NAME],
+        description: "Fastfetch-style banner when opening the Arcadia terminal (requires terminal).",
+        required_modules: &[TERMINAL_MODULE_NAME],
     },
     ModuleManifest {
         name: LATE_MODULE_NAME,
@@ -226,6 +228,19 @@ impl ConfigFile for ModulesConfig {
             changed = true;
         }
 
+        if let Some(v) = self.modules.remove(LEGACY_TERMINAL_MODULE_NAME) {
+            self.modules
+                .entry(TERMINAL_MODULE_NAME.to_string())
+                .or_insert(v);
+            changed = true;
+        }
+        if let Some(v) = self.modules.remove(LEGACY_TERMINAL_MOTD_MODULE_NAME) {
+            self.modules
+                .entry(TERMINAL_MOTD_MODULE_NAME.to_string())
+                .or_insert(v);
+            changed = true;
+        }
+
         let defaults = Self::default();
         for (key, value) in defaults.modules {
             if !self.modules.contains_key(&key) {
@@ -249,7 +264,7 @@ mod tests {
     fn default_surface_enabled_others_disabled() {
         let cfg = base();
         assert_eq!(cfg.modules.get(SURFACE_MODULE_NAME), Some(&true));
-        assert_eq!(cfg.modules.get(SHELL_MODULE_NAME), Some(&false));
+        assert_eq!(cfg.modules.get(TERMINAL_MODULE_NAME), Some(&false));
         assert_eq!(cfg.modules.get(NET_MODULE_NAME), Some(&false));
         assert_eq!(cfg.modules.get(LAN_MODULE_NAME), Some(&false));
     }
@@ -257,8 +272,8 @@ mod tests {
     #[test]
     fn set_module_state_enables_known_module() {
         let mut cfg = base();
-        cfg.set_module_state(SHELL_MODULE_NAME, true).unwrap();
-        assert_eq!(cfg.modules.get(SHELL_MODULE_NAME), Some(&true));
+        cfg.set_module_state(TERMINAL_MODULE_NAME, true).unwrap();
+        assert_eq!(cfg.modules.get(TERMINAL_MODULE_NAME), Some(&true));
     }
 
     #[test]
@@ -347,8 +362,8 @@ mod tests {
 
     #[test]
     fn manifest_for_known_module() {
-        let m = ModulesConfig::manifest_for(SHELL_MODULE_NAME).unwrap();
-        assert_eq!(m.name, SHELL_MODULE_NAME);
+        let m = ModulesConfig::manifest_for(TERMINAL_MODULE_NAME).unwrap();
+        assert_eq!(m.name, TERMINAL_MODULE_NAME);
     }
 
     #[test]
@@ -363,14 +378,12 @@ mod tests {
     }
 
     #[test]
-    fn shell_motd_requires_shell() {
+    fn terminal_motd_requires_terminal() {
         let mut cfg = base();
-        // shell-motd requires shell; shell disabled → enable should fail
-        let err = cfg.set_module_state(SHELL_MOTD_MODULE_NAME, true).unwrap_err();
-        assert!(err.contains("shell"), "error should mention shell: {err}");
-        // enable shell first, then motd should work
-        cfg.set_module_state(SHELL_MODULE_NAME, true).unwrap();
-        cfg.set_module_state(SHELL_MOTD_MODULE_NAME, true).unwrap();
-        assert_eq!(cfg.modules.get(SHELL_MOTD_MODULE_NAME), Some(&true));
+        let err = cfg.set_module_state(TERMINAL_MOTD_MODULE_NAME, true).unwrap_err();
+        assert!(err.contains("terminal"), "error should mention terminal: {err}");
+        cfg.set_module_state(TERMINAL_MODULE_NAME, true).unwrap();
+        cfg.set_module_state(TERMINAL_MOTD_MODULE_NAME, true).unwrap();
+        assert_eq!(cfg.modules.get(TERMINAL_MOTD_MODULE_NAME), Some(&true));
     }
 }

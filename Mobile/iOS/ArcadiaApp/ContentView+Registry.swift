@@ -4,7 +4,7 @@ extension ContentView {
     static func loadNavigationRegistry() -> NavigationRegistry {
         let fallback = NavigationRegistry(
             pages: [
-                PageDefinition(id: "utility.shell", title: "Shell", description: "Run and manage shell utility actions.", glyph: "SH", systemImage: "terminal", accent: "emerald", requiredModule: ModuleNames.shell),
+                PageDefinition(id: "utility.shell", title: "Terminal", description: "Run and manage terminal commands.", glyph: "TM", systemImage: "terminal", accent: "emerald", requiredModule: ModuleNames.terminal),
                 PageDefinition(id: "global.dashboard", title: "Dashboard", description: "Overview of the Arcadia application surface.", glyph: "DH", systemImage: "house", accent: "violet"),
                 PageDefinition(id: "global.logs", title: "Logs", description: "Recent logs and activity stream appear here.", glyph: "LG", systemImage: "doc.text.magnifyingglass", accent: "sky"),
                 PageDefinition(id: "global.settings", title: "Settings", description: "App preferences and configuration controls appear here.", glyph: "ST", systemImage: "gearshape", accent: "indigo"),

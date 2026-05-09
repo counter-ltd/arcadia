@@ -531,6 +531,441 @@ pub fn http_delete_token(server_url: &str, token: &str) -> Result<(), String> {
     }
 }
 
+// ── Experimental state (late.experimental page) ───────────────────────────────
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct LateProfile {
+    pub username: String,
+    pub bio: String,
+    pub notify_format: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateNotification {
+    pub id: String,
+    pub kind: String,
+    pub body: String,
+    pub created: String,
+    pub read: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateArticle {
+    pub id: String,
+    pub url: String,
+    pub title: String,
+    pub summary: String,
+    pub created: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateWorkProfile {
+    pub id: String,
+    pub slug: String,
+    pub headline: String,
+    pub status: String,
+    pub work_type: String,
+    pub location: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateRssFeed {
+    pub id: String,
+    pub url: String,
+    pub title: String,
+    pub active: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateRssEntry {
+    pub id: String,
+    pub feed_title: String,
+    pub title: String,
+    pub url: String,
+    pub published_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateShowcaseItem {
+    pub id: String,
+    pub title: String,
+    pub url: String,
+    pub description: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateLeaderEntry {
+    pub username: String,
+    pub game: String,
+    pub score: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LateChip {
+    pub id: String,
+    pub label: String,
+    pub color: String,
+    pub count: i64,
+}
+
+#[derive(Default)]
+pub struct LateExperimentalState {
+    pub profile: Option<LateProfile>,
+    pub notifications: Vec<LateNotification>,
+    pub unread_notifications: i64,
+    pub articles: Vec<LateArticle>,
+    pub work_profiles: Vec<LateWorkProfile>,
+    pub rss_feeds: Vec<LateRssFeed>,
+    pub rss_unread: i64,
+    pub rss_entries: Vec<LateRssEntry>,
+    pub showcase: Vec<LateShowcaseItem>,
+    pub leaderboard: Vec<LateLeaderEntry>,
+    pub chips: Vec<LateChip>,
+    pub artboard_size: Option<(u32, u32)>,
+    pub last_error: Option<String>,
+    pub loading: bool,
+    pub revision: u64,
+}
+
+static EXPERIMENTAL_STATE: OnceLock<Arc<Mutex<LateExperimentalState>>> = OnceLock::new();
+
+pub fn experimental_state() -> Arc<Mutex<LateExperimentalState>> {
+    EXPERIMENTAL_STATE
+        .get_or_init(|| Arc::new(Mutex::new(LateExperimentalState::default())))
+        .clone()
+}
+
+pub fn experimental_refresh(server_url: String, token: String) {
+    {
+        let arc = experimental_state();
+        let mut st = arc.lock().unwrap_or_else(|e| e.into_inner());
+        st.loading = true;
+        st.last_error = None;
+        st.revision += 1;
+    }
+    std::thread::Builder::new()
+        .name("late-exp-refresh".to_string())
+        .spawn(move || {
+            let mut errors: Vec<String> = Vec::new();
+
+            macro_rules! fetch {
+                ($result:expr, $apply:expr) => {
+                    match $result {
+                        Ok(val) => {
+                            let arc = experimental_state();
+                            let mut st = arc.lock().unwrap_or_else(|e| e.into_inner());
+                            $apply(&mut *st, val);
+                            st.revision += 1;
+                        }
+                        Err(e) => errors.push(e),
+                    }
+                };
+            }
+
+            fetch!(
+                http_get_profile(&server_url, &token),
+                |st: &mut LateExperimentalState, v: LateProfile| { st.profile = Some(v); }
+            );
+            fetch!(
+                http_get_notifications(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateNotification>| { st.notifications = v; }
+            );
+            fetch!(
+                http_get_notifications_unread(&server_url, &token),
+                |st: &mut LateExperimentalState, v: i64| { st.unread_notifications = v; }
+            );
+            fetch!(
+                http_get_articles(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateArticle>| { st.articles = v; }
+            );
+            fetch!(
+                http_get_work_profiles(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateWorkProfile>| { st.work_profiles = v; }
+            );
+            fetch!(
+                http_get_rss_feeds(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateRssFeed>| { st.rss_feeds = v; }
+            );
+            fetch!(
+                http_get_rss_unread(&server_url, &token),
+                |st: &mut LateExperimentalState, v: i64| { st.rss_unread = v; }
+            );
+            fetch!(
+                http_get_rss_entries(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateRssEntry>| { st.rss_entries = v; }
+            );
+            fetch!(
+                http_get_showcase(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateShowcaseItem>| { st.showcase = v; }
+            );
+            fetch!(
+                http_get_leaderboard(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateLeaderEntry>| { st.leaderboard = v; }
+            );
+            fetch!(
+                http_get_chips(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Vec<LateChip>| { st.chips = v; }
+            );
+            fetch!(
+                http_get_artboard_size(&server_url, &token),
+                |st: &mut LateExperimentalState, v: Option<(u32, u32)>| { st.artboard_size = v; }
+            );
+
+            let arc = experimental_state();
+            let mut st = arc.lock().unwrap_or_else(|e| e.into_inner());
+            st.loading = false;
+            if !errors.is_empty() {
+                st.last_error = Some(errors.join("; "));
+            }
+            st.revision += 1;
+        })
+        .ok();
+}
+
+// ── Experimental HTTP helpers ─────────────────────────────────────────────────
+
+fn bearer(token: &str) -> String {
+    format!("Bearer {token}")
+}
+
+pub fn http_get_profile(server_url: &str, token: &str) -> Result<LateProfile, String> {
+    ureq::get(&format!("{server_url}/api/native/profile"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| LateProfile {
+            username: v["username"].as_str().unwrap_or("").to_string(),
+            bio: v["bio"].as_str().unwrap_or("").to_string(),
+            notify_format: v["notify_format"].as_str().unwrap_or("").to_string(),
+        })
+}
+
+pub fn http_get_notifications(server_url: &str, token: &str) -> Result<Vec<LateNotification>, String> {
+    ureq::get(&format!("{server_url}/api/native/notifications"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|n| serde_json::from_value(n.clone()).ok())
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_notifications_unread(server_url: &str, token: &str) -> Result<i64, String> {
+    ureq::get(&format!("{server_url}/api/native/notifications/unread"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| v["unread"].as_i64().unwrap_or(0))
+}
+
+pub fn http_get_articles(server_url: &str, token: &str) -> Result<Vec<LateArticle>, String> {
+    ureq::get(&format!("{server_url}/api/native/articles?limit=10"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|a| LateArticle {
+                            id: a["id"].as_str().unwrap_or("").to_string(),
+                            url: a["url"].as_str().unwrap_or("").to_string(),
+                            title: a["title"].as_str().unwrap_or("").to_string(),
+                            summary: a["summary"].as_str().unwrap_or("").to_string(),
+                            created: a["created"].as_str().unwrap_or("").to_string(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_work_profiles(server_url: &str, token: &str) -> Result<Vec<LateWorkProfile>, String> {
+    ureq::get(&format!("{server_url}/api/native/work-profiles?limit=20"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|p| LateWorkProfile {
+                            id: p["id"].as_str().unwrap_or("").to_string(),
+                            slug: p["slug"].as_str().unwrap_or("").to_string(),
+                            headline: p["headline"].as_str().unwrap_or("").to_string(),
+                            status: p["status"].as_str().unwrap_or("").to_string(),
+                            work_type: p["work_type"].as_str().unwrap_or("").to_string(),
+                            location: p["location"].as_str().unwrap_or("").to_string(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_rss_feeds(server_url: &str, token: &str) -> Result<Vec<LateRssFeed>, String> {
+    ureq::get(&format!("{server_url}/api/native/rss/feeds"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|f| LateRssFeed {
+                            id: f["id"].as_str().unwrap_or("").to_string(),
+                            url: f["url"].as_str().unwrap_or("").to_string(),
+                            title: f["title"].as_str().unwrap_or("").to_string(),
+                            active: f["active"].as_bool().unwrap_or(false),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_rss_unread(server_url: &str, token: &str) -> Result<i64, String> {
+    ureq::get(&format!("{server_url}/api/native/rss/unread"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| v["unread"].as_i64().unwrap_or(0))
+}
+
+pub fn http_get_rss_entries(server_url: &str, token: &str) -> Result<Vec<LateRssEntry>, String> {
+    ureq::get(&format!("{server_url}/api/native/rss/entries?limit=20"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|e| LateRssEntry {
+                            id: e["id"].as_str().unwrap_or("").to_string(),
+                            feed_title: e["feed_title"].as_str().unwrap_or("").to_string(),
+                            title: e["title"].as_str().unwrap_or("").to_string(),
+                            url: e["url"].as_str().unwrap_or("").to_string(),
+                            published_at: e["published_at"].as_str().map(|s| s.to_string()),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_showcase(server_url: &str, token: &str) -> Result<Vec<LateShowcaseItem>, String> {
+    ureq::get(&format!("{server_url}/api/native/showcase?limit=20"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|s| LateShowcaseItem {
+                            id: s["id"].as_str().unwrap_or("").to_string(),
+                            title: s["title"].as_str().unwrap_or("").to_string(),
+                            url: s["url"].as_str().unwrap_or("").to_string(),
+                            description: s["description"].as_str().unwrap_or("").to_string(),
+                            tags: s["tags"]
+                                .as_array()
+                                .map(|a| {
+                                    a.iter()
+                                        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_leaderboard(server_url: &str, token: &str) -> Result<Vec<LateLeaderEntry>, String> {
+    ureq::get(&format!("{server_url}/api/native/games/leaderboard"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|e| LateLeaderEntry {
+                            username: e["username"].as_str().unwrap_or("").to_string(),
+                            game: e["game"].as_str().unwrap_or("").to_string(),
+                            score: e["score"].as_i64().unwrap_or(0),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_chips(server_url: &str, token: &str) -> Result<Vec<LateChip>, String> {
+    ureq::get(&format!("{server_url}/api/native/chips"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())
+        .map(|v| {
+            v.as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .map(|c| LateChip {
+                            id: c["id"].as_str().unwrap_or("").to_string(),
+                            label: c["label"].as_str().unwrap_or("").to_string(),
+                            color: c["color"].as_str().unwrap_or("").to_string(),
+                            count: c["count"].as_i64().unwrap_or(0),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+}
+
+pub fn http_get_artboard_size(server_url: &str, token: &str) -> Result<Option<(u32, u32)>, String> {
+    let val = ureq::get(&format!("{server_url}/api/native/artboard"))
+        .set("Authorization", &bearer(token))
+        .call()
+        .map_err(|e| e.to_string())?
+        .into_json::<serde_json::Value>()
+        .map_err(|e| e.to_string())?;
+    let canvas = &val["canvas"];
+    let w = canvas["width"].as_u64().or_else(|| canvas["cols"].as_u64());
+    let h = canvas["height"].as_u64().or_else(|| canvas["rows"].as_u64());
+    Ok(w.zip(h).map(|(w, h)| (w as u32, h as u32)))
+}
+
 fn expand_tilde_path(path: &str) -> String {
     if path == "~" {
         return std::env::var("HOME").unwrap_or_else(|_| path.to_string());

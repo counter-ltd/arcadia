@@ -1,6 +1,6 @@
 use gpui::Rgba;
 use gpui::{
-    div, px, rgb, Context, Div, FontWeight, InteractiveElement, ParentElement,
+    div, px, Context, Div, FontWeight, InteractiveElement, ParentElement,
     StatefulInteractiveElement, Styled,
 };
 

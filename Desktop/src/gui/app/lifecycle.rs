@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use arcadia_core::config::modules::{
-    ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, SHELL_MODULE_NAME,
-    SHELL_MOTD_MODULE_NAME,
+    ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME,
+    TERMINAL_MOTD_MODULE_NAME,
 };
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
@@ -47,10 +47,10 @@ impl ArcadiaRoot {
         let Ok(cfg) = ModulesConfig::load_or_create() else {
             return vec!["Arcadia Terminal ready.".to_string()];
         };
-        let shell_on = cfg.modules.get(SHELL_MODULE_NAME).copied().unwrap_or(false);
+        let shell_on = cfg.modules.get(TERMINAL_MODULE_NAME).copied().unwrap_or(false);
         let motd_on = cfg
             .modules
-            .get(SHELL_MOTD_MODULE_NAME)
+            .get(TERMINAL_MOTD_MODULE_NAME)
             .copied()
             .unwrap_or(false);
         if shell_on && motd_on {
@@ -226,7 +226,7 @@ impl ArcadiaRoot {
                         let should_stop = cx
                             .update(|_, app| {
                                 view.update(app, |this, cx| {
-                                    if !this.is_module_enabled(SHELL_MODULE_NAME) {
+                                    if !this.is_module_enabled(TERMINAL_MODULE_NAME) {
                                         this.shell_caret_task_started = false;
                                         return true;
                                     }

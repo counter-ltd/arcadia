@@ -218,7 +218,7 @@ impl ArcadiaRoot {
         };
         div()
             .px_3()
-            .py_2()
+            .py_1()
             .rounded_md()
             .cursor_pointer()
             .text_sm()

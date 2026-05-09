@@ -74,6 +74,13 @@ impl NavGroupRef<'_> {
         }
     }
 
+    pub fn glyph(&self) -> &str {
+        match self {
+            NavGroupRef::Static(g) => g.glyph,
+            NavGroupRef::Remote(g) => g.glyph.as_str(),
+        }
+    }
+
     pub fn system_image(&self) -> &str {
         match self {
             NavGroupRef::Static(g) => g.system_image,

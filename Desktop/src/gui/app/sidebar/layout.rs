@@ -302,7 +302,7 @@ impl ArcadiaRoot {
                                         Self::sidebar_group_item(
                                             cx,
                                             gpui::SharedString::from(group.label().to_string()),
-                                            gpui::SharedString::from(group.system_image().to_string()),
+                                            gpui::SharedString::from(group.glyph().to_string()),
                                             group.id().to_string(),
                                             self.active_group_id == group.id(),
                                             is_dark,
@@ -334,18 +334,24 @@ impl ArcadiaRoot {
                                 }),
                             )),
                     )
-                    .children(self.global_page_ids_effective().into_iter().filter_map(|page_id| {
-                        let page = self.page_ref(page_id)?;
-                        Some(Self::sidebar_global_item(
-                            cx,
-                            gpui::SharedString::from(page.title().to_string()),
-                            gpui::SharedString::from(page.glyph().to_string()),
-                            page.id().to_string(),
-                            self.active_page_id == page.id(),
-                            is_dark,
-                            page.accent().to_string(),
-                        ))
-                    })),
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_0p5()
+                            .children(self.global_page_ids_effective().into_iter().filter_map(|page_id| {
+                                let page = self.page_ref(page_id)?;
+                                Some(Self::sidebar_global_item(
+                                    cx,
+                                    gpui::SharedString::from(page.title().to_string()),
+                                    gpui::SharedString::from(page.glyph().to_string()),
+                                    page.id().to_string(),
+                                    self.active_page_id == page.id(),
+                                    is_dark,
+                                    page.accent().to_string(),
+                                ))
+                            })),
+                    ),
             )
     }
 }

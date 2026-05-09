@@ -9,6 +9,11 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "modules" => "icons/modules.svg",
         "nodes" => "icons/nodes.svg",
         "tools" => "icons/tools.svg",
+        "network" => "icons/network.svg",
+        "chat" => "icons/chat.svg",
+        "music" => "icons/music.svg",
+        "flask" => "icons/flask.svg",
+        "coffee" => "icons/coffee.svg",
         _ => "icons/terminal.svg",
     }
 }

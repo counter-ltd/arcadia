@@ -24,18 +24,18 @@ fn rgba_u8(r: u32, g: u32, b: u32) -> Rgba {
     }
 }
 
-fn sgr_fg_basic(code: u32) -> Option<Rgba> {
+fn sgr_fg_basic(code: u32, is_dark: bool) -> Option<Rgba> {
     match code {
-        30..=37 => Some(colors::ansi_indexed((code - 30) as u8)),
-        90..=97 => Some(colors::ansi_indexed((code - 90 + 8) as u8)),
+        30..=37 => Some(colors::ansi_indexed((code - 30) as u8, is_dark)),
+        90..=97 => Some(colors::ansi_indexed((code - 90 + 8) as u8, is_dark)),
         _ => None,
     }
 }
 
-fn sgr_bg_basic(code: u32) -> Option<Rgba> {
+fn sgr_bg_basic(code: u32, is_dark: bool) -> Option<Rgba> {
     match code {
-        40..=47 => Some(colors::ansi_indexed((code - 40) as u8)),
-        100..=107 => Some(colors::ansi_indexed((code - 100 + 8) as u8)),
+        40..=47 => Some(colors::ansi_indexed((code - 40) as u8, is_dark)),
+        100..=107 => Some(colors::ansi_indexed((code - 100 + 8) as u8, is_dark)),
         _ => None,
     }
 }
@@ -55,7 +55,7 @@ fn parse_sgr_params(raw: &str) -> Vec<u32> {
         .collect()
 }
 
-fn apply_sgr(codes: &[u32], st: &mut StyleState, default_fg: Rgba) {
+fn apply_sgr(codes: &[u32], st: &mut StyleState, default_fg: Rgba, is_dark: bool) {
     let mut i = 0usize;
     while i < codes.len() {
         match codes[i] {
@@ -69,18 +69,18 @@ fn apply_sgr(codes: &[u32], st: &mut StyleState, default_fg: Rgba) {
             39 => st.fg = default_fg,
             49 => st.bg = None,
             n @ 30..=37 | n @ 90..=97 => {
-                if let Some(c) = sgr_fg_basic(n) {
+                if let Some(c) = sgr_fg_basic(n, is_dark) {
                     st.fg = c;
                 }
             }
             n @ 40..=47 | n @ 100..=107 => {
-                if let Some(c) = sgr_bg_basic(n) {
+                if let Some(c) = sgr_bg_basic(n, is_dark) {
                     st.bg = Some(c);
                 }
             }
             38 => {
                 if codes.get(i + 1) == Some(&5) && i + 2 < codes.len() {
-                    st.fg = colors::ansi_indexed(codes[i + 2].min(255) as u8);
+                    st.fg = colors::ansi_indexed(codes[i + 2].min(255) as u8, is_dark);
                     i += 3;
                     continue;
                 }
@@ -93,7 +93,7 @@ fn apply_sgr(codes: &[u32], st: &mut StyleState, default_fg: Rgba) {
             }
             48 => {
                 if codes.get(i + 1) == Some(&5) && i + 2 < codes.len() {
-                    st.bg = Some(colors::ansi_indexed(codes[i + 2].min(255) as u8));
+                    st.bg = Some(colors::ansi_indexed(codes[i + 2].min(255) as u8, is_dark));
                     i += 3;
                     continue;
                 }
@@ -160,7 +160,7 @@ fn flush_run(buf: &mut String, runs: &mut Vec<Run>, st: StyleState) {
     });
 }
 
-fn parse_ansi_runs(line: &str, default_fg: Rgba) -> Vec<Run> {
+fn parse_ansi_runs(line: &str, default_fg: Rgba, is_dark: bool) -> Vec<Run> {
     let mut runs = Vec::new();
     let mut buf = String::new();
     let mut st = StyleState {
@@ -184,7 +184,7 @@ fn parse_ansi_runs(line: &str, default_fg: Rgba) -> Vec<Run> {
                     while let Some(c) = it.next() {
                         if ('\x40'..='\x7e').contains(&c) {
                             if c == 'm' {
-                                apply_sgr(&parse_sgr_params(&raw), &mut st, default_fg);
+                                apply_sgr(&parse_sgr_params(&raw), &mut st, default_fg, is_dark);
                             }
                             closed = true;
                             break;
@@ -220,7 +220,7 @@ pub(crate) fn shell_history_line(line: &str, is_dark: bool) -> Div {
         rgb(0x1f2937)
     };
 
-    let runs = parse_ansi_runs(line, default_fg);
+    let runs = parse_ansi_runs(line, default_fg, is_dark);
     if runs.is_empty() {
         return div().w_full().h(px(0.)).flex_shrink_0().overflow_hidden();
     }
