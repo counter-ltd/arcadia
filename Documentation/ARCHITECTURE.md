@@ -144,7 +144,7 @@ Arcadia supports a **headless host + GUI client** pattern over LAN:
 
 **`ARCADIA_NET_AS`** env var bootstraps `net_as` on startup, overriding `thin-client.toml`.
 
-**Multi-client caveat:** `modules.toml` is a single file on the host. Concurrent edits are last-writer-wins with no merge semantics. See [roadmap.md](roadmap.md).
+**Multi-client caveat:** `modules.toml` is a single file on the host. Concurrent edits are last-writer-wins with no merge semantics. See [Roadmap.md](Roadmap.md).
 
 ---
 
