@@ -126,40 +126,10 @@ extension ContentView {
                     .buttonStyle(.plain)
                     .accessibilityLabel(isSidebarOpen ? "Close sidebar" : "Open sidebar")
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        activePageID = "global.logs"
-                    } label: {
-                        let isLogsActive = activePageID == "global.logs"
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(isLogsActive ? theme.primaryTextColor : theme.accentTextColor)
-                            .frame(width: 52, height: 52)
-                            .background(
-                                isLogsActive
-                                    ? AnyShapeStyle(theme.cardFillColor)
-                                    : AnyShapeStyle(.ultraThinMaterial),
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .fill(
-                                        isLogsActive
-                                            ? (colorScheme == .dark ? .white.opacity(0.08) : .white.opacity(0.45))
-                                            : (colorScheme == .dark ? .white.opacity(0.04) : .white.opacity(0.35))
-                                    )
-                            }
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        isLogsActive ? theme.accentTextColor.opacity(0.4) : theme.cardStrokeColor,
-                                        lineWidth: 1
-                                    )
-                            }
-                            .shadow(color: theme.contentShadowColor, radius: 14, x: 0, y: 8)
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    ForEach(visibleTopBarPages) { page in
+                        topBarPageButton(page: page)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open logs")
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -187,6 +157,49 @@ extension ContentView {
                 }
             }
         }
+    }
+
+    var visibleTopBarPages: [PageDefinition] {
+        navigationRegistry.topBarPages
+            .filter { isPageVisible($0) }
+            .compactMap { id in navigationRegistry.pages.first(where: { $0.id == id }) }
+    }
+
+    @ViewBuilder
+    func topBarPageButton(page: PageDefinition) -> some View {
+        let isActive = activePageID == page.id
+        Button {
+            activePageID = page.id
+        } label: {
+            Image(systemName: page.systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(isActive ? theme.primaryTextColor : theme.accentTextColor)
+                .frame(width: 52, height: 52)
+                .background(
+                    isActive
+                        ? AnyShapeStyle(theme.cardFillColor)
+                        : AnyShapeStyle(.ultraThinMaterial),
+                    in: Circle()
+                )
+                .overlay {
+                    Circle()
+                        .fill(
+                            isActive
+                                ? (colorScheme == .dark ? .white.opacity(0.08) : .white.opacity(0.45))
+                                : (colorScheme == .dark ? .white.opacity(0.04) : .white.opacity(0.35))
+                        )
+                }
+                .overlay {
+                    Circle()
+                        .stroke(
+                            isActive ? theme.accentTextColor.opacity(0.4) : theme.cardStrokeColor,
+                            lineWidth: 1
+                        )
+                }
+                .shadow(color: theme.contentShadowColor, radius: 14, x: 0, y: 8)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(page.title)")
     }
 
     var glassBackground: some View {

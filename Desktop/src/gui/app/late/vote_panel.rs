@@ -1,4 +1,4 @@
-use gpui::{div, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
+use openframe::{div, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
 
 use arcadia_core::modules::late::{send_ws, state};
 

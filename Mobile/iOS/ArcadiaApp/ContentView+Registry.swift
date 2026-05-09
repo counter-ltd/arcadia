@@ -18,7 +18,8 @@ extension ContentView {
                 GroupDefinition(id: "network", label: "Network", glyph: "NW", systemImage: "network", pageIDs: ["network.overview", "network.nodes"], accent: "cyan"),
                 GroupDefinition(id: "social", label: "Social", glyph: "SC", systemImage: "bubble.left.and.bubble.right.fill", pageIDs: ["late.now_playing"], accent: "teal")
             ],
-            globalPages: ["global.dashboard", "global.settings", "global.modules"],
+            globalPages: ["global.dashboard", "global.settings"],
+            topBarPages: ["global.logs", "global.modules"],
             defaultGroup: "utilities",
             defaultPage: "global.dashboard"
         )

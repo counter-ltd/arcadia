@@ -1,6 +1,6 @@
 use arcadia_core::modules::lan::{discover_lan_peers, list_known_lan_peers};
 use arcadia_core::modules::{execute_command, ExecutionContext};
-use gpui::{
+use openframe::{
     div, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
 };
 
@@ -80,7 +80,7 @@ impl ArcadiaRoot {
     fn lan_section_title(&self, label: &'static str, is_dark: bool) -> impl IntoElement {
         div()
             .text_base()
-            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .font_weight(openframe::FontWeight::SEMIBOLD)
             .text_color(theme::module_title_text(is_dark))
             .child(label)
     }
@@ -131,7 +131,7 @@ impl ArcadiaRoot {
             .border_1()
             .border_color(theme::module_row_stroke(is_dark))
             .text_sm()
-            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .font_weight(openframe::FontWeight::SEMIBOLD)
             .text_color(theme::module_title_text(is_dark))
             .child(label)
             .on_mouse_down(
@@ -170,7 +170,7 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child(hostname.to_string()),
                     )
@@ -194,7 +194,7 @@ impl ArcadiaRoot {
                             rgb(0xeef2ff)
                         })
                         .text_xs()
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .font_weight(openframe::FontWeight::SEMIBOLD)
                         .text_color(theme::module_title_text(is_dark))
                         .child("Pair")
                         .on_mouse_down(
@@ -313,7 +313,7 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child(hostname),
                     )
@@ -346,7 +346,7 @@ impl ArcadiaRoot {
                 rgb(0xeef2ff)
             })
             .text_xs()
-            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .font_weight(openframe::FontWeight::SEMIBOLD)
             .text_color(theme::module_title_text(is_dark))
             .child(label)
             .on_mouse_down(

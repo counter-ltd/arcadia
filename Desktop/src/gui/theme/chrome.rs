@@ -1,4 +1,4 @@
-use gpui::Rgba;
+use openframe::Rgba;
 
 /// Neutral compact pill in the main top bar (matches cwd / small actions).
 pub fn top_bar_pill_bg(is_dark: bool) -> Rgba {

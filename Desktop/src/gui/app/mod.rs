@@ -17,15 +17,15 @@ mod splash;
 pub use entry::run;
 
 use arcadia_core::navigation::NavigationRegistryOwned;
-use gpui::{FocusHandle, ScrollHandle, SharedString};
+use openframe::{FocusHandle, ScrollHandle, SharedString};
 
 use super::tui::TuiSession;
 
 /// Top inset so window chrome (macOS traffic lights) does not overlap the first row of UI.
-pub(crate) fn window_controls_top_padding(window: &gpui::Window) -> gpui::Pixels {
+pub(crate) fn window_controls_top_padding(window: &openframe::Window) -> openframe::Pixels {
     #[cfg(target_os = "macos")]
     {
-        use gpui::px;
+        use openframe::px;
         if window.is_fullscreen() {
             px(0.)
         } else {
@@ -35,7 +35,7 @@ pub(crate) fn window_controls_top_padding(window: &gpui::Window) -> gpui::Pixels
     #[cfg(not(target_os = "macos"))]
     {
         let _ = window;
-        gpui::px(0.)
+        openframe::px(0.)
     }
 }
 
@@ -68,21 +68,14 @@ impl ShellMode {
     }
 }
 
-pub struct ArcadiaRoot {
-    pub title: SharedString,
-    pub active_page_id: String,
-    pub active_group_id: String,
-    pub module_rows: Vec<(String, bool)>,
-    pub pending_module_enable: Option<(String, Vec<String>)>,
+pub struct TerminalInstance {
+    pub id: usize,
+    pub label: String,
     pub shell_history: Vec<String>,
     pub shell_input: String,
-    pub shell_focus: FocusHandle,
-    pub late_compose_focus: FocusHandle,
     pub shell_cursor: usize,
     pub shell_command_history: Vec<String>,
     pub shell_history_index: Option<usize>,
-    pub shell_caret_visible: bool,
-    pub shell_caret_task_started: bool,
     pub shell_stream_nonce: u64,
     pub shell_output_scroll: ScrollHandle,
     /// Keeps the embedded PTY viewport pinned to the prompt line (bottom of the terminal grid).
@@ -97,6 +90,24 @@ pub struct ArcadiaRoot {
     pub tui_ready: bool,
     pub tui_cols: u16,
     pub tui_rows: u16,
+}
+
+pub struct ArcadiaRoot {
+    pub title: SharedString,
+    pub active_page_id: String,
+    pub active_group_id: String,
+    pub module_rows: Vec<(String, bool)>,
+    pub pending_module_enable: Option<(String, Vec<String>)>,
+    pub terminals: Vec<TerminalInstance>,
+    pub active_terminal_id: usize,
+    pub next_terminal_serial: usize,
+    pub terminal_context_menu_open: bool,
+    pub terminal_kill_menu: Option<usize>,
+    pub context_menu_position: openframe::Point<openframe::Pixels>,
+    pub shell_focus: FocusHandle,
+    pub late_compose_focus: FocusHandle,
+    pub shell_caret_visible: bool,
+    pub shell_caret_task_started: bool,
     pub splash_elapsed_ms: f32,
     pub splash_tick_started: bool,
     pub sidebar_visible: bool,
@@ -120,6 +131,14 @@ pub struct ArcadiaRoot {
 }
 
 impl ArcadiaRoot {
+    pub(crate) fn active_terminal(&self) -> &TerminalInstance {
+        &self.terminals[self.active_terminal_id]
+    }
+
+    pub(crate) fn active_terminal_mut(&mut self) -> &mut TerminalInstance {
+        &mut self.terminals[self.active_terminal_id]
+    }
+
     pub(crate) fn is_module_enabled(&self, name: &str) -> bool {
         self.module_rows
             .iter()

@@ -12,34 +12,86 @@ use arcadia_core::modules;
 use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::parse_surface_snapshot;
 use arcadia_core::navigation;
-use gpui::{Context, Timer, Window};
+use openframe::{Context, Timer, Window};
 
 use super::super::tui;
-use super::ArcadiaRoot;
+use super::{ArcadiaRoot, ShellMode, TerminalInstance};
 
-impl ArcadiaRoot {
-    pub(super) fn reset_shell_state(&mut self) {
+impl TerminalInstance {
+    pub(crate) fn new(
+        id: usize,
+        label: String,
+        shell_working_dir: PathBuf,
+        shell_display_cwd: String,
+        initial_history: Vec<String>,
+    ) -> Self {
+        Self {
+            id,
+            label,
+            shell_history: initial_history,
+            shell_input: String::new(),
+            shell_cursor: 0,
+            shell_command_history: Vec::new(),
+            shell_history_index: None,
+            shell_stream_nonce: 0,
+            shell_output_scroll: openframe::ScrollHandle::new(),
+            tui_scroll: openframe::ScrollHandle::new(),
+            shell_mode: ShellMode::Generic,
+            shell_working_dir,
+            shell_display_cwd,
+            tui_session: None,
+            tui_nonce: 0,
+            tui_ready: false,
+            tui_cols: tui::DEFAULT_COLS,
+            tui_rows: tui::DEFAULT_ROWS,
+        }
+    }
+
+    pub(crate) fn reset(
+        &mut self,
+        initial_history: Vec<String>,
+        shell_working_dir: PathBuf,
+        shell_display_cwd: String,
+    ) {
         self.shell_stream_nonce = self.shell_stream_nonce.wrapping_add(1);
-        self.shell_history = Self::initial_shell_history();
+        self.shell_history = initial_history;
         self.shell_input.clear();
         self.shell_cursor = 0;
         self.shell_history_index = None;
         self.shell_output_scroll.scroll_to_bottom();
-        self.sync_shell_display_cwd_from_env();
+        self.shell_working_dir = shell_working_dir;
+        self.shell_display_cwd = shell_display_cwd;
+    }
+}
+
+impl ArcadiaRoot {
+    pub(super) fn reset_shell_state(&mut self) {
+        let (working_dir, display_cwd) = Self::current_dir_strings();
+        let history = Self::initial_shell_history();
+        self.active_terminal_mut().reset(history, working_dir, display_cwd);
     }
 
     pub(super) fn sync_shell_display_cwd_from_env(&mut self) {
+        let (working_dir, display_cwd) = Self::current_dir_strings();
+        let term = self.active_terminal_mut();
+        term.shell_working_dir = working_dir;
+        term.shell_display_cwd = display_cwd;
+    }
+
+    fn current_dir_strings() -> (PathBuf, String) {
         match env::current_dir() {
             Ok(path) => {
-                self.shell_working_dir = path.clone();
-                self.shell_display_cwd = path
+                let display = path
+                    .clone()
                     .into_os_string()
                     .into_string()
                     .unwrap_or_else(|_| "cwd: unavailable".to_string());
+                (path, display)
             }
-            Err(_) => {
-                self.shell_display_cwd = "cwd: unavailable".to_string();
-            }
+            Err(_) => (
+                PathBuf::from("/"),
+                "cwd: unavailable".to_string(),
+            ),
         }
     }
 
@@ -62,44 +114,37 @@ impl ArcadiaRoot {
         }
     }
 
-    pub fn new(cx: &mut gpui::Context<Self>) -> Self {
+    pub fn new(cx: &mut openframe::Context<Self>) -> Self {
         let shell_focus = cx.focus_handle();
         let late_compose_focus = cx.focus_handle();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
-        let shell_working_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
-        let shell_display_cwd = shell_working_dir
-            .clone()
-            .into_os_string()
-            .into_string()
-            .unwrap_or_else(|_| "cwd: unavailable".to_string());
+        let (shell_working_dir, shell_display_cwd) = Self::current_dir_strings();
+        let initial_history = Self::initial_shell_history();
+        let first_terminal = TerminalInstance::new(
+            0,
+            "Terminal 1".to_string(),
+            shell_working_dir,
+            shell_display_cwd,
+            initial_history,
+        );
         let mut root = ArcadiaRoot {
-            title: gpui::SharedString::new_static("Arcadia"),
+            title: openframe::SharedString::new_static("Arcadia"),
             active_page_id: navigation::DEFAULT_PAGE_ID.to_string(),
             active_group_id: navigation::DEFAULT_GROUP_ID.to_string(),
             module_rows,
             pending_module_enable: None,
-            shell_history: Self::initial_shell_history(),
-            shell_input: String::new(),
+            terminals: vec![first_terminal],
+            active_terminal_id: 0,
+            next_terminal_serial: 2,
+            terminal_context_menu_open: false,
+            terminal_kill_menu: None,
+            context_menu_position: openframe::Point::default(),
             shell_focus,
             late_compose_focus,
-            shell_cursor: 0,
-            shell_command_history: Vec::new(),
-            shell_history_index: None,
             shell_caret_visible: true,
             shell_caret_task_started: false,
-            shell_stream_nonce: 0,
-            shell_output_scroll: gpui::ScrollHandle::new(),
-            tui_scroll: gpui::ScrollHandle::new(),
-            shell_mode: super::ShellMode::Generic,
-            shell_working_dir,
-            shell_display_cwd,
-            tui_session: None,
-            tui_nonce: 0,
-            tui_ready: false,
-            tui_cols: tui::DEFAULT_COLS,
-            tui_rows: tui::DEFAULT_ROWS,
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
             sidebar_visible: true,
@@ -173,6 +218,37 @@ impl ArcadiaRoot {
         self.ensure_valid_navigation_selection();
     }
 
+    pub fn create_new_terminal(&mut self) {
+        let serial = self.next_terminal_serial;
+        self.next_terminal_serial += 1;
+        let new_id = self.terminals.len();
+        let (working_dir, display_cwd) = Self::current_dir_strings();
+        let new_term = TerminalInstance::new(
+            new_id,
+            format!("Terminal {serial}"),
+            working_dir,
+            display_cwd,
+            vec!["Arcadia Terminal ready.".to_string()],
+        );
+        self.terminals.push(new_term);
+        self.active_terminal_id = new_id;
+        self.active_page_id = "utility.shell".to_string();
+        self.terminal_context_menu_open = false;
+    }
+
+    pub fn kill_terminal(&mut self, idx: usize) {
+        if self.terminals.len() <= 1 {
+            return;
+        }
+        self.terminals.remove(idx);
+        if self.active_terminal_id >= self.terminals.len() {
+            self.active_terminal_id = self.terminals.len() - 1;
+        } else if self.active_terminal_id > idx {
+            self.active_terminal_id -= 1;
+        }
+        self.terminal_kill_menu = None;
+    }
+
     pub fn ensure_lan_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.lan_poll_task_started {
             return;
@@ -183,7 +259,7 @@ impl ArcadiaRoot {
         self.lan_poll_task_started = true;
         cx.spawn_in(
             window,
-            move |view: gpui::WeakEntity<ArcadiaRoot>, cx: &mut gpui::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {
@@ -218,7 +294,7 @@ impl ArcadiaRoot {
         self.shell_caret_task_started = true;
         cx.spawn_in(
             window,
-            move |view: gpui::WeakEntity<ArcadiaRoot>, cx: &mut gpui::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {

@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 REPO_ROOT="$(cd "${SOURCE_DIR}/.." && pwd)"
-CARGO_TARGET_DIR="${REPO_ROOT}/Builds/Shared"
+CARGO_TARGET_DIR="${REPO_ROOT}/Builds/workspace"
 OUT_DIR="${SOURCE_DIR}/../Mobile/iOS/ArcadiaCore"
 LIB_NAME="libarcadia_core.a"
 DEVICE_TARGET="aarch64-apple-ios"

@@ -1,4 +1,4 @@
-use gpui::Modifiers;
+use openframe::Modifiers;
 
 /// Map a GPUI key event to PTY byte sequence.
 pub fn key_to_bytes(key: &str, mods: Modifiers) -> Option<Vec<u8>> {

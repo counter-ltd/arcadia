@@ -1,4 +1,4 @@
-use gpui::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
 use arcadia_core::modules::late::state;
 use arcadia_core::modules;
@@ -9,7 +9,7 @@ use crate::gui::theme;
 
 use crate::gui::app::ArcadiaRoot;
 
-fn track_bar_vertical_rule(is_dark: bool) -> gpui::Div {
+fn track_bar_vertical_rule(is_dark: bool) -> openframe::Div {
     div()
         .w_px()
         .h_6()
@@ -43,7 +43,7 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
         })
         .child(if connected { "Reconnect" } else { "Connect" })
         .on_mouse_down(
-            gpui::MouseButton::Left,
+            openframe::MouseButton::Left,
             cx.listener(|this, _, _, cx| {
                 let ctx = this.execution_context();
                 match modules::execute_command("late.connect", &[], &ctx) {

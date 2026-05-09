@@ -13,19 +13,18 @@ function Invoke-Arcadia {
 
     $projectRoot = Resolve-Path (Join-Path $RootDir "..")
     $manifestPath = "Desktop/Cargo.toml"
-    $targetDir = "Builds/Desktop/Windows"
 
     Push-Location $projectRoot
     try {
         if ($Release) {
             Write-Host ""
-            Write-Host "Running: cargo run --manifest-path $manifestPath --target-dir $targetDir --release --features $Feature"
-            cargo run --manifest-path $manifestPath --target-dir $targetDir --release --features $Feature
+            Write-Host "Running: cargo run --manifest-path $manifestPath --release --features $Feature"
+            cargo run --manifest-path $manifestPath --release --features $Feature
         }
         else {
             Write-Host ""
-            Write-Host "Running: cargo run --manifest-path $manifestPath --target-dir $targetDir --features $Feature"
-            cargo run --manifest-path $manifestPath --target-dir $targetDir --features $Feature
+            Write-Host "Running: cargo run --manifest-path $manifestPath --features $Feature"
+            cargo run --manifest-path $manifestPath --features $Feature
         }
     }
     finally {

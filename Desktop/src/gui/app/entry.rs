@@ -1,4 +1,4 @@
-use gpui::{AppContext, Application, TitlebarOptions, WindowOptions};
+use openframe::{AppContext, Application, TitlebarOptions, WindowOptions};
 
 use super::super::assets::EmbeddedAssets;
 use super::ArcadiaRoot;

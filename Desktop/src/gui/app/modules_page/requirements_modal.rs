@@ -1,5 +1,5 @@
-use gpui::{div, rgb};
-use gpui::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, rgb};
+use openframe::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
 use crate::cli;
 use crate::gui::app::ArcadiaRoot;
@@ -27,7 +27,7 @@ impl ArcadiaRoot {
                     .bg(rgb(0x000000))
                     .opacity(0.35)
                     .on_mouse_down(
-                        gpui::MouseButton::Left,
+                        openframe::MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
                             this.pending_module_enable = None;
                             cx.notify();
@@ -54,7 +54,7 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_lg()
-                                    .font_weight(gpui::FontWeight::BOLD)
+                                    .font_weight(openframe::FontWeight::BOLD)
                                     .text_color(if is_dark { rgb(0xf9fafb) } else { rgb(0x111827) })
                                     .child("Enable with requirements?"),
                             )
@@ -81,7 +81,7 @@ impl ArcadiaRoot {
                                             .text_color(if is_dark { rgb(0xf3f4f6) } else { rgb(0x1f2937) })
                                             .child("Cancel")
                                             .on_mouse_down(
-                                                gpui::MouseButton::Left,
+                                                openframe::MouseButton::Left,
                                                 cx.listener(|this, _, _, cx| {
                                                     this.pending_module_enable = None;
                                                     cx.notify();
@@ -98,7 +98,7 @@ impl ArcadiaRoot {
                                             .text_color(rgb(0x1d4ed8))
                                             .child("Enable")
                                             .on_mouse_down(
-                                                gpui::MouseButton::Left,
+                                                openframe::MouseButton::Left,
                                                 cx.listener(|this, _, _, cx| {
                                                     if let Some((module_name, _)) =
                                                         this.pending_module_enable.clone()

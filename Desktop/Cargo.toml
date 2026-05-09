@@ -8,12 +8,12 @@ license = "MIT"
 [features]
 default = ["headless"]
 headless = []
-gui = ["dep:gpui", "dep:libc", "dep:portable-pty", "dep:vt100"]
+gui = ["dep:openframe", "dep:libc", "dep:portable-pty", "dep:vt100"]
 
 [dependencies]
 arcadia-core = { path = "../Shared/ArcadiaCore" }
 serde_json   = "1"
-gpui         = { version = "0.2.2", optional = true }
+openframe    = { path = "../Libraries/OpenFrame", optional = true }
 libc         = { version = "0.2", optional = true }
 rustyline    = "18.0.0"
 portable-pty = { version = "0.8", optional = true }

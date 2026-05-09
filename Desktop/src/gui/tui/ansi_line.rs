@@ -1,6 +1,6 @@
 //! Parse ANSI SGR sequences in plain strings for shell transcript rendering.
 
-use gpui::{div, px, rgb, Div, FontWeight, ParentElement, Rgba, Styled};
+use openframe::{div, px, rgb, Div, FontWeight, ParentElement, Rgba, Styled};
 
 /// Must match `shell/execute.rs` `CHAR_W` / `CHAR_H` (PTY ↔ transcript cell grid).
 const MONO_CELL_W: f32 = 8.4;

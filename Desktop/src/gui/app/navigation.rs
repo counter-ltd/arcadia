@@ -1,5 +1,5 @@
 use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
-use gpui::{div, rgb, Context, Div, FontWeight, ParentElement, Styled, Window};
+use openframe::{div, rgb, Context, Div, FontWeight, ParentElement, Styled, Window};
 
 use super::ArcadiaRoot;
 
@@ -126,6 +126,14 @@ impl ArcadiaRoot {
             nav.global_pages.iter().map(|s| s.as_str()).collect()
         } else {
             navigation::GLOBAL_PAGE_IDS.iter().copied().collect()
+        }
+    }
+
+    pub(crate) fn top_bar_page_ids_effective(&self) -> Vec<&str> {
+        if let Some(nav) = &self.remote_nav {
+            nav.top_bar_pages.iter().map(|s| s.as_str()).collect()
+        } else {
+            navigation::TOP_BAR_PAGE_IDS.iter().copied().collect()
         }
     }
 

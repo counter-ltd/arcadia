@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use gpui::{Context, Timer, Window};
+use openframe::{Context, Timer, Window};
 
 use crate::gui::app::ArcadiaRoot;
 
@@ -17,7 +17,7 @@ impl ArcadiaRoot {
         self.late_poll_task_started = true;
         cx.spawn_in(
             window,
-            move |view: gpui::WeakEntity<ArcadiaRoot>, cx: &mut gpui::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {

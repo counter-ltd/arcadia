@@ -415,8 +415,8 @@ cd Desktop && cargo run --features gui
 # Desktop headless (CLI)
 cd Desktop && cargo run
 
-# Core tests (artifact dir: Builds/Shared)
-cargo test -p arcadia-core --manifest-path Shared/Cargo.toml --target-dir Builds/Shared
+# Core tests (artifacts under Builds/workspace via /.cargo/config.toml)
+cargo test -p arcadia-core --manifest-path Shared/Cargo.toml
 
 # iOS framework rebuild (after ffi.rs changes)
 bash Shared/Scripts/Builds/build-ios-framework.sh

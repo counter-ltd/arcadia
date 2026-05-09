@@ -1,4 +1,4 @@
-use gpui::Rgba;
+use openframe::Rgba;
 
 pub fn default_fg(is_dark: bool) -> Rgba {
     if is_dark {

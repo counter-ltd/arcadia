@@ -23,21 +23,19 @@ run_arcadia() {
   local features="$2"
   local project_root="${ROOT_DIR}/.."
   local manifest_path="Desktop/Cargo.toml"
-  local target_dir
-  target_dir="$(arcadia_desktop_target_rel)"
 
   echo
   if [[ -n "${build_mode}" ]]; then
-    echo "Running: cargo run --manifest-path ${manifest_path} --target-dir ${target_dir} ${build_mode} --features ${features}"
+    echo "Running: cargo run --manifest-path ${manifest_path} ${build_mode} --features ${features}"
   else
-    echo "Running: cargo run --manifest-path ${manifest_path} --target-dir ${target_dir} --features ${features}"
+    echo "Running: cargo run --manifest-path ${manifest_path} --features ${features}"
   fi
   (
     cd "${project_root}" || exit 1
     if [[ -n "${build_mode}" ]]; then
-      cargo run --manifest-path "${manifest_path}" --target-dir "${target_dir}" "${build_mode}" --features "${features}"
+      cargo run --manifest-path "${manifest_path}" "${build_mode}" --features "${features}"
     else
-      cargo run --manifest-path "${manifest_path}" --target-dir "${target_dir}" --features "${features}"
+      cargo run --manifest-path "${manifest_path}" --features "${features}"
     fi
   )
 }

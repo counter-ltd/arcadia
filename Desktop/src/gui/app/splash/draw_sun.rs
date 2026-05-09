@@ -1,10 +1,10 @@
-use gpui::{fill, point, px, size, Bounds, Window};
+use openframe::{fill, point, px, size, Bounds, Window};
 
 use crate::gui::theme;
 
 use super::math::{alpha_rgba, lerp_f32, splash_scene_width};
 
-pub(super) fn splash_draw_sun(bounds: Bounds<gpui::Pixels>, t: f32, window: &mut Window) {
+pub(super) fn splash_draw_sun(bounds: Bounds<openframe::Pixels>, t: f32, window: &mut Window) {
     let w = f32::from(bounds.size.width);
     let h = f32::from(bounds.size.height);
     let ox = f32::from(bounds.origin.x);

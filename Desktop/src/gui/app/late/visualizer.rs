@@ -1,4 +1,4 @@
-use gpui::{div, rgb, IntoElement, ParentElement, Styled};
+use openframe::{div, rgb, IntoElement, ParentElement, Styled};
 
 use arcadia_core::modules::late::state;
 

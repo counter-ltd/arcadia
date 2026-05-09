@@ -1,4 +1,4 @@
-use gpui::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
 use crate::gui::app::{ArcadiaRoot, ShellMode};
 use crate::gui::theme;
@@ -9,8 +9,8 @@ impl ArcadiaRoot {
     pub(crate) fn render_main_top_bar(
         &self,
         cx: &mut Context<Self>,
-        active_page_title: gpui::SharedString,
-        active_page_glyph: gpui::SharedString,
+        active_page_title: openframe::SharedString,
+        active_page_glyph: openframe::SharedString,
         is_dark: bool,
     ) -> impl IntoElement {
         div()
@@ -38,7 +38,7 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_sm()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .font_weight(openframe::FontWeight::SEMIBOLD)
                                     .text_color(if is_dark {
                                         rgb(0xe5e7eb)
                                     } else {
@@ -60,7 +60,7 @@ impl ArcadiaRoot {
                                             .py_0p5()
                                             .rounded_md()
                                             .text_xs()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                                            .font_weight(openframe::FontWeight::SEMIBOLD)
                                             .bg(if is_active {
                                                 if is_dark { rgb(0x0d9488) } else { rgb(0x99f6e4) }
                                             } else {
@@ -80,7 +80,7 @@ impl ArcadiaRoot {
                                             })
                                             .child(*label)
                                             .on_mouse_down(
-                                                gpui::MouseButton::Left,
+                                                openframe::MouseButton::Left,
                                                 cx.listener(move |this, _, _, cx| {
                                                     this.late_active_room = rid;
                                                     arcadia_core::modules::late::send_ws(
@@ -99,7 +99,7 @@ impl ArcadiaRoot {
                                     .py_0p5()
                                     .rounded_md()
                                     .text_xs()
-                                    .bg(if self.shell_mode == ShellMode::Generic {
+                                    .bg(if self.active_terminal().shell_mode == ShellMode::Generic {
                                         if is_dark {
                                             rgb(0x1e3a5f)
                                         } else {
@@ -112,7 +112,7 @@ impl ArcadiaRoot {
                                             rgb(0xffedd5)
                                         }
                                     })
-                                    .text_color(if self.shell_mode == ShellMode::Generic {
+                                    .text_color(if self.active_terminal().shell_mode == ShellMode::Generic {
                                         if is_dark {
                                             rgb(0x93c5fd)
                                         } else {
@@ -125,13 +125,13 @@ impl ArcadiaRoot {
                                             rgb(0xc2410c)
                                         }
                                     })
-                                    .child(self.shell_mode.label())
+                                    .child(self.active_terminal().shell_mode.label())
                             } else {
                                 div()
                             })
                             .child(
                                 if self.active_page_id.as_str() == "utility.shell"
-                                    && self.shell_mode == ShellMode::Generic
+                                    && self.active_terminal().shell_mode == ShellMode::Generic
                                 {
                                     div()
                                         .px_2()
@@ -159,7 +159,7 @@ impl ArcadiaRoot {
                                     })
                                     .child("Reset")
                                     .on_mouse_down(
-                                        gpui::MouseButton::Left,
+                                        openframe::MouseButton::Left,
                                         cx.listener(|this, _, _, cx| {
                                             this.reset_shell_state();
                                             cx.notify();
@@ -182,10 +182,10 @@ impl ArcadiaRoot {
                                     })
                                     .child("Clear")
                                     .on_mouse_down(
-                                        gpui::MouseButton::Left,
+                                        openframe::MouseButton::Left,
                                         cx.listener(|this, _, _, cx| {
-                                            this.shell_history.clear();
-                                            this.shell_output_scroll.scroll_to_bottom();
+                                            this.active_terminal_mut().shell_history.clear();
+                                            this.active_terminal_mut().shell_output_scroll.scroll_to_bottom();
                                             cx.notify();
                                         }),
                                     )
@@ -193,17 +193,29 @@ impl ArcadiaRoot {
                                 div()
                             }),
                     )
-                    .child(Self::top_bar_global_item(
-                        cx,
-                        "Logs".into(),
-                        "logs".into(),
-                        "global.logs".into(),
-                        self.active_page_id.as_str() == "global.logs",
-                        is_dark,
-                        self.page_ref("global.logs")
-                            .map(|p| p.accent().to_string())
-                            .unwrap_or_else(|| "sky".to_string()),
-                    )),
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .children(self.top_bar_page_ids_effective().into_iter().filter_map(
+                                |page_id| {
+                                    if !self.is_page_visible(page_id) {
+                                        return None;
+                                    }
+                                    let page = self.page_ref(page_id)?;
+                                    Some(Self::top_bar_global_item(
+                                        cx,
+                                        openframe::SharedString::from(page.title().to_string()),
+                                        openframe::SharedString::from(page.glyph().to_string()),
+                                        page.id().to_string(),
+                                        self.active_page_id.as_str() == page.id(),
+                                        is_dark,
+                                        page.accent().to_string(),
+                                    ))
+                                },
+                            )),
+                    ),
             )
     }
 }

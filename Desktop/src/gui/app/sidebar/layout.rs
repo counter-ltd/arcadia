@@ -1,9 +1,9 @@
 use arcadia_core::config::modules::REMOTE_SESSION_MODULE_NAME;
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::modules::lan::connected_approved_session_peers;
-use gpui::{
-    div, img, px, rgb, Context, Div, InteractiveElement, ParentElement, StatefulInteractiveElement,
-    Styled, Window,
+use openframe::{
+    div, img, px, rgb, AnyElement, Context, Div, IntoElement, InteractiveElement, ParentElement,
+    StatefulInteractiveElement, Styled, Window,
 };
 
 use crate::gui::app::navigation::NavGroupRef;
@@ -57,7 +57,7 @@ impl ArcadiaRoot {
                             .items_center()
                             .gap_2()
                             .on_mouse_down(
-                                gpui::MouseButton::Right,
+                                openframe::MouseButton::Right,
                                 cx.listener(|this, _, _, cx| {
                                     this.session_route_menu_open = false;
                                     this.app_menu_open = true;
@@ -68,7 +68,7 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_lg()
-                                    .font_weight(gpui::FontWeight::BOLD)
+                                    .font_weight(openframe::FontWeight::BOLD)
                                     .text_color(if is_dark {
                                         rgb(0xe5e7eb)
                                     } else {
@@ -95,7 +95,7 @@ impl ArcadiaRoot {
                                         .child(
                                             div()
                                                 .text_xs()
-                                                .font_weight(gpui::FontWeight::MEDIUM)
+                                                .font_weight(openframe::FontWeight::MEDIUM)
                                                 .text_color(theme::sidebar_session_chip_text(is_dark))
                                                 .child("local"),
                                         )
@@ -123,14 +123,14 @@ impl ArcadiaRoot {
                                                 .child(
                                                     div()
                                                         .text_xs()
-                                                        .font_weight(gpui::FontWeight::MEDIUM)
+                                                        .font_weight(openframe::FontWeight::MEDIUM)
                                                         .text_color(
                                                             theme::sidebar_session_chip_text(is_dark),
                                                         )
                                                         .child(session_label),
                                                 )
                                                 .on_mouse_down(
-                                                    gpui::MouseButton::Left,
+                                                    openframe::MouseButton::Left,
                                                     cx.listener(|this, _, _, cx| {
                                                         cx.stop_propagation();
                                                         this.session_route_menu_open =
@@ -181,7 +181,7 @@ impl ArcadiaRoot {
                                                         })
                                                         .child("Local")
                                                         .on_mouse_down(
-                                                            gpui::MouseButton::Left,
+                                                            openframe::MouseButton::Left,
                                                             cx.listener(|this, _, _, cx| {
                                                                 let _ = ThinClientConfig::set_preferred_remote_route(None);
                                                                 this.remote_route = None;
@@ -216,7 +216,7 @@ impl ArcadiaRoot {
                                                             })
                                                             .child(label)
                                                             .on_mouse_down(
-                                                                gpui::MouseButton::Left,
+                                                                openframe::MouseButton::Left,
                                                                 cx.listener(move |this, _, _, cx| {
                                                                     let _ = ThinClientConfig::set_preferred_remote_route(Some(&route));
                                                                     this.remote_route =
@@ -276,7 +276,7 @@ impl ArcadiaRoot {
                                     })
                                     .child("Quit")
                                     .on_mouse_down(
-                                        gpui::MouseButton::Left,
+                                        openframe::MouseButton::Left,
                                         cx.listener(|this, _, _, _| {
                                             this.app_menu_open = false;
                                             this.run_internal_quit_command();
@@ -301,8 +301,8 @@ impl ArcadiaRoot {
                                     .children(visible_groups.iter().copied().map(|group| {
                                         Self::sidebar_group_item(
                                             cx,
-                                            gpui::SharedString::from(group.label().to_string()),
-                                            gpui::SharedString::from(group.glyph().to_string()),
+                                            openframe::SharedString::from(group.label().to_string()),
+                                            openframe::SharedString::from(group.glyph().to_string()),
                                             group.id().to_string(),
                                             self.active_group_id == group.id(),
                                             is_dark,
@@ -316,23 +316,49 @@ impl ArcadiaRoot {
                             .id("sidebar-subtabs")
                             .flex_1()
                             .overflow_y_scroll()
-                            .child(div().flex().flex_col().gap_1().children(
-                                active_group.page_ids().into_iter().filter_map(|page_id| {
+                            .relative()
+                            .child({
+                                let mut items: Vec<AnyElement> = Vec::new();
+                                for page_id in active_group.page_ids() {
                                     if !self.is_page_visible(page_id) {
-                                        return None;
+                                        continue;
                                     }
-                                    let page = self.page_ref(page_id)?;
-                                    Some(Self::sidebar_item(
-                                        cx,
-                                        gpui::SharedString::from(page.title().to_string()),
-                                        gpui::SharedString::from(page.glyph().to_string()),
-                                        page.id().to_string(),
-                                        self.active_page_id == page.id(),
-                                        is_dark,
-                                        page.accent().to_string(),
-                                    ))
-                                }),
-                            )),
+                                    let Some(page) = self.page_ref(page_id) else {
+                                        continue;
+                                    };
+                                    let is_page_active = self.active_page_id == page.id();
+                                    items.push(
+                                        Self::sidebar_item(
+                                            cx,
+                                            openframe::SharedString::from(page.title().to_string()),
+                                            openframe::SharedString::from(page.glyph().to_string()),
+                                            page.id().to_string(),
+                                            is_page_active,
+                                            is_dark,
+                                            page.accent().to_string(),
+                                        )
+                                        .into_any_element(),
+                                    );
+                                    if page_id == "utility.shell" && self.terminals.len() > 1 {
+                                        for i in 0..self.terminals.len() {
+                                            let label = self.terminals[i].label.clone();
+                                            let is_sub_active = is_page_active
+                                                && self.active_terminal_id == i;
+                                            items.push(
+                                                Self::sidebar_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from(label),
+                                                    i,
+                                                    is_sub_active,
+                                                    is_dark,
+                                                )
+                                                .into_any_element(),
+                                            );
+                                        }
+                                    }
+                                }
+                                div().flex().flex_col().gap_1().children(items)
+                            })
                     )
                     .child(
                         div()
@@ -343,8 +369,8 @@ impl ArcadiaRoot {
                                 let page = self.page_ref(page_id)?;
                                 Some(Self::sidebar_global_item(
                                     cx,
-                                    gpui::SharedString::from(page.title().to_string()),
-                                    gpui::SharedString::from(page.glyph().to_string()),
+                                    openframe::SharedString::from(page.title().to_string()),
+                                    openframe::SharedString::from(page.glyph().to_string()),
                                     page.id().to_string(),
                                     self.active_page_id == page.id(),
                                     is_dark,

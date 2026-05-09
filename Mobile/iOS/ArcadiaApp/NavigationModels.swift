@@ -61,6 +61,9 @@ struct NavigationRegistry: Codable {
     let pages: [PageDefinition]
     let groups: [GroupDefinition]
     let globalPages: [String]
+    /// Pages rendered as compact controls in the top bar (e.g. Logs, Modules).
+    /// Distinct from `globalPages` (sidebar) so each surface places them appropriately.
+    let topBarPages: [String]
     let defaultGroup: String
     let defaultPage: String
 
@@ -68,7 +71,34 @@ struct NavigationRegistry: Codable {
         case pages
         case groups
         case globalPages = "global_pages"
+        case topBarPages = "top_bar_pages"
         case defaultGroup = "default_group"
         case defaultPage = "default_page"
+    }
+
+    init(
+        pages: [PageDefinition],
+        groups: [GroupDefinition],
+        globalPages: [String],
+        topBarPages: [String],
+        defaultGroup: String,
+        defaultPage: String
+    ) {
+        self.pages = pages
+        self.groups = groups
+        self.globalPages = globalPages
+        self.topBarPages = topBarPages
+        self.defaultGroup = defaultGroup
+        self.defaultPage = defaultPage
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        pages = try c.decode([PageDefinition].self, forKey: .pages)
+        groups = try c.decode([GroupDefinition].self, forKey: .groups)
+        globalPages = try c.decode([String].self, forKey: .globalPages)
+        topBarPages = (try? c.decode([String].self, forKey: .topBarPages)) ?? []
+        defaultGroup = try c.decode(String.self, forKey: .defaultGroup)
+        defaultPage = try c.decode(String.self, forKey: .defaultPage)
     }
 }

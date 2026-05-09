@@ -39,19 +39,19 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: Shared -> Builds/Shared
+          workspaces: Shared -> Builds/workspace
 
       - name: Build arcadia-core for iOS device
         run: |
           cd Shared
-          cargo build -p arcadia-core --release --target aarch64-apple-ios --target-dir ../Builds/Shared
+          cargo build -p arcadia-core --release --target aarch64-apple-ios
 
       - name: Generate Swift bindings into temp dir
         run: |
           mkdir -p /tmp/ffi-generated
           cd Shared
-          cargo run --target-dir ../Builds/Shared -p uniffi-bindgen -- generate \
-            --library ../Builds/Shared/aarch64-apple-ios/release/libarcadia_core.a \
+          cargo run -p uniffi-bindgen -- generate \
+            --library ../Builds/workspace/aarch64-apple-ios/release/libarcadia_core.a \
             --language swift \
             --out-dir /tmp/ffi-generated
 

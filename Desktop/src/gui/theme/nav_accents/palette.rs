@@ -1,4 +1,4 @@
-use gpui::Rgba;
+use openframe::Rgba;
 
 /// Per-group / per-page nav accent: icon tints and row selection (see `Navigation*Definition::accent` in the core).
 #[derive(Clone, Copy)]

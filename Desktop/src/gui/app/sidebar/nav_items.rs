@@ -1,4 +1,4 @@
-use gpui::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme::{self, render_icon};
@@ -40,7 +40,7 @@ impl ArcadiaRoot {
                 rgb(0x1f2937)
             }))
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
                     this.sidebar_visible = !this.sidebar_visible;
                     cx.notify();
@@ -50,8 +50,8 @@ impl ArcadiaRoot {
 
     pub fn sidebar_group_item(
         cx: &mut Context<Self>,
-        label: gpui::SharedString,
-        system_image: gpui::SharedString,
+        label: openframe::SharedString,
+        system_image: openframe::SharedString,
         group_id: String,
         is_active: bool,
         is_dark: bool,
@@ -78,9 +78,9 @@ impl ArcadiaRoot {
             .cursor_pointer()
             .text_xs()
             .font_weight(if is_active {
-                gpui::FontWeight::BOLD
+                openframe::FontWeight::BOLD
             } else {
-                gpui::FontWeight::NORMAL
+                openframe::FontWeight::NORMAL
             })
             .bg(if is_active {
                 pal.row_selected
@@ -113,7 +113,7 @@ impl ArcadiaRoot {
                     .child(div().child(label)),
             )
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
                     this.active_group_id = group_id.clone();
                     if let Some(group) = this.effective_group(group_id.as_str()) {
@@ -134,8 +134,8 @@ impl ArcadiaRoot {
     /// the sidebar still uses [`Self::sidebar_global_item`].
     pub fn top_bar_global_item(
         cx: &mut Context<Self>,
-        label: gpui::SharedString,
-        system_image: gpui::SharedString,
+        label: openframe::SharedString,
+        system_image: openframe::SharedString,
         page_id: String,
         is_active: bool,
         is_dark: bool,
@@ -159,9 +159,9 @@ impl ArcadiaRoot {
             .cursor_pointer()
             .text_xs()
             .font_weight(if is_active {
-                gpui::FontWeight::SEMIBOLD
+                openframe::FontWeight::SEMIBOLD
             } else {
-                gpui::FontWeight::NORMAL
+                openframe::FontWeight::NORMAL
             })
             .bg(if is_active {
                 pal.row_selected
@@ -185,7 +185,7 @@ impl ArcadiaRoot {
                     .child(div().child(label)),
             )
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
                     this.active_page_id = page_id.clone();
                     if page_id == "global.modules" {
@@ -198,8 +198,8 @@ impl ArcadiaRoot {
 
     pub fn sidebar_global_item(
         cx: &mut Context<Self>,
-        label: gpui::SharedString,
-        system_image: gpui::SharedString,
+        label: openframe::SharedString,
+        system_image: openframe::SharedString,
         page_id: String,
         is_active: bool,
         is_dark: bool,
@@ -223,9 +223,9 @@ impl ArcadiaRoot {
             .cursor_pointer()
             .text_sm()
             .font_weight(if is_active {
-                gpui::FontWeight::BOLD
+                openframe::FontWeight::BOLD
             } else {
-                gpui::FontWeight::NORMAL
+                openframe::FontWeight::NORMAL
             })
             .bg(if is_active {
                 pal.row_selected
@@ -253,7 +253,7 @@ impl ArcadiaRoot {
                     .child(div().child(label)),
             )
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
                     this.active_page_id = page_id.clone();
                     if page_id == "global.modules" {
@@ -266,8 +266,8 @@ impl ArcadiaRoot {
 
     pub fn sidebar_item(
         cx: &mut Context<Self>,
-        label: gpui::SharedString,
-        system_image: gpui::SharedString,
+        label: openframe::SharedString,
+        system_image: openframe::SharedString,
         page_id: String,
         is_active: bool,
         is_dark: bool,
@@ -284,6 +284,8 @@ impl ArcadiaRoot {
         } else {
             theme::sidebar_nav_idle_foreground(is_dark)
         };
+        let is_shell_page = page_id == "utility.shell";
+        let page_id_left = page_id.clone();
         div()
             .px_3()
             .py_2()
@@ -291,9 +293,9 @@ impl ArcadiaRoot {
             .cursor_pointer()
             .text_sm()
             .font_weight(if is_active {
-                gpui::FontWeight::BOLD
+                openframe::FontWeight::BOLD
             } else {
-                gpui::FontWeight::NORMAL
+                openframe::FontWeight::NORMAL
             })
             .bg(if is_active {
                 pal.row_selected
@@ -321,9 +323,84 @@ impl ArcadiaRoot {
                     .child(div().child(label)),
             )
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    this.active_page_id = page_id.clone();
+                    this.active_page_id = page_id_left.clone();
+                    cx.notify();
+                }),
+            )
+            .on_mouse_down(
+                openframe::MouseButton::Right,
+                cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
+                    if is_shell_page {
+                        this.terminal_context_menu_open = true;
+                        this.terminal_kill_menu = None;
+                        this.context_menu_position = event.position;
+                        cx.notify();
+                    }
+                }),
+            )
+    }
+
+    pub fn sidebar_sub_item(
+        cx: &mut Context<Self>,
+        label: openframe::SharedString,
+        terminal_id: usize,
+        is_active: bool,
+        is_dark: bool,
+    ) -> impl IntoElement {
+        let label_color = if is_active {
+            theme::nav_accent_palette("emerald", is_dark).icon_active
+        } else {
+            theme::sidebar_nav_idle_foreground(is_dark)
+        };
+        let pal = theme::nav_accent_palette("emerald", is_dark);
+        div()
+            .pl_6()
+            .pr_3()
+            .py_1()
+            .rounded_md()
+            .cursor_pointer()
+            .text_xs()
+            .font_weight(if is_active {
+                openframe::FontWeight::MEDIUM
+            } else {
+                openframe::FontWeight::NORMAL
+            })
+            .bg(if is_active {
+                pal.row_selected
+            } else if is_dark {
+                rgb(0x171b22)
+            } else {
+                rgb(0xf6f7fb)
+            })
+            .text_color(label_color)
+            .hover(move |style| {
+                style.bg(if is_active {
+                    pal.row_hover
+                } else if is_dark {
+                    rgb(0x1e2530)
+                } else {
+                    rgb(0xeef2ff)
+                })
+            })
+            .child(div().child(label))
+            .on_mouse_down(
+                openframe::MouseButton::Left,
+                cx.listener(move |this, _, _, cx| {
+                    if terminal_id < this.terminals.len() {
+                        this.active_terminal_id = terminal_id;
+                        this.active_page_id = "utility.shell".to_string();
+                    }
+                    cx.notify();
+                }),
+            )
+            .on_mouse_down(
+                openframe::MouseButton::Right,
+                cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
+                    this.terminal_kill_menu = Some(terminal_id);
+                    this.terminal_context_menu_open = false;
+                    this.context_menu_position = event.position;
                     cx.notify();
                 }),
             )

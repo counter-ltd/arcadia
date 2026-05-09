@@ -1,4 +1,4 @@
-use gpui::Rgba;
+use openframe::Rgba;
 pub const SPLASH_BG_TOP: Rgba = Rgba {
     r: 0.060,
     g: 0.055,

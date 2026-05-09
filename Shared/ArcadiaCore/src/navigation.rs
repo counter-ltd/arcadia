@@ -31,6 +31,9 @@ pub struct NavigationRegistry {
     pub pages: Vec<NavigationPageDefinition>,
     pub groups: Vec<NavigationGroupDefinition>,
     pub global_pages: Vec<&'static str>,
+    /// Pages rendered as compact controls in the surface's top bar (e.g. Logs, Modules).
+    /// Distinct from `global_pages` (sidebar), so each surface can place them appropriately.
+    pub top_bar_pages: Vec<&'static str>,
     pub default_group: &'static str,
     pub default_page: &'static str,
 }
@@ -66,6 +69,8 @@ pub struct NavigationRegistryOwned {
     pub groups: Vec<NavigationGroupOwned>,
     #[serde(rename = "global_pages")]
     pub global_pages: Vec<String>,
+    #[serde(rename = "top_bar_pages", default)]
+    pub top_bar_pages: Vec<String>,
     #[serde(rename = "default_group")]
     pub default_group: String,
     #[serde(rename = "default_page")]
@@ -78,6 +83,7 @@ impl NavigationRegistryOwned {
             pages: PAGE_DEFINITIONS.iter().map(|p| p.into()).collect(),
             groups: GROUP_DEFINITIONS.iter().map(|g| g.into()).collect(),
             global_pages: GLOBAL_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
+            top_bar_pages: TOP_BAR_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
             default_group: DEFAULT_GROUP_ID.to_string(),
             default_page: DEFAULT_PAGE_ID.to_string(),
         }
@@ -222,7 +228,8 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
     },
 ];
 
-pub const GLOBAL_PAGE_IDS: &[&str] = &["global.dashboard", "global.settings", "global.modules"];
+pub const GLOBAL_PAGE_IDS: &[&str] = &["global.dashboard", "global.settings"];
+pub const TOP_BAR_PAGE_IDS: &[&str] = &["global.logs", "global.modules"];
 pub const DEFAULT_GROUP_ID: &str = "utilities";
 pub const DEFAULT_PAGE_ID: &str = "global.dashboard";
 
@@ -239,6 +246,7 @@ pub fn default_navigation_registry() -> NavigationRegistry {
         pages: PAGE_DEFINITIONS.to_vec(),
         groups: GROUP_DEFINITIONS.to_vec(),
         global_pages: GLOBAL_PAGE_IDS.to_vec(),
+        top_bar_pages: TOP_BAR_PAGE_IDS.to_vec(),
         default_group: DEFAULT_GROUP_ID,
         default_page: DEFAULT_PAGE_ID,
     }
@@ -353,5 +361,35 @@ mod tests {
                 "GLOBAL_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"
             );
         }
+    }
+
+    #[test]
+    fn all_top_bar_page_ids_exist_in_definitions() {
+        for page_id in TOP_BAR_PAGE_IDS {
+            assert!(
+                page_by_id(page_id).is_some(),
+                "TOP_BAR_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"
+            );
+        }
+    }
+
+    #[test]
+    fn top_bar_pages_disjoint_from_global_pages() {
+        for page_id in TOP_BAR_PAGE_IDS {
+            assert!(
+                !GLOBAL_PAGE_IDS.contains(page_id),
+                "page '{page_id}' is in both TOP_BAR_PAGE_IDS and GLOBAL_PAGE_IDS"
+            );
+        }
+    }
+
+    #[test]
+    fn top_bar_pages_round_trip_through_json() {
+        let json = default_navigation_registry_json();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v["top_bar_pages"].as_array().expect("top_bar_pages must serialize as array");
+        let ids: Vec<String> = arr.iter().filter_map(|x| x.as_str().map(String::from)).collect();
+        assert!(ids.contains(&"global.logs".to_string()));
+        assert!(ids.contains(&"global.modules".to_string()));
     }
 }

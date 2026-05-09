@@ -1,0 +1,3 @@
+[submodule "Libraries/OpenFrame"]
+	path = Libraries/OpenFrame
+	url = git@github-counter:counter-ltd/openframe.git
