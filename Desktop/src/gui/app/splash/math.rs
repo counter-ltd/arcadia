@@ -1,4 +1,4 @@
-use gpui::Rgba;
+use openframe::Rgba;
 
 use crate::gui::theme;
 

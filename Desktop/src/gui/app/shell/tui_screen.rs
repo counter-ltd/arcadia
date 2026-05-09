@@ -1,5 +1,5 @@
-use gpui::Rgba;
-use gpui::{
+use openframe::Rgba;
+use openframe::{
     div, px, Context, Div, FontWeight, InteractiveElement, ParentElement,
     StatefulInteractiveElement, Styled,
 };
@@ -8,11 +8,12 @@ use super::super::super::tui::{self};
 use super::super::ArcadiaRoot;
 
 /// Pixel row height; must stay aligned with `shell/execute.rs` `CHAR_H` (PTY rows × this ≈ panel).
-const TUI_ROW_HEIGHT: gpui::Pixels = px(18.);
+const TUI_ROW_HEIGHT: openframe::Pixels = px(18.);
 
 impl ArcadiaRoot {
     pub(crate) fn render_tui_screen(&self, is_dark: bool, cx: &mut Context<Self>) -> Div {
-        let Some(session) = &self.tui_session else {
+        let term = self.active_terminal();
+        let Some(session) = &term.tui_session else {
             return div();
         };
         let Ok(parser) = session.parser.lock() else {
@@ -101,6 +102,8 @@ impl ArcadiaRoot {
             })
             .collect();
 
+        let tui_scroll = &self.active_terminal().tui_scroll;
+
         div()
             .w_full()
             .h_full()
@@ -112,7 +115,7 @@ impl ArcadiaRoot {
             .flex_col()
             .track_focus(&self.shell_focus)
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(|this, _, window, _| {
                     this.shell_focus.focus(window);
                 }),
@@ -125,7 +128,7 @@ impl ArcadiaRoot {
                     .w_full()
                     .id("arcadia-tui-scroll")
                     .overflow_y_scroll()
-                    .track_scroll(&self.tui_scroll)
+                    .track_scroll(tui_scroll)
                     .child(div().w_full().flex().flex_col().children(row_els)),
             )
     }

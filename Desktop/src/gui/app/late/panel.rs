@@ -1,4 +1,4 @@
-use gpui::{div, Context, IntoElement, ParentElement, Styled, Window};
+use openframe::{div, Context, IntoElement, ParentElement, Styled, Window};
 
 use crate::gui::app::ArcadiaRoot;
 
@@ -33,7 +33,7 @@ impl ArcadiaRoot {
         _window: &mut Window,
         cx: &mut Context<Self>,
         is_dark: bool,
-    ) -> gpui::Div {
+    ) -> openframe::Div {
         div()
             .flex_1()
             .h_full()

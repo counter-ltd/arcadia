@@ -1,5 +1,5 @@
 use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
-use gpui::{div, rgb, Context, Div, FontWeight, ParentElement, Styled, Window};
+use openframe::{div, rgb, Context, Div, FontWeight, ParentElement, Styled, Window};
 
 use super::ArcadiaRoot;
 
@@ -129,6 +129,39 @@ impl ArcadiaRoot {
         }
     }
 
+    pub(crate) fn top_bar_page_ids_effective(&self) -> Vec<&str> {
+        if let Some(nav) = &self.remote_nav {
+            nav.top_bar_pages.iter().map(|s| s.as_str()).collect()
+        } else {
+            navigation::TOP_BAR_PAGE_IDS.iter().copied().collect()
+        }
+    }
+
+    pub(crate) fn settings_hub_page_ids_effective(&self) -> Vec<&str> {
+        if let Some(nav) = &self.remote_nav {
+            if nav.settings_hub_pages.is_empty() {
+                navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect()
+            } else {
+                nav.settings_hub_pages.iter().map(|s| s.as_str()).collect()
+            }
+        } else {
+            navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect()
+        }
+    }
+
+    /// Expand the Settings hub when the active page is the hub root or a nested registry target.
+    pub(crate) fn sync_settings_hub_expanded_from_active_page(&mut self) {
+        let active = self.active_page_id.as_str();
+        if active == navigation::SETTINGS_HUB_ROOT_PAGE_ID
+            || self
+                .settings_hub_page_ids_effective()
+                .iter()
+                .any(|p| *p == active)
+        {
+            self.settings_hub_expanded = true;
+        }
+    }
+
     pub(crate) fn visible_groups_effective(&self) -> Vec<NavGroupRef<'_>> {
         let all: Vec<NavGroupRef<'_>> = if let Some(nav) = &self.remote_nav {
             nav.groups.iter().map(NavGroupRef::Remote).collect()
@@ -182,6 +215,12 @@ impl ArcadiaRoot {
         }
         if self.active_page_id.as_str() == "late.now_playing" {
             return self.render_late_now_playing(window, cx, is_dark);
+        }
+        if self.active_page_id.as_str() == "late.settings" {
+            return div().w_full().p_6().child(self.late_settings_panel(cx, is_dark));
+        }
+        if self.active_page_id.as_str() == "python.settings" {
+            return div().w_full().p_6().child(self.python_settings_panel(cx, is_dark));
         }
         div()
             .w_full()

@@ -1,4 +1,4 @@
-use gpui::{svg, Svg};
+use openframe::{svg, Svg};
 
 pub fn icon_path(glyph_key: &str) -> &'static str {
     match glyph_key {

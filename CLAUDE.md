@@ -415,8 +415,8 @@ cd Desktop && cargo run --features gui
 # Desktop headless (CLI)
 cd Desktop && cargo run
 
-# Core tests (artifact dir: Builds/Shared)
-cargo test -p arcadia-core --manifest-path Shared/Cargo.toml --target-dir Builds/Shared
+# Core tests (artifacts under Builds/workspace via /.cargo/config.toml)
+cargo test -p arcadia-core --manifest-path Shared/Cargo.toml
 
 # iOS framework rebuild (after ffi.rs changes)
 bash Shared/Scripts/Builds/build-ios-framework.sh
@@ -429,7 +429,7 @@ bash Shared/Scripts/Installers/install-global-commands-macos.sh
 
 ## Known Gotchas
 
-- `surface.revision` only advances on `surface.patch` — CLI/FFI writes bypass it. Do not use revision as a reliable freshness signal until gap 1 in `gaps.md` is resolved.
+- `surface.revision` only advances on `surface.patch` — CLI/FFI writes bypass it. Do not use revision as a reliable freshness signal until gap 1 in `Documentation/GAPS.md` is resolved.
 - Multiple concurrent GUIs on the same host = last-write-wins on `modules.toml`. No merge semantics.
 - LAN forwarding requires `remote-session`, `lan`, and `net` enabled locally. The peer checks its own module rules for the forwarded token.
 - iOS `ArcadiaCore.xcframework` must be manually rebuilt after `ffi.rs` changes — no CI automation yet.

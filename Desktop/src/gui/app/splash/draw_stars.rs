@@ -1,10 +1,10 @@
-use gpui::{fill, point, px, size, Bounds, PathBuilder, Window};
+use openframe::{fill, point, px, size, Bounds, PathBuilder, Window};
 
 use crate::gui::theme;
 
 use super::math::alpha_rgba;
 
-pub(super) fn splash_draw_stars(bounds: Bounds<gpui::Pixels>, t: f32, window: &mut Window) {
+pub(super) fn splash_draw_stars(bounds: Bounds<openframe::Pixels>, t: f32, window: &mut Window) {
     let w = f32::from(bounds.size.width);
     let h = f32::from(bounds.size.height);
     let ox = f32::from(bounds.origin.x);

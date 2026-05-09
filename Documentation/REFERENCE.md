@@ -31,9 +31,9 @@ All 7 pages. Add new pages to `PAGE_DEFINITIONS` in `navigation.rs` — never to
 | Page ID | Title | Group | Required Module | Glyph | SF Symbol |
 |---------|-------|-------|-----------------|-------|-----------|
 | `utility.shell` | Shell | `utilities` | `shell` | `terminal` | `terminal` |
-| `global.dashboard` | Dashboard | (global) | — | `home` | `house` |
-| `global.logs` | Logs | (global) | — | `logs` | `doc.text` |
-| `global.settings` | Settings | (global) | — | `settings` | `gear` |
-| `global.modules` | Modules | (global) | — | `modules` | `square.stack.3d.up` |
+| `global.dashboard` | Dashboard | (sidebar global) | — | `home` | `house` |
+| `global.logs` | Logs | (top bar) | — | `logs` | `doc.text.magnifyingglass` |
+| `global.settings` | Settings | (sidebar global) | — | `settings` | `gearshape` |
+| `global.modules` | Modules | (top bar) | — | `modules` | `switch.2` |
 | `network.overview` | Network | `network` | `net` | `nodes` | `network` |
 | `network.nodes` | Nodes | `network` | `lan` | `nodes` | `antenna.radiowaves.left.and.right` |

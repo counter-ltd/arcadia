@@ -1,10 +1,10 @@
-use gpui::{point, px, Bounds, PathBuilder, Rgba, Window};
+use openframe::{point, px, Bounds, PathBuilder, Rgba, Window};
 
 use crate::gui::theme;
 
 use super::math::{alpha_rgba, splash_scene_width};
 
-pub(super) fn splash_draw_arch(bounds: Bounds<gpui::Pixels>, t: f32, window: &mut Window) {
+pub(super) fn splash_draw_arch(bounds: Bounds<openframe::Pixels>, t: f32, window: &mut Window) {
     if t <= 0.001 {
         return;
     }
@@ -20,7 +20,7 @@ pub(super) fn splash_draw_arch(bounds: Bounds<gpui::Pixels>, t: f32, window: &mu
     let left_x = cx - scene_w * 0.205;
     let right_x = cx + scene_w * 0.205;
 
-    let fp = |x: f32, y: f32| -> gpui::Point<gpui::Pixels> {
+    let fp = |x: f32, y: f32| -> openframe::Point<openframe::Pixels> {
         point(px(apex_x + (x - apex_x) * t), px(apex_y + (y - apex_y) * t))
     };
 

@@ -1,5 +1,7 @@
 # Build and Run
 
+Cargo artifacts for **every crate** in this repo go under **`Builds/workspace/`**, driven by [`/.cargo/config.toml`](../.cargo/config.toml) (`build.target-dir`). You normally **do not pass `--target-dir`**. One-off override: `CARGO_TARGET_DIR=/tmp/foo cargo build …`.
+
 ## Desktop GUI
 
 ```sh
@@ -23,10 +25,10 @@ cd Desktop && cargo build --release --features gui
 
 ## Core tests
 
-Artifacts go under `Builds/Shared/`:
+Artifacts go under `Builds/workspace/` with everything else:
 
 ```sh
-cargo test -p arcadia-core --manifest-path Shared/Cargo.toml --target-dir Builds/Shared
+cargo test -p arcadia-core --manifest-path Shared/Cargo.toml
 ```
 
 ## iOS framework + Swift bindings

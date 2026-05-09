@@ -8,6 +8,8 @@ build/
 /Mobile/iOS/.xcode/
 **/xcuserdata/
 .DS_Store
+.claude/
+.cursor/
 
 # SwiftPM / local launcher build output (not source)
 Launchers/Development/OSX/.build/

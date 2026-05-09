@@ -1,6 +1,6 @@
 use arcadia_core::config::modules::{LAN_MODULE_NAME, NET_MODULE_NAME};
 use arcadia_core::modules::lan::{lan_service_info, start_service, stop_service};
-use gpui::{
+use openframe::{
     div, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
 };
 
@@ -128,7 +128,7 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child("Network Module"),
                     )
@@ -164,7 +164,7 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child("LAN Discovery Service"),
                     )
@@ -191,7 +191,7 @@ impl ArcadiaRoot {
                             .border_1()
                             .border_color(theme::module_row_stroke(is_dark))
                             .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child("Refresh")
                             .on_mouse_down(
@@ -213,7 +213,7 @@ impl ArcadiaRoot {
                             .border_1()
                             .border_color(theme::module_row_stroke(is_dark))
                             .text_sm()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child(if running { "Stop" } else { "Start" })
                             .on_mouse_down(
@@ -283,7 +283,7 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_lg()
-                                    .font_weight(gpui::FontWeight::BOLD)
+                                    .font_weight(openframe::FontWeight::BOLD)
                                     .text_color(if is_dark { rgb(0xf9fafb) } else { rgb(0x111827) })
                                     .child("Kill Existing?"),
                             )
@@ -359,7 +359,7 @@ impl ArcadiaRoot {
             .py_0p5()
             .rounded_full()
             .text_xs()
-            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .font_weight(openframe::FontWeight::SEMIBOLD)
             .bg(if enabled {
                 rgb(0x166534)
             } else {
@@ -380,7 +380,7 @@ impl ArcadiaRoot {
             .py_0p5()
             .rounded_full()
             .text_xs()
-            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .font_weight(openframe::FontWeight::SEMIBOLD)
             .bg(if running {
                 rgb(0x166534)
             } else {

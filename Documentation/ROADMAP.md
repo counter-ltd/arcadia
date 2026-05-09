@@ -1,6 +1,6 @@
 # Roadmap and Known Gaps
 
-`gaps.md` tracks all deliberate limitations. Summary with priority ranking:
+`Documentation/GAPS.md` tracks all deliberate limitations. Summary with priority ranking:
 
 ## P0 — Fix before trusting in production
 
@@ -29,6 +29,7 @@
 
 | Gap | Problem | Direction |
 |----|---------|-----------|
+| **iOS OpenFrame migration** | SwiftUI shell while Desktop uses OpenFrame; embedding/a11y/build story not done. | **§11** in `Documentation/GAPS.md` — spike, iOS shell crate, registry-driven OF UI, then cut SwiftUI. |
 | **Surface parity** | Desktop has PTY/TUI paths; iOS is shell.execute only; not all panels are execute-only. | Converge per capability class with explicit "unavailable on this surface" from core. |
 | **Renderer-only client** | Surfaces still bundle compiled nav — no enforced "remote-only" profile. | Optional build flag that refuses static nav when `remote_route` is mandatory. |
 | **`extra` schema** | `extra.navigation_registry` is wired; broader extra buckets and corresponding `SurfacePatch` variants are undefined. | Define schema + version fields inside `extra`; extend `SurfacePatch` incrementally. |
@@ -52,4 +53,4 @@ What this means in practice:
 
 `.github/workflows/` — `stable-build-matrix.yml` builds Desktop targets and iOS simulator configs on selected branches. See individual workflow files for triggers and matrix.
 
-Gaps in CI coverage: FFI drift detection, core integration tests. See [contributing.md](contributing.md).
+Gaps in CI coverage: FFI drift detection, core integration tests. See [CONTRIBUTING.md](CONTRIBUTING.md).

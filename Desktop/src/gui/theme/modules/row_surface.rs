@@ -1,4 +1,4 @@
-use gpui::Rgba;
+use openframe::Rgba;
 
 pub fn module_row_bg(is_dark: bool) -> Rgba {
     if is_dark {

@@ -1,6 +1,6 @@
 use std::env;
 
-use gpui::{
+use openframe::{
     div, rgb, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
     Styled, Window, WindowAppearance,
 };
@@ -23,9 +23,10 @@ impl ArcadiaRoot {
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
         );
+        let term = self.active_terminal();
 
         // Live PTY: vt100 grid fills the panel (transcript returns after the process exits).
-        if self.tui_session.is_some() && self.tui_ready {
+        if term.tui_session.is_some() && term.tui_ready {
             return div()
                 .w_full()
                 .h_full()
@@ -81,10 +82,10 @@ impl ArcadiaRoot {
                     .min_h_0()
                     .id("arcadia-shell-output")
                     .overflow_y_scroll()
-                    .track_scroll(&self.shell_output_scroll)
+                    .track_scroll(&term.shell_output_scroll)
                     .child(
                         div().w_full().p_3().flex().flex_col().gap_0().children(
-                            self.shell_history
+                            term.shell_history
                                 .iter()
                                 .filter(|line| !line.is_empty())
                                 .map(|line| shell_history_line(line, is_dark)),
@@ -115,7 +116,7 @@ impl ArcadiaRoot {
                     })
                     .track_focus(&self.shell_focus)
                     .on_mouse_down(
-                        gpui::MouseButton::Left,
+                        openframe::MouseButton::Left,
                         cx.listener(|this, _, window, _| {
                             this.shell_focus.focus(window);
                         }),
@@ -145,8 +146,9 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn shell_input_with_cursor(&self, is_focused: bool) -> String {
-        let chars = self.shell_input.chars().collect::<Vec<_>>();
-        let cursor = self.shell_cursor.min(chars.len());
+        let term = self.active_terminal();
+        let chars = term.shell_input.chars().collect::<Vec<_>>();
+        let cursor = term.shell_cursor.min(chars.len());
         let mut out = String::with_capacity(chars.len() + 1);
         for (idx, ch) in chars.iter().enumerate() {
             if idx == cursor && is_focused && self.shell_caret_visible {
@@ -161,8 +163,9 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn shell_working_directory_label(&self) -> String {
-        if self.tui_session.is_some() {
-            self.shell_display_cwd.clone()
+        let term = self.active_terminal();
+        if term.tui_session.is_some() {
+            term.shell_display_cwd.clone()
         } else {
             env::current_dir()
                 .ok()

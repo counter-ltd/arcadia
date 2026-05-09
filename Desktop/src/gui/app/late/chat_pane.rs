@@ -1,4 +1,4 @@
-use gpui::{
+use openframe::{
     div, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
     ParentElement, StatefulInteractiveElement, Styled,
 };
@@ -59,7 +59,7 @@ impl ArcadiaRoot {
                                     .child(
                                         div()
                                             .text_sm()
-                                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                                            .font_weight(openframe::FontWeight::SEMIBOLD)
                                             .text_color(theme::module_title_text(is_dark))
                                             .child(msg.username.clone()),
                                     )
@@ -179,7 +179,7 @@ impl ArcadiaRoot {
                     .rounded_lg()
                     .bg(if is_dark { rgb(0x0d9488) } else { rgb(0x14b8a6) })
                     .text_sm()
-                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .font_weight(openframe::FontWeight::SEMIBOLD)
                     .text_color(rgb(0xf0fdfa))
                     .child("Send")
                     .on_mouse_down(

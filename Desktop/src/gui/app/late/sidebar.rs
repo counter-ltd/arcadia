@@ -1,4 +1,4 @@
-use gpui::{
+use openframe::{
     div, rgb, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
     Styled,
 };
@@ -36,7 +36,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                 .border_b_1()
                 .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
                 .text_xs()
-                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .font_weight(openframe::FontWeight::SEMIBOLD)
                 .text_color(theme::module_meta_text(is_dark))
                 .child(format!("● {} online", users.len())),
         )
@@ -82,7 +82,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                                 .px_3()
                                 .py_1()
                                 .text_xs()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .font_weight(openframe::FontWeight::SEMIBOLD)
                                 .text_color(theme::module_meta_text(is_dark))
                                 .child("Activity"),
                         )

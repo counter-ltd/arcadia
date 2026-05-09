@@ -21,7 +21,7 @@ Shared/
         remote_session.rs             # routing manifest entry (no standalone commands)
         remote_mirror.rs              # host transcript queue + FFI drain
         net.rs                        # networking foundation
-        lan/                          # LAN subsystem (see reference.md)
+        lan/                          # LAN subsystem (see REFERENCE.md)
           mod.rs, discovery.rs, handlers.rs, config.rs, peers.rs, protocol.rs
       platform/
         mod.rs, macos.rs, ios.rs, linux.rs, windows.rs, unknown.rs
@@ -31,6 +31,11 @@ Shared/
     Installers/install-git-hooks.sh             # Enable repo .githooks (FFI pre-commit, etc.)
     Launchers/Launcher.sh / Launcher.ps1        # Shell launcher menus
   Tools/uniffi-bindgen/               # UniFFI bindgen binary (workspace member)
+
+Libraries/
+  OpenFrame/                          # Submodule (GPUI fork) — `git@github-counter:counter-ltd/openframe.git`
+
+Extensions/                           # Submodule — `git@github-counter:counter-ltd/arcadia-haven.git` (extension catalog; shipped hello demo under `hello/`)
 
 Desktop/
   Cargo.toml                          # features: headless (default), gui
@@ -107,7 +112,7 @@ Launchers/Development/OSX/            # SwiftPM menu bar launcher (optional, dev
   stable-build-matrix.yml             # Desktop + iOS simulator CI
   FUNDING.yml                         # GitHub Sponsors
 
-gaps.md                               # Deliberate limitations and next-tier work
+Documentation/GAPS.md                 # Deliberate limitations, thin-client gaps, iOS OpenFrame migration
 CLAUDE.md                             # Contributor guide (architecture patterns)
 AGENTS.md                             # Agent rules (registry discipline, anti-patterns)
 ```

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use gpui::{AssetSource, Result, SharedString};
+use openframe::{AssetSource, Result, SharedString};
 
 pub struct EmbeddedAssets;
 

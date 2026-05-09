@@ -1,0 +1,5 @@
+# Unified Cargo output for all crates under this repository.
+# Cargo discovers this file when invoked from any subdirectory (walks upward).
+# Override for one-off builds: `CARGO_TARGET_DIR=... cargo ...`
+[build]
+target-dir = "Builds/workspace"

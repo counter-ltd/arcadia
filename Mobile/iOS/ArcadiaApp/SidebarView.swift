@@ -4,6 +4,9 @@ struct SidebarView: View {
     @Environment(\.colorScheme) private var colorScheme
     private var theme: AppTheme { AppTheme(isDark: colorScheme == .dark) }
 
+    /// Matches `SETTINGS_HUB_ROOT_PAGE_ID` in `navigation.rs`.
+    private static let settingsHubRootId = "global.settings"
+
     let registry: NavigationRegistry
     let sidebarWidth: CGFloat
     let sidebarSwipeThreshold: CGFloat
@@ -15,6 +18,8 @@ struct SidebarView: View {
 
     @Binding var activeGroupID: String
     @Binding var activePageID: String
+
+    @State private var settingsHubExpanded = false
 
     private var visibleGroups: [GroupDefinition] {
         registry.groups.filter { group in
@@ -32,6 +37,15 @@ struct SidebarView: View {
         activeGroup.pageIDs
             .filter { isPageVisible($0) }
             .compactMap { id in registry.pages.first(where: { $0.id == id }) }
+    }
+
+    /// Global sidebar rows excluding the Settings hub root (that row is rendered as an expandable group).
+    private var flatGlobalPageIDs: [String] {
+        registry.globalPages.filter { $0 != Self.settingsHubRootId && isPageVisible($0) }
+    }
+
+    private var visibleSettingsHubPageIDs: [String] {
+        registry.settingsHubPages.filter { isPageVisible($0) }
     }
 
     private var sessionChipTitle: String {
@@ -125,13 +139,17 @@ struct SidebarView: View {
                 .foregroundStyle(theme.tertiaryTextColor)
                 .padding(.horizontal, 16)
 
-            ForEach(registry.globalPages.filter { isPageVisible($0) }, id: \.self) { pageID in
+            ForEach(flatGlobalPageIDs, id: \.self) { pageID in
                 if let page = registry.pages.first(where: { $0.id == pageID }) {
                     pageButton(page: page)
                 }
             }
-            .padding(.bottom, 14)
+
+            if isPageVisible(Self.settingsHubRootId), let hubPage = registry.pages.first(where: { $0.id == Self.settingsHubRootId }) {
+                settingsHubSection(hubPage: hubPage)
+            }
         }
+        .padding(.bottom, 14)
         .frame(width: sidebarWidth)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(.ultraThinMaterial)
@@ -142,6 +160,95 @@ struct SidebarView: View {
         }
         .shadow(color: theme.sidebarShadowColor, radius: 28, x: 8, y: 0)
         .ignoresSafeArea()
+        .onChange(of: activePageID) { _, newVal in
+            if newVal == Self.settingsHubRootId || registry.settingsHubPages.contains(newVal) {
+                settingsHubExpanded = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func settingsHubSection(hubPage: PageDefinition) -> some View {
+        let pal = theme.navAccentPalette(hubPage.accent)
+        let hubHighlighted =
+            activePageID == Self.settingsHubRootId || visibleSettingsHubPageIDs.contains(activePageID)
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                activePageID = Self.settingsHubRootId
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    settingsHubExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: hubPage.systemImage)
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 20)
+                    Text(hubPage.title)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(theme.tertiaryTextColor)
+                        .rotationEffect(.degrees(settingsHubExpanded ? 90 : 0))
+                }
+                .font(.body.weight(hubHighlighted ? .semibold : .medium))
+                .foregroundStyle(hubHighlighted ? pal.iconActive : theme.primaryTextColor)
+                .padding(.horizontal, 16)
+                .frame(height: 50)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(hubHighlighted ? pal.selectedFill : .clear)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(hubHighlighted ? pal.iconActive.opacity(0.38) : .clear, lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
+
+            if settingsHubExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(visibleSettingsHubPageIDs, id: \.self) { pageID in
+                        if let page = registry.pages.first(where: { $0.id == pageID }) {
+                            settingsHubChildRow(page: page)
+                        }
+                    }
+                }
+                .padding(.leading, 12)
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(theme.cardStrokeColor.opacity(0.85))
+                        .frame(width: 2)
+                        .padding(.leading, 6)
+                }
+            }
+        }
+    }
+
+    private func settingsHubChildRow(page: PageDefinition) -> some View {
+        let isActive = activePageID == page.id
+        let pal = theme.navAccentPalette(page.accent)
+        return Button {
+            activePageID = page.id
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: page.systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 20)
+                Text(page.title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .font(.callout.weight(isActive ? .semibold : .medium))
+            .foregroundStyle(isActive ? pal.iconActive : theme.primaryTextColor)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isActive ? pal.selectedFill : .clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
     }
 
     private func groupTabButton(group: GroupDefinition) -> some View {

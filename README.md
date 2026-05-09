@@ -14,15 +14,15 @@ In-depth guides live under [`Documentation/`](Documentation/). Use this as the m
 
 | Doc | What it covers |
 |-----|----------------|
-| [**Vision**](Documentation/vision.md) | Why Arcadia exists and where it is headed |
-| [**Architecture**](Documentation/architecture.md) | Command model, modules, navigation, thin-client, FFI |
-| [**Module & navigation reference**](Documentation/reference.md) | Every module and page in the registry |
-| [**Repository layout**](Documentation/repository.md) | Directory map of the whole repo |
-| [**Configuration**](Documentation/configuration.md) | Config files, prerequisites, environment variables |
-| [**Build & run**](Documentation/build.md) | All targets, scripts, and platform builds |
-| [**Contributing**](Documentation/contributing.md) | Conventions, adding features, testing |
-| [**Roadmap & known gaps**](Documentation/roadmap.md) | Priorities, limitations, security posture, CI |
-| [**Lineage & about**](Documentation/about.md) | History, creator, supporting the project |
+| [**Vision**](Documentation/VISION.md) | Why Arcadia exists and where it is headed |
+| [**Architecture**](Documentation/ARCHITECTURE.md) | Command model, modules, navigation, thin-client, FFI |
+| [**Module & navigation reference**](Documentation/REFERENCE.md) | Every module and page in the registry |
+| [**Repository layout**](Documentation/REPOSITORY.md) | Directory map of the whole repo |
+| [**Configuration**](Documentation/CONFIGURATION.md) | Config files, prerequisites, environment variables |
+| [**Build & run**](Documentation/BUILD.md) | All targets, scripts, and platform builds |
+| [**Contributing**](Documentation/CONTRIBUTING.md) | Conventions, adding features, testing |
+| [**Roadmap & known gaps**](Documentation/ROADMAP.md) | Priorities, limitations, security posture, CI |
+| [**Lineage & about**](Documentation/ABOUT.md) | History, creator, supporting the project |
 
 ---
 
@@ -56,7 +56,7 @@ In short: the software is meant for **people** — personal, educational, resear
 Moves fast. Breaks occasionally. That's intentional.
 
 - Features land continuously on `development`.
-- APIs (especially FFI and `surface.*`) may evolve — see [**Roadmap**](Documentation/roadmap.md).
+- APIs (especially FFI and `surface.*`) may evolve — see [**Roadmap**](Documentation/ROADMAP.md).
 - Building from source is the surest way to stay current.
 - Stable tagged builds will appear as the project matures; CI exercises desktop + iOS simulator paths.
 

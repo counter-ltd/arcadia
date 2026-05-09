@@ -1,6 +1,6 @@
 use arcadia_core::navigation;
-use gpui::{
-    div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Render,
+use openframe::{
+    div, px, rgb, AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
 
@@ -18,7 +18,7 @@ impl Render for ArcadiaRoot {
         self.ensure_shell_caret_task(window, cx);
         self.ensure_lan_poll_task(window, cx);
         self.ensure_late_poll_task(window, cx);
-        if self.tui_session.is_some() {
+        if self.terminals[self.active_terminal_id].tui_session.is_some() {
             self.sync_tui_size(window);
         }
         let is_dark = matches!(
@@ -38,18 +38,19 @@ impl Render for ArcadiaRoot {
         let active_page = self
             .active_page_if_visible()
             .or_else(|| self.page_ref(self.effective_default_page()));
-        let active_page_title = gpui::SharedString::from(
+        let active_page_title = openframe::SharedString::from(
             active_page
                 .map(|page| page.title().to_string())
                 .unwrap_or_else(|| "Arcadia".to_string()),
         );
-        let active_page_glyph = gpui::SharedString::from(
+        let active_page_glyph = openframe::SharedString::from(
             active_page
                 .map(|page| page.glyph().to_string())
                 .unwrap_or_else(|| "tools".to_string()),
         );
 
         div()
+            .relative()
             .size_full()
             .bg(if is_dark {
                 rgb(0x0f1115)
@@ -58,14 +59,26 @@ impl Render for ArcadiaRoot {
             })
             .flex()
             .on_mouse_down(
-                gpui::MouseButton::Left,
+                openframe::MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
+                    let mut changed = false;
                     if this.app_menu_open {
                         this.app_menu_open = false;
-                        cx.notify();
+                        changed = true;
                     }
                     if this.session_route_menu_open {
                         this.session_route_menu_open = false;
+                        changed = true;
+                    }
+                    if this.terminal_context_menu_open {
+                        this.terminal_context_menu_open = false;
+                        changed = true;
+                    }
+                    if this.terminal_kill_menu.is_some() {
+                        this.terminal_kill_menu = None;
+                        changed = true;
+                    }
+                    if changed {
                         cx.notify();
                     }
                 }),
@@ -116,5 +129,90 @@ impl Render for ArcadiaRoot {
             )
             .child(self.requirements_modal(cx, is_dark))
             .child(self.kill_existing_lan_modal(cx, is_dark))
+            .child(self.render_context_menu_overlay(cx, is_dark))
+    }
+}
+
+impl ArcadiaRoot {
+    fn render_context_menu_overlay(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> AnyElement {
+        let pos = self.context_menu_position;
+        let border_color = if is_dark { rgb(0x374151) } else { rgb(0xd1d5db) };
+        let bg_color = if is_dark { rgb(0x111827) } else { rgb(0xffffff) };
+        let text_color = if is_dark { rgb(0xe5e7eb) } else { rgb(0x111827) };
+        let hover_bg = if is_dark { rgb(0x1f2937) } else { rgb(0xf3f4f6) };
+
+        let menu_item = move |label: &'static str, hover_bg| {
+            div()
+                .w_full()
+                .px_2()
+                .py_1()
+                .rounded_md()
+                .cursor_pointer()
+                .text_sm()
+                .text_color(text_color)
+                .hover(move |s| s.bg(hover_bg))
+                .child(label)
+        };
+
+        if self.terminal_context_menu_open {
+            div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .w(px(160.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_item("New Terminal", hover_bg)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
+                            this.create_new_terminal();
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        } else if let Some(kill_idx) = self.terminal_kill_menu {
+            let label = self.terminals.get(kill_idx)
+                .map(|t| t.label.clone())
+                .unwrap_or_else(|| "Terminal".to_string());
+            let kill_label = format!("Kill {label}");
+            div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .w(px(160.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    div()
+                        .w_full()
+                        .px_2()
+                        .py_1()
+                        .rounded_md()
+                        .cursor_pointer()
+                        .text_sm()
+                        .text_color(rgb(0xf87171))
+                        .hover(move |s| s.bg(hover_bg))
+                        .child(kill_label)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            this.kill_terminal(kill_idx);
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        } else {
+            div().into_any_element()
+        }
     }
 }

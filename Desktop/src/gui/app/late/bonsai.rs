@@ -1,4 +1,4 @@
-use gpui::{
+use openframe::{
     div, px, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
 };
 
@@ -42,7 +42,7 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_xs()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .font_weight(openframe::FontWeight::SEMIBOLD)
                                     .text_color(theme::module_title_text(is_dark))
                                     .child("Bonsai"),
                             )
@@ -62,7 +62,7 @@ impl ArcadiaRoot {
                             .rounded_md()
                             .bg(theme::module_button_enable_bg(is_dark))
                             .text_xs()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(theme::module_button_enable_text(is_dark))
                             .hover(|style| style.bg(theme::module_button_enable_hover_bg(is_dark)))
                             .child("Water")

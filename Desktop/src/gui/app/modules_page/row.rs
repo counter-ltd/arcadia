@@ -1,8 +1,8 @@
 use arcadia_core::config::modules::{ModuleManifest, ModulesConfig};
 use arcadia_core::modules;
 use arcadia_core::config::ConfigFile;
-use gpui::{div, rgb};
-use gpui::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, rgb};
+use openframe::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
 use crate::cli;
 use crate::gui::app::ArcadiaRoot;
@@ -41,7 +41,7 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_base()
-                            .font_weight(gpui::FontWeight::BOLD)
+                            .font_weight(openframe::FontWeight::BOLD)
                             .text_color(theme::module_title_text(is_dark))
                             .child(module_name.clone()),
                     )
@@ -62,7 +62,7 @@ impl ArcadiaRoot {
                                     .py_0p5()
                                     .rounded_full()
                                     .text_xs()
-                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .font_weight(openframe::FontWeight::SEMIBOLD)
                                     .bg(if enabled {
                                         theme::module_state_enabled_bg(is_dark)
                                     } else {
@@ -100,7 +100,7 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_xs()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .font_weight(openframe::FontWeight::SEMIBOLD)
                             .text_color(if enabled {
                                 theme::module_state_enabled_text(is_dark)
                             } else {
@@ -146,7 +146,7 @@ impl ArcadiaRoot {
                             }))
                     })
                     .on_mouse_down(
-                        gpui::MouseButton::Left,
+                        openframe::MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
                             if this.remote_route.is_some() {
                                 let enabled_next = !enabled;

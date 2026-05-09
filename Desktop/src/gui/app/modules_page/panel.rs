@@ -1,6 +1,6 @@
 use arcadia_core::config::modules::ModulesConfig;
-use gpui::div;
-use gpui::{Context, IntoElement, ParentElement, Styled};
+use openframe::div;
+use openframe::{Context, IntoElement, ParentElement, Styled};
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;

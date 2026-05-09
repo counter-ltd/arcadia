@@ -68,4 +68,4 @@ cd Shared && cargo test -p arcadia-core
 # - Module enable/disable with dependency enforcement
 ```
 
-iOS `ArcadiaCore.xcframework` rebuild after FFI changes is currently manual. Adding a CI step that fails when `Generated/` drifts from `ffi.rs` is a high-priority gap — see [roadmap.md](roadmap.md).
+iOS `ArcadiaCore.xcframework` rebuild after FFI changes is currently manual. Adding a CI step that fails when `Generated/` drifts from `ffi.rs` is a high-priority gap — see [ROADMAP.md](ROADMAP.md).

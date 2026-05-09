@@ -1,7 +1,7 @@
 use arcadia_core::modules::remote_mirror::{
     drain_formatted_mirror_lines, take_host_ui_sync_pending,
 };
-use gpui::{Context, Window};
+use openframe::{Context, Window};
 
 use super::super::ArcadiaRoot;
 
@@ -17,11 +17,12 @@ impl ArcadiaRoot {
 
         let mut dirty = false;
         if !lines.is_empty() {
-            self.shell_stream_nonce = self.shell_stream_nonce.wrapping_add(1);
+            let term = self.active_terminal_mut();
+            term.shell_stream_nonce = term.shell_stream_nonce.wrapping_add(1);
             for line in lines {
-                self.shell_history.push(line);
+                term.shell_history.push(line);
             }
-            self.shell_output_scroll.scroll_to_bottom();
+            term.shell_output_scroll.scroll_to_bottom();
             dirty = true;
         }
         if reload_host && self.remote_route.is_none() {

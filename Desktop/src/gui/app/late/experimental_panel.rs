@@ -1,4 +1,4 @@
-use gpui::{
+use openframe::{
     div, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
@@ -10,18 +10,18 @@ use arcadia_core::config::late::LateConfig;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
-fn section_header(label: &str, is_dark: bool) -> gpui::Div {
+fn section_header(label: &str, is_dark: bool) -> openframe::Div {
     div()
         .px_4()
         .pt_4()
         .pb_1()
         .text_xs()
-        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .font_weight(openframe::FontWeight::SEMIBOLD)
         .text_color(theme::module_meta_text(is_dark))
         .child(label.to_uppercase())
 }
 
-fn pill(text: String, is_dark: bool) -> gpui::Div {
+fn pill(text: String, is_dark: bool) -> openframe::Div {
     div()
         .px_2()
         .py_0p5()
@@ -32,14 +32,14 @@ fn pill(text: String, is_dark: bool) -> gpui::Div {
         .child(text)
 }
 
-fn row_label(text: String, is_dark: bool) -> gpui::Div {
+fn row_label(text: String, is_dark: bool) -> openframe::Div {
     div()
         .text_sm()
         .text_color(theme::module_description_text(is_dark))
         .child(text)
 }
 
-fn divider(is_dark: bool) -> gpui::Div {
+fn divider(is_dark: bool) -> openframe::Div {
     div()
         .mx_4()
         .my_1()
@@ -162,7 +162,7 @@ pub fn late_experimental_panel(
                 .child(
                     div()
                         .text_base()
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .font_weight(openframe::FontWeight::SEMIBOLD)
                         .text_color(if is_dark { rgb(0xf1f5f9) } else { rgb(0x0f172a) })
                         .child("Experimental"),
                 )
@@ -289,7 +289,7 @@ pub fn late_experimental_panel(
                         .child(
                             div()
                                 .text_xs()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .font_weight(openframe::FontWeight::SEMIBOLD)
                                 .text_color(theme::module_meta_text(is_dark))
                                 .pt_1()
                                 .child("Feeds"),
@@ -298,7 +298,7 @@ pub fn late_experimental_panel(
                         .child(
                             div()
                                 .text_xs()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .font_weight(openframe::FontWeight::SEMIBOLD)
                                 .text_color(theme::module_meta_text(is_dark))
                                 .pt_1()
                                 .child("Latest Entries"),
@@ -389,7 +389,7 @@ impl ArcadiaRoot {
         _window: &mut Window,
         cx: &mut Context<Self>,
         is_dark: bool,
-    ) -> gpui::Div {
+    ) -> openframe::Div {
         div()
             .flex_1()
             .h_full()

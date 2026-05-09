@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use gpui::{canvas, div, Context, Div, ParentElement, Styled, Timer, Window};
+use openframe::{canvas, div, Context, Div, ParentElement, Styled, Timer, Window};
 
 use crate::gui::app::ArcadiaRoot;
 
@@ -21,7 +21,7 @@ impl ArcadiaRoot {
         self.splash_tick_started = true;
         cx.spawn_in(
             window,
-            move |view: gpui::WeakEntity<ArcadiaRoot>, cx: &mut gpui::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {

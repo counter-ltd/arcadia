@@ -40,8 +40,8 @@ if [[ "\${1:-}" == "configuration" ]]; then
 fi
 
 cd "\${PROJECT_ROOT}"
-cargo build --manifest-path "\${DESKTOP_MANIFEST}" --target-dir Builds/Desktop/OSX --no-default-features --features headless >/dev/null
-exec "\${PROJECT_ROOT}/Builds/Desktop/OSX/debug/arcadia" "\$@"
+cargo build --manifest-path "\${DESKTOP_MANIFEST}" --no-default-features --features headless >/dev/null
+exec "\${PROJECT_ROOT}/Builds/workspace/debug/arcadia" "\$@"
 EOF
 
 cat > "${BIN_DIR}/arcadia-gui" <<EOF
@@ -75,8 +75,8 @@ if [[ "\${1:-}" == "configuration" ]]; then
 fi
 
 cd "\${PROJECT_ROOT}"
-cargo build --manifest-path "\${DESKTOP_MANIFEST}" --target-dir Builds/Desktop/OSX --no-default-features --features gui >/dev/null
-exec "\${PROJECT_ROOT}/Builds/Desktop/OSX/debug/arcadia" "\$@"
+cargo build --manifest-path "\${DESKTOP_MANIFEST}" --no-default-features --features gui >/dev/null
+exec "\${PROJECT_ROOT}/Builds/workspace/debug/arcadia" "\$@"
 EOF
 
 cat > "${BIN_DIR}/arcadia-ios" <<EOF

@@ -94,6 +94,10 @@ Navigation structure lives entirely in `navigation.rs` as two static slices:
 | `utilities` | Utilities | `utility.shell` |
 | `network` | Network | `network.overview`, `network.nodes` |
 
+**`GLOBAL_PAGE_IDS`** — pages rendered in the sidebar global section: `global.dashboard`, `global.settings`.
+
+**`TOP_BAR_PAGE_IDS`** — pages rendered as compact controls in the surface top bar: `global.logs`, `global.modules`. Each surface chooses how to render them (Desktop pill, iOS toolbar item) — registry stays the source of truth.
+
 `NavigationPageDefinition.required_module` drives visibility — surfaces query `is_module_enabled(page.required_module)`, never hardcode per-page logic. The full registry serializes to JSON via `default_navigation_registry_json()` for:
 
 - iOS FFI: `navigation_registry_json()` → deserializes into `NavigationRegistry` Swift struct
@@ -140,7 +144,7 @@ Arcadia supports a **headless host + GUI client** pattern over LAN:
 
 **`ARCADIA_NET_AS`** env var bootstraps `net_as` on startup, overriding `thin-client.toml`.
 
-**Multi-client caveat:** `modules.toml` is a single file on the host. Concurrent edits are last-writer-wins with no merge semantics. See [roadmap.md](roadmap.md).
+**Multi-client caveat:** `modules.toml` is a single file on the host. Concurrent edits are last-writer-wins with no merge semantics. See [ROADMAP.md](ROADMAP.md).
 
 ---
 

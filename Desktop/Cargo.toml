@@ -8,13 +8,15 @@ license = "MIT"
 [features]
 default = ["headless"]
 headless = []
-gui = ["dep:gpui", "dep:libc", "dep:portable-pty", "dep:vt100"]
+gui = ["dep:openframe", "dep:libc", "dep:portable-pty", "dep:vt100"]
+python-extensions = ["dep:arcadia-python"]
 
 [dependencies]
-arcadia-core = { path = "../Shared/ArcadiaCore" }
-serde_json   = "1"
-gpui         = { version = "0.2.2", optional = true }
-libc         = { version = "0.2", optional = true }
-rustyline    = "18.0.0"
-portable-pty = { version = "0.8", optional = true }
-vt100        = { version = "0.15", optional = true }
+arcadia-core     = { path = "../Shared/ArcadiaCore" }
+arcadia-python   = { path = "../Shared/ArcadiaPython", optional = true }
+serde_json       = "1"
+openframe        = { path = "../Libraries/OpenFrame", optional = true }
+libc             = { version = "0.2", optional = true }
+rustyline        = "18.0.0"
+portable-pty     = { version = "0.8", optional = true }
+vt100            = { version = "0.15", optional = true }

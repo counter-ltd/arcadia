@@ -1,4 +1,4 @@
-use gpui::{point, px, Bounds, PathBuilder, Window};
+use openframe::{point, px, Bounds, PathBuilder, Window};
 
 use crate::gui::theme;
 
@@ -6,13 +6,13 @@ use super::math::alpha_rgba;
 
 const SPLASH_HILLS_FINAL_DROP_PX: f32 = 52.0;
 
-pub(super) fn splash_draw_hills(bounds: Bounds<gpui::Pixels>, t: f32, window: &mut Window) {
+pub(super) fn splash_draw_hills(bounds: Bounds<openframe::Pixels>, t: f32, window: &mut Window) {
     let w = f32::from(bounds.size.width);
     let h = f32::from(bounds.size.height);
     let ox = f32::from(bounds.origin.x);
     let oy = f32::from(bounds.origin.y);
     let offset = SPLASH_HILLS_FINAL_DROP_PX + (1.0 - t) * h * 0.35;
-    let p = |fx: f32, fy: f32| -> gpui::Point<gpui::Pixels> {
+    let p = |fx: f32, fy: f32| -> openframe::Point<openframe::Pixels> {
         point(px(ox + fx * w), px(oy + fy * h + offset))
     };
 
