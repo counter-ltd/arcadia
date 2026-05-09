@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Regenerates iOS UniFFI bindings + xcframework when ArcadiaCore sources are committed.
+# Install once: bash Shared/Scripts/Installers/install-git-hooks.sh
+# Skip when needed: SKIP_IOS_FFI=1 git commit ...
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+if [[ "${SKIP_IOS_FFI:-}" == "1" ]] || [[ "${ARCADIA_SKIP_IOS_FFI:-}" == "1" ]]; then
+	echo "Arcadia: skipping iOS FFI pre-commit hook (SKIP_IOS_FFI=1)."
+	exit 0
+fi
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+[[ -n "$STAGED" ]] || exit 0
+
+touch_arcadia=0
+while IFS= read -r f; do
+	if [[ "$f" =~ ^Shared/ArcadiaCore/src/.*\.rs$ ]]; then
+		touch_arcadia=1
+		break
+	fi
+done <<< "$STAGED"
+
+[[ "${touch_arcadia}" -eq 1 ]] || exit 0
+
+echo "Arcadia: ArcadiaCore sources staged — running Shared/Scripts/build-ios-framework.sh"
+echo "          (slow; skip with: SKIP_IOS_FFI=1 git commit ...)"
+
+bash "${REPO_ROOT}/Shared/Scripts/build-ios-framework.sh"
+
+git add Mobile/iOS/ArcadiaCore/Generated Mobile/iOS/ArcadiaCore/ArcadiaCore.xcframework
+
+echo "Arcadia: iOS FFI outputs refreshed and staged."

@@ -47,7 +47,7 @@ pwsh  Shared/Scripts/Launcher.ps1
 ## Global wrappers (macOS)
 
 ```sh
-bash Shared/Scripts/install-global-commands-macos.sh
+bash Shared/Scripts/Installers/install-global-commands-macos.sh
 ```
 
 Installs helpers to `~/.local/bin` — ensure it's on `PATH`.

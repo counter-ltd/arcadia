@@ -31,7 +31,7 @@ Built on the same DNA as **[Holos](https://github.com/stack-node/holos)** — *u
 | Push module changes from client to host | `surface.patch` with `modules_set` op |
 | Run headless as a host | `cargo run` (default `headless` feature) |
 | Rebuild iOS after FFI changes | `bash Shared/Scripts/build-ios-framework.sh` |
-| Install global CLI wrappers | `bash Shared/Scripts/install-global-commands-macos.sh` |
+| Install global CLI wrappers | `bash Shared/Scripts/Installers/install-global-commands-macos.sh` |
 
 ---
 

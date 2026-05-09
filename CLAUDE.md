@@ -422,7 +422,7 @@ cd Shared && cargo test -p arcadia-core
 bash Shared/Scripts/build-ios-framework.sh
 
 # Global CLI wrappers (macOS)
-bash Shared/Scripts/install-global-commands-macos.sh
+bash Shared/Scripts/Installers/install-global-commands-macos.sh
 ```
 
 ---
