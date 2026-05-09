@@ -1,4 +1,5 @@
 use arcadia_core::config::modules::REMOTE_SESSION_MODULE_NAME;
+use arcadia_core::navigation;
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::modules::lan::connected_approved_session_peers;
 use openframe::{
@@ -365,18 +366,37 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_0p5()
-                            .children(self.global_page_ids_effective().into_iter().filter_map(|page_id| {
-                                let page = self.page_ref(page_id)?;
-                                Some(Self::sidebar_global_item(
-                                    cx,
-                                    openframe::SharedString::from(page.title().to_string()),
-                                    openframe::SharedString::from(page.glyph().to_string()),
-                                    page.id().to_string(),
-                                    self.active_page_id == page.id(),
-                                    is_dark,
-                                    page.accent().to_string(),
-                                ))
-                            })),
+                            .children({
+                                self.global_page_ids_effective()
+                                    .into_iter()
+                                    .filter_map(|page_id| {
+                                        let page = self.page_ref(page_id)?;
+                                        if page_id == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
+                                            Some(
+                                                self.sidebar_settings_hub_section(cx, page, is_dark)
+                                                    .into_any_element(),
+                                            )
+                                        } else {
+                                            Some(
+                                                Self::sidebar_global_item(
+                                                    cx,
+                                                    openframe::SharedString::from(
+                                                        page.title().to_string(),
+                                                    ),
+                                                    openframe::SharedString::from(
+                                                        page.glyph().to_string(),
+                                                    ),
+                                                    page.id().to_string(),
+                                                    self.active_page_id == page.id(),
+                                                    is_dark,
+                                                    page.accent().to_string(),
+                                                )
+                                                .into_any_element(),
+                                            )
+                                        }
+                                    })
+                                    .collect::<Vec<AnyElement>>()
+                            }),
                     ),
             )
     }

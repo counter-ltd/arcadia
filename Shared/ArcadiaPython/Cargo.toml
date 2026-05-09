@@ -1,0 +1,10 @@
+[package]
+name = "arcadia-python"
+version = "0.1.0"
+edition = "2021"
+description = "Python extension host for Arcadia — loads .py extensions and bridges them into arcadia-core"
+license = "MIT"
+
+[dependencies]
+arcadia-core = { path = "../ArcadiaCore" }
+pyo3 = { version = "0.22", features = ["auto-initialize"] }

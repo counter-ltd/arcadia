@@ -9,6 +9,7 @@ const LEGACY_TERMINAL_MOTD_MODULE_NAME: &str = "shell-motd";
 pub const LAN_MODULE_NAME: &str = "lan";
 pub const LATE_MODULE_NAME: &str = "late";
 pub const NET_MODULE_NAME: &str = "net";
+pub const PYTHON_HOST_MODULE_NAME: &str = "python-host";
 pub const SURFACE_MODULE_NAME: &str = "surface";
 pub const REMOTE_SESSION_MODULE_NAME: &str = "remote-session";
 pub const TERMINAL_MODULE_NAME: &str = "terminal";
@@ -65,6 +66,12 @@ static MODULE_REGISTRY: &[ModuleManifest] = &[
         name: LATE_MODULE_NAME,
         version: "0.1.0",
         description: "Native late.sh client — chat rooms, music stream, reactions, and bonsai.",
+        required_modules: &[],
+    },
+    ModuleManifest {
+        name: PYTHON_HOST_MODULE_NAME,
+        version: "0.1.0",
+        description: "Python extension loader. Scans ~/Arcadia/Extensions/ for .py files and registers their commands.",
         required_modules: &[],
     },
 ];

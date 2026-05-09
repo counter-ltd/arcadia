@@ -64,6 +64,8 @@ struct NavigationRegistry: Codable {
     /// Pages rendered as compact controls in the top bar (e.g. Logs, Modules).
     /// Distinct from `globalPages` (sidebar) so each surface places them appropriately.
     let topBarPages: [String]
+    /// Nested pages under the sidebar Settings hub (same IDs may appear in `topBarPages`).
+    let settingsHubPages: [String]
     let defaultGroup: String
     let defaultPage: String
 
@@ -72,6 +74,7 @@ struct NavigationRegistry: Codable {
         case groups
         case globalPages = "global_pages"
         case topBarPages = "top_bar_pages"
+        case settingsHubPages = "settings_hub_pages"
         case defaultGroup = "default_group"
         case defaultPage = "default_page"
     }
@@ -81,6 +84,7 @@ struct NavigationRegistry: Codable {
         groups: [GroupDefinition],
         globalPages: [String],
         topBarPages: [String],
+        settingsHubPages: [String],
         defaultGroup: String,
         defaultPage: String
     ) {
@@ -88,6 +92,7 @@ struct NavigationRegistry: Codable {
         self.groups = groups
         self.globalPages = globalPages
         self.topBarPages = topBarPages
+        self.settingsHubPages = settingsHubPages
         self.defaultGroup = defaultGroup
         self.defaultPage = defaultPage
     }
@@ -98,6 +103,9 @@ struct NavigationRegistry: Codable {
         groups = try c.decode([GroupDefinition].self, forKey: .groups)
         globalPages = try c.decode([String].self, forKey: .globalPages)
         topBarPages = (try? c.decode([String].self, forKey: .topBarPages)) ?? []
+        settingsHubPages = (try? c.decode([String].self, forKey: .settingsHubPages)) ?? [
+            "global.logs", "global.modules", "global.settings"
+        ]
         defaultGroup = try c.decode(String.self, forKey: .defaultGroup)
         defaultPage = try c.decode(String.self, forKey: .defaultPage)
     }

@@ -107,7 +107,7 @@ Launchers/Development/OSX/            # SwiftPM menu bar launcher (optional, dev
   stable-build-matrix.yml             # Desktop + iOS simulator CI
   FUNDING.yml                         # GitHub Sponsors
 
-gaps.md                               # Deliberate limitations and next-tier work
+Documentation/gaps.md                 # Deliberate limitations, thin-client gaps, iOS OpenFrame migration
 CLAUDE.md                             # Contributor guide (architecture patterns)
 AGENTS.md                             # Agent rules (registry discipline, anti-patterns)
 ```

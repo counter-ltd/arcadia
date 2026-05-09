@@ -2,9 +2,10 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::modules::{
-    ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME,
-    TERMINAL_MOTD_MODULE_NAME,
+    ModulesConfig, LAN_MODULE_NAME, PYTHON_HOST_MODULE_NAME, REMOTE_SESSION_MODULE_NAME,
+    TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME,
 };
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
@@ -117,6 +118,10 @@ impl ArcadiaRoot {
     pub fn new(cx: &mut openframe::Context<Self>) -> Self {
         let shell_focus = cx.focus_handle();
         let late_compose_focus = cx.focus_handle();
+        let late_settings_server_url_focus = cx.focus_handle();
+        let late_settings_username_focus = cx.focus_handle();
+        let late_settings_default_room_focus = cx.focus_handle();
+        let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
@@ -134,6 +139,7 @@ impl ArcadiaRoot {
             active_page_id: navigation::DEFAULT_PAGE_ID.to_string(),
             active_group_id: navigation::DEFAULT_GROUP_ID.to_string(),
             module_rows,
+            python_extension_rows: Vec::new(),
             pending_module_enable: None,
             terminals: vec![first_terminal],
             active_terminal_id: 0,
@@ -148,6 +154,7 @@ impl ArcadiaRoot {
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
             sidebar_visible: true,
+            settings_hub_expanded: false,
             app_menu_open: false,
             session_route_menu_open: false,
             remote_route: None,
@@ -163,6 +170,13 @@ impl ArcadiaRoot {
             late_last_revision: 0,
             late_active_room: 1,
             late_compose_text: String::new(),
+            late_settings_server_url: late_cfg.server_url,
+            late_settings_username: late_cfg.username,
+            late_settings_default_room: late_cfg.default_room.to_string(),
+            late_settings_feedback: String::new(),
+            late_settings_server_url_focus,
+            late_settings_username_focus,
+            late_settings_default_room_focus,
         };
 
         // Thin client bootstrap: ARCADIA_NET_AS overrides persisted thin-client.toml route.
@@ -186,7 +200,25 @@ impl ArcadiaRoot {
             }
         }
 
+        #[cfg(feature = "python-extensions")]
+        if root.is_module_enabled(PYTHON_HOST_MODULE_NAME) {
+            let ext_dir = arcadia_core::config::config_root_dir()
+                .ok()
+                .and_then(|d| d.parent().map(|p| p.join("Extensions")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Extensions"));
+            if let Err(e) = arcadia_python::PythonExtensionHost::start(ext_dir) {
+                eprintln!("python-host: {e}");
+            }
+            root.python_extension_rows =
+                arcadia_core::modules::python_registry::list_modules();
+        }
+
         root
+    }
+
+    pub fn reload_python_extensions(&mut self) {
+        self.python_extension_rows =
+            arcadia_core::modules::python_registry::list_modules();
     }
 
     pub fn reload_modules(&mut self) {

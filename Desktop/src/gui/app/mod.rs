@@ -9,6 +9,7 @@ mod lifecycle;
 mod modules_page;
 mod navigation;
 mod network_overview;
+mod python_settings;
 mod root;
 mod shell;
 mod sidebar;
@@ -97,6 +98,8 @@ pub struct ArcadiaRoot {
     pub active_page_id: String,
     pub active_group_id: String,
     pub module_rows: Vec<(String, bool)>,
+    /// (name, version, description, enabled) — refreshed after python-host loads extensions.
+    pub python_extension_rows: Vec<(String, String, String, bool)>,
     pub pending_module_enable: Option<(String, Vec<String>)>,
     pub terminals: Vec<TerminalInstance>,
     pub active_terminal_id: usize,
@@ -111,6 +114,8 @@ pub struct ArcadiaRoot {
     pub splash_elapsed_ms: f32,
     pub splash_tick_started: bool,
     pub sidebar_visible: bool,
+    /// When true, the sidebar Settings hub lists Logs / Modules / Settings rows.
+    pub settings_hub_expanded: bool,
     pub app_menu_open: bool,
     pub session_route_menu_open: bool,
     /// When `Some("lan:<ip-or-alias>")`, module visibility and routed commands use this peer.
@@ -128,6 +133,13 @@ pub struct ArcadiaRoot {
     pub late_last_revision: u64,
     pub late_active_room: u32,
     pub late_compose_text: String,
+    pub late_settings_server_url: String,
+    pub late_settings_username: String,
+    pub late_settings_default_room: String,
+    pub late_settings_feedback: String,
+    pub late_settings_server_url_focus: FocusHandle,
+    pub late_settings_username_focus: FocusHandle,
+    pub late_settings_default_room_focus: FocusHandle,
 }
 
 impl ArcadiaRoot {

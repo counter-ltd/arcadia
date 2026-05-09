@@ -1,6 +1,8 @@
 pub mod lan;
 pub mod late;
 pub mod net;
+pub mod python_host;
+pub mod python_registry;
 pub mod remote_mirror;
 pub mod remote_session;
 pub mod shell;
@@ -29,6 +31,7 @@ fn module_commands(module_name: &str) -> Option<&'static [ModuleCommand]> {
         lan::NAME => Some(lan::commands()),
         late::NAME => Some(late::commands()),
         net::NAME => Some(net::commands()),
+        python_host::NAME => Some(python_host::commands()),
         remote_session::NAME => Some(remote_session::commands()),
         shell::NAME => Some(shell::commands()),
         shell_motd::NAME => Some(shell_motd::commands()),
@@ -60,6 +63,9 @@ pub fn enabled_command_tokens() -> Vec<String> {
                 tokens.push(format!("{module_name}.{}", command.name));
             }
         }
+    }
+    for (token, _) in python_registry::list_commands() {
+        tokens.push(token);
     }
     tokens
 }
@@ -108,6 +114,10 @@ pub fn execute_command(
     };
 
     let Some(commands) = module_commands(module_name) else {
+        // Python extension fallback: dispatch to dynamically registered handlers.
+        if let Some(result) = python_registry::try_dispatch(token, args) {
+            return Ok(Some(result));
+        }
         return Ok(None);
     };
 
@@ -192,6 +202,9 @@ pub fn all_command_entries() -> Vec<(String, String)> {
             }
         }
     }
+    for (token, description) in python_registry::list_commands() {
+        entries.push((token, description));
+    }
     entries
 }
 
@@ -200,6 +213,7 @@ pub fn load_all() {
         lan::NAME,
         late::NAME,
         net::NAME,
+        python_host::NAME,
         remote_session::NAME,
         shell::NAME,
         shell_motd::NAME,
