@@ -17,6 +17,6 @@ Build a clickable menu bar app with:
 The launcher prefers `~/.local/bin/arcadia-gui` when it exists. If the global command has not been installed, it falls back to the same build-and-run flow used by that wrapper:
 
 ```sh
-cargo build --manifest-path Desktop/Cargo.toml --target-dir target --no-default-features --features gui
-target/debug/arcadia
+cargo build --manifest-path Desktop/Cargo.toml --target-dir Builds/Desktop/OSX --no-default-features --features gui
+Builds/Desktop/OSX/debug/arcadia
 ```

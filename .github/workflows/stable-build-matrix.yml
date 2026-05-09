@@ -19,26 +19,32 @@ jobs:
         include:
           - os: ubuntu-latest
             os_name: linux
+            cargo_desktop_target: Builds/Desktop/Linux
             feature: gui
             artifact_name: arcadia-desktop-linux
           - os: ubuntu-latest
             os_name: linux
+            cargo_desktop_target: Builds/Desktop/Linux
             feature: headless
             artifact_name: arcadia-desktop-linux-headless
           - os: macos-latest
             os_name: macos
+            cargo_desktop_target: Builds/Desktop/OSX
             feature: gui
             artifact_name: arcadia-desktop-macos
           - os: macos-latest
             os_name: macos
+            cargo_desktop_target: Builds/Desktop/OSX
             feature: headless
             artifact_name: arcadia-desktop-macos-headless
           - os: windows-latest
             os_name: windows
+            cargo_desktop_target: Builds/Desktop/Windows
             feature: gui
             artifact_name: arcadia-desktop-windows
           - os: windows-latest
             os_name: windows
+            cargo_desktop_target: Builds/Desktop/Windows
             feature: headless
             artifact_name: arcadia-desktop-windows-headless
 
@@ -53,8 +59,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
-            Desktop -> target
-            Shared/ArcadiaCore -> target
+            Desktop -> ${{ matrix.cargo_desktop_target }}
 
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux' && matrix.feature == 'gui'
@@ -66,7 +71,7 @@ jobs:
             libxkbcommon-x11-dev
 
       - name: Build Arcadia
-        run: cargo build --manifest-path Desktop/Cargo.toml --target-dir target --no-default-features --features ${{ matrix.feature }}
+        run: cargo build --manifest-path Desktop/Cargo.toml --target-dir ${{ matrix.cargo_desktop_target }} --no-default-features --features ${{ matrix.feature }}
 
       - name: Package binary (Windows)
         if: runner.os == 'Windows'
@@ -74,14 +79,14 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $target = "dist/${{ matrix.artifact_name }}.exe"
-          Copy-Item "target/debug/arcadia.exe" $target
+          Copy-Item "${{ matrix.cargo_desktop_target }}/debug/arcadia.exe" $target
 
       - name: Package binary (macOS/Linux)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           mkdir -p dist
-          cp target/debug/arcadia "dist/${{ matrix.artifact_name }}"
+          cp "${{ matrix.cargo_desktop_target }}/debug/arcadia" "dist/${{ matrix.artifact_name }}"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -107,14 +112,14 @@ jobs:
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
-            -derivedDataPath build/ios \
+            -derivedDataPath Builds/Mobile/iOS/DerivedData/Simulator \
             build
 
       - name: Package iOS app
         shell: bash
         run: |
           mkdir -p dist
-          cp -R "build/ios/Build/Products/Release-iphonesimulator/ArcadiaApp.app" "dist/arcadia-mobile-ios.app"
+          cp -R "Builds/Mobile/iOS/DerivedData/Simulator/Build/Products/Release-iphonesimulator/ArcadiaApp.app" "dist/arcadia-mobile-ios.app"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

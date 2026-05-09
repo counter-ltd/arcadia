@@ -3,13 +3,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SOURCE_DIR}/.." && pwd)"
+CARGO_TARGET_DIR="${REPO_ROOT}/Builds/Shared"
 OUT_DIR="${SOURCE_DIR}/../Mobile/iOS/ArcadiaCore"
 LIB_NAME="libarcadia_core.a"
 DEVICE_TARGET="aarch64-apple-ios"
 SIM_TARGET="aarch64-apple-ios-sim"
 
-DEVICE_LIB="${SOURCE_DIR}/target/${DEVICE_TARGET}/release/${LIB_NAME}"
-SIM_LIB="${SOURCE_DIR}/target/${SIM_TARGET}/release/${LIB_NAME}"
+DEVICE_LIB="${CARGO_TARGET_DIR}/${DEVICE_TARGET}/release/${LIB_NAME}"
+SIM_LIB="${CARGO_TARGET_DIR}/${SIM_TARGET}/release/${LIB_NAME}"
 XCFRAMEWORK_DIR="${OUT_DIR}/ArcadiaCore.xcframework"
 BINDGEN_OUT="${OUT_DIR}/Generated"
 DEVICE_DIR=""
@@ -22,15 +24,15 @@ rustup target add "${DEVICE_TARGET}" "${SIM_TARGET}"
 
 # ── 1. Build for device + simulator ──────────────────────────────────────────
 echo "==> Building for ${DEVICE_TARGET}"
-(cd "${SOURCE_DIR}" && cargo build -p arcadia-core --release --target "${DEVICE_TARGET}")
+(cd "${SOURCE_DIR}" && cargo build -p arcadia-core --release --target "${DEVICE_TARGET}" --target-dir "${CARGO_TARGET_DIR}")
 
 echo "==> Building for ${SIM_TARGET}"
-(cd "${SOURCE_DIR}" && cargo build -p arcadia-core --release --target "${SIM_TARGET}")
+(cd "${SOURCE_DIR}" && cargo build -p arcadia-core --release --target "${SIM_TARGET}" --target-dir "${CARGO_TARGET_DIR}")
 
 # ── 2. Generate Swift bindings ────────────────────────────────────────────────
 echo "==> Generating Swift bindings"
 mkdir -p "${BINDGEN_OUT}"
-(cd "${SOURCE_DIR}" && cargo run -p uniffi-bindgen -- \
+(cd "${SOURCE_DIR}" && cargo run --target-dir "${CARGO_TARGET_DIR}" -p uniffi-bindgen -- \
     generate \
     --library "${DEVICE_LIB}" \
     --language swift \

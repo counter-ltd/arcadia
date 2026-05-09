@@ -40,8 +40,8 @@ if [[ "\${1:-}" == "configuration" ]]; then
 fi
 
 cd "\${PROJECT_ROOT}"
-cargo build --manifest-path "\${DESKTOP_MANIFEST}" --target-dir target --no-default-features --features headless >/dev/null
-exec "\${PROJECT_ROOT}/target/debug/arcadia" "\$@"
+cargo build --manifest-path "\${DESKTOP_MANIFEST}" --target-dir Builds/Desktop/OSX --no-default-features --features headless >/dev/null
+exec "\${PROJECT_ROOT}/Builds/Desktop/OSX/debug/arcadia" "\$@"
 EOF
 
 cat > "${BIN_DIR}/arcadia-gui" <<EOF
@@ -75,8 +75,8 @@ if [[ "\${1:-}" == "configuration" ]]; then
 fi
 
 cd "\${PROJECT_ROOT}"
-cargo build --manifest-path "\${DESKTOP_MANIFEST}" --target-dir target --no-default-features --features gui >/dev/null
-exec "\${PROJECT_ROOT}/target/debug/arcadia" "\$@"
+cargo build --manifest-path "\${DESKTOP_MANIFEST}" --target-dir Builds/Desktop/OSX --no-default-features --features gui >/dev/null
+exec "\${PROJECT_ROOT}/Builds/Desktop/OSX/debug/arcadia" "\$@"
 EOF
 
 cat > "${BIN_DIR}/arcadia-ios" <<EOF
@@ -86,7 +86,7 @@ set -euo pipefail
 PROJECT_ROOT="${ROOT_DIR}/.."
 PROJECT_PATH="Mobile/iOS/ArcadiaApp.xcodeproj"
 SHARED_BUILD_SCRIPT="${ROOT_DIR}/Scripts/Builds/build-ios-framework.sh"
-DERIVED_DATA_PATH="\${PROJECT_ROOT}/build/ios-device"
+DERIVED_DATA_PATH="\${PROJECT_ROOT}/Builds/Mobile/iOS/DerivedData/Device"
 BUNDLE_ID="com.stacknode.arcadia"
 PREFERRED_DEVICE_NAME="\${ARCADIA_IOS_DEVICE_NAME:-}"
 DESTINATIONS=""

@@ -1,6 +1,7 @@
 /target
 **/target/
 build/
+/Builds/
 **/*.rs.bk
 /Models/
 /Configuration/

@@ -13,18 +13,19 @@ function Invoke-Arcadia {
 
     $projectRoot = Resolve-Path (Join-Path $RootDir "..")
     $manifestPath = "Desktop/Cargo.toml"
+    $targetDir = "Builds/Desktop/Windows"
 
     Push-Location $projectRoot
     try {
         if ($Release) {
             Write-Host ""
-            Write-Host "Running: cargo run --manifest-path $manifestPath --target-dir target --release --features $Feature"
-            cargo run --manifest-path $manifestPath --target-dir target --release --features $Feature
+            Write-Host "Running: cargo run --manifest-path $manifestPath --target-dir $targetDir --release --features $Feature"
+            cargo run --manifest-path $manifestPath --target-dir $targetDir --release --features $Feature
         }
         else {
             Write-Host ""
-            Write-Host "Running: cargo run --manifest-path $manifestPath --target-dir target --features $Feature"
-            cargo run --manifest-path $manifestPath --target-dir target --features $Feature
+            Write-Host "Running: cargo run --manifest-path $manifestPath --target-dir $targetDir --features $Feature"
+            cargo run --manifest-path $manifestPath --target-dir $targetDir --features $Feature
         }
     }
     finally {
@@ -41,7 +42,7 @@ function Invoke-IosDeviceDeploy {
     $configuration = if ($Release) { "Release" } else { "Debug" }
     $projectPath = Join-Path $RootDir "../Mobile/iOS/ArcadiaApp.xcodeproj"
     $sharedBuildScript = Join-Path $RootDir "Scripts/Builds/build-ios-framework.sh"
-    $derivedDataPath = Join-Path (Join-Path $RootDir "..") "build/ios-device"
+    $derivedDataPath = Join-Path (Join-Path $RootDir "..") "Builds/Mobile/iOS/DerivedData/Device"
     $bundleId = "com.stacknode.arcadia"
     $preferredDeviceName = $env:ARCADIA_IOS_DEVICE_NAME
     $destinations = ""

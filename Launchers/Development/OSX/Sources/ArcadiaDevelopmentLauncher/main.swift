@@ -272,8 +272,8 @@ final class ArcadiaDevelopmentLauncher: NSObject, NSApplicationDelegate, NSMenuD
                 """
                 export PATH="${HOME}/.cargo/bin:${PATH}"
                 cd "\(repositoryRoot.path)"
-                cargo build --manifest-path Desktop/Cargo.toml --target-dir target --no-default-features --features gui >/dev/null
-                exec "\(repositoryRoot.path)/target/debug/arcadia"
+                cargo build --manifest-path Desktop/Cargo.toml --target-dir Builds/Desktop/OSX --no-default-features --features gui >/dev/null
+                exec "\(repositoryRoot.path)/Builds/Desktop/OSX/debug/arcadia"
                 """
             ]
         }
@@ -393,7 +393,7 @@ final class ArcadiaDevelopmentLauncher: NSObject, NSApplicationDelegate, NSMenuD
         }
 
         let currentPID = ProcessInfo.processInfo.processIdentifier
-        let binaryPath = "\(repositoryRoot.path)/target/debug/arcadia"
+        let binaryPath = "\(repositoryRoot.path)/Builds/Desktop/OSX/debug/arcadia"
 
         return text.split(separator: "\n").compactMap { line -> pid_t? in
             let trimmed = String(line).trimmingCharacters(in: .whitespaces)

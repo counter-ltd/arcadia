@@ -2,19 +2,35 @@
 
 **One Rust core. One Python SDK. An infinite extension surface. Zero rent.**
 
-Arcadia is a multi-platform runtime, shell, and — ultimately — an **open platform for building system-integrated applications**. One `arcadia-core` crate owns every module, command, navigation structure, LAN protocol, and config schema, consumed by two native surfaces (GPUI desktop, SwiftUI iOS) plus a CLI.
+Arcadia is a multi-platform runtime and shell — an **open platform for building system-integrated applications**. A single `arcadia-core` crate owns modules, commands, navigation, LAN protocol, and config; GPUI (desktop), SwiftUI (iOS), and a CLI are thin surfaces over that core.
 
-Built on the same DNA as **[Holos](https://github.com/stack-node/holos)** — *utility over monetization, ownership over subscriptions* — but with a harder engineering mandate: **no duplicated truth between platforms, no hardcoded IDs in surface code, no growing if-else chains that break the next time a module is added.**
+Built on the same DNA as **[Holos](https://github.com/stack-node/holos)** — *utility over monetization, ownership over subscriptions* — with a hard rule: **no duplicated truth between platforms, no hardcoded IDs in surface code, no growing dispatch chains that break the next time a module ships.**
 
 ---
 
-## What Arcadia is
+## Documentation
 
-- **A runtime and shell** — execute commands locally or route them across your LAN with the same `execute_command` API.
-- **A module registry** — enable/disable capabilities (`shell`, `lan`, `net`, `surface`, `remote-session`, `shell-motd`) from any surface; the registry enforces dependencies.
-- **A navigation system** — page and group definitions live in `navigation.rs`, serialized to JSON for iOS, consumed by Desktop directly. No surface hardcodes page IDs.
-- **A thin-client protocol** — `surface.snapshot` mirrors host state (modules, nav registry, revision) to clients; `surface.patch` lets clients push changes back.
-- **A cross-platform core** — the same Rust crate (`arcadia-core`) builds as a staticlib for iOS (via UniFFI), a native library for Desktop GPUI, and a CLI binary.
+In-depth guides live under [`Documentation/`](Documentation/). Use this as the map:
+
+| Doc | What it covers |
+|-----|----------------|
+| [**Vision**](Documentation/vision.md) | Why Arcadia exists and where it is headed |
+| [**Architecture**](Documentation/architecture.md) | Command model, modules, navigation, thin-client, FFI |
+| [**Module & navigation reference**](Documentation/reference.md) | Every module and page in the registry |
+| [**Repository layout**](Documentation/repository.md) | Directory map of the whole repo |
+| [**Configuration**](Documentation/configuration.md) | Config files, prerequisites, environment variables |
+| [**Build & run**](Documentation/build.md) | All targets, scripts, and platform builds |
+| [**Contributing**](Documentation/contributing.md) | Conventions, adding features, testing |
+| [**Roadmap & known gaps**](Documentation/roadmap.md) | Priorities, limitations, security posture, CI |
+| [**Lineage & about**](Documentation/about.md) | History, creator, supporting the project |
+
+---
+
+## License
+
+Arcadia is released under the **Arcadia Community License (ACL) v1.6** ([`LICENSE.md`](LICENSE.md)).
+
+In short: the software is meant for **people** — personal, educational, research, accessibility, and community use — with **attribution** and rules that keep the **core** improvements open when distributed. **Large corporations** and **profit-focused commercialization of Arcadia itself** (or selling Arcadia-targeted extensions without permission) are out of scope unless the copyright holder grants written permission. Education and learning get a broad, explicit welcome. The full text defines thresholds, conditions, and philosophy; **do not rely on this paragraph alone** for compliance.
 
 ---
 
@@ -40,11 +56,9 @@ Built on the same DNA as **[Holos](https://github.com/stack-node/holos)** — *u
 Moves fast. Breaks occasionally. That's intentional.
 
 - Features land continuously on `development`.
-- APIs (especially FFI and `surface.*`) may evolve — see [Roadmap](Documentation/roadmap.md) for deliberate limitations.
+- APIs (especially FFI and `surface.*`) may evolve — see [**Roadmap**](Documentation/roadmap.md).
 - Building from source is the surest way to stay current.
 - Stable tagged builds will appear as the project matures; CI exercises desktop + iOS simulator paths.
-
-Known gaps are tracked in-repo instead of pretending shipping equals finished.
 
 ---
 
@@ -73,17 +87,3 @@ cd Shared && cargo test -p arcadia-core
 # iOS framework (after ffi.rs changes)
 bash Shared/Scripts/Builds/build-ios-framework.sh
 ```
-
----
-
-## Documentation
-
-- [Vision](Documentation/vision.md) — why this exists and where it's going
-- [Architecture](Documentation/architecture.md) — philosophy, command model, module system, navigation, thin-client, FFI
-- [Module & Navigation reference](Documentation/reference.md) — all modules and pages
-- [Repository layout](Documentation/repository.md) — full directory map
-- [Configuration](Documentation/configuration.md) — config files, prerequisites, environment variables
-- [Build & run](Documentation/build.md) — all build targets and scripts
-- [Contributing](Documentation/contributing.md) — rules, adding features, testing
-- [Roadmap & known gaps](Documentation/roadmap.md) — P0–P3 gaps, security posture, CI
-- [Lineage & about](Documentation/about.md) — history, creator, donations

@@ -4,6 +4,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/../Builds/build-paths.sh"
 CARGO_BIN="${HOME}/.cargo/bin"
 
 if [[ ":${PATH}:" != *":${CARGO_BIN}:"* ]]; then
@@ -21,19 +23,21 @@ run_arcadia() {
   local features="$2"
   local project_root="${ROOT_DIR}/.."
   local manifest_path="Desktop/Cargo.toml"
+  local target_dir
+  target_dir="$(arcadia_desktop_target_rel)"
 
   echo
   if [[ -n "${build_mode}" ]]; then
-    echo "Running: cargo run --manifest-path ${manifest_path} --target-dir target ${build_mode} --features ${features}"
+    echo "Running: cargo run --manifest-path ${manifest_path} --target-dir ${target_dir} ${build_mode} --features ${features}"
   else
-    echo "Running: cargo run --manifest-path ${manifest_path} --target-dir target --features ${features}"
+    echo "Running: cargo run --manifest-path ${manifest_path} --target-dir ${target_dir} --features ${features}"
   fi
   (
     cd "${project_root}" || exit 1
     if [[ -n "${build_mode}" ]]; then
-      cargo run --manifest-path "${manifest_path}" --target-dir target "${build_mode}" --features "${features}"
+      cargo run --manifest-path "${manifest_path}" --target-dir "${target_dir}" "${build_mode}" --features "${features}"
     else
-      cargo run --manifest-path "${manifest_path}" --target-dir target --features "${features}"
+      cargo run --manifest-path "${manifest_path}" --target-dir "${target_dir}" --features "${features}"
     fi
   )
 }
@@ -46,7 +50,7 @@ deploy_ios_device() {
   local configuration="$1"
   local project_path="${ROOT_DIR}/../Mobile/iOS/ArcadiaApp.xcodeproj"
   local shared_build_script="${ROOT_DIR}/Scripts/Builds/build-ios-framework.sh"
-  local derived_data_path="${ROOT_DIR}/../build/ios-device"
+  local derived_data_path="${ROOT_DIR}/../${ARCADIA_IOS_DERIVED_DEVICE_REL}"
   local bundle_id="com.stacknode.arcadia"
   local preferred_device_name="${ARCADIA_IOS_DEVICE_NAME:-}"
   local destinations=""

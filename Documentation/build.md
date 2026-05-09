@@ -23,8 +23,10 @@ cd Desktop && cargo build --release --features gui
 
 ## Core tests
 
+Artifacts go under `Builds/Shared/`:
+
 ```sh
-cd Shared && cargo test -p arcadia-core
+cargo test -p arcadia-core --manifest-path Shared/Cargo.toml --target-dir Builds/Shared
 ```
 
 ## iOS framework + Swift bindings
