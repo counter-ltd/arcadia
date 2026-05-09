@@ -260,14 +260,14 @@ Before marking a feature ready for production, verify:
 - [ ] Module rename includes `merge_defaults()` migration
 - [ ] New mirrored state uses `surface.*` protocol, not ad-hoc verbs
 - [ ] `cargo test -p arcadia-core` passes
-- [ ] Known gap addressed or documented in `Documentation/Gaps.md` if not fully solved
+- [ ] Known gap addressed or documented in `Documentation/GAPS.md` if not fully solved
 
 ---
 
 ## LAN / Thin-Client Rules
 
 - LAN command forwarding requires `remote-session` + `lan` + `net` enabled locally. The peer checks its own module rules.
-- `surface.revision` is not a reliable freshness signal yet — gap 1 in `Documentation/Gaps.md`. Do not build logic that assumes revision covers all write paths.
+- `surface.revision` is not a reliable freshness signal yet — gap 1 in `Documentation/GAPS.md`. Do not build logic that assumes revision covers all write paths.
 - `surface.patch` `client_id` is attribution only — not authentication. Do not build authorization logic on it.
 - Multiple concurrent clients patching the same host = last-writer-wins. Do not imply merge semantics.
 
@@ -286,4 +286,4 @@ Before marking a feature ready for production, verify:
 | Thin-client route | Session chip in top bar | Route picker in sidebar | `ThinClientConfig` |
 | Splash screen | Animated canvas (`splash/`) | `SplashView.swift` | — |
 
-Divergence between surfaces is tracked in gap 10 of `Documentation/Gaps.md`. When implementing a new capability, prefer making it routable via `execute_command` so both surfaces can reach it over LAN without platform-specific implementations.
+Divergence between surfaces is tracked in gap 10 of `Documentation/GAPS.md`. When implementing a new capability, prefer making it routable via `execute_command` so both surfaces can reach it over LAN without platform-specific implementations.
