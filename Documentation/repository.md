@@ -32,6 +32,11 @@ Shared/
     Launchers/Launcher.sh / Launcher.ps1        # Shell launcher menus
   Tools/uniffi-bindgen/               # UniFFI bindgen binary (workspace member)
 
+Libraries/
+  OpenFrame/                          # Submodule (GPUI fork) — `git@github-counter:counter-ltd/openframe.git`
+
+Extensions/                           # Submodule — `git@github-counter:counter-ltd/arcadia-haven.git` (extension catalog; shipped hello demo under `hello/`)
+
 Desktop/
   Cargo.toml                          # features: headless (default), gui
   src/

@@ -1,3 +1,6 @@
 [submodule "Libraries/OpenFrame"]
 	path = Libraries/OpenFrame
 	url = git@github-counter:counter-ltd/openframe.git
+[submodule "Extensions"]
+	path = Extensions
+	url = git@github-counter:counter-ltd/arcadia-haven.git
