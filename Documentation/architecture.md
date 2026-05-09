@@ -201,6 +201,6 @@ When this machine executes an inbound `NODE_EXEC` for a remote peer, `modules/re
 
 After any change to `ffi.rs` or exported types, run:
 ```sh
-bash Shared/Scripts/build-ios-framework.sh
+bash Shared/Scripts/Builds/build-ios-framework.sh
 ```
 This regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcframework`.

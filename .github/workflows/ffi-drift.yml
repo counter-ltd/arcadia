@@ -87,7 +87,7 @@ jobs:
           if [[ "$DRIFT" -eq 1 ]]; then
             echo ""
             echo "FFI bindings are out of sync. Run:"
-            echo "  bash Shared/Scripts/build-ios-framework.sh"
+            echo "  bash Shared/Scripts/Builds/build-ios-framework.sh"
             echo "and commit the updated Generated/ directory."
             exit 1
           fi

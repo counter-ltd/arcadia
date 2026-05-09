@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RootDir = Resolve-Path (Join-Path $ScriptDir "..")
+$RootDir = Resolve-Path "$ScriptDir/../.."
 
 function Invoke-Arcadia {
     param(
@@ -40,7 +40,7 @@ function Invoke-IosDeviceDeploy {
 
     $configuration = if ($Release) { "Release" } else { "Debug" }
     $projectPath = Join-Path $RootDir "../Mobile/iOS/ArcadiaApp.xcodeproj"
-    $sharedBuildScript = Join-Path $RootDir "Scripts/build-ios-framework.sh"
+    $sharedBuildScript = Join-Path $RootDir "Scripts/Builds/build-ios-framework.sh"
     $derivedDataPath = Join-Path (Join-Path $RootDir "..") "build/ios-device"
     $bundleId = "com.stacknode.arcadia"
     $preferredDeviceName = $env:ARCADIA_IOS_DEVICE_NAME

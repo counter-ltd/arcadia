@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SOURCE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 OUT_DIR="${SOURCE_DIR}/../Mobile/iOS/ArcadiaCore"
 LIB_NAME="libarcadia_core.a"
 DEVICE_TARGET="aarch64-apple-ios"

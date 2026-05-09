@@ -20,7 +20,7 @@ Config migrations live in `ModulesConfig::merge_defaults()`. When renaming a mod
 |------|-------------|
 | Rust (`rustup`, `cargo`) | Core + Desktop |
 | Xcode + CLI tools | iOS app + xcframework build |
-| `rustup target add aarch64-apple-ios aarch64-apple-ios-sim` | `build-ios-framework.sh` |
+| `rustup target add aarch64-apple-ios aarch64-apple-ios-sim` | `Builds/build-ios-framework.sh` |
 | Swift (via Xcode) | iOS app + dev launcher |
 
 ---

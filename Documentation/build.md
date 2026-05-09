@@ -32,7 +32,7 @@ cd Shared && cargo test -p arcadia-core
 Run after any change to `ffi.rs` or exported types:
 
 ```sh
-bash Shared/Scripts/build-ios-framework.sh
+bash Shared/Scripts/Builds/build-ios-framework.sh
 ```
 
 Regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcframework`. Then open `ArcadiaApp` in Xcode and build.
@@ -40,8 +40,8 @@ Regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcfram
 ## Launcher menus
 
 ```sh
-bash Shared/Scripts/Launcher.sh
-pwsh  Shared/Scripts/Launcher.ps1
+bash Shared/Scripts/Launchers/Launcher.sh
+pwsh  Shared/Scripts/Launchers/Launcher.ps1
 ```
 
 ## Global wrappers (macOS)

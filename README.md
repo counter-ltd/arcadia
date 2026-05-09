@@ -30,7 +30,7 @@ Built on the same DNA as **[Holos](https://github.com/stack-node/holos)** — *u
 | Mirror host UI state to clients | `surface.snapshot` — modules + nav registry + revision |
 | Push module changes from client to host | `surface.patch` with `modules_set` op |
 | Run headless as a host | `cargo run` (default `headless` feature) |
-| Rebuild iOS after FFI changes | `bash Shared/Scripts/build-ios-framework.sh` |
+| Rebuild iOS after FFI changes | `bash Shared/Scripts/Builds/build-ios-framework.sh` |
 | Install global CLI wrappers | `bash Shared/Scripts/Installers/install-global-commands-macos.sh` |
 
 ---
@@ -56,7 +56,7 @@ Known gaps are tracked in-repo instead of pretending shipping equals finished.
 |------|-------------|
 | Rust (`rustup`, `cargo`) | Core + Desktop |
 | Xcode + CLI tools | iOS app + xcframework build |
-| `rustup target add aarch64-apple-ios aarch64-apple-ios-sim` | `build-ios-framework.sh` |
+| `rustup target add aarch64-apple-ios aarch64-apple-ios-sim` | `Builds/build-ios-framework.sh` |
 
 **Build:**
 
@@ -71,7 +71,7 @@ cd Desktop && cargo run
 cd Shared && cargo test -p arcadia-core
 
 # iOS framework (after ffi.rs changes)
-bash Shared/Scripts/build-ios-framework.sh
+bash Shared/Scripts/Builds/build-ios-framework.sh
 ```
 
 ---

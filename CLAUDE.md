@@ -171,7 +171,7 @@ Surface code must NOT:
 
 Any edit to `ffi.rs` or exported FFI types requires:
 ```sh
-bash Shared/Scripts/build-ios-framework.sh
+bash Shared/Scripts/Builds/build-ios-framework.sh
 ```
 This regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcframework`. Commit both.
 
@@ -419,7 +419,7 @@ cd Desktop && cargo run
 cd Shared && cargo test -p arcadia-core
 
 # iOS framework rebuild (after ffi.rs changes)
-bash Shared/Scripts/build-ios-framework.sh
+bash Shared/Scripts/Builds/build-ios-framework.sh
 
 # Global CLI wrappers (macOS)
 bash Shared/Scripts/Installers/install-global-commands-macos.sh

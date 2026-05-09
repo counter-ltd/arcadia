@@ -7,7 +7,7 @@ Read `AGENTS.md` — it has the registry-discipline rules and the full list of a
 3. **No hardcoded page ID match arms in visibility logic.** Derive from `required_module` in `PageDefinition`.
 4. **No inline colors.** Theme layer only.
 5. **Cross-platform logic belongs in core.** If you're writing the same thing in `app.rs` and `ContentView.swift`, it's core logic.
-6. **After FFI changes:** run `build-ios-framework.sh` and commit `Generated/` + `xcframework`.
+6. **After FFI changes:** run `Shared/Scripts/Builds/build-ios-framework.sh` and commit `Generated/` + `xcframework`.
 
 If something's missing: open a PR, draft a module, or file an issue with a concrete repro.
 

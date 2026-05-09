@@ -25,10 +25,10 @@ done <<< "$STAGED"
 
 [[ "${touch_arcadia}" -eq 1 ]] || exit 0
 
-echo "Arcadia: ArcadiaCore sources staged — running Shared/Scripts/build-ios-framework.sh"
+echo "Arcadia: ArcadiaCore sources staged — running Shared/Scripts/Builds/build-ios-framework.sh"
 echo "          (slow; skip with: SKIP_IOS_FFI=1 git commit ...)"
 
-bash "${REPO_ROOT}/Shared/Scripts/build-ios-framework.sh"
+bash "${REPO_ROOT}/Shared/Scripts/Builds/build-ios-framework.sh"
 
 git add Mobile/iOS/ArcadiaCore/Generated Mobile/iOS/ArcadiaCore/ArcadiaCore.xcframework
 

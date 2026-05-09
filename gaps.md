@@ -92,7 +92,7 @@ There is limited automated coverage for:
 - Thin-client preference persistence  
 - LAN routing integration
 
-iOS **`ArcadiaCore.xcframework`** rebuild after FFI changes is **manual** unless CI encodes **`Shared/Scripts/build-ios-framework.sh`**.
+iOS **`ArcadiaCore.xcframework`** rebuild after FFI changes is **manual** unless CI encodes **`Shared/Scripts/Builds/build-ios-framework.sh`**.
 
 **Directions:** add targeted **`arcadia-core`** tests + workflow step that fails when Generated bindings / xcframework drift from **`ffi.rs`**.
 

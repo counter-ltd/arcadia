@@ -3,7 +3,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 CARGO_BIN="${HOME}/.cargo/bin"
 
 if [[ ":${PATH}:" != *":${CARGO_BIN}:"* ]]; then
@@ -45,7 +45,7 @@ deploy_ios_device() {
   fi
   local configuration="$1"
   local project_path="${ROOT_DIR}/../Mobile/iOS/ArcadiaApp.xcodeproj"
-  local shared_build_script="${ROOT_DIR}/Scripts/build-ios-framework.sh"
+  local shared_build_script="${ROOT_DIR}/Scripts/Builds/build-ios-framework.sh"
   local derived_data_path="${ROOT_DIR}/../build/ios-device"
   local bundle_id="com.stacknode.arcadia"
   local preferred_device_name="${ARCADIA_IOS_DEVICE_NAME:-}"

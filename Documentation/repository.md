@@ -26,10 +26,10 @@ Shared/
       platform/
         mod.rs, macos.rs, ios.rs, linux.rs, windows.rs, unknown.rs
   Scripts/
-    build-ios-framework.sh                      # Rebuild xcframework + Swift bindings
+    Builds/build-ios-framework.sh               # Rebuild xcframework + Swift bindings
     Installers/install-global-commands-macos.sh # Install ~/.local/bin wrappers
     Installers/install-git-hooks.sh             # Enable repo .githooks (FFI pre-commit, etc.)
-    Launcher.sh / Launcher.ps1        # Shell launcher menus
+    Launchers/Launcher.sh / Launcher.ps1        # Shell launcher menus
   Tools/uniffi-bindgen/               # UniFFI bindgen binary (workspace member)
 
 Desktop/

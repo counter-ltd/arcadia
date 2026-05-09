@@ -108,7 +108,7 @@ The `remote-session` module is a routing gate only. `surface.*` is the protocol 
 
 ```
 // NEVER commit ffi.rs changes without running:
-//   bash Shared/Scripts/build-ios-framework.sh
+//   bash Shared/Scripts/Builds/build-ios-framework.sh
 // and committing the updated Generated/ + ArcadiaCore.xcframework
 ```
 
@@ -216,7 +216,7 @@ Ask these questions. If any answer is "no," stop and fix it first.
 3. **Am I adding a new field/property that tracks a specific module's state?** → Use `is_module_enabled(name)` instead.
 4. **Am I writing the same logic for both Desktop and iOS?** → Move it to `arcadia_core`.
 5. **Am I inlining a color value?** → Put it in the theme layer.
-6. **Did I change `ffi.rs` or any FFI-exported type?** → Run `build-ios-framework.sh` before committing.
+6. **Did I change `ffi.rs` or any FFI-exported type?** → Run `Shared/Scripts/Builds/build-ios-framework.sh` before committing.
 7. **Am I renaming a module?** → Add a `merge_defaults()` migration.
 8. **Am I creating a new `remote-session.*` command for UI state?** → Use `surface.snapshot` / `surface.patch` instead.
 
