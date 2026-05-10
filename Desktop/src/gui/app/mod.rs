@@ -1,25 +1,32 @@
 //! GPUI shell root view — split across `app/` submodules for readability.
 
+#[cfg(feature = "gui")]
 use std::path::PathBuf;
 
+#[cfg(feature = "gui")]
 mod entry;
+#[cfg(feature = "ios-gui")]
+pub mod entry_ios;
 mod lan_nodes;
 mod late;
 mod lifecycle;
 mod modules_page;
 mod navigation;
-mod network_overview;
 mod python_settings;
 mod root;
+mod services;
+#[cfg(feature = "gui")]
 mod shell;
 mod sidebar;
 mod splash;
 
+#[cfg(feature = "gui")]
 pub use entry::run;
 
 use arcadia_core::navigation::NavigationRegistryOwned;
 use openframe::{FocusHandle, ScrollHandle, SharedString};
 
+#[cfg(feature = "gui")]
 use super::tui::TuiSession;
 
 /// Top inset so window chrome (macOS traffic lights) does not overlap the first row of UI.
@@ -40,12 +47,25 @@ pub(crate) fn window_controls_top_padding(window: &openframe::Window) -> openfra
     }
 }
 
+/// Request to recover a port-bound service after a collision. `service_id` indexes into
+/// `arcadia_core::services::SERVICE_DEFINITIONS` so the modal can call `controls.start`
+/// generically once the existing process has been terminated.
+#[derive(Clone, Debug)]
+pub struct PendingPortKill {
+    pub service_id: &'static str,
+    pub service_title: &'static str,
+    pub port: u16,
+    pub error: String,
+}
+
+#[cfg(feature = "gui")]
 #[derive(Clone, Copy, PartialEq)]
 pub enum ShellMode {
     Generic,
     Internal,
 }
 
+#[cfg(feature = "gui")]
 impl ShellMode {
     pub(super) fn toggle(self) -> Self {
         match self {
@@ -69,6 +89,7 @@ impl ShellMode {
     }
 }
 
+#[cfg(feature = "gui")]
 pub struct TerminalInstance {
     pub id: usize,
     pub label: String,
@@ -101,15 +122,24 @@ pub struct ArcadiaRoot {
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
     pub python_extension_rows: Vec<(String, String, String, bool)>,
     pub pending_module_enable: Option<(String, Vec<String>)>,
+    #[cfg(feature = "gui")]
     pub terminals: Vec<TerminalInstance>,
+    #[cfg(feature = "gui")]
     pub active_terminal_id: usize,
+    #[cfg(feature = "gui")]
     pub next_terminal_serial: usize,
+    #[cfg(feature = "gui")]
     pub terminal_context_menu_open: bool,
+    #[cfg(feature = "gui")]
     pub terminal_kill_menu: Option<usize>,
+    #[cfg(feature = "gui")]
     pub context_menu_position: openframe::Point<openframe::Pixels>,
+    #[cfg(feature = "gui")]
     pub shell_focus: FocusHandle,
     pub late_compose_focus: FocusHandle,
+    #[cfg(feature = "gui")]
     pub shell_caret_visible: bool,
+    #[cfg(feature = "gui")]
     pub shell_caret_task_started: bool,
     pub splash_elapsed_ms: f32,
     pub splash_tick_started: bool,
@@ -127,7 +157,10 @@ pub struct ArcadiaRoot {
     pub lan_discovered_peers: Vec<(String, String)>,
     pub lan_command_feedback: String,
     pub lan_service_feedback: String,
-    pub pending_lan_port_kill_prompt: Option<String>,
+    /// Pending "kill existing process on this port and retry" prompt for any service whose
+    /// `start` failed with a port-collision error. Carries enough context (service id +
+    /// detected port + raw error) to recover generically without per-service GUI code.
+    pub pending_port_kill_prompt: Option<PendingPortKill>,
     pub lan_poll_task_started: bool,
     pub late_poll_task_started: bool,
     pub late_last_revision: u64,
@@ -143,10 +176,12 @@ pub struct ArcadiaRoot {
 }
 
 impl ArcadiaRoot {
+    #[cfg(feature = "gui")]
     pub(crate) fn active_terminal(&self) -> &TerminalInstance {
         &self.terminals[self.active_terminal_id]
     }
 
+    #[cfg(feature = "gui")]
     pub(crate) fn active_terminal_mut(&mut self) -> &mut TerminalInstance {
         &mut self.terminals[self.active_terminal_id]
     }

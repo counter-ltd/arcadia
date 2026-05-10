@@ -85,7 +85,7 @@ set -euo pipefail
 
 PROJECT_ROOT="${ROOT_DIR}/.."
 PROJECT_PATH="Mobile/iOS/ArcadiaApp.xcodeproj"
-SHARED_BUILD_SCRIPT="${ROOT_DIR}/Scripts/Builds/build-ios-framework.sh"
+SHARED_BUILD_SCRIPT="${ROOT_DIR}/Scripts/Builds/build-ios-app.sh"
 DERIVED_DATA_PATH="\${PROJECT_ROOT}/Builds/Mobile/iOS/DerivedData/Device"
 BUNDLE_ID="com.stacknode.arcadia"
 PREFERRED_DEVICE_NAME="\${ARCADIA_IOS_DEVICE_NAME:-}"

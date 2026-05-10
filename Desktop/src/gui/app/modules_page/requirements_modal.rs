@@ -1,7 +1,8 @@
 use openframe::{div, rgb};
 use openframe::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
-use crate::cli;
+use arcadia_core::config::ConfigFile;
+use arcadia_core::config::modules::ModulesConfig;
 use crate::gui::app::ArcadiaRoot;
 
 impl ArcadiaRoot {
@@ -103,9 +104,10 @@ impl ArcadiaRoot {
                                                     if let Some((module_name, _)) =
                                                         this.pending_module_enable.clone()
                                                     {
-                                                        let _ = cli::handle(&format!(
-                                                            "module {module_name} enable -requirements"
-                                                        ));
+                                                        if let Ok(mut cfg) = ModulesConfig::load_or_create() {
+                                                            let _ = cfg.enable_with_requirements(&module_name);
+                                                            let _ = cfg.save();
+                                                        }
                                                         this.reload_modules();
                                                     }
                                                     this.pending_module_enable = None;

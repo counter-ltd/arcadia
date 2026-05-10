@@ -485,7 +485,7 @@ impl ArcadiaRoot {
         } else {
             theme::sidebar_nav_idle_foreground(is_dark)
         };
-        let is_shell_page = page_id == "utility.shell";
+        let _is_shell_page = page_id == "utility.shell";
         let page_id_left = page_id.clone();
         div()
             .px_3()
@@ -533,16 +533,20 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Right,
                 cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
-                    if is_shell_page {
+                    #[cfg(feature = "gui")]
+                    if _is_shell_page {
                         this.terminal_context_menu_open = true;
                         this.terminal_kill_menu = None;
                         this.context_menu_position = event.position;
                         cx.notify();
                     }
+                    #[cfg(not(feature = "gui"))]
+                    let _ = (this, event, cx);
                 }),
             )
     }
 
+    #[cfg(feature = "gui")]
     pub fn sidebar_sub_item(
         cx: &mut Context<Self>,
         label: openframe::SharedString,
@@ -590,6 +594,7 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
+                    #[cfg(feature = "gui")]
                     if terminal_id < this.terminals.len() {
                         this.active_terminal_id = terminal_id;
                         this.active_page_id = "utility.shell".to_string();
@@ -600,9 +605,14 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Right,
                 cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
-                    this.terminal_kill_menu = Some(terminal_id);
-                    this.terminal_context_menu_open = false;
-                    this.context_menu_position = event.position;
+                    #[cfg(feature = "gui")]
+                    {
+                        this.terminal_kill_menu = Some(terminal_id);
+                        this.terminal_context_menu_open = false;
+                        this.context_menu_position = event.position;
+                    }
+                    #[cfg(not(feature = "gui"))]
+                    let _ = (this, event, terminal_id);
                     cx.notify();
                 }),
             )

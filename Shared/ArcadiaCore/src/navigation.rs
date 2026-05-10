@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::modules::{
-    LAN_MODULE_NAME, LATE_MODULE_NAME, NET_MODULE_NAME, PYTHON_HOST_MODULE_NAME,
-    TERMINAL_MODULE_NAME,
+    LAN_MODULE_NAME, LATE_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
 };
+use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
 
 #[derive(Clone, Copy, Serialize)]
 pub struct NavigationPageDefinition {
@@ -34,11 +34,13 @@ pub struct NavigationRegistry {
     pub pages: Vec<NavigationPageDefinition>,
     pub groups: Vec<NavigationGroupDefinition>,
     pub global_pages: Vec<&'static str>,
-    /// Pages rendered as compact controls in the surface's top bar (e.g. Logs, Modules).
+    /// Pages rendered as compact controls in the surface's top bar (e.g. Logs, Extensions, Modules).
     /// Distinct from `global_pages` (sidebar), so each surface can place them appropriately.
     pub top_bar_pages: Vec<&'static str>,
     /// Sidebar "Settings" hub: tapping the parent reveals these pages (same IDs may appear in `top_bar_pages`).
     pub settings_hub_pages: Vec<&'static str>,
+    /// Modules that have registered themselves on a service-host page (e.g. LAN Discovery → utility.services).
+    pub services: Vec<crate::services::ServiceDefinition>,
     pub default_group: &'static str,
     pub default_page: &'static str,
 }
@@ -78,6 +80,10 @@ pub struct NavigationRegistryOwned {
     pub top_bar_pages: Vec<String>,
     #[serde(rename = "settings_hub_pages", default)]
     pub settings_hub_pages: Vec<String>,
+    /// Service descriptors mirrored from the host so thin clients render the same Services rows.
+    /// Drives service-host page visibility (see [`is_page_visible_with`]).
+    #[serde(default)]
+    pub services: Vec<ServiceOwned>,
     #[serde(rename = "default_group")]
     pub default_group: String,
     #[serde(rename = "default_page")]
@@ -92,9 +98,19 @@ impl NavigationRegistryOwned {
             global_pages: GLOBAL_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
             top_bar_pages: TOP_BAR_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
             settings_hub_pages: SETTINGS_HUB_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
+            services: SERVICE_DEFINITIONS.iter().map(|s| s.into()).collect(),
             default_group: DEFAULT_GROUP_ID.to_string(),
             default_page: DEFAULT_PAGE_ID.to_string(),
         }
+    }
+
+    pub fn services_for_page(&self, page_id: &str) -> Vec<&ServiceOwned> {
+        self.services.iter().filter(|s| s.page_id == page_id).collect()
+    }
+
+    /// True when at least one service is registered to this page in this registry.
+    pub fn page_has_services(&self, page_id: &str) -> bool {
+        self.services.iter().any(|s| s.page_id == page_id)
     }
 }
 
@@ -136,6 +152,17 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         required_module: Some(TERMINAL_MODULE_NAME),
     },
     NavigationPageDefinition {
+        id: "utility.services",
+        title: "Services",
+        description: "Long-running module services advertised by Arcadia (LAN discovery, etc.).",
+        glyph: "services",
+        system_image: "antenna.radiowaves.left.and.right",
+        accent: "amber",
+        // Visibility is service-driven: page is shown iff at least one entry in
+        // `SERVICE_DEFINITIONS` targets this page id and has its required module enabled.
+        required_module: None,
+    },
+    NavigationPageDefinition {
         id: "global.dashboard",
         title: "Dashboard",
         description: "Overview of the Arcadia application surface.",
@@ -172,13 +199,13 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         required_module: None,
     },
     NavigationPageDefinition {
-        id: "network.overview",
-        title: "Overview",
-        description: "Network status and module connectivity overview.",
-        glyph: "network",
-        system_image: "network",
-        accent: "teal",
-        required_module: Some(NET_MODULE_NAME),
+        id: "global.appearance",
+        title: "Appearance",
+        description: "Theme and display preferences. Placeholder — detailed controls will land here.",
+        glyph: "appearance",
+        system_image: "paintpalette",
+        accent: "indigo",
+        required_module: None,
     },
     NavigationPageDefinition {
         id: "network.nodes",
@@ -218,9 +245,9 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
     },
     NavigationPageDefinition {
         id: "python.settings",
-        title: "Python",
-        description: "Enable or disable individual Python extensions loaded from ~/Arcadia/Extensions/.",
-        glyph: "flask",
+        title: "Extensions",
+        description: "Enable or disable Python extensions loaded from ~/Arcadia/Extensions/.",
+        glyph: "python",
         system_image: "flask.fill",
         accent: "indigo",
         required_module: Some(PYTHON_HOST_MODULE_NAME),
@@ -233,7 +260,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
         label: "Utilities",
         glyph: "tools",
         system_image: "wrench.and.screwdriver",
-        pages: &["utility.shell"],
+        pages: &["utility.shell", "utility.services"],
         accent: "amber",
     },
     NavigationGroupDefinition {
@@ -241,7 +268,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
         label: "Network",
         glyph: "network",
         system_image: "network",
-        pages: &["network.overview", "network.nodes"],
+        pages: &["network.nodes"],
         accent: "cyan",
     },
     NavigationGroupDefinition {
@@ -255,12 +282,12 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
 ];
 
 pub const GLOBAL_PAGE_IDS: &[&str] = &["global.dashboard", "global.settings"];
-pub const TOP_BAR_PAGE_IDS: &[&str] = &["global.logs", "global.modules"];
+pub const TOP_BAR_PAGE_IDS: &[&str] = &["global.logs", "python.settings", "global.modules"];
 /// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; these are **nested only**
 /// (not the hub header). Omit [`SETTINGS_HUB_ROOT_PAGE_ID`] — the header row is that page.
-/// Logs and modules are omitted because they are listed in [`TOP_BAR_PAGE_IDS`].
+/// Logs, Extensions (python.settings), and modules are omitted because they are listed in [`TOP_BAR_PAGE_IDS`].
 pub const SETTINGS_HUB_ROOT_PAGE_ID: &str = "global.settings";
-pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &["late.settings", "python.settings"];
+pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &["global.appearance", "late.settings"];
 pub const DEFAULT_GROUP_ID: &str = "utilities";
 pub const DEFAULT_PAGE_ID: &str = "global.dashboard";
 
@@ -279,6 +306,7 @@ pub fn default_navigation_registry() -> NavigationRegistry {
         global_pages: GLOBAL_PAGE_IDS.to_vec(),
         top_bar_pages: TOP_BAR_PAGE_IDS.to_vec(),
         settings_hub_pages: SETTINGS_HUB_PAGE_IDS.to_vec(),
+        services: SERVICE_DEFINITIONS.to_vec(),
         default_group: DEFAULT_GROUP_ID,
         default_page: DEFAULT_PAGE_ID,
     }
@@ -287,6 +315,53 @@ pub fn default_navigation_registry() -> NavigationRegistry {
 pub fn default_navigation_registry_json() -> String {
     serde_json::to_string(&NavigationRegistryOwned::from_static_registry())
         .expect("navigation registry serialization should always succeed")
+}
+
+/// Resolve page visibility from the static registry. Service-host pages (any page that has at
+/// least one entry in [`SERVICE_DEFINITIONS`]) become visible iff one of those services has its
+/// `required_module` enabled — the page's own `required_module` is ignored. Other pages fall
+/// back to their declared `required_module`.
+pub fn is_page_visible_with<F>(page_id: &str, is_module_enabled: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    let Some(page) = page_by_id(page_id) else {
+        return false;
+    };
+    if services::page_has_services(page_id) {
+        return services::services_for_page(page_id)
+            .iter()
+            .any(|service| is_module_enabled(service.required_module));
+    }
+    match page.required_module {
+        Some(module_name) => is_module_enabled(module_name),
+        None => true,
+    }
+}
+
+/// Same as [`is_page_visible_with`] but resolves the page (and its services) against an owned
+/// registry — used by clients consuming a host's `surface.snapshot` payload.
+pub fn is_page_visible_in_owned<F>(
+    registry: &NavigationRegistryOwned,
+    page_id: &str,
+    is_module_enabled: F,
+) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    let Some(page) = registry.pages.iter().find(|p| p.id == page_id) else {
+        return false;
+    };
+    if registry.page_has_services(page_id) {
+        return registry
+            .services_for_page(page_id)
+            .iter()
+            .any(|service| is_module_enabled(&service.required_module));
+    }
+    match page.required_module.as_deref() {
+        Some(module_name) => is_module_enabled(module_name),
+        None => true,
+    }
 }
 
 #[cfg(test)]
@@ -422,8 +497,8 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         let arr = v["top_bar_pages"].as_array().expect("top_bar_pages must serialize as array");
         let ids: Vec<String> = arr.iter().filter_map(|x| x.as_str().map(String::from)).collect();
-        assert!(ids.contains(&"global.logs".to_string()));
-        assert!(ids.contains(&"global.modules".to_string()));
+        let expected: Vec<String> = TOP_BAR_PAGE_IDS.iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(ids, expected, "top_bar_pages JSON must match TOP_BAR_PAGE_IDS");
     }
 
     #[test]
@@ -446,5 +521,56 @@ mod tests {
         let ids: Vec<String> = arr.iter().filter_map(|x| x.as_str().map(String::from)).collect();
         let expected: Vec<String> = SETTINGS_HUB_PAGE_IDS.iter().map(|s| (*s).to_string()).collect();
         assert_eq!(ids, expected, "settings_hub_pages JSON must match SETTINGS_HUB_PAGE_IDS");
+    }
+
+    #[test]
+    fn services_round_trip_through_json() {
+        let json = default_navigation_registry_json();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let arr = v["services"]
+            .as_array()
+            .expect("services must serialize as array");
+        assert!(
+            !arr.is_empty(),
+            "services array must include at least lan.discovery"
+        );
+        let ids: Vec<String> = arr
+            .iter()
+            .filter_map(|s| s["id"].as_str().map(String::from))
+            .collect();
+        assert!(ids.contains(&"lan.discovery".to_string()));
+    }
+
+    #[test]
+    fn service_host_page_visibility_follows_required_module() {
+        let visible_when = |module: &str| {
+            is_page_visible_with("utility.services", |name| name == module)
+        };
+        assert!(visible_when(crate::config::modules::LAN_MODULE_NAME));
+        assert!(!visible_when(crate::config::modules::TERMINAL_MODULE_NAME));
+        assert!(!is_page_visible_with("utility.services", |_| false));
+    }
+
+    #[test]
+    fn non_service_page_visibility_follows_declared_required_module() {
+        assert!(is_page_visible_with("utility.shell", |name| {
+            name == crate::config::modules::TERMINAL_MODULE_NAME
+        }));
+        assert!(!is_page_visible_with("utility.shell", |_| false));
+        // global.dashboard has no required_module → always visible.
+        assert!(is_page_visible_with("global.dashboard", |_| false));
+    }
+
+    #[test]
+    fn unknown_page_id_is_never_visible() {
+        assert!(!is_page_visible_with("does.not.exist", |_| true));
+    }
+
+    #[test]
+    fn is_page_visible_in_owned_matches_static() {
+        let registry = NavigationRegistryOwned::from_static_registry();
+        let lan_only = |name: &str| name == crate::config::modules::LAN_MODULE_NAME;
+        assert!(is_page_visible_in_owned(&registry, "utility.services", lan_only));
+        assert!(!is_page_visible_in_owned(&registry, "utility.services", |_| false));
     }
 }

@@ -1,8 +1,10 @@
 use arcadia_core::navigation;
 use openframe::{
-    div, px, rgb, AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render,
+    div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
+#[cfg(feature = "gui")]
+use openframe::AnyElement;
 
 use crate::gui::app::navigation::NavGroupRef;
 use crate::gui::app::splash::SPLASH_TOTAL_MS;
@@ -14,10 +16,13 @@ impl Render for ArcadiaRoot {
             self.ensure_splash_tick(window, cx);
             return self.render_splash();
         }
+        #[cfg(feature = "gui")]
         self.sync_peer_remote_exec_side_effects(window, cx);
+        #[cfg(feature = "gui")]
         self.ensure_shell_caret_task(window, cx);
         self.ensure_lan_poll_task(window, cx);
         self.ensure_late_poll_task(window, cx);
+        #[cfg(feature = "gui")]
         if self.terminals[self.active_terminal_id].tui_session.is_some() {
             self.sync_tui_size(window);
         }
@@ -70,10 +75,12 @@ impl Render for ArcadiaRoot {
                         this.session_route_menu_open = false;
                         changed = true;
                     }
+                    #[cfg(feature = "gui")]
                     if this.terminal_context_menu_open {
                         this.terminal_context_menu_open = false;
                         changed = true;
                     }
+                    #[cfg(feature = "gui")]
                     if this.terminal_kill_menu.is_some() {
                         this.terminal_kill_menu = None;
                         changed = true;
@@ -83,7 +90,12 @@ impl Render for ArcadiaRoot {
                     }
                 }),
             )
-            .on_key_down(cx.listener(Self::handle_global_key_down))
+            .on_key_down(cx.listener({
+                #[cfg(feature = "gui")]
+                { Self::handle_global_key_down }
+                #[cfg(not(feature = "gui"))]
+                { |_this: &mut ArcadiaRoot, _ev, _window, _cx| {} }
+            }))
             .child(if self.sidebar_visible {
                 self.render_sidebar(window, cx, &visible_groups, active_group, is_dark)
             } else {
@@ -128,11 +140,17 @@ impl Render for ArcadiaRoot {
                     ),
             )
             .child(self.requirements_modal(cx, is_dark))
-            .child(self.kill_existing_lan_modal(cx, is_dark))
-            .child(self.render_context_menu_overlay(cx, is_dark))
+            .child(self.kill_existing_port_modal(cx, is_dark))
+            .child({
+                #[cfg(feature = "gui")]
+                { self.render_context_menu_overlay(cx, is_dark) }
+                #[cfg(not(feature = "gui"))]
+                { div().into_any_element() }
+            })
     }
 }
 
+#[cfg(feature = "gui")]
 impl ArcadiaRoot {
     fn render_context_menu_overlay(
         &self,

@@ -62,6 +62,7 @@ pub fn top_bar_pill_hover_bg(is_dark: bool) -> Rgba {
 }
 
 /// Selected top-bar nav pill (e.g. Logs when that page is active).
+#[allow(dead_code)]
 pub fn top_bar_pill_active_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
@@ -80,6 +81,7 @@ pub fn top_bar_pill_active_bg(is_dark: bool) -> Rgba {
     }
 }
 
+#[allow(dead_code)]
 pub fn top_bar_pill_active_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
@@ -98,6 +100,7 @@ pub fn top_bar_pill_active_text(is_dark: bool) -> Rgba {
     }
 }
 
+#[allow(dead_code)]
 pub fn top_bar_pill_active_hover_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {

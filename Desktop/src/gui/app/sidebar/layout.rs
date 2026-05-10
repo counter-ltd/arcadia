@@ -280,6 +280,7 @@ impl ArcadiaRoot {
                                         openframe::MouseButton::Left,
                                         cx.listener(|this, _, _, _| {
                                             this.app_menu_open = false;
+                                            #[cfg(feature = "gui")]
                                             this.run_internal_quit_command();
                                         }),
                                     ),
@@ -340,6 +341,7 @@ impl ArcadiaRoot {
                                         )
                                         .into_any_element(),
                                     );
+                                    #[cfg(feature = "gui")]
                                     if page_id == "utility.shell" && self.terminals.len() > 1 {
                                         for i in 0..self.terminals.len() {
                                             let label = self.terminals[i].label.clone();

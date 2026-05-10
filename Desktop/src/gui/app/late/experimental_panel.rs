@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use openframe::{
     div, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement,
     StatefulInteractiveElement, Styled, Window,

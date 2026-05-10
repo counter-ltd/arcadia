@@ -4,7 +4,6 @@ use arcadia_core::config::ConfigFile;
 use openframe::{div, rgb};
 use openframe::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
-use crate::cli;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -170,7 +169,10 @@ impl ArcadiaRoot {
                                 return;
                             }
                             if enabled {
-                                let _ = cli::handle(&format!("module {module_name} disable"));
+                                if let Ok(mut cfg) = ModulesConfig::load_or_create() {
+                                    let _ = cfg.set_module_state(&module_name, false);
+                                    let _ = cfg.save();
+                                }
                                 this.pending_module_enable = None;
                                 this.reload_modules();
                                 cx.notify();
@@ -183,8 +185,10 @@ impl ArcadiaRoot {
                                             Some((module_name.clone(), missing));
                                     }
                                     Ok(_) => {
-                                        let _ =
-                                            cli::handle(&format!("module {module_name} enable"));
+                                        if let Ok(mut cfg) = ModulesConfig::load_or_create() {
+                                            let _ = cfg.enable_with_requirements(&module_name);
+                                            let _ = cfg.save();
+                                        }
                                         this.pending_module_enable = None;
                                         this.reload_modules();
                                     }

@@ -1,23 +1,32 @@
 use std::env;
+#[cfg(feature = "gui")]
 use std::path::PathBuf;
 use std::time::Duration;
 
 use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::modules::{
-    ModulesConfig, LAN_MODULE_NAME, PYTHON_HOST_MODULE_NAME, REMOTE_SESSION_MODULE_NAME,
-    TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME,
+    ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME,
 };
+#[cfg(feature = "gui")]
+use arcadia_core::config::modules::{TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME};
+#[cfg(feature = "python-extensions")]
+use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
+#[cfg(feature = "gui")]
 use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::parse_surface_snapshot;
 use arcadia_core::navigation;
 use openframe::{Context, Timer, Window};
 
+#[cfg(feature = "gui")]
 use super::super::tui;
-use super::{ArcadiaRoot, ShellMode, TerminalInstance};
+use super::ArcadiaRoot;
+#[cfg(feature = "gui")]
+use super::{ShellMode, TerminalInstance};
 
+#[cfg(feature = "gui")]
 impl TerminalInstance {
     pub(crate) fn new(
         id: usize,
@@ -66,12 +75,14 @@ impl TerminalInstance {
 }
 
 impl ArcadiaRoot {
+    #[cfg(feature = "gui")]
     pub(super) fn reset_shell_state(&mut self) {
         let (working_dir, display_cwd) = Self::current_dir_strings();
         let history = Self::initial_shell_history();
         self.active_terminal_mut().reset(history, working_dir, display_cwd);
     }
 
+    #[cfg(feature = "gui")]
     pub(super) fn sync_shell_display_cwd_from_env(&mut self) {
         let (working_dir, display_cwd) = Self::current_dir_strings();
         let term = self.active_terminal_mut();
@@ -79,6 +90,7 @@ impl ArcadiaRoot {
         term.shell_display_cwd = display_cwd;
     }
 
+    #[cfg(feature = "gui")]
     fn current_dir_strings() -> (PathBuf, String) {
         match env::current_dir() {
             Ok(path) => {
@@ -96,6 +108,7 @@ impl ArcadiaRoot {
         }
     }
 
+    #[cfg(feature = "gui")]
     fn initial_shell_history() -> Vec<String> {
         let Ok(cfg) = ModulesConfig::load_or_create() else {
             return vec!["Arcadia Terminal ready.".to_string()];
@@ -116,6 +129,7 @@ impl ArcadiaRoot {
     }
 
     pub fn new(cx: &mut openframe::Context<Self>) -> Self {
+        #[cfg(feature = "gui")]
         let shell_focus = cx.focus_handle();
         let late_compose_focus = cx.focus_handle();
         let late_settings_server_url_focus = cx.focus_handle();
@@ -125,15 +139,18 @@ impl ArcadiaRoot {
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
-        let (shell_working_dir, shell_display_cwd) = Self::current_dir_strings();
-        let initial_history = Self::initial_shell_history();
-        let first_terminal = TerminalInstance::new(
-            0,
-            "Terminal 1".to_string(),
-            shell_working_dir,
-            shell_display_cwd,
-            initial_history,
-        );
+        #[cfg(feature = "gui")]
+        let first_terminal = {
+            let (shell_working_dir, shell_display_cwd) = Self::current_dir_strings();
+            let initial_history = Self::initial_shell_history();
+            TerminalInstance::new(
+                0,
+                "Terminal 1".to_string(),
+                shell_working_dir,
+                shell_display_cwd,
+                initial_history,
+            )
+        };
         let mut root = ArcadiaRoot {
             title: openframe::SharedString::new_static("Arcadia"),
             active_page_id: navigation::DEFAULT_PAGE_ID.to_string(),
@@ -141,15 +158,24 @@ impl ArcadiaRoot {
             module_rows,
             python_extension_rows: Vec::new(),
             pending_module_enable: None,
+            #[cfg(feature = "gui")]
             terminals: vec![first_terminal],
+            #[cfg(feature = "gui")]
             active_terminal_id: 0,
+            #[cfg(feature = "gui")]
             next_terminal_serial: 2,
+            #[cfg(feature = "gui")]
             terminal_context_menu_open: false,
+            #[cfg(feature = "gui")]
             terminal_kill_menu: None,
+            #[cfg(feature = "gui")]
             context_menu_position: openframe::Point::default(),
+            #[cfg(feature = "gui")]
             shell_focus,
             late_compose_focus,
+            #[cfg(feature = "gui")]
             shell_caret_visible: true,
+            #[cfg(feature = "gui")]
             shell_caret_task_started: false,
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
@@ -164,7 +190,7 @@ impl ArcadiaRoot {
             lan_discovered_peers: Vec::new(),
             lan_command_feedback: String::new(),
             lan_service_feedback: String::new(),
-            pending_lan_port_kill_prompt: None,
+            pending_port_kill_prompt: None,
             lan_poll_task_started: false,
             late_poll_task_started: false,
             late_last_revision: 0,
@@ -250,6 +276,7 @@ impl ArcadiaRoot {
         self.ensure_valid_navigation_selection();
     }
 
+    #[cfg(feature = "gui")]
     pub fn create_new_terminal(&mut self) {
         let serial = self.next_terminal_serial;
         self.next_terminal_serial += 1;
@@ -268,6 +295,7 @@ impl ArcadiaRoot {
         self.terminal_context_menu_open = false;
     }
 
+    #[cfg(feature = "gui")]
     pub fn kill_terminal(&mut self, idx: usize) {
         if self.terminals.len() <= 1 {
             return;
@@ -319,6 +347,7 @@ impl ArcadiaRoot {
         .detach();
     }
 
+    #[cfg(feature = "gui")]
     pub fn ensure_shell_caret_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.shell_caret_task_started {
             return;

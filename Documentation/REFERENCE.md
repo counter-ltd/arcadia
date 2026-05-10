@@ -26,14 +26,23 @@
 
 ## Navigation reference
 
-All 7 pages. Add new pages to `PAGE_DEFINITIONS` in `navigation.rs` — never to surface match arms.
+Pages live in `PAGE_DEFINITIONS` (`navigation.rs`). `service-driven` in the table below means
+the page is visible iff at least one entry in `SERVICE_DEFINITIONS` targeting it has its
+required module enabled — see `services.rs` for the registry. Never hardcode per-page logic
+in surface match arms.
 
 | Page ID | Title | Group | Required Module | Glyph | SF Symbol |
 |---------|-------|-------|-----------------|-------|-----------|
-| `utility.shell` | Shell | `utilities` | `shell` | `terminal` | `terminal` |
+| `utility.shell` | Terminal | `utilities` | `terminal` | `terminal` | `terminal` |
+| `utility.services` | Services | `utilities` | _service-driven_ | `services` | `antenna.radiowaves.left.and.right` |
 | `global.dashboard` | Dashboard | (sidebar global) | — | `home` | `house` |
 | `global.logs` | Logs | (top bar) | — | `logs` | `doc.text.magnifyingglass` |
 | `global.settings` | Settings | (sidebar global) | — | `settings` | `gearshape` |
 | `global.modules` | Modules | (top bar) | — | `modules` | `switch.2` |
-| `network.overview` | Network | `network` | `net` | `nodes` | `network` |
-| `network.nodes` | Nodes | `network` | `lan` | `nodes` | `antenna.radiowaves.left.and.right` |
+| `network.nodes` | Nodes | `network` | `lan` | `nodes` | `wifi` |
+
+### Services (`SERVICE_DEFINITIONS`)
+
+| Service ID | Target Page | Required Module | Controls |
+|------------|-------------|-----------------|----------|
+| `lan.discovery` | `utility.services` | `lan` | start, stop, status_detail |

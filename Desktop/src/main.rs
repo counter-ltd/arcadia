@@ -31,17 +31,17 @@ fn main() {
         return;
     }
 
-    #[cfg(not(feature = "gui"))]
+    #[cfg(not(feature = "gui-any"))]
     {
         headless::run();
         modules::shutdown_all();
     }
 }
 
-#[cfg(feature = "gui")]
+#[cfg(feature = "gui-any")]
 mod gui;
 
-#[cfg(not(feature = "gui"))]
+#[cfg(not(feature = "gui-any"))]
 mod headless {
     use crate::cli;
 

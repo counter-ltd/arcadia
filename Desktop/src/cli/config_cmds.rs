@@ -352,6 +352,10 @@ pub fn open_config(config_name: &str) {
                 .args(["/C", "start", "", &path.to_string_lossy()])
                 .status()
         }
+        #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+        {
+            Err::<std::process::ExitStatus, _>(std::io::Error::new(std::io::ErrorKind::Unsupported, "open not supported on this platform"))
+        }
     };
 
     match status {

@@ -51,6 +51,7 @@ impl NavPageRef<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn required_module(&self) -> Option<&str> {
         match self {
             NavPageRef::Static(p) => p.required_module,
@@ -81,6 +82,7 @@ impl NavGroupRef<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn system_image(&self) -> &str {
         match self {
             NavGroupRef::Static(g) => g.system_image,
@@ -190,6 +192,7 @@ impl ArcadiaRoot {
         active_page: Option<NavPageRef<'_>>,
         is_dark: bool,
     ) -> Div {
+        #[cfg(feature = "gui")]
         if self.active_page_id.as_str() == "utility.shell" {
             return div()
                 .flex_1()
@@ -201,17 +204,18 @@ impl ArcadiaRoot {
         if self.active_page_id.as_str() == "global.modules" {
             return div().w_full().p_6().child(self.modules_panel(cx, is_dark));
         }
-        if self.active_page_id.as_str() == "network.overview" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.network_overview_panel(cx, is_dark));
-        }
         if self.active_page_id.as_str() == "network.nodes" {
             return div()
                 .w_full()
                 .p_6()
                 .child(self.lan_nodes_panel(cx, is_dark));
+        }
+        // TODO: dispatch via page registry; see anti-pattern #3 in AGENTS.md.
+        if self.active_page_id.as_str() == "utility.services" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.services_panel(cx, is_dark));
         }
         if self.active_page_id.as_str() == "late.now_playing" {
             return self.render_late_now_playing(window, cx, is_dark);
@@ -262,13 +266,12 @@ impl ArcadiaRoot {
     }
 
     pub fn is_page_visible(&self, page_id: &str) -> bool {
-        let Some(page) = self.page_ref(page_id) else {
-            return false;
-        };
-        match page.required_module() {
-            Some(module_name) => self.is_module_enabled(module_name),
-            None => true,
+        if let Some(remote) = &self.remote_nav {
+            return navigation::is_page_visible_in_owned(remote, page_id, |name| {
+                self.is_module_enabled(name)
+            });
         }
+        navigation::is_page_visible_with(page_id, |name| self.is_module_enabled(name))
     }
 
     pub fn active_page_if_visible(&self) -> Option<NavPageRef<'_>> {
