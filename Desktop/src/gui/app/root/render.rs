@@ -3,6 +3,7 @@ use openframe::{
     div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
+use openframe::prelude::FluentBuilder as _;
 #[cfg(feature = "gui")]
 use openframe::AnyElement;
 
@@ -30,6 +31,7 @@ impl Render for ArcadiaRoot {
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
         );
+        self.refresh_style_for_mode(is_dark, cx);
         let visible_groups = self.visible_groups_effective();
         let fallback_group = NavGroupRef::Static(
             navigation::group_by_id(navigation::DEFAULT_GROUP_ID)
@@ -55,9 +57,11 @@ impl Render for ArcadiaRoot {
         );
 
         let glyph = crate::gui::theme::active_glyph(cx);
+        let ui_font_family = crate::gui::theme::active_ui_font_family(cx).map(str::to_string);
         div()
             .relative()
             .size_full()
+            .when_some(ui_font_family, |d, f| d.font_family(f))
             .bg(if let Some(g) = glyph {
                 g.bg
             } else if is_dark {
@@ -86,6 +90,10 @@ impl Render for ArcadiaRoot {
                     #[cfg(feature = "gui")]
                     if this.terminal_kill_menu.is_some() {
                         this.terminal_kill_menu = None;
+                        changed = true;
+                    }
+                    if this.color_picker_modal.is_some() {
+                        this.color_picker_modal = None;
                         changed = true;
                     }
                     if changed {
@@ -144,6 +152,7 @@ impl Render for ArcadiaRoot {
             )
             .child(self.requirements_modal(cx, is_dark))
             .child(self.kill_existing_port_modal(cx, is_dark))
+            .child(self.color_picker_modal(cx, is_dark))
             .child({
                 #[cfg(feature = "gui")]
                 { self.render_context_menu_overlay(cx, is_dark) }

@@ -1,7 +1,111 @@
 //! Arcadia MOTD — ethereal gateway scene (gradient sky, parabolic arch, sun, dunes) + system info.
 
+use crate::config::appearance::AppearanceConfig;
+use crate::config::extension_tokens;
+use crate::config::ConfigFile;
+use crate::modules::python_registry::{list_styles, GlyphParams};
 use crate::modules::{ExecutionContext, ModuleCommand};
 use std::fmt::Write as _;
+
+#[derive(Clone, Copy)]
+struct MotdAnsiPalette {
+    accent: (u8, u8, u8),
+    body: (u8, u8, u8),
+    dim: (u8, u8, u8),
+    sep: (u8, u8, u8),
+}
+
+fn hex_to_rgb(hex: &str) -> Option<(u8, u8, u8)> {
+    let hex = hex.trim().trim_start_matches('#');
+    if hex.len() < 6 {
+        return None;
+    }
+    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    Some((r, g, b))
+}
+
+fn rgb_from_hex(opt: Option<&String>, fallback: (u8, u8, u8)) -> (u8, u8, u8) {
+    opt.and_then(|s| hex_to_rgb(s.as_str())).unwrap_or(fallback)
+}
+
+fn merged_glyph_for_active_style(is_dark: bool) -> Option<GlyphParams> {
+    let active = AppearanceConfig::load_or_create().unwrap_or_default().active_style;
+    let style_row = list_styles().into_iter().find(|s| s.name == active)?;
+    let mut g = if is_dark {
+        style_row.glyph.clone()
+    } else {
+        style_row.glyph_light.clone().or_else(|| style_row.glyph.clone())
+    }?;
+    if let Some(module) = style_row.module_name.as_deref() {
+        if let Ok(file) = extension_tokens::load_module_tokens(module) {
+            extension_tokens::apply_file_tokens_to_glyph(&mut g, &file, is_dark);
+        }
+    }
+    Some(g)
+}
+
+fn palette_from_glyph(g: &GlyphParams, is_dark: bool) -> MotdAnsiPalette {
+    let defaults = if is_dark {
+        (
+            (16_u8, 185_u8, 129_u8),
+            (229_u8, 231_u8, 235_u8),
+            (156_u8, 163_u8, 175_u8),
+            (55_u8, 65_u8, 81_u8),
+        )
+    } else {
+        (
+            (16_u8, 185_u8, 129_u8),
+            (17_u8, 24_u8, 39_u8),
+            (107_u8, 114_u8, 128_u8),
+            (209_u8, 213_u8, 219_u8),
+        )
+    };
+    MotdAnsiPalette {
+        accent: rgb_from_hex(g.accent.as_ref(), defaults.0),
+        body: rgb_from_hex(g.text.as_ref(), defaults.1),
+        dim: rgb_from_hex(g.dim.as_ref(), defaults.2),
+        sep: rgb_from_hex(g.border.as_ref(), defaults.3),
+    }
+}
+
+fn fallback_palette(is_dark: bool) -> MotdAnsiPalette {
+    if is_dark {
+        MotdAnsiPalette {
+            accent: (176, 162, 236),
+            body: (235, 238, 248),
+            dim: (158, 138, 220),
+            sep: (118, 102, 198),
+        }
+    } else {
+        MotdAnsiPalette {
+            accent: (16, 185, 129),
+            body: (17, 24, 39),
+            dim: (107, 114, 128),
+            sep: (5, 150, 105),
+        }
+    }
+}
+
+fn motd_palette(is_dark: bool) -> MotdAnsiPalette {
+    merged_glyph_for_active_style(is_dark)
+        .map(|g| palette_from_glyph(&g, is_dark))
+        .unwrap_or_else(|| fallback_palette(is_dark))
+}
+
+/// Dark/light for CLI MOTD when no GUI passes a scheme (`ARCADIA_COLOR_SCHEME=light|dark`).
+pub fn guess_terminal_scheme_dark() -> bool {
+    match std::env::var("ARCADIA_COLOR_SCHEME") {
+        Ok(s) => match s.to_ascii_lowercase().as_str() {
+            "light" => return false,
+            "dark" => return true,
+            _ => {}
+        },
+        Err(_) => {}
+    }
+    true
+}
 
 pub const NAME: &str = "shell-motd";
 
@@ -560,50 +664,76 @@ fn memory_line() -> String {
 }
 
 /// Left column labels for stats block (fixed width reads cleaner beside wide art).
-fn lbl_col(key: &str, width: usize) -> String {
+fn lbl_col(key: &str, width: usize, accent: (u8, u8, u8)) -> String {
     format!(
-        "\x1b[38;2;176;162;236m{key:<width$}\x1b[0m",
+        "\x1b[38;2;{};{};{}m{key:<width$}\x1b[0m",
+        accent.0,
+        accent.1,
+        accent.2,
         key = key,
         width = width
     )
 }
 
-fn stat_row(key: &str, value: &str, label_w: usize) -> String {
+fn stat_row(key: &str, value: &str, label_w: usize, pal: &MotdAnsiPalette) -> String {
     format!(
-        "{}  \x1b[38;2;235;238;248m{value}\x1b[0m",
-        lbl_col(key, label_w),
+        "{}  \x1b[38;2;{};{};{}m{value}\x1b[0m",
+        lbl_col(key, label_w, pal.accent),
+        pal.body.0,
+        pal.body.1,
+        pal.body.2,
     )
 }
 
-fn palette_footer() -> String {
-    let colors: &[(u8, u8, u8)] = &[
+fn palette_footer(pal: &MotdAnsiPalette) -> String {
+    let colors: [(u8, u8, u8); 8] = [
+        pal.accent,
         (42, 28, 92),
         (88, 48, 138),
         (168, 92, 118),
         (255, 238, 168),
-        (218, 208, 246),
         (52, 36, 118),
         (36, 26, 82),
         (255, 252, 255),
     ];
     let mut s = String::new();
-    s.push_str("\x1b[38;2;140;125;188m.\x1b[0m ");
-    for &(r, g, b) in colors {
+    let _ = write!(
+        s,
+        "\x1b[38;2;{};{};{}m.\x1b[0m ",
+        pal.dim.0,
+        pal.dim.1,
+        pal.dim.2
+    );
+    for &(r, g, b) in &colors {
         let _ = write!(s, "\x1b[38;2;{r};{g};{b}mo\x1b[0m  ");
     }
     s.trim_end().to_string()
 }
 
-fn gather_right_column() -> Vec<String> {
+fn gather_right_column(pal: &MotdAnsiPalette) -> Vec<String> {
     const KW: usize = 10;
     let host = hostname_str();
     let user = username();
     let head = format!(
-        "\x1b[1m\x1b[38;2;248;246;255m{user}\x1b[0m\x1b[38;2;158;138;220m@\x1b[0m\x1b[1m\x1b[38;2;236;232;252m{host}\x1b[0m"
+        "\x1b[1m\x1b[38;2;{};{};{}m{user}\x1b[0m\x1b[38;2;{};{};{}m@\x1b[0m\x1b[1m\x1b[38;2;{};{};{}m{host}\x1b[0m",
+        pal.accent.0,
+        pal.accent.1,
+        pal.accent.2,
+        pal.dim.0,
+        pal.dim.1,
+        pal.dim.2,
+        pal.body.0,
+        pal.body.1,
+        pal.body.2,
     );
     let sep_n = format!("{user}@{host}").chars().count().clamp(28, 44);
     let sep: String = std::iter::repeat('─').take(sep_n).collect();
-    let sep_line = format!("\x1b[38;2;118;102;198m{sep}\x1b[0m");
+    let sep_line = format!(
+        "\x1b[38;2;{};{};{}m{sep}\x1b[0m",
+        pal.sep.0,
+        pal.sep.1,
+        pal.sep.2
+    );
 
     let mut lines = vec![head, sep_line];
     let pairs: [(&str, String); 9] = [
@@ -618,9 +748,9 @@ fn gather_right_column() -> Vec<String> {
         ("Memory", memory_line()),
     ];
     for (k, v) in pairs {
-        lines.push(stat_row(k, &v, KW));
+        lines.push(stat_row(k, &v, KW, pal));
     }
-    lines.push(palette_footer());
+    lines.push(palette_footer(pal));
     lines
 }
 
@@ -671,6 +801,12 @@ pub fn motd_string() -> String {
     motd_lines().join("\n")
 }
 
+/// Shell transcript / CLI MOTD using inferred scheme ([`guess_terminal_scheme_dark`]).
 pub fn motd_lines() -> Vec<String> {
-    merge_ansi(&arch_art_lines(), &gather_right_column())
+    motd_lines_for_scheme(guess_terminal_scheme_dark())
+}
+
+pub fn motd_lines_for_scheme(is_dark: bool) -> Vec<String> {
+    let pal = motd_palette(is_dark);
+    merge_ansi(&arch_art_lines(), &gather_right_column(&pal))
 }

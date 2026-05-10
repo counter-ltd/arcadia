@@ -134,82 +134,104 @@ fn value_as_glyph_color_string(v: &Value) -> Option<String> {
     }
 }
 
+fn apply_glyph_token_key(g: &mut GlyphParams, key: &str, v: &Value) {
+    match key {
+        "bg" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.bg = Some(s);
+            }
+        }
+        "surface" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.surface = Some(s);
+            }
+        }
+        "surface2" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.surface2 = Some(s);
+            }
+        }
+        "text" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.text = Some(s);
+            }
+        }
+        "dim" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.dim = Some(s);
+            }
+        }
+        "ui_font_family" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.ui_font_family = Some(s);
+            }
+        }
+        "border" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.border = Some(s);
+            }
+        }
+        "accent" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.accent = Some(s);
+            }
+        }
+        "border_chars" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.border_chars = Some(s);
+            }
+        }
+        "border_horizontal_pattern" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.border_horizontal_pattern = Some(s);
+            }
+        }
+        "border_vertical_pattern" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.border_vertical_pattern = Some(s);
+            }
+        }
+        "border_font_family" => {
+            if let Some(s) = value_as_glyph_color_string(v) {
+                g.border_font_family = Some(s);
+            }
+        }
+        "border_radius" => {
+            if let Some(f) = value_as_f32(v) {
+                g.border_radius = f;
+            }
+        }
+        "border_font_size_rems" => {
+            if let Some(f) = value_as_f32(v) {
+                g.border_font_size_rems = Some(f);
+            }
+        }
+        "border_side_rail_px" => {
+            if let Some(f) = value_as_f32(v) {
+                g.border_side_rail_px = Some(f);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Apply saved token file entries onto glyph params. Only keys that map to [`GlyphParams`] are used;
 /// other keys are for custom / future use and stay in the file.
-pub fn apply_file_tokens_to_glyph(g: &mut GlyphParams, file: &HashMap<String, Value>) {
+///
+/// Any `*_dark` / `*_light` token variants are mode-specific overrides applied after their
+/// base token (when present), so each color scheme can have independent values per key.
+pub fn apply_file_tokens_to_glyph(g: &mut GlyphParams, file: &HashMap<String, Value>, is_dark: bool) {
     for (k, v) in file {
-        match k.as_str() {
-            "bg" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.bg = Some(s);
-                }
-            }
-            "surface" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.surface = Some(s);
-                }
-            }
-            "surface2" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.surface2 = Some(s);
-                }
-            }
-            "text" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.text = Some(s);
-                }
-            }
-            "dim" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.dim = Some(s);
-                }
-            }
-            "border" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.border = Some(s);
-                }
-            }
-            "accent" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.accent = Some(s);
-                }
-            }
-            "border_chars" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.border_chars = Some(s);
-                }
-            }
-            "border_horizontal_pattern" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.border_horizontal_pattern = Some(s);
-                }
-            }
-            "border_vertical_pattern" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.border_vertical_pattern = Some(s);
-                }
-            }
-            "border_font_family" => {
-                if let Some(s) = value_as_glyph_color_string(v) {
-                    g.border_font_family = Some(s);
-                }
-            }
-            "border_radius" => {
-                if let Some(f) = value_as_f32(v) {
-                    g.border_radius = f;
-                }
-            }
-            "border_font_size_rems" => {
-                if let Some(f) = value_as_f32(v) {
-                    g.border_font_size_rems = Some(f);
-                }
-            }
-            "border_side_rail_px" => {
-                if let Some(f) = value_as_f32(v) {
-                    g.border_side_rail_px = Some(f);
-                }
-            }
-            _ => {}
+        if k.ends_with("_dark") || k.ends_with("_light") {
+            continue;
+        }
+        apply_glyph_token_key(g, k.as_str(), v);
+    }
+
+    let mode_suffix = if is_dark { "_dark" } else { "_light" };
+    for (k, v) in file {
+        if let Some(base_key) = k.strip_suffix(mode_suffix) {
+            apply_glyph_token_key(g, base_key, v);
         }
     }
 }

@@ -23,6 +23,8 @@ pub struct GlyphParams {
     pub surface2: Option<String>,
     pub text: Option<String>,
     pub dim: Option<String>,
+    /// Optional global UI font family for the app surface (e.g. "Inter", "IBM Plex Sans").
+    pub ui_font_family: Option<String>,
     pub border: Option<String>,
     pub accent: Option<String>,
     pub border_chars: Option<String>,
@@ -64,8 +66,10 @@ pub struct StyleInfo {
     pub name: String,
     pub label: String,
     pub description: String,
-    /// When `Some`, this style uses glyph rendering with the given parameters.
+    /// Glyph params used for dark mode (or all modes when `glyph_light` is `None`).
     pub glyph: Option<GlyphParams>,
+    /// Optional light-mode glyph params for mode-specific alternates.
+    pub glyph_light: Option<GlyphParams>,
     /// Owning Python extension module id (e.g. `tui-style`) for token files + overrides.
     pub module_name: Option<String>,
 }
@@ -138,6 +142,7 @@ pub fn register_style(
     label: String,
     description: String,
     glyph: Option<GlyphParams>,
+    glyph_light: Option<GlyphParams>,
     module_name: Option<String>,
 ) {
     if let Ok(mut reg) = registry().lock() {
@@ -147,6 +152,7 @@ pub fn register_style(
             label,
             description,
             glyph,
+            glyph_light,
             module_name,
         });
     }

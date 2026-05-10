@@ -1,21 +1,12 @@
 use arcadia_core::modules::python_registry::{list_style_tokens, StyleTokenKind};
 use openframe::{
-    AnyElement, Rgba, color_picker_with_weak, div, px, rgb, Context, FontWeight, InteractiveElement,
+    AnyElement, Rgba, div, px, rgb, Context, FontWeight, InteractiveElement,
     IntoElement, KeyDownEvent, MouseButton, ParentElement, Styled,
 };
 use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
-
-fn rgba_to_hex_token(r: Rgba) -> String {
-    format!(
-        "#{:02x}{:02x}{:02x}",
-        (r.r * 255.) as u8,
-        (r.g * 255.) as u8,
-        (r.b * 255.) as u8,
-    )
-}
 
 fn token_edit_rgba(display: &str, default_s: &str) -> Rgba {
     crate::gui::app::lifecycle::parse_hex_color(display.trim())
@@ -56,9 +47,14 @@ impl ArcadiaRoot {
         let subtext_color = glyph_dim.unwrap_or_else(|| theme::module_meta_text(is_dark));
 
         let ext_token_focus = self.extension_token_focus.clone();
-        let root_weak = cx.weak_entity();
 
-        let styles = self.available_styles.clone();
+        let mut styles = self.available_styles.clone();
+        styles.sort_by(|a, b| {
+            a.label
+                .to_ascii_lowercase()
+                .cmp(&b.label.to_ascii_lowercase())
+                .then_with(|| a.name.cmp(&b.name))
+        });
         let active = self.active_style.clone();
 
         let style_rows = styles.into_iter().map(|info| {
@@ -98,7 +94,7 @@ impl ArcadiaRoot {
                 .gap_3()
                 .cursor_pointer()
                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                    this.apply_style(name.clone(), cx);
+                    this.apply_style(name.clone(), this.current_color_scheme_dark(), cx);
                 }))
                 .child(
                     div()
@@ -130,8 +126,21 @@ impl ArcadiaRoot {
                 )
         });
 
-        let token_specs = list_style_tokens();
-        let show_extension_tokens = !token_specs.is_empty();
+        let selected_style_module = self
+            .available_styles
+            .iter()
+            .find(|s| s.name == self.active_style)
+            .and_then(|s| s.module_name.clone());
+        let token_specs = selected_style_module
+            .as_ref()
+            .and_then(|module_id| {
+                list_style_tokens()
+                    .into_iter()
+                    .find(|(m, _)| m == module_id)
+                    .map(|(_, specs)| specs)
+            })
+            .unwrap_or_default();
+        let show_extension_tokens = selected_style_module.is_some() && !token_specs.is_empty();
         let input_bg = theme::glyph_snapshot(cx)
             .map(|g| g.surface)
             .unwrap_or_else(|| theme::ui_surface(cx, is_dark));
@@ -139,7 +148,7 @@ impl ArcadiaRoot {
             .map(|g| g.border)
             .unwrap_or_else(|| theme::ui_border(cx, is_dark));
 
-        let token_sections = token_specs.into_iter().map(|(module_id, specs)| {
+        let token_sections = selected_style_module.into_iter().map(|module_id| {
             let heading = module_id.clone();
             div()
                 .flex()
@@ -152,7 +161,7 @@ impl ArcadiaRoot {
                         .text_color(subtext_color)
                         .child(format!("Extension: {heading}")),
                 )
-                .children(specs.into_iter().map(|spec| {
+                .children(token_specs.clone().into_iter().map(|spec| {
                     let key = spec.key.clone();
                     let label = spec.label.clone();
                     let kind = spec.kind;
@@ -206,93 +215,62 @@ impl ArcadiaRoot {
                                 ),
                         )
                         .child({
-                            let edit_cell: AnyElement = if is_editing {
-                                if kind == StyleTokenKind::Color {
-                                    let rgba = token_edit_rgba(&display_val, &row_default);
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .gap_3()
-                                        .child(color_picker_with_weak(root_weak.clone(), rgba, {
-                                            let m = row_module.clone();
-                                            let k = row_key.clone();
-                                            move |this, picked, cx| {
-                                                let hex = rgba_to_hex_token(picked);
-                                                this.extension_token_values.insert((m.clone(), k.clone()), hex);
-                                                this.flush_extension_token_edit(m.clone(), k.clone(), cx);
+                            let edit_cell: AnyElement = if kind == StyleTokenKind::Color {
+                                let preview = token_edit_rgba(&display_val, &row_default);
+                                div()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded(px(panel_radius))
+                                    .bg(input_bg)
+                                    .border_1()
+                                    .border_color(input_border)
+                                    .text_sm()
+                                    .text_color(header_color)
+                                    .cursor_pointer()
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .gap_2()
+                                            .child(
+                                                div()
+                                                    .w(px(14.))
+                                                    .h(px(14.))
+                                                    .rounded(px(3.))
+                                                    .border_1()
+                                                    .border_color(input_border)
+                                                    .bg(preview),
+                                            )
+                                            .child(div().child(display_val.clone())),
+                                    )
+                                    .on_mouse_down(MouseButton::Left, cx.listener({
+                                        let m = row_module.clone();
+                                        let k = row_key.clone();
+                                        let d = row_default.clone();
+                                        let current = display_val.clone();
+                                        move |this, _, _, cx| {
+                                            if let Some((ref em, ref ek)) =
+                                                this.extension_token_editing.clone()
+                                            {
+                                                this.flush_extension_token_edit(
+                                                    em.clone(),
+                                                    ek.clone(),
+                                                    cx,
+                                                );
                                             }
-                                        }))
-                                        .child(
-                                            div()
-                                                .px_3()
-                                                .py_2()
-                                                .rounded(px(panel_radius))
-                                                .bg(input_bg)
-                                                .border_1()
-                                                .border_color(input_border)
-                                                .text_sm()
-                                                .text_color(header_color)
-                                                .track_focus(&ext_token_focus)
-                                                .on_mouse_down(
-                                                    MouseButton::Left,
-                                                    cx.listener(move |this, _, window, _| {
-                                                        this.extension_token_focus.focus(window);
-                                                    }),
-                                                )
-                                                .child(div().child(display_val.clone()))
-                                                .on_key_down(cx.listener({
-                                                    let m = row_module.clone();
-                                                    let k = row_key.clone();
-                                                    let default_for_esc = row_default.clone();
-                                                    move |this, event: &KeyDownEvent, _, cx| {
-                                                        let key_ev = event.keystroke.key.as_str();
-                                                        let mods = event.keystroke.modifiers;
-                                                        if key_ev == "enter" || key_ev == "return" {
-                                                            this.flush_extension_token_edit(m.clone(), k.clone(), cx);
-                                                            this.extension_token_editing = None;
-                                                            cx.notify();
-                                                            return;
-                                                        }
-                                                        if key_ev == "escape" {
-                                                            let file =
-                                                                arcadia_core::config::extension_tokens::load_module_tokens(&m)
-                                                                    .unwrap_or_default();
-                                                            let v = arcadia_core::config::extension_tokens::merged_display_for_key(
-                                                                &k,
-                                                                &default_for_esc,
-                                                                &file,
-                                                            );
-                                                            this.extension_token_values.insert((m.clone(), k.clone()), v);
-                                                            this.extension_token_editing = None;
-                                                            cx.notify();
-                                                            return;
-                                                        }
-                                                        let pair = (m.clone(), k.clone());
-                                                        let entry = this
-                                                            .extension_token_values
-                                                            .entry(pair.clone())
-                                                            .or_insert_with(String::new);
-                                                        if key_ev == "backspace" {
-                                                            entry.pop();
-                                                            cx.notify();
-                                                        } else if key_ev == "space" {
-                                                            entry.push(' ');
-                                                            cx.notify();
-                                                        } else if !mods.control
-                                                            && !mods.alt
-                                                            && !mods.platform
-                                                            && !mods.function
-                                                        {
-                                                            if let Some(ch) = &event.keystroke.key_char {
-                                                                entry.push_str(ch);
-                                                                cx.notify();
-                                                            }
-                                                        }
-                                                    }
-                                                })),
-                                        )
-                                        .into_any_element()
-                                } else {
+                                            this.extension_token_editing = None;
+                                            this.color_picker_modal = Some((
+                                                m.clone(),
+                                                k.clone(),
+                                                current.clone(),
+                                                d.clone(),
+                                            ));
+                                            cx.notify();
+                                        }
+                                    }))
+                                    .into_any_element()
+                            } else if is_editing {
                                 div()
                                     .px_3()
                                     .py_2()
@@ -361,7 +339,6 @@ impl ArcadiaRoot {
                                         }
                                     }))
                                     .into_any_element()
-                                }
                             } else {
                                 div()
                                     .px_3()

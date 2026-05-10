@@ -185,6 +185,13 @@ pub struct ArcadiaRoot {
     pub extension_token_values: HashMap<(String, String), String>,
     pub extension_token_editing: Option<(String, String)>,
     pub extension_token_focus: FocusHandle,
+    /// Active color picker modal state: (module, key, current_color, default_color).
+    pub color_picker_modal: Option<(String, String, String, String)>,
+    /// Last observed window dark/light mode for mode-aware style re-application.
+    pub last_color_scheme_dark: Option<bool>,
+    /// Lines at top of each terminal transcript occupied by shell MOTD (incl. trailing blank), when enabled.
+    #[cfg(feature = "gui")]
+    pub shell_motd_prefix_lines: usize,
 }
 
 impl ArcadiaRoot {

@@ -4,6 +4,61 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::sync::Arc;
 
+fn glyph_from_fields(
+    bg: Option<String>,
+    surface: Option<String>,
+    surface2: Option<String>,
+    text: Option<String>,
+    dim: Option<String>,
+    ui_font_family: Option<String>,
+    border: Option<String>,
+    accent: Option<String>,
+    border_chars: Option<String>,
+    border_horizontal_pattern: Option<String>,
+    border_vertical_pattern: Option<String>,
+    border_font_family: Option<String>,
+    border_font_size_rems: Option<f32>,
+    border_side_rail_px: Option<f32>,
+    border_radius: f32,
+) -> Option<python_registry::GlyphParams> {
+    let has_glyph = bg.is_some()
+        || surface.is_some()
+        || surface2.is_some()
+        || text.is_some()
+        || dim.is_some()
+        || ui_font_family.is_some()
+        || border.is_some()
+        || accent.is_some()
+        || border_chars.is_some()
+        || border_horizontal_pattern.is_some()
+        || border_vertical_pattern.is_some()
+        || border_font_family.is_some()
+        || border_font_size_rems.is_some()
+        || border_side_rail_px.is_some();
+
+    if has_glyph {
+        Some(python_registry::GlyphParams {
+            bg,
+            surface,
+            surface2,
+            text,
+            dim,
+            ui_font_family,
+            border,
+            accent,
+            border_chars,
+            border_horizontal_pattern,
+            border_vertical_pattern,
+            border_font_family,
+            border_font_size_rems,
+            border_side_rail_px,
+            border_radius,
+        })
+    } else {
+        None
+    }
+}
+
 #[pyfunction]
 fn register_module(name: String, version: String, description: String) {
     python_registry::register_module(name, version, description);
@@ -44,6 +99,7 @@ fn register_command(
     surface2 = None,
     text = None,
     dim = None,
+    ui_font_family = None,
     border = None,
     accent = None,
     border_chars = None,
@@ -52,6 +108,21 @@ fn register_command(
     border_font_family = None,
     border_font_size_rems = None,
     border_side_rail_px = None,
+    light_bg = None,
+    light_surface = None,
+    light_surface2 = None,
+    light_text = None,
+    light_dim = None,
+    light_ui_font_family = None,
+    light_border = None,
+    light_accent = None,
+    light_border_chars = None,
+    light_border_horizontal_pattern = None,
+    light_border_vertical_pattern = None,
+    light_border_font_family = None,
+    light_border_font_size_rems = None,
+    light_border_side_rail_px = None,
+    light_border_radius = None,
     border_radius = 0.0
 ))]
 fn register_style(
@@ -64,6 +135,7 @@ fn register_style(
     surface2: Option<String>,
     text: Option<String>,
     dim: Option<String>,
+    ui_font_family: Option<String>,
     border: Option<String>,
     accent: Option<String>,
     border_chars: Option<String>,
@@ -72,44 +144,59 @@ fn register_style(
     border_font_family: Option<String>,
     border_font_size_rems: Option<f32>,
     border_side_rail_px: Option<f32>,
+    light_bg: Option<String>,
+    light_surface: Option<String>,
+    light_surface2: Option<String>,
+    light_text: Option<String>,
+    light_dim: Option<String>,
+    light_ui_font_family: Option<String>,
+    light_border: Option<String>,
+    light_accent: Option<String>,
+    light_border_chars: Option<String>,
+    light_border_horizontal_pattern: Option<String>,
+    light_border_vertical_pattern: Option<String>,
+    light_border_font_family: Option<String>,
+    light_border_font_size_rems: Option<f32>,
+    light_border_side_rail_px: Option<f32>,
+    light_border_radius: Option<f32>,
     border_radius: f32,
 ) {
-    let has_glyph = bg.is_some()
-        || surface.is_some()
-        || surface2.is_some()
-        || text.is_some()
-        || dim.is_some()
-        || border.is_some()
-        || accent.is_some()
-        || border_chars.is_some()
-        || border_horizontal_pattern.is_some()
-        || border_vertical_pattern.is_some()
-        || border_font_family.is_some()
-        || border_font_size_rems.is_some()
-        || border_side_rail_px.is_some();
+    let glyph = glyph_from_fields(
+        bg,
+        surface,
+        surface2,
+        text,
+        dim,
+        ui_font_family,
+        border,
+        accent,
+        border_chars,
+        border_horizontal_pattern,
+        border_vertical_pattern,
+        border_font_family,
+        border_font_size_rems,
+        border_side_rail_px,
+        border_radius,
+    );
+    let glyph_light = glyph_from_fields(
+        light_bg,
+        light_surface,
+        light_surface2,
+        light_text,
+        light_dim,
+        light_ui_font_family,
+        light_border,
+        light_accent,
+        light_border_chars,
+        light_border_horizontal_pattern,
+        light_border_vertical_pattern,
+        light_border_font_family,
+        light_border_font_size_rems,
+        light_border_side_rail_px,
+        light_border_radius.unwrap_or(border_radius),
+    );
 
-    let glyph = if has_glyph {
-        Some(python_registry::GlyphParams {
-            bg,
-            surface,
-            surface2,
-            text,
-            dim,
-            border,
-            accent,
-            border_chars,
-            border_horizontal_pattern,
-            border_vertical_pattern,
-            border_font_family,
-            border_font_size_rems,
-            border_side_rail_px,
-            border_radius,
-        })
-    } else {
-        None
-    };
-
-    python_registry::register_style(name, label, description, glyph, module);
+    python_registry::register_style(name, label, description, glyph, glyph_light, module);
 }
 
 fn py_default_to_string(obj: &Bound<'_, PyAny>) -> PyResult<String> {

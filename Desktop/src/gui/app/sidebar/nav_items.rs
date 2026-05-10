@@ -12,23 +12,17 @@ use crate::gui::theme::{self, render_icon, GlyphStyleConfig};
 fn nav_idle_bg(g: Option<GlyphStyleConfig>, is_dark: bool) -> Rgba {
     g.as_ref().map(|g| g.surface).unwrap_or_else(|| if is_dark { rgb(0x171b22) } else { rgb(0xf6f7fb) })
 }
-fn nav_active_bg(g: Option<GlyphStyleConfig>, pal_selected: Rgba) -> Rgba {
-    g.as_ref().map(|g| g.surface2).unwrap_or(pal_selected)
+fn nav_active_bg(_g: Option<GlyphStyleConfig>, pal_selected: Rgba) -> Rgba {
+    pal_selected
 }
-fn nav_hover_bg(g: Option<GlyphStyleConfig>, is_dark: bool, pal_hover: Rgba) -> Rgba {
-    g.as_ref().map(|g| g.surface2).unwrap_or_else(|| {
-        if g.is_some() { unreachable!() }
-        pal_hover
-    })
-}
-fn nav_hover_bg_raw(g: Option<GlyphStyleConfig>, is_dark: bool, fallback: Rgba) -> Rgba {
-    g.as_ref().map(|g| g.surface2).unwrap_or(fallback)
+fn nav_hover_bg_raw(_g: Option<GlyphStyleConfig>, _is_dark: bool, fallback: Rgba) -> Rgba {
+    fallback
 }
 fn nav_idle_text(g: Option<GlyphStyleConfig>, is_dark: bool) -> Rgba {
     g.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::sidebar_nav_idle_foreground(is_dark))
 }
-fn nav_active_text(g: Option<GlyphStyleConfig>, pal_active: Rgba) -> Rgba {
-    g.as_ref().map(|g| g.accent).unwrap_or(pal_active)
+fn nav_active_text(_g: Option<GlyphStyleConfig>, pal_active: Rgba) -> Rgba {
+    pal_active
 }
 fn nav_radius(g: Option<GlyphStyleConfig>) -> f32 {
     g.as_ref().map(|g| g.border_radius).unwrap_or(6.0)

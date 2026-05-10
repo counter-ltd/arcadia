@@ -24,7 +24,7 @@ use arcadia_core::navigation;
 use openframe::{Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
 use crate::gui::theme::{
     ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
-    GlyphBorderTypography, GlyphStyleConfig,
+    ActiveGlyphUiFontFamily, GlyphBorderTypography, GlyphStyleConfig,
 };
 
 #[cfg(feature = "gui")]
@@ -85,7 +85,8 @@ impl ArcadiaRoot {
     #[cfg(feature = "gui")]
     pub(super) fn reset_shell_state(&mut self) {
         let (working_dir, display_cwd) = Self::current_dir_strings();
-        let history = Self::initial_shell_history();
+        let (history, motd_n) = Self::initial_shell_history(self.current_color_scheme_dark());
+        self.shell_motd_prefix_lines = motd_n;
         self.active_terminal_mut().reset(history, working_dir, display_cwd);
     }
 
@@ -116,9 +117,9 @@ impl ArcadiaRoot {
     }
 
     #[cfg(feature = "gui")]
-    fn initial_shell_history() -> Vec<String> {
+    fn initial_shell_history(is_dark: bool) -> (Vec<String>, usize) {
         let Ok(cfg) = ModulesConfig::load_or_create() else {
-            return vec!["Arcadia Terminal ready.".to_string()];
+            return (vec!["Arcadia Terminal ready.".to_string()], 0);
         };
         let shell_on = cfg.modules.get(TERMINAL_MODULE_NAME).copied().unwrap_or(false);
         let motd_on = cfg
@@ -127,12 +128,53 @@ impl ArcadiaRoot {
             .copied()
             .unwrap_or(false);
         if shell_on && motd_on {
-            let mut lines = shell_motd::motd_lines();
+            let mut lines = shell_motd::motd_lines_for_scheme(is_dark);
+            let n = lines.len() + 1;
             lines.push(String::new());
-            lines
+            (lines, n)
         } else {
-            vec!["Arcadia Terminal ready.".to_string()]
+            (vec!["Arcadia Terminal ready.".to_string()], 0)
         }
+    }
+
+    #[cfg(feature = "gui")]
+    fn refresh_shell_motd_prefix(&mut self, is_dark: bool) {
+        let Ok(cfg) = ModulesConfig::load_or_create() else {
+            return;
+        };
+        let shell_on = cfg.modules.get(TERMINAL_MODULE_NAME).copied().unwrap_or(false);
+        let motd_on = cfg
+            .modules
+            .get(TERMINAL_MOTD_MODULE_NAME)
+            .copied()
+            .unwrap_or(false);
+        if !shell_on || !motd_on {
+            let old = self.shell_motd_prefix_lines;
+            if old > 0 {
+                for term in &mut self.terminals {
+                    if term.shell_history.len() >= old {
+                        term.shell_history.drain(0..old);
+                    }
+                }
+            }
+            self.shell_motd_prefix_lines = 0;
+            return;
+        }
+
+        let mut block = shell_motd::motd_lines_for_scheme(is_dark);
+        let new_n = block.len() + 1;
+        block.push(String::new());
+        let old_n = self.shell_motd_prefix_lines;
+
+        for term in &mut self.terminals {
+            if old_n > 0 && term.shell_history.len() >= old_n {
+                let tail: Vec<_> = term.shell_history[old_n..].to_vec();
+                term.shell_history.truncate(0);
+                term.shell_history.extend(block.iter().cloned());
+                term.shell_history.extend(tail);
+            }
+        }
+        self.shell_motd_prefix_lines = new_n;
     }
 
     pub fn new(cx: &mut openframe::Context<Self>) -> Self {
@@ -155,16 +197,18 @@ impl ArcadiaRoot {
         ActiveGlyphStyle::set_global(cx, ActiveGlyphStyle(None));
         ActiveGlyphBorderTypography::set_global(cx, ActiveGlyphBorderTypography(None));
         ActiveGlyphBorderPatterns::set_global(cx, ActiveGlyphBorderPatterns(None));
+        ActiveGlyphUiFontFamily::set_global(cx, ActiveGlyphUiFontFamily(None));
+        #[cfg(feature = "gui")]
+        let (initial_hist, initial_motd_n) = Self::initial_shell_history(true);
         #[cfg(feature = "gui")]
         let first_terminal = {
             let (shell_working_dir, shell_display_cwd) = Self::current_dir_strings();
-            let initial_history = Self::initial_shell_history();
             TerminalInstance::new(
                 0,
                 "Terminal 1".to_string(),
                 shell_working_dir,
                 shell_display_cwd,
-                initial_history,
+                initial_hist,
             )
         };
         let mut root = ArcadiaRoot {
@@ -224,6 +268,10 @@ impl ArcadiaRoot {
             extension_token_values: std::collections::HashMap::new(),
             extension_token_editing: None,
             extension_token_focus,
+            color_picker_modal: None,
+            last_color_scheme_dark: None,
+            #[cfg(feature = "gui")]
+            shell_motd_prefix_lines: initial_motd_n,
         };
 
         // Thin client bootstrap: ARCADIA_NET_AS overrides persisted thin-client.toml route.
@@ -259,16 +307,14 @@ impl ArcadiaRoot {
             root.python_extension_rows =
                 arcadia_core::modules::python_registry::list_modules();
             // Merge styles from Python extensions into available_styles.
-            let mut styles = built_in_styles();
-            styles.extend(arcadia_core::modules::python_registry::list_styles());
-            root.available_styles = styles;
+            root.available_styles = merged_available_styles();
         }
 
         root.refresh_extension_token_cache();
 
         // Apply persisted style (may activate a glyph config from an extension).
         let active = root.active_style.clone();
-        root.apply_style(active, cx);
+        root.apply_style(active, true, cx);
 
         root
     }
@@ -309,7 +355,7 @@ impl ArcadiaRoot {
                 if extension_tokens::save_module_tokens(&module, &file).is_ok() {
                     let disp = extension_tokens::value_to_display_string(&val);
                     self.extension_token_values.insert(pair, disp);
-                    self.apply_style(self.active_style.clone(), cx);
+                    self.apply_style(self.active_style.clone(), self.current_color_scheme_dark(), cx);
                 }
             }
             Err(_) => {}
@@ -320,8 +366,7 @@ impl ArcadiaRoot {
         self.python_extension_rows =
             arcadia_core::modules::python_registry::list_modules();
         // Merge any newly registered styles from Python extensions.
-        let mut styles = built_in_styles();
-        styles.extend(arcadia_core::modules::python_registry::list_styles());
+        let styles = merged_available_styles();
         // Re-apply active style; fall back to default if the extension providing it was disabled.
         let active = self.active_style.clone();
         let active = if styles.iter().any(|s| s.name == active) {
@@ -331,19 +376,35 @@ impl ArcadiaRoot {
         };
         self.available_styles = styles;
         self.refresh_extension_token_cache();
-        self.apply_style(active, cx);
+        self.apply_style(active, self.current_color_scheme_dark(), cx);
+    }
+
+    pub(crate) fn current_color_scheme_dark(&self) -> bool {
+        self.last_color_scheme_dark.unwrap_or(true)
+    }
+
+    pub(crate) fn refresh_style_for_mode(&mut self, is_dark: bool, cx: &mut Context<Self>) {
+        if self.last_color_scheme_dark == Some(is_dark) {
+            return;
+        }
+        self.last_color_scheme_dark = Some(is_dark);
+        self.apply_style(self.active_style.clone(), is_dark, cx);
     }
 
     /// Persist and apply a new style selection.
-    pub fn apply_style(&mut self, name: String, cx: &mut Context<Self>) {
+    pub fn apply_style(&mut self, name: String, is_dark: bool, cx: &mut Context<Self>) {
         // Look up glyph params for the chosen style.
         let style_row = self.available_styles.iter().find(|s| s.name == name);
 
         let merged_glyph = style_row.and_then(|s| {
-            let mut g = s.glyph.clone()?;
+            let mut g = if is_dark {
+                s.glyph.clone()
+            } else {
+                s.glyph_light.clone().or_else(|| s.glyph.clone())
+            }?;
             if let Some(module) = s.module_name.as_deref() {
                 if let Ok(file) = extension_tokens::load_module_tokens(module) {
-                    extension_tokens::apply_file_tokens_to_glyph(&mut g, &file);
+                    extension_tokens::apply_file_tokens_to_glyph(&mut g, &file, is_dark);
                 }
             }
             Some(g)
@@ -363,6 +424,10 @@ impl ArcadiaRoot {
             horizontal: p.border_horizontal_pattern.clone(),
             vertical: p.border_vertical_pattern.clone(),
         });
+        let ui_font_family = merged_glyph
+            .as_ref()
+            .and_then(|p| p.ui_font_family.clone())
+            .filter(|s| !s.trim().is_empty());
 
         if glyph_cfg.is_some() {
             RenderStyle::set_global(cx, RenderStyle::Custom);
@@ -372,11 +437,14 @@ impl ArcadiaRoot {
         ActiveGlyphStyle::set_global(cx, ActiveGlyphStyle(glyph_cfg));
         ActiveGlyphBorderTypography::set_global(cx, ActiveGlyphBorderTypography(border_typography));
         ActiveGlyphBorderPatterns::set_global(cx, ActiveGlyphBorderPatterns(border_patterns));
+        ActiveGlyphUiFontFamily::set_global(cx, ActiveGlyphUiFontFamily(ui_font_family));
 
         self.active_style = name.clone();
         let mut cfg = AppearanceConfig::load_or_create().unwrap_or_default();
         cfg.active_style = name;
         let _ = cfg.save();
+        #[cfg(feature = "gui")]
+        self.refresh_shell_motd_prefix(is_dark);
         cx.notify();
     }
 
@@ -415,12 +483,13 @@ impl ArcadiaRoot {
         self.next_terminal_serial += 1;
         let new_id = self.terminals.len();
         let (working_dir, display_cwd) = Self::current_dir_strings();
+        let (hist, _) = Self::initial_shell_history(self.current_color_scheme_dark());
         let new_term = TerminalInstance::new(
             new_id,
             format!("Terminal {serial}"),
             working_dir,
             display_cwd,
-            vec!["Arcadia Terminal ready.".to_string()],
+            hist,
         );
         self.terminals.push(new_term);
         self.active_terminal_id = new_id;
@@ -524,8 +593,24 @@ pub(crate) fn built_in_styles() -> Vec<StyleInfo> {
         label: "Default".to_string(),
         description: "Standard GPU-rendered appearance.".to_string(),
         glyph: None,
+        glyph_light: None,
         module_name: None,
     }]
+}
+
+pub(crate) fn merged_available_styles() -> Vec<StyleInfo> {
+    let mut styles = built_in_styles();
+    for style in arcadia_core::modules::python_registry::list_styles() {
+        styles.retain(|s| s.name != style.name);
+        styles.push(style);
+    }
+    styles.sort_by(|a, b| {
+        a.label
+            .to_ascii_lowercase()
+            .cmp(&b.label.to_ascii_lowercase())
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    styles
 }
 
 /// Convert a `GlyphParams` (hex strings from the Python extension) into a

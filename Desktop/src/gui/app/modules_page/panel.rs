@@ -1,9 +1,9 @@
 use arcadia_core::config::modules::ModulesConfig;
-use openframe::{AnyElement, IntoElement as _, div, px};
-use openframe::{Context, IntoElement, ParentElement, Styled, glyph_border};
+use openframe::{AnyElement, div, px};
+use openframe::{Context, IntoElement, ParentElement, Styled};
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme::{self, apply_glyph_border_typography, GLYPH_PANEL_CONTENT_MAX_W_PX};
+use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
     pub fn modules_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> AnyElement {
@@ -25,6 +25,7 @@ impl ArcadiaRoot {
             })
             .collect();
         if let Some(ref g) = glyph_cfg {
+            let radius = g.border_radius.min(12.0);
             div()
                 .w_full()
                 .flex()
@@ -33,16 +34,15 @@ impl ArcadiaRoot {
                     div()
                         .w_full()
                         .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
-                        .child(
-                            apply_glyph_border_typography(
-                                &*cx,
-                                glyph_border()
-                                    .border_color(g.accent)
-                                    .bg(g.surface)
-                                    .border_chars(g.border_chars),
-                            )
-                            .child(div().w_full().flex().flex_col().gap_3().children(rows.into_iter())),
-                        ),
+                        .p_4()
+                        .rounded(px(radius))
+                        .bg(g.surface)
+                        .border_1()
+                        .border_color(g.border)
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .children(rows.into_iter()),
                 )
                 .into_any_element()
         } else {

@@ -1,12 +1,12 @@
 use arcadia_core::modules;
 use openframe::{
-    AnyElement, IntoElement, InteractiveElement, ParentElement, Styled, div, px, glyph_border,
+    AnyElement, IntoElement, InteractiveElement, ParentElement, Styled, div, px,
 };
 use openframe::{Context, FontWeight, MouseButton};
 use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme::{self, apply_glyph_border_typography, GLYPH_PANEL_CONTENT_MAX_W_PX};
+use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
     pub fn python_settings_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> AnyElement {
@@ -70,23 +70,15 @@ impl ArcadiaRoot {
                     div()
                         .w_full()
                         .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
-                        .child(
-                            apply_glyph_border_typography(
-                                &*cx,
-                                glyph_border()
-                                    .border_color(g.accent)
-                                    .bg(g.surface)
-                                    .border_chars(g.border_chars),
-                            )
-                            .child(
-                                div()
-                                    .w_full()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_3()
-                                    .child(content),
-                            ),
-                        ),
+                        .p_4()
+                        .rounded(px(panel_radius.min(12.0)))
+                        .bg(g.surface)
+                        .border_1()
+                        .border_color(g.border)
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(content),
                 )
                 .into_any_element()
         } else {

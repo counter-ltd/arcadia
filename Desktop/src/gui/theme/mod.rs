@@ -68,6 +68,11 @@ pub struct ActiveGlyphBorderPatterns(pub Option<GlyphBorderPatterns>);
 
 impl Global for ActiveGlyphBorderPatterns {}
 
+/// Active global UI font family from [`GlyphParams::ui_font_family`].
+pub struct ActiveGlyphUiFontFamily(pub Option<String>);
+
+impl Global for ActiveGlyphUiFontFamily {}
+
 /// Returns a reference to the active glyph style config, or `None` when Default is active.
 pub fn active_glyph(cx: &App) -> Option<&GlyphStyleConfig> {
     cx.try_global::<ActiveGlyphStyle>()
@@ -80,7 +85,14 @@ pub fn glyph_snapshot(cx: &App) -> Option<GlyphStyleConfig> {
     active_glyph(cx).copied()
 }
 
+pub fn active_ui_font_family(cx: &App) -> Option<&str> {
+    cx.try_global::<ActiveGlyphUiFontFamily>()
+        .and_then(|x| x.0.as_deref())
+}
+
 /// Applies extension-provided border typography and repeating glyph patterns when set.
+/// Used whenever UI renders [`openframe::GlyphBorder`]; panel chrome uses rounded rects + `border` token instead.
+#[allow(dead_code)]
 pub fn apply_glyph_border_typography(cx: &App, mut b: openframe::GlyphBorder) -> openframe::GlyphBorder {
     if let Some(extra) = cx
         .try_global::<ActiveGlyphBorderTypography>()
