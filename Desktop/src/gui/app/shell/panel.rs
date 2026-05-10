@@ -1,11 +1,12 @@
 use std::env;
 
 use openframe::{
-    div, rgb, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
+    div, px, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
     Styled, Window, WindowAppearance,
 };
 
 use crate::gui::tui::shell_history_line;
+use crate::gui::theme;
 
 use super::super::ArcadiaRoot;
 
@@ -23,6 +24,10 @@ impl ArcadiaRoot {
             window.appearance(),
             WindowAppearance::Dark | WindowAppearance::VibrantDark
         );
+        let shell_bg = theme::ui_surface(cx, is_dark);
+        let shell_border = theme::ui_border(cx, is_dark);
+        let shell_radius = theme::ui_radius(cx);
+        let shell_accent = theme::ui_accent(cx);
         let term = self.active_terminal();
 
         // Live PTY: vt100 grid fills the panel (transcript returns after the process exits).
@@ -32,18 +37,10 @@ impl ArcadiaRoot {
                 .h_full()
                 .overflow_hidden()
                 .p_1()
-                .rounded_lg()
-                .bg(if is_dark {
-                    rgb(0x151a22)
-                } else {
-                    rgb(0xf8fafc)
-                })
+                .rounded(px(shell_radius))
+                .bg(shell_bg)
                 .border_1()
-                .border_color(if is_dark {
-                    rgb(0x2f3948)
-                } else {
-                    rgb(0xe2e8f0)
-                })
+                .border_color(shell_border)
                 .flex()
                 .flex_col()
                 .child(
@@ -60,18 +57,10 @@ impl ArcadiaRoot {
             .h_full()
             .overflow_hidden()
             .p_1()
-            .rounded_lg()
-            .bg(if is_dark {
-                rgb(0x151a22)
-            } else {
-                rgb(0xf8fafc)
-            })
+            .rounded(px(shell_radius))
+            .bg(shell_bg)
             .border_1()
-            .border_color(if is_dark {
-                rgb(0x2f3948)
-            } else {
-                rgb(0xe2e8f0)
-            })
+            .border_color(shell_border)
             .flex()
             .flex_col()
             .gap_0()
@@ -103,17 +92,11 @@ impl ArcadiaRoot {
                     .items_center()
                     .border_t_1()
                     .border_color(if is_focused {
-                        rgb(0x3b82f6)
-                    } else if is_dark {
-                        rgb(0x2f3948)
+                        shell_accent
                     } else {
-                        rgb(0xe2e8f0)
+                        shell_border
                     })
-                    .bg(if is_dark {
-                        rgb(0x0f141b)
-                    } else {
-                        rgb(0xffffff)
-                    })
+                    .bg(theme::ui_bg(cx, is_dark))
                     .track_focus(&self.shell_focus)
                     .on_mouse_down(
                         openframe::MouseButton::Left,
@@ -125,21 +108,13 @@ impl ArcadiaRoot {
                     .child(
                         div()
                             .text_sm()
-                            .text_color(if is_dark {
-                                rgb(0x60a5fa)
-                            } else {
-                                rgb(0x1d4ed8)
-                            })
+                            .text_color(shell_accent)
                             .child("$"),
                     )
                     .child(
                         div()
                             .text_sm()
-                            .text_color(if is_dark {
-                                rgb(0xe5e7eb)
-                            } else {
-                                rgb(0x111827)
-                            })
+                            .text_color(theme::ui_text(cx, is_dark))
                             .child(self.shell_input_with_cursor(is_focused)),
                     ),
             )

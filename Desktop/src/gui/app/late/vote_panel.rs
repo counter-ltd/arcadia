@@ -18,6 +18,10 @@ pub(super) fn late_vote_pills(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> i
         ("Classic", votes.classic, "classic"),
     ];
 
+    let pill_bg = theme::action_pill_bg(cx, is_dark);
+    let pill_tc = theme::action_pill_text(cx, is_dark);
+    let pill_hover = theme::action_pill_hover_bg(cx, is_dark);
+
     div()
         .flex()
         .flex_row()
@@ -30,10 +34,10 @@ pub(super) fn late_vote_pills(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> i
                 .py_0p5()
                 .rounded_md()
                 .text_xs()
-                .bg(theme::top_bar_pill_bg(is_dark))
-                .text_color(theme::top_bar_pill_text(is_dark))
+                .bg(pill_bg)
+                .text_color(pill_tc)
                 .hover(move |style| {
-                    style.bg(theme::top_bar_pill_hover_bg(is_dark))
+                    style.bg(pill_hover)
                 })
                 .child(format!("{label} {count}"))
                 .on_mouse_down(

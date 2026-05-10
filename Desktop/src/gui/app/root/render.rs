@@ -54,10 +54,13 @@ impl Render for ArcadiaRoot {
                 .unwrap_or_else(|| "tools".to_string()),
         );
 
+        let glyph = crate::gui::theme::active_glyph(cx);
         div()
             .relative()
             .size_full()
-            .bg(if is_dark {
+            .bg(if let Some(g) = glyph {
+                g.bg
+            } else if is_dark {
                 rgb(0x0f1115)
             } else {
                 rgb(0xffffff)
@@ -128,14 +131,14 @@ impl Render for ArcadiaRoot {
                                 .min_h_0()
                                 .w_full()
                                 .id("arcadia-page-full")
-                                .child(self.render_active_content(window, cx, active_page, is_dark))
+                                .child(self.render_active_content(window, cx, is_dark))
                         } else {
                             div()
                                 .flex_1()
                                 .w_full()
                                 .id("arcadia-page-scroll")
                                 .overflow_y_scroll()
-                                .child(self.render_active_content(window, cx, active_page, is_dark))
+                                .child(self.render_active_content(window, cx, is_dark))
                         },
                     ),
             )
@@ -158,17 +161,18 @@ impl ArcadiaRoot {
         is_dark: bool,
     ) -> AnyElement {
         let pos = self.context_menu_position;
-        let border_color = if is_dark { rgb(0x374151) } else { rgb(0xd1d5db) };
-        let bg_color = if is_dark { rgb(0x111827) } else { rgb(0xffffff) };
-        let text_color = if is_dark { rgb(0xe5e7eb) } else { rgb(0x111827) };
-        let hover_bg = if is_dark { rgb(0x1f2937) } else { rgb(0xf3f4f6) };
+        let border_color = crate::gui::theme::ui_border(cx, is_dark);
+        let bg_color = crate::gui::theme::ui_surface(cx, is_dark);
+        let text_color = crate::gui::theme::ui_text(cx, is_dark);
+        let hover_bg = crate::gui::theme::ui_surface2(cx, is_dark);
+        let radius = crate::gui::theme::ui_radius(cx);
 
         let menu_item = move |label: &'static str, hover_bg| {
             div()
                 .w_full()
                 .px_2()
                 .py_1()
-                .rounded_md()
+                .rounded(px(radius))
                 .cursor_pointer()
                 .text_sm()
                 .text_color(text_color)
@@ -220,7 +224,7 @@ impl ArcadiaRoot {
                         .rounded_md()
                         .cursor_pointer()
                         .text_sm()
-                        .text_color(rgb(0xf87171))
+                        .text_color(crate::gui::theme::ui_danger(cx, is_dark))
                         .hover(move |s| s.bg(hover_bg))
                         .child(kill_label)
                         .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {

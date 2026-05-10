@@ -7,6 +7,7 @@ use std::path::PathBuf;
 mod entry;
 #[cfg(feature = "ios-gui")]
 pub mod entry_ios;
+mod appearance;
 mod lan_nodes;
 mod late;
 mod lifecycle;
@@ -23,6 +24,9 @@ mod splash;
 #[cfg(feature = "gui")]
 pub use entry::run;
 
+use std::collections::HashMap;
+
+use arcadia_core::modules::python_registry::StyleInfo;
 use arcadia_core::navigation::NavigationRegistryOwned;
 use openframe::{FocusHandle, ScrollHandle, SharedString};
 
@@ -121,6 +125,10 @@ pub struct ArcadiaRoot {
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
     pub python_extension_rows: Vec<(String, String, String, bool)>,
+    /// Active render style name ("default", "tui", or python-registered).
+    pub active_style: String,
+    /// Built-in styles prepended, then python-registered styles appended on extension reload.
+    pub available_styles: Vec<StyleInfo>,
     pub pending_module_enable: Option<(String, Vec<String>)>,
     #[cfg(feature = "gui")]
     pub terminals: Vec<TerminalInstance>,
@@ -173,6 +181,10 @@ pub struct ArcadiaRoot {
     pub late_settings_server_url_focus: FocusHandle,
     pub late_settings_username_focus: FocusHandle,
     pub late_settings_default_room_focus: FocusHandle,
+    /// Styling extension token values for Appearance (`module_id`, `token_key`).
+    pub extension_token_values: HashMap<(String, String), String>,
+    pub extension_token_editing: Option<(String, String)>,
+    pub extension_token_focus: FocusHandle,
 }
 
 impl ArcadiaRoot {

@@ -1,12 +1,13 @@
 use openframe::{
-    div, px, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
+    div, px, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
 };
+use openframe::prelude::FluentBuilder as _;
 
 use arcadia_core::modules;
 use arcadia_core::modules::late::state;
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme;
+use crate::gui::theme::{self, glyph_snapshot};
 
 impl ArcadiaRoot {
     pub(super) fn late_bonsai(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
@@ -15,15 +16,32 @@ impl ArcadiaRoot {
         let art = st.bonsai_art.clone();
         drop(st);
 
-        let accent = theme::nav_accent_palette("violet", is_dark);
+        let glyph = glyph_snapshot(cx);
+        let is_glyph = glyph.is_some();
+
+        let panel_bg     = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::module_panel_bg(is_dark));
+        let panel_stroke = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_panel_stroke(is_dark));
+        let panel_radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(12.0);
+        let title_c      = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| theme::module_title_text(is_dark));
+        let desc_c       = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_description_text(is_dark));
+        let btn_bg       = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
+        let btn_text     = glyph.as_ref().map(|g| g.bg).unwrap_or_else(|| theme::module_button_enable_text(is_dark));
+        let btn_hover    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_button_enable_hover_bg(is_dark));
+        let well_bg      = glyph.as_ref().map(|g| g.bg).unwrap_or_else(|| theme::late_bonsai_well_bg(is_dark));
+        let well_stroke  = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::late_bonsai_well_stroke(is_dark));
+        let pot_band     = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::late_bonsai_pot_band(is_dark));
+        let foliage_c    = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| theme::late_bonsai_foliage_text(is_dark));
+        let accent_bar   = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| {
+            theme::nav_accent_palette("violet", is_dark).icon_active
+        });
 
         div()
             .w_full()
             .p_3()
-            .rounded_xl()
-            .bg(theme::module_panel_bg(is_dark))
+            .rounded(px(panel_radius))
+            .bg(panel_bg)
             .border_1()
-            .border_color(theme::module_panel_stroke(is_dark))
+            .border_color(panel_stroke)
             .flex()
             .flex_col()
             .gap_2()
@@ -43,13 +61,13 @@ impl ArcadiaRoot {
                                 div()
                                     .text_xs()
                                     .font_weight(openframe::FontWeight::SEMIBOLD)
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(title_c)
                                     .child("Bonsai"),
                             )
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(theme::module_description_text(is_dark))
+                                    .text_color(desc_c)
                                     .child("Living ASCII from late.sh"),
                             ),
                     )
@@ -59,12 +77,12 @@ impl ArcadiaRoot {
                             .flex_shrink_0()
                             .px_2()
                             .py_1()
-                            .rounded_md()
-                            .bg(theme::module_button_enable_bg(is_dark))
+                            .rounded(px(panel_radius.min(6.0)))
+                            .bg(btn_bg)
                             .text_xs()
                             .font_weight(openframe::FontWeight::SEMIBOLD)
-                            .text_color(theme::module_button_enable_text(is_dark))
-                            .hover(|style| style.bg(theme::module_button_enable_hover_bg(is_dark)))
+                            .text_color(btn_text)
+                            .hover(move |style| style.bg(btn_hover))
                             .child("Water")
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -84,15 +102,15 @@ impl ArcadiaRoot {
                 div()
                     .flex()
                     .flex_row()
-                    .rounded_lg()
+                    .when(!is_glyph, |d| d.rounded_lg())
                     .overflow_hidden()
                     .border_1()
-                    .border_color(theme::late_bonsai_well_stroke(is_dark))
+                    .border_color(well_stroke)
                     .child(
                         div()
                             .w(px(3.))
                             .min_w(px(3.))
-                            .bg(accent.icon_active),
+                            .bg(accent_bar),
                     )
                     .child(
                         div()
@@ -104,13 +122,13 @@ impl ArcadiaRoot {
                                 div()
                                     .w_full()
                                     .h(px(5.))
-                                    .bg(theme::late_bonsai_pot_band(is_dark)),
+                                    .bg(pot_band),
                             )
                             .child(
                                 div()
                                     .w_full()
                                     .p_3()
-                                    .bg(theme::late_bonsai_well_bg(is_dark))
+                                    .bg(well_bg)
                                     .flex()
                                     .flex_col()
                                     .child(if art.is_empty() {
@@ -121,7 +139,7 @@ impl ArcadiaRoot {
                                             .justify_center()
                                             .items_center()
                                             .text_xs()
-                                            .text_color(theme::module_description_text(is_dark))
+                                            .text_color(desc_c)
                                             .child("No bonsai yet — connect to late.sh.")
                                     } else {
                                         div()
@@ -130,7 +148,7 @@ impl ArcadiaRoot {
                                             .flex_col()
                                             .font_family("monospace")
                                             .text_sm()
-                                            .text_color(theme::late_bonsai_foliage_text(is_dark))
+                                            .text_color(foliage_c)
                                             .children(art.into_iter().map(|line| {
                                                 div()
                                                     .line_height(px(15.))

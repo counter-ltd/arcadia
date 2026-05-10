@@ -19,16 +19,16 @@ const TOP_BAR_H: f32 = 37.0;
 /// Sidebar width when visible (w_64 = 256 px).
 const SIDEBAR_W: f32 = 256.0;
 
-/// Matches shell input `$` styling in `shell/panel.rs` (`rgb(0x60a5fa)` / `rgb(0x1d4ed8)`).
+/// Matches shell input `$` styling in `shell/panel.rs` (`theme::ui_accent` — default `#10b981`).
 fn shell_history_prompt_prefix(window: &Window) -> String {
     let is_dark = matches!(
         window.appearance(),
         WindowAppearance::Dark | WindowAppearance::VibrantDark
     );
     if is_dark {
-        "\x1b[38;2;96;165;250m$\x1b[0m ".to_string()
+        "\x1b[38;2;16;185;129m$\x1b[0m ".to_string()
     } else {
-        "\x1b[38;2;29;78;216m$\x1b[0m ".to_string()
+        "\x1b[38;2;4;120;87m$\x1b[0m ".to_string()
     }
 }
 

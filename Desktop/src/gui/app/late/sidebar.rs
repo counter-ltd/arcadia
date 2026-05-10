@@ -1,5 +1,5 @@
 use openframe::{
-    div, rgb, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
+    div, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
     Styled,
 };
 
@@ -21,6 +21,10 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
         .collect();
     drop(st);
 
+    let glyph = theme::glyph_snapshot(cx);
+    let subtext_c = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_meta_text(is_dark));
+    let desc_c    = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_description_text(is_dark));
+    let sidebar_border = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::ui_border(cx, is_dark));
     div()
         .w_72()
         .h_full()
@@ -28,16 +32,16 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
         .flex_col()
         .gap_0()
         .border_l_1()
-        .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+        .border_color(sidebar_border)
         .child(
             div()
                 .px_3()
                 .py_2()
                 .border_b_1()
-                .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+                .border_color(sidebar_border)
                 .text_xs()
                 .font_weight(openframe::FontWeight::SEMIBOLD)
-                .text_color(theme::module_meta_text(is_dark))
+                .text_color(subtext_c)
                 .child(format!("● {} online", users.len())),
         )
         .child(
@@ -66,7 +70,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                                 .children(users.into_iter().map(|username| {
                                     div()
                                         .text_xs()
-                                        .text_color(theme::module_description_text(is_dark))
+                                        .text_color(desc_c)
                                         .child(format!("@{username}"))
                                 })),
                         )
@@ -75,7 +79,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                                 .mx_3()
                                 .my_1()
                                 .h_px()
-                                .bg(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) }),
+                                .bg(sidebar_border),
                         )
                         .child(
                             div()
@@ -83,7 +87,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                                 .py_1()
                                 .text_xs()
                                 .font_weight(openframe::FontWeight::SEMIBOLD)
-                                .text_color(theme::module_meta_text(is_dark))
+                                .text_color(subtext_c)
                                 .child("Activity"),
                         )
                         .child(
@@ -97,7 +101,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                                     let icon = if kind == "join" { "→" } else { "←" };
                                     div()
                                         .text_xs()
-                                        .text_color(theme::module_description_text(is_dark))
+                                        .text_color(desc_c)
                                         .child(format!(
                                             "{icon} @{username} {}",
                                             format_relative(&ts)
@@ -112,7 +116,7 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                         .pt_2()
                         .pb_3()
                         .border_t_1()
-                        .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+                        .border_color(sidebar_border)
                         .flex()
                         .flex_col()
                         .gap_2()

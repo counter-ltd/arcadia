@@ -8,9 +8,11 @@
 
 use arcadia_core::services::{is_port_collision_error, service_by_id};
 use openframe::{
-    div, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    div, rgb, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Styled,
 };
+
+use crate::gui::theme;
 
 use crate::gui::app::{ArcadiaRoot, PendingPortKill};
 
@@ -138,10 +140,10 @@ impl ArcadiaRoot {
                         div()
                             .w_128()
                             .p_5()
-                            .rounded_lg()
-                            .bg(if is_dark { rgb(0x111827) } else { rgb(0xffffff) })
+                            .rounded(px(theme::ui_radius(cx)))
+                            .bg(theme::ui_surface(cx, is_dark))
                             .border_1()
-                            .border_color(if is_dark { rgb(0x374151) } else { rgb(0xe2e8f0) })
+                            .border_color(theme::ui_border(cx, is_dark))
                             .flex()
                             .flex_col()
                             .gap_3()
@@ -149,13 +151,13 @@ impl ArcadiaRoot {
                                 div()
                                     .text_lg()
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(if is_dark { rgb(0xf9fafb) } else { rgb(0x111827) })
+                                    .text_color(theme::ui_text(cx, is_dark))
                                     .child("Kill Existing?"),
                             )
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(if is_dark { rgb(0xd1d5db) } else { rgb(0x374151) })
+                                    .text_color(theme::ui_text(cx, is_dark))
                                     .child(format!(
                                         "{} failed to bind port {}: {}",
                                         pending.service_title, pending.port, pending.error
@@ -164,7 +166,7 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(if is_dark { rgb(0x9ca3af) } else { rgb(0x6b7280) })
+                                    .text_color(theme::ui_subtext(cx, is_dark))
                                     .child("Arcadia will terminate any older Arcadia process holding this port and retry Start."),
                             )
                             .child(self.kill_modal_actions(cx, is_dark, pending)),
@@ -180,6 +182,7 @@ impl ArcadiaRoot {
     ) -> impl IntoElement {
         let service_id = pending.service_id;
         let port = pending.port;
+        let modal_radius = theme::ui_radius(cx);
         div()
             .flex()
             .gap_2()
@@ -188,10 +191,10 @@ impl ArcadiaRoot {
                 div()
                     .px_3()
                     .py_2()
-                    .rounded_md()
+                    .rounded(px(modal_radius))
                     .cursor_pointer()
-                    .bg(if is_dark { rgb(0x374151) } else { rgb(0xe5e7eb) })
-                    .text_color(if is_dark { rgb(0xf3f4f6) } else { rgb(0x1f2937) })
+                    .bg(theme::ui_surface2(cx, is_dark))
+                    .text_color(theme::ui_text(cx, is_dark))
                     .child("Cancel")
                     .on_mouse_down(
                         MouseButton::Left,
@@ -205,10 +208,10 @@ impl ArcadiaRoot {
                 div()
                     .px_3()
                     .py_2()
-                    .rounded_md()
+                    .rounded(px(modal_radius))
                     .cursor_pointer()
-                    .bg(rgb(0xdbeafe))
-                    .text_color(rgb(0x1d4ed8))
+                    .bg(theme::ui_accent(cx))
+                    .text_color(theme::ui_accent_fg(cx))
                     .child("Kill Existing")
                     .on_mouse_down(
                         MouseButton::Left,

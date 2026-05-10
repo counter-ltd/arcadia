@@ -1,4 +1,4 @@
-use openframe::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
 use arcadia_core::modules::late::state;
 use arcadia_core::modules;
@@ -9,17 +9,13 @@ use crate::gui::theme;
 
 use crate::gui::app::ArcadiaRoot;
 
-fn track_bar_vertical_rule(is_dark: bool) -> openframe::Div {
+fn track_bar_vertical_rule(border_c: openframe::Rgba) -> openframe::Div {
     div()
         .w_px()
         .h_6()
         .flex_shrink_0()
         .mx_2()
-        .bg(if is_dark {
-            rgb(0x475569)
-        } else {
-            rgb(0xcbd5e1)
-        })
+        .bg(border_c)
 }
 
 pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl IntoElement {
@@ -30,16 +26,24 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
     let connected = st.connected;
     drop(st);
 
+    let rule_c = theme::ui_border(cx, is_dark);
+    let reconnect_bg = theme::action_pill_bg(cx, is_dark);
+    let reconnect_tc = theme::action_pill_text(cx, is_dark);
+    let reconnect_hover = theme::action_pill_hover_bg(cx, is_dark);
+    let track_primary = theme::content_emphasis_text(cx, is_dark);
+    let track_note = theme::content_muted_text(cx, is_dark);
+    let track_empty = theme::content_subdued_text(cx, is_dark);
+
     let reconnect_btn = div()
         .px_2()
         .py_0p5()
         .rounded_md()
         .cursor_pointer()
         .text_xs()
-        .bg(theme::top_bar_pill_bg(is_dark))
-        .text_color(theme::top_bar_pill_text(is_dark))
+        .bg(reconnect_bg)
+        .text_color(reconnect_tc)
         .hover(move |style| {
-            style.bg(theme::top_bar_pill_hover_bg(is_dark))
+            style.bg(reconnect_hover)
         })
         .child(if connected { "Reconnect" } else { "Connect" })
         .on_mouse_down(
@@ -55,12 +59,14 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
             }),
         );
 
+    let topbar_border = theme::ui_border(cx, is_dark);
+    let topbar_bg = theme::ui_bg(cx, is_dark);
     div()
         .px_3()
         .py_2()
-        .bg(if is_dark { rgb(0x0a0f1a) } else { rgb(0xf0fdf4) })
+        .bg(topbar_bg)
         .border_b_1()
-        .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xd1fae5) })
+        .border_color(topbar_border)
         .child(
             div()
                 .flex()
@@ -78,22 +84,22 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
                         .child(
                             div()
                                 .text_xs()
-                                .text_color(theme::module_meta_text(is_dark))
+                                .text_color(track_note)
                                 .child("♫"),
                         )
                         .child(if track.is_empty() {
                             div()
                                 .text_xs()
-                                .text_color(theme::module_description_text(is_dark))
+                                .text_color(track_empty)
                                 .child("No track info — connect to late.sh to stream.")
                         } else {
                             div()
                                 .text_xs()
-                                .text_color(theme::module_title_text(is_dark))
+                                .text_color(track_primary)
                                 .child(format!("{track} · {artist}"))
                         }),
                 )
-                .child(track_bar_vertical_rule(is_dark))
+                .child(track_bar_vertical_rule(rule_c))
                 .child(
                     div()
                         .flex_1()
@@ -106,7 +112,7 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
                         .px_2()
                         .child(late_visualizer_inline(is_dark)),
                 )
-                .child(track_bar_vertical_rule(is_dark))
+                .child(track_bar_vertical_rule(rule_c))
                 .child(if connected {
                     div()
                         .flex()
@@ -115,7 +121,7 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
                         .items_center()
                         .gap_1()
                         .child(late_vote_pills(cx, is_dark))
-                        .child(track_bar_vertical_rule(is_dark))
+                        .child(track_bar_vertical_rule(rule_c))
                         .child(reconnect_btn)
                 } else {
                     div()

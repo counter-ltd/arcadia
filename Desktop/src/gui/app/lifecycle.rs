@@ -3,6 +3,8 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use arcadia_core::config::appearance::AppearanceConfig;
+use arcadia_core::config::extension_tokens;
 use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::modules::{
     ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME,
@@ -14,11 +16,16 @@ use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
+use arcadia_core::modules::python_registry::StyleInfo;
 #[cfg(feature = "gui")]
 use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::parse_surface_snapshot;
 use arcadia_core::navigation;
-use openframe::{Context, Timer, Window};
+use openframe::{Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
+use crate::gui::theme::{
+    ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
+    GlyphBorderTypography, GlyphStyleConfig,
+};
 
 #[cfg(feature = "gui")]
 use super::super::tui;
@@ -135,10 +142,19 @@ impl ArcadiaRoot {
         let late_settings_server_url_focus = cx.focus_handle();
         let late_settings_username_focus = cx.focus_handle();
         let late_settings_default_room_focus = cx.focus_handle();
+        let extension_token_focus = cx.focus_handle();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
+        let appearance_cfg = AppearanceConfig::load_or_create().unwrap_or_default();
+        let active_style = appearance_cfg.active_style.clone();
+        let available_styles = built_in_styles();
+        // Initialize globals; glyph config is populated once extensions load.
+        RenderStyle::set_global(cx, RenderStyle::Default);
+        ActiveGlyphStyle::set_global(cx, ActiveGlyphStyle(None));
+        ActiveGlyphBorderTypography::set_global(cx, ActiveGlyphBorderTypography(None));
+        ActiveGlyphBorderPatterns::set_global(cx, ActiveGlyphBorderPatterns(None));
         #[cfg(feature = "gui")]
         let first_terminal = {
             let (shell_working_dir, shell_display_cwd) = Self::current_dir_strings();
@@ -157,6 +173,8 @@ impl ArcadiaRoot {
             active_group_id: navigation::DEFAULT_GROUP_ID.to_string(),
             module_rows,
             python_extension_rows: Vec::new(),
+            active_style,
+            available_styles,
             pending_module_enable: None,
             #[cfg(feature = "gui")]
             terminals: vec![first_terminal],
@@ -203,6 +221,9 @@ impl ArcadiaRoot {
             late_settings_server_url_focus,
             late_settings_username_focus,
             late_settings_default_room_focus,
+            extension_token_values: std::collections::HashMap::new(),
+            extension_token_editing: None,
+            extension_token_focus,
         };
 
         // Thin client bootstrap: ARCADIA_NET_AS overrides persisted thin-client.toml route.
@@ -237,14 +258,126 @@ impl ArcadiaRoot {
             }
             root.python_extension_rows =
                 arcadia_core::modules::python_registry::list_modules();
+            // Merge styles from Python extensions into available_styles.
+            let mut styles = built_in_styles();
+            styles.extend(arcadia_core::modules::python_registry::list_styles());
+            root.available_styles = styles;
         }
+
+        root.refresh_extension_token_cache();
+
+        // Apply persisted style (may activate a glyph config from an extension).
+        let active = root.active_style.clone();
+        root.apply_style(active, cx);
 
         root
     }
 
-    pub fn reload_python_extensions(&mut self) {
+    pub(super) fn refresh_extension_token_cache(&mut self) {
+        self.extension_token_values.clear();
+        for (module, specs) in arcadia_core::modules::python_registry::list_style_tokens() {
+            let file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
+            for spec in specs {
+                let v = extension_tokens::merged_display_for_key(
+                    &spec.key,
+                    &spec.default_value,
+                    &file,
+                );
+                self.extension_token_values
+                    .insert((module.clone(), spec.key), v);
+            }
+        }
+    }
+
+    pub(crate) fn flush_extension_token_edit(&mut self, module: String, key: String, cx: &mut Context<Self>) {
+        let kind = arcadia_core::modules::python_registry::list_style_tokens()
+            .into_iter()
+            .find(|(m, _)| m == &module)
+            .and_then(|(_, specs)| specs.into_iter().find(|s| s.key == key))
+            .map(|s| s.kind);
+        let Some(kind) = kind else {
+            return;
+        };
+        let pair = (module.clone(), key.clone());
+        let Some(raw) = self.extension_token_values.get(&pair).cloned() else {
+            return;
+        };
+        let mut file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
+        match extension_tokens::parse_input_to_value(kind, &raw) {
+            Ok(val) => {
+                file.insert(key.clone(), val.clone());
+                if extension_tokens::save_module_tokens(&module, &file).is_ok() {
+                    let disp = extension_tokens::value_to_display_string(&val);
+                    self.extension_token_values.insert(pair, disp);
+                    self.apply_style(self.active_style.clone(), cx);
+                }
+            }
+            Err(_) => {}
+        }
+    }
+
+    pub fn reload_python_extensions(&mut self, cx: &mut Context<Self>) {
         self.python_extension_rows =
             arcadia_core::modules::python_registry::list_modules();
+        // Merge any newly registered styles from Python extensions.
+        let mut styles = built_in_styles();
+        styles.extend(arcadia_core::modules::python_registry::list_styles());
+        // Re-apply active style; fall back to default if the extension providing it was disabled.
+        let active = self.active_style.clone();
+        let active = if styles.iter().any(|s| s.name == active) {
+            active
+        } else {
+            "default".to_string()
+        };
+        self.available_styles = styles;
+        self.refresh_extension_token_cache();
+        self.apply_style(active, cx);
+    }
+
+    /// Persist and apply a new style selection.
+    pub fn apply_style(&mut self, name: String, cx: &mut Context<Self>) {
+        // Look up glyph params for the chosen style.
+        let style_row = self.available_styles.iter().find(|s| s.name == name);
+
+        let merged_glyph = style_row.and_then(|s| {
+            let mut g = s.glyph.clone()?;
+            if let Some(module) = s.module_name.as_deref() {
+                if let Ok(file) = extension_tokens::load_module_tokens(module) {
+                    extension_tokens::apply_file_tokens_to_glyph(&mut g, &file);
+                }
+            }
+            Some(g)
+        });
+
+        let glyph_cfg = merged_glyph
+            .as_ref()
+            .map(|p| build_glyph_style_config(p));
+
+        let border_typography = merged_glyph.as_ref().map(|p| GlyphBorderTypography {
+            font_family: p.border_font_family.clone(),
+            font_size_rems: p.border_font_size_rems,
+            side_rail_px: p.border_side_rail_px,
+        });
+
+        let border_patterns = merged_glyph.as_ref().map(|p| GlyphBorderPatterns {
+            horizontal: p.border_horizontal_pattern.clone(),
+            vertical: p.border_vertical_pattern.clone(),
+        });
+
+        if glyph_cfg.is_some() {
+            RenderStyle::set_global(cx, RenderStyle::Custom);
+        } else {
+            RenderStyle::set_global(cx, RenderStyle::Default);
+        }
+        ActiveGlyphStyle::set_global(cx, ActiveGlyphStyle(glyph_cfg));
+        ActiveGlyphBorderTypography::set_global(cx, ActiveGlyphBorderTypography(border_typography));
+        ActiveGlyphBorderPatterns::set_global(cx, ActiveGlyphBorderPatterns(border_patterns));
+
+        self.active_style = name.clone();
+        let mut cfg = AppearanceConfig::load_or_create().unwrap_or_default();
+        cfg.active_style = name;
+        let _ = cfg.save();
+        cx.notify();
     }
 
     pub fn reload_modules(&mut self) {
@@ -383,4 +516,54 @@ impl ArcadiaRoot {
         )
         .detach();
     }
+}
+
+pub(crate) fn built_in_styles() -> Vec<StyleInfo> {
+    vec![StyleInfo {
+        name: "default".to_string(),
+        label: "Default".to_string(),
+        description: "Standard GPU-rendered appearance.".to_string(),
+        glyph: None,
+        module_name: None,
+    }]
+}
+
+/// Convert a `GlyphParams` (hex strings from the Python extension) into a
+/// `GlyphStyleConfig` (Rgba values) the Desktop rendering layer can use.
+pub(crate) fn build_glyph_style_config(
+    p: &arcadia_core::modules::python_registry::GlyphParams,
+) -> GlyphStyleConfig {
+    let hex = |s: &Option<String>, default: Rgba| -> Rgba {
+        s.as_deref().and_then(parse_hex_color).unwrap_or(default)
+    };
+    let fallback_dark = Rgba { r: 0.067, g: 0.067, b: 0.067, a: 1.0 };
+
+    let chars: [char; 7] = p.border_chars.as_deref()
+        .map(|s| {
+            let v: Vec<char> = s.chars().collect();
+            if v.len() >= 7 { [v[0], v[1], v[2], v[3], v[4], v[5], v[6]] }
+            else { ['┌', '─', '┐', '│', '└', '─', '┘'] }
+        })
+        .unwrap_or(['┌', '─', '┐', '│', '└', '─', '┘']);
+
+    GlyphStyleConfig {
+        bg:      hex(&p.bg,      Rgba { r: 0.047, g: 0.047, b: 0.047, a: 1.0 }),
+        surface: hex(&p.surface, fallback_dark),
+        surface2: hex(&p.surface2, Rgba { r: 0.102, g: 0.102, b: 0.102, a: 1.0 }),
+        text:    hex(&p.text,    Rgba { r: 0.831, g: 0.831, b: 0.831, a: 1.0 }),
+        dim:     hex(&p.dim,     Rgba { r: 0.333, g: 0.333, b: 0.333, a: 1.0 }),
+        border:  hex(&p.border,  Rgba { r: 0.200, g: 0.200, b: 0.200, a: 1.0 }),
+        accent:  hex(&p.accent,  Rgba { r: 0.0, g: 0.800, b: 0.533, a: 1.0 }),
+        border_radius: p.border_radius,
+        border_chars: chars,
+    }
+}
+
+pub(crate) fn parse_hex_color(hex: &str) -> Option<Rgba> {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() < 6 { return None; }
+    let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
+    let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
+    let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
+    Some(Rgba { r, g, b, a: 1.0 })
 }

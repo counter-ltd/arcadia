@@ -1,7 +1,8 @@
 use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
-use openframe::{div, rgb, Context, Div, FontWeight, ParentElement, Styled, Window};
+use openframe::{div, Context, Div, FontWeight, ParentElement, Styled, Window};
 
 use super::ArcadiaRoot;
+use crate::gui::theme;
 
 #[derive(Clone, Copy)]
 pub(crate) enum NavPageRef<'a> {
@@ -186,10 +187,9 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn render_active_content(
-        &self,
+        &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        active_page: Option<NavPageRef<'_>>,
         is_dark: bool,
     ) -> Div {
         #[cfg(feature = "gui")]
@@ -226,43 +226,43 @@ impl ArcadiaRoot {
         if self.active_page_id.as_str() == "python.settings" {
             return div().w_full().p_6().child(self.python_settings_panel(cx, is_dark));
         }
-        div()
-            .w_full()
-            .p_6()
-            .flex()
-            .flex_col()
-            .items_center()
-            .gap_3()
-            .py_16()
-            .child(
-                div()
-                    .text_3xl()
-                    .font_weight(FontWeight::BOLD)
-                    .child(self.title.clone()),
-            )
-            .child(
-                div()
-                    .text_2xl()
-                    .text_color(if is_dark {
-                        rgb(0xe5e7eb)
-                    } else {
-                        rgb(0x1f2937)
-                    })
-                    .child(active_page.map_or_else(|| "Page".to_string(), |page| page.title().to_string())),
-            )
-            .child(
-                div()
-                    .text_base()
-                    .text_color(if is_dark {
-                        rgb(0x9ca3af)
-                    } else {
-                        rgb(0x6b7280)
-                    })
-                    .child(active_page.map_or_else(
-                        || "Page definition not found.".to_string(),
-                        |page| page.description().to_string(),
-                    )),
-            )
+        if self.active_page_id.as_str() == "global.appearance" {
+            return div().w_full().p_6().child(self.appearance_panel(cx, is_dark));
+        }
+        {
+            let active_page = self
+                .active_page_if_visible()
+                .or_else(|| self.page_ref(self.effective_default_page()));
+            div()
+                .w_full()
+                .p_6()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap_3()
+                .py_16()
+                .child(
+                    div()
+                        .text_3xl()
+                        .font_weight(FontWeight::BOLD)
+                        .child(self.title.clone()),
+                )
+                .child(
+                    div()
+                        .text_2xl()
+                        .text_color(theme::ui_text(cx, is_dark))
+                        .child(active_page.map_or_else(|| "Page".to_string(), |page| page.title().to_string())),
+                )
+                .child(
+                    div()
+                        .text_base()
+                        .text_color(theme::ui_subtext(cx, is_dark))
+                        .child(active_page.map_or_else(
+                            || "Page definition not found.".to_string(),
+                            |page| page.description().to_string(),
+                        )),
+                )
+        }
     }
 
     pub fn is_page_visible(&self, page_id: &str) -> bool {

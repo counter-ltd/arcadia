@@ -1,14 +1,18 @@
 use arcadia_core::modules;
-use openframe::{div, rgb, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
-use openframe::Context;
+use openframe::{
+    AnyElement, IntoElement, InteractiveElement, ParentElement, Styled, div, px, glyph_border,
+};
+use openframe::{Context, FontWeight, MouseButton};
+use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme;
+use crate::gui::theme::{self, apply_glyph_border_typography, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
-    pub fn python_settings_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
-        let header_text = if is_dark { rgb(0xe5e7eb) } else { rgb(0x111827) };
-        let subtext = if is_dark { rgb(0x6b7280) } else { rgb(0x9ca3af) };
+    pub fn python_settings_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> AnyElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let g_snap = theme::glyph_snapshot(cx);
+        let panel_radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
         let rows = self.python_extension_rows.clone();
 
@@ -23,38 +27,82 @@ impl ArcadiaRoot {
                     div()
                         .text_sm()
                         .font_weight(FontWeight::MEDIUM)
-                        .text_color(header_text)
+                        .text_color(p.content_title)
                         .child("No extensions loaded"),
                 )
                 .child(
                     div()
                         .text_xs()
-                        .text_color(subtext)
+                        .text_color(p.content_meta)
                         .child("Drop a .py file or a folder with main.py into ~/Arcadia/Extensions/ and reload."),
                 )
-                .child(Self::python_reload_button(cx, is_dark))
+                .child(Self::python_reload_button(cx, p.accent, p.on_accent, panel_radius))
         } else {
             div()
                 .flex()
                 .flex_col()
                 .gap_3()
                 .children(rows.into_iter().map(|(name, version, description, enabled)| {
-                    Self::python_extension_row(cx, name, version, description, enabled, is_dark)
+                    Self::python_extension_row(
+                        cx,
+                        name,
+                        version,
+                        description,
+                        enabled,
+                        is_dark,
+                        panel_radius,
+                    )
                 }))
-                .child(div().pt_2().child(Self::python_reload_button(cx, is_dark)))
+                .child(div().pt_2().child(Self::python_reload_button(
+                    cx,
+                    p.accent,
+                    p.on_accent,
+                    panel_radius,
+                )))
         };
 
-        div()
-            .w_full()
-            .p_4()
-            .rounded_lg()
-            .bg(theme::module_panel_bg(is_dark))
-            .border_1()
-            .border_color(theme::module_panel_stroke(is_dark))
-            .flex()
-            .flex_col()
-            .gap_3()
-            .child(content)
+        if let Some(g) = theme::active_glyph(cx) {
+            div()
+                .w_full()
+                .flex()
+                .justify_center()
+                .child(
+                    div()
+                        .w_full()
+                        .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+                        .child(
+                            apply_glyph_border_typography(
+                                &*cx,
+                                glyph_border()
+                                    .border_color(g.accent)
+                                    .bg(g.surface)
+                                    .border_chars(g.border_chars),
+                            )
+                            .child(
+                                div()
+                                    .w_full()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_3()
+                                    .child(content),
+                            ),
+                        ),
+                )
+                .into_any_element()
+        } else {
+            div()
+                .w_full()
+                .p_4()
+                .rounded(px(panel_radius.min(12.0)))
+                .bg(p.panel_bg)
+                .border_1()
+                .border_color(p.panel_border)
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(content)
+                .into_any_element()
+        }
     }
 
     fn python_extension_row(
@@ -64,17 +112,23 @@ impl ArcadiaRoot {
         description: String,
         enabled: bool,
         is_dark: bool,
-    ) -> impl IntoElement {
+        border_radius: f32,
+    ) -> AnyElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let is_glyph = theme::glyph_snapshot(cx).is_some();
         let state_label = if enabled { "Enabled" } else { "Disabled" };
+        let r_track = border_radius.min(8.0_f32).max(0.0);
 
-        div()
+        let (badge_bg, badge_fg) = if enabled {
+            (p.accent, p.on_accent)
+        } else {
+            (p.surface_elevated, p.ui_subtext)
+        };
+
+        let row_inner = div()
             .w_full()
             .px_4()
             .py_3()
-            .rounded_lg()
-            .bg(theme::module_row_bg(is_dark))
-            .border_1()
-            .border_color(theme::module_row_stroke(is_dark))
             .flex()
             .justify_between()
             .items_center()
@@ -88,7 +142,7 @@ impl ArcadiaRoot {
                         div()
                             .text_base()
                             .font_weight(FontWeight::BOLD)
-                            .text_color(theme::module_title_text(is_dark))
+                            .text_color(p.content_title)
                             .child(name.clone()),
                     )
                     .child(
@@ -99,59 +153,43 @@ impl ArcadiaRoot {
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(theme::module_meta_text(is_dark))
+                                    .text_color(p.content_meta)
                                     .child(format!("v{version}")),
                             )
                             .child(
                                 div()
                                     .px_2()
                                     .py_0p5()
-                                    .rounded_full()
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(border_radius.min(12.0)))
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .bg(if enabled {
-                                        theme::module_state_enabled_bg(is_dark)
-                                    } else {
-                                        theme::module_state_disabled_bg(is_dark)
-                                    })
-                                    .text_color(if enabled {
-                                        theme::module_state_enabled_text(is_dark)
-                                    } else {
-                                        theme::module_state_disabled_text(is_dark)
-                                    })
+                                    .bg(badge_bg)
+                                    .text_color(badge_fg)
                                     .child(state_label),
                             ),
                     )
                     .child(
                         div()
                             .text_xs()
-                            .text_color(theme::module_description_text(is_dark))
+                            .text_color(p.content_body)
                             .child(description),
                     ),
             )
             .child(
-                // Toggle switch — mirrors the modules page pattern.
                 div()
                     .flex()
                     .items_center()
                     .gap_2()
-                    .px_2()
-                    .py_1()
-                    .rounded_full()
                     .cursor_pointer()
-                    .bg(if enabled {
-                        theme::module_state_enabled_bg(is_dark)
-                    } else {
-                        theme::module_state_disabled_bg(is_dark)
-                    })
                     .child(
                         div()
                             .text_xs()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(if enabled {
-                                theme::module_state_enabled_text(is_dark)
+                                p.accent
                             } else {
-                                theme::module_state_disabled_text(is_dark)
+                                p.ui_subtext
                             })
                             .child(if enabled { "ON" } else { "OFF" }),
                     )
@@ -160,10 +198,11 @@ impl ArcadiaRoot {
                             .w_10()
                             .h_6()
                             .px_0p5()
-                            .rounded_full()
+                            .when(!is_glyph, |d| d.rounded_full())
+                            .rounded(px(r_track))
                             .border_1()
-                            .border_color(theme::module_row_stroke(is_dark))
-                            .bg(theme::module_button_enable_bg(is_dark))
+                            .border_color(p.border)
+                            .bg(p.accent)
                             .flex()
                             .items_center()
                             .justify_end()
@@ -171,18 +210,20 @@ impl ArcadiaRoot {
                                 div()
                                     .w_4()
                                     .h_4()
-                                    .rounded_full()
-                                    .bg(theme::module_button_enable_text(is_dark)),
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(r_track))
+                                    .bg(p.on_accent),
                             )
                     } else {
                         div()
                             .w_10()
                             .h_6()
                             .px_0p5()
-                            .rounded_full()
+                            .when(!is_glyph, |d| d.rounded_full())
+                            .rounded(px(r_track))
                             .border_1()
-                            .border_color(theme::module_row_stroke(is_dark))
-                            .bg(theme::module_panel_stroke(is_dark))
+                            .border_color(p.border)
+                            .bg(p.surface_elevated)
                             .flex()
                             .items_center()
                             .justify_start()
@@ -190,8 +231,9 @@ impl ArcadiaRoot {
                                 div()
                                     .w_4()
                                     .h_4()
-                                    .rounded_full()
-                                    .bg(if is_dark { rgb(0xd1d5db) } else { rgb(0xf8fafc) }),
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(r_track))
+                                    .bg(p.toggle_knob_off),
                             )
                     })
                     .on_mouse_down(
@@ -204,30 +246,55 @@ impl ArcadiaRoot {
                                 "python-host.extension-enable"
                             };
                             let _ = modules::execute_command(token, &[name.as_str()], &ctx);
-                            this.reload_python_extensions();
+                            this.reload_python_extensions(cx);
                             cx.notify();
                         }),
                     ),
-            )
+            );
+
+        if let Some(g) = theme::active_glyph(cx) {
+            div()
+                .w_full()
+                .rounded(px(g.border_radius.min(12.0)))
+                .bg(g.surface2)
+                .border_1()
+                .border_color(g.border)
+                .child(row_inner)
+                .into_any_element()
+        } else {
+            div()
+                .w_full()
+                .rounded(px(border_radius.min(12.0)))
+                .bg(p.row_bg)
+                .border_1()
+                .border_color(p.row_border)
+                .child(row_inner)
+                .into_any_element()
+        }
     }
 
-    fn python_reload_button(cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
+    fn python_reload_button(
+        cx: &mut Context<Self>,
+        btn_bg: openframe::Rgba,
+        btn_text: openframe::Rgba,
+        radius: f32,
+    ) -> impl IntoElement {
         div()
             .cursor_pointer()
             .px_4()
             .py_2()
-            .rounded_lg()
-            .bg(theme::module_button_enable_bg(is_dark))
+            .rounded(px(radius.min(12.0)))
+            .bg(btn_bg)
             .text_sm()
             .font_weight(FontWeight::SEMIBOLD)
-            .text_color(theme::module_button_enable_text(is_dark))
+            .text_color(btn_text)
             .child("Reload Extensions")
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
                     let ctx = this.execution_context();
                     let _ = modules::execute_command("python-host.reload", &[], &ctx);
-                    this.reload_python_extensions();
+                    this.reload_python_extensions(cx);
                     cx.notify();
                 }),
             )

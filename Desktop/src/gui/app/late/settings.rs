@@ -2,7 +2,7 @@ use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use openframe::{
-    div, rgb, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, Styled,
 };
 
@@ -24,8 +24,21 @@ impl ArcadiaRoot {
             .unwrap_or(false);
         let palette = theme::nav_accent_palette("violet", is_dark);
 
-        let input_bg = if is_dark { rgb(0x0f172a) } else { rgb(0xf8fafc) };
-        let input_border = if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) };
+        let glyph = theme::glyph_snapshot(cx);
+        let text_c    = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| theme::module_title_text(is_dark));
+        let subtext_c = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_meta_text(is_dark));
+        let row_bg    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_row_bg(is_dark));
+        let row_str   = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_row_stroke(is_dark));
+        let btn_bg    = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
+        let btn_text  = glyph.as_ref().map(|g| g.bg).unwrap_or_else(|| theme::module_button_enable_text(is_dark));
+        let dis_bg    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_button_disable_bg(is_dark));
+        let dis_text  = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_button_disable_text(is_dark));
+        let conn_bg   = glyph.as_ref().map(|g| g.surface2).unwrap_or(palette.row_selected);
+        let conn_text = glyph.as_ref().map(|g| g.accent).unwrap_or(palette.icon_active);
+        let radius    = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
+        let input_bg = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::ui_surface(cx, is_dark));
+        let input_border = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::ui_border(cx, is_dark));
+        let settings_radius = radius;
 
         div()
             .w_full()
@@ -42,13 +55,13 @@ impl ArcadiaRoot {
                         div()
                             .text_2xl()
                             .font_weight(FontWeight::BOLD)
-                            .text_color(theme::module_title_text(is_dark))
+                            .text_color(text_c)
                             .child("Late.sh"),
                     )
                     .child(
                         div()
                             .text_sm()
-                            .text_color(theme::module_meta_text(is_dark))
+                            .text_color(subtext_c)
                             .child(
                                 "Connection and preference settings. Changes take effect on next connect.",
                             ),
@@ -70,7 +83,7 @@ impl ArcadiaRoot {
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(text_c)
                                     .child("Server URL"),
                             )
                             .child({
@@ -79,12 +92,12 @@ impl ArcadiaRoot {
                                     .id("late-settings-url")
                                     .px_3()
                                     .py_2()
-                                    .rounded_lg()
+                                    .rounded(px(settings_radius))
                                     .bg(input_bg)
                                     .border_1()
                                     .border_color(input_border)
                                     .text_sm()
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(text_c)
                                     .track_focus(&self.late_settings_server_url_focus)
                                     .on_mouse_down(
                                         MouseButton::Left,
@@ -94,7 +107,7 @@ impl ArcadiaRoot {
                                     )
                                     .child(if url_val.is_empty() {
                                         div()
-                                            .text_color(theme::module_meta_text(is_dark))
+                                            .text_color(subtext_c)
                                             .child("https://late.sh")
                                     } else {
                                         div().child(url_val)
@@ -131,7 +144,7 @@ impl ArcadiaRoot {
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(text_c)
                                     .child("Username"),
                             )
                             .child({
@@ -140,12 +153,12 @@ impl ArcadiaRoot {
                                     .id("late-settings-username")
                                     .px_3()
                                     .py_2()
-                                    .rounded_lg()
+                                    .rounded(px(settings_radius))
                                     .bg(input_bg)
                                     .border_1()
                                     .border_color(input_border)
                                     .text_sm()
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(text_c)
                                     .track_focus(&self.late_settings_username_focus)
                                     .on_mouse_down(
                                         MouseButton::Left,
@@ -155,7 +168,7 @@ impl ArcadiaRoot {
                                     )
                                     .child(if uname_val.is_empty() {
                                         div()
-                                            .text_color(theme::module_meta_text(is_dark))
+                                            .text_color(subtext_c)
                                             .child("your-username")
                                     } else {
                                         div().child(uname_val)
@@ -192,7 +205,7 @@ impl ArcadiaRoot {
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(text_c)
                                     .child("Default Room"),
                             )
                             .child({
@@ -201,12 +214,12 @@ impl ArcadiaRoot {
                                     .id("late-settings-room")
                                     .px_3()
                                     .py_2()
-                                    .rounded_lg()
+                                    .rounded(px(settings_radius))
                                     .bg(input_bg)
                                     .border_1()
                                     .border_color(input_border)
                                     .text_sm()
-                                    .text_color(theme::module_title_text(is_dark))
+                                    .text_color(text_c)
                                     .track_focus(&self.late_settings_default_room_focus)
                                     .on_mouse_down(
                                         MouseButton::Left,
@@ -216,7 +229,7 @@ impl ArcadiaRoot {
                                     )
                                     .child(if room_val.is_empty() {
                                         div()
-                                            .text_color(theme::module_meta_text(is_dark))
+                                            .text_color(subtext_c)
                                             .child("1")
                                     } else {
                                         div().child(room_val)
@@ -253,17 +266,17 @@ impl ArcadiaRoot {
                         div()
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme::module_title_text(is_dark))
+                            .text_color(text_c)
                             .child("Authentication"),
                     )
                     .child(
                         div()
                             .px_4()
                             .py_3()
-                            .rounded_lg()
-                            .bg(theme::module_row_bg(is_dark))
+                            .rounded(px(radius))
+                            .bg(row_bg)
                             .border_1()
-                            .border_color(theme::module_row_stroke(is_dark))
+                            .border_color(row_str)
                             .flex()
                             .justify_between()
                             .items_center()
@@ -275,7 +288,7 @@ impl ArcadiaRoot {
                                     .child(
                                         div()
                                             .text_sm()
-                                            .text_color(theme::module_title_text(is_dark))
+                                            .text_color(text_c)
                                             .child(if has_token {
                                                 "Token: ●●●●●●●●"
                                             } else {
@@ -285,7 +298,7 @@ impl ArcadiaRoot {
                                     .child(
                                         div()
                                             .text_xs()
-                                            .text_color(theme::module_meta_text(is_dark))
+                                            .text_color(subtext_c)
                                             .child(if has_token {
                                                 "Authenticated. Use late.logout to revoke."
                                             } else {
@@ -298,11 +311,11 @@ impl ArcadiaRoot {
                                     .cursor_pointer()
                                     .px_3()
                                     .py_1()
-                                    .rounded_md()
-                                    .bg(theme::module_button_disable_bg(is_dark))
+                                    .rounded(px(settings_radius))
+                                    .bg(dis_bg)
                                     .text_xs()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme::module_button_disable_text(is_dark))
+                                    .text_color(dis_text)
                                     .child("Logout")
                                     .on_mouse_down(
                                         MouseButton::Left,
@@ -336,11 +349,11 @@ impl ArcadiaRoot {
                             .cursor_pointer()
                             .px_4()
                             .py_2()
-                            .rounded_lg()
-                            .bg(theme::module_button_enable_bg(is_dark))
+                            .rounded(px(radius))
+                            .bg(btn_bg)
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme::module_button_enable_text(is_dark))
+                            .text_color(btn_text)
                             .child("Save")
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -368,11 +381,11 @@ impl ArcadiaRoot {
                             .cursor_pointer()
                             .px_4()
                             .py_2()
-                            .rounded_lg()
-                            .bg(palette.row_selected)
+                            .rounded(px(radius))
+                            .bg(conn_bg)
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(palette.icon_active)
+                            .text_color(conn_text)
                             .child("Connect")
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -394,13 +407,13 @@ impl ArcadiaRoot {
                             .cursor_pointer()
                             .px_4()
                             .py_2()
-                            .rounded_lg()
-                            .bg(theme::module_row_bg(is_dark))
+                            .rounded(px(radius))
+                            .bg(row_bg)
                             .border_1()
-                            .border_color(theme::module_row_stroke(is_dark))
+                            .border_color(row_str)
                             .text_sm()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme::module_meta_text(is_dark))
+                            .text_color(subtext_c)
                             .child("Disconnect")
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -424,7 +437,7 @@ impl ArcadiaRoot {
             } else {
                 div()
                     .text_sm()
-                    .text_color(theme::module_meta_text(is_dark))
+                    .text_color(subtext_c)
                     .child(feedback)
                     .into_any()
             })

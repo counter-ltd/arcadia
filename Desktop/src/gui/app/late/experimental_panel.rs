@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use openframe::{
-    div, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    div, px, Context, InteractiveElement, IntoElement, MouseButton, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
 
@@ -11,41 +11,41 @@ use arcadia_core::config::late::LateConfig;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
-fn section_header(label: &str, is_dark: bool) -> openframe::Div {
+fn section_header(label: &str, meta_c: openframe::Rgba) -> openframe::Div {
     div()
         .px_4()
         .pt_4()
         .pb_1()
         .text_xs()
         .font_weight(openframe::FontWeight::SEMIBOLD)
-        .text_color(theme::module_meta_text(is_dark))
+        .text_color(meta_c)
         .child(label.to_uppercase())
 }
 
-fn pill(text: String, is_dark: bool) -> openframe::Div {
+fn pill(text: String, bg: openframe::Rgba, tc: openframe::Rgba) -> openframe::Div {
     div()
         .px_2()
         .py_0p5()
         .rounded_md()
         .text_xs()
-        .bg(theme::top_bar_pill_bg(is_dark))
-        .text_color(theme::top_bar_pill_text(is_dark))
+        .bg(bg)
+        .text_color(tc)
         .child(text)
 }
 
-fn row_label(text: String, is_dark: bool) -> openframe::Div {
+fn row_label(text: String, desc_c: openframe::Rgba) -> openframe::Div {
     div()
         .text_sm()
-        .text_color(theme::module_description_text(is_dark))
+        .text_color(desc_c)
         .child(text)
 }
 
-fn divider(is_dark: bool) -> openframe::Div {
+fn divider(line_c: openframe::Rgba) -> openframe::Div {
     div()
         .mx_4()
         .my_1()
         .h_px()
-        .bg(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+        .bg(line_c)
 }
 
 pub fn late_experimental_panel(
@@ -144,6 +144,15 @@ pub fn late_experimental_panel(
 
     let refresh_label = if loading { "Loading…" } else { "↻ Refresh" };
 
+    let exp_border = theme::ui_border(cx, is_dark);
+    let exp_surface2 = theme::ui_surface2(cx, is_dark);
+    let exp_text = theme::ui_text(cx, is_dark);
+    let exp_subtext = theme::ui_subtext(cx, is_dark);
+    let exp_radius = theme::ui_radius(cx);
+    let exp_section_meta = theme::content_muted_text(cx, is_dark);
+    let exp_row_desc = theme::content_subdued_text(cx, is_dark);
+    let exp_pill_bg = theme::action_pill_bg(cx, is_dark);
+    let exp_pill_tc = theme::action_pill_text(cx, is_dark);
     div()
         .w_full()
         .h_full()
@@ -159,12 +168,12 @@ pub fn late_experimental_panel(
                 .items_center()
                 .gap_3()
                 .border_b_1()
-                .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+                .border_color(exp_border)
                 .child(
                     div()
                         .text_base()
                         .font_weight(openframe::FontWeight::SEMIBOLD)
-                        .text_color(if is_dark { rgb(0xf1f5f9) } else { rgb(0x0f172a) })
+                        .text_color(exp_text)
                         .child("Experimental"),
                 )
                 .child({
@@ -173,7 +182,7 @@ pub fn late_experimental_panel(
                         d = d.child(
                             div()
                                 .text_xs()
-                                .text_color(rgb(0xf87171))
+                                .text_color(theme::ui_danger(cx, is_dark))
                                 .child(truncate(&e, 80)),
                         );
                     }
@@ -184,11 +193,11 @@ pub fn late_experimental_panel(
                         .cursor_pointer()
                         .px_3()
                         .py_1()
-                        .rounded_md()
-                        .bg(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+                        .rounded(px(exp_radius))
+                        .bg(exp_surface2)
                         .text_sm()
-                        .text_color(if is_dark { rgb(0x94a3b8) } else { rgb(0x475569) })
-                        .hover(move |s| s.bg(if is_dark { rgb(0x334155) } else { rgb(0xcbd5e1) }))
+                        .text_color(exp_subtext)
+                        .hover(move |s| s.bg(exp_surface2))
                         .child(refresh_label)
                         .on_mouse_down(
                             MouseButton::Left,
@@ -210,7 +219,7 @@ pub fn late_experimental_panel(
                 .flex()
                 .flex_col()
                 // ── Profile ────────────────────────────────────────────────
-                .child(section_header("Profile", is_dark))
+                .child(section_header("Profile", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -220,7 +229,7 @@ pub fn late_experimental_panel(
                         .gap_1()
                         .child(row_label(
                             format!("@{profile_username}"),
-                            is_dark,
+                            exp_row_desc,
                         ))
                         .child(row_label(
                             if profile_bio.is_empty() {
@@ -228,16 +237,16 @@ pub fn late_experimental_panel(
                             } else {
                                 truncate(&profile_bio, 80)
                             },
-                            is_dark,
+                            exp_row_desc,
                         ))
                         .child(row_label(
                             format!("notify: {profile_notify}"),
-                            is_dark,
+                            exp_row_desc,
                         )),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Notifications ──────────────────────────────────────────
-                .child(section_header("Notifications", is_dark))
+                .child(section_header("Notifications", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -245,12 +254,20 @@ pub fn late_experimental_panel(
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .child(pill(format!("{unread_notif} unread"), is_dark))
-                        .children(notif_preview.into_iter().map(|n| row_label(n, is_dark))),
+                        .child(pill(
+                            format!("{unread_notif} unread"),
+                            exp_pill_bg,
+                            exp_pill_tc,
+                        ))
+                        .children(
+                            notif_preview
+                                .into_iter()
+                                .map(|n| row_label(n, exp_row_desc)),
+                        ),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Articles ───────────────────────────────────────────────
-                .child(section_header("Articles", is_dark))
+                .child(section_header("Articles", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -258,11 +275,15 @@ pub fn late_experimental_panel(
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .children(articles.into_iter().map(|(title, _url)| row_label(title, is_dark))),
+                        .children(
+                            articles
+                                .into_iter()
+                                .map(|(title, _url)| row_label(title, exp_row_desc)),
+                        ),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Work Profiles ──────────────────────────────────────────
-                .child(section_header("Work Profiles", is_dark))
+                .child(section_header("Work Profiles", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -271,14 +292,17 @@ pub fn late_experimental_panel(
                         .flex_col()
                         .gap_1()
                         .children(if work_profiles.is_empty() {
-                            vec![row_label("No profiles yet".to_string(), is_dark)]
+                            vec![row_label("No profiles yet".to_string(), exp_row_desc)]
                         } else {
-                            work_profiles.into_iter().map(|p| row_label(p, is_dark)).collect()
+                            work_profiles
+                                .into_iter()
+                                .map(|p| row_label(p, exp_row_desc))
+                                .collect()
                         }),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── RSS ────────────────────────────────────────────────────
-                .child(section_header("RSS", is_dark))
+                .child(section_header("RSS", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -286,29 +310,33 @@ pub fn late_experimental_panel(
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .child(pill(format!("{rss_unread} unread entries"), is_dark))
+                        .child(pill(
+                            format!("{rss_unread} unread entries"),
+                            exp_pill_bg,
+                            exp_pill_tc,
+                        ))
                         .child(
                             div()
                                 .text_xs()
                                 .font_weight(openframe::FontWeight::SEMIBOLD)
-                                .text_color(theme::module_meta_text(is_dark))
+                                .text_color(exp_section_meta)
                                 .pt_1()
                                 .child("Feeds"),
                         )
-                        .children(rss_feeds.into_iter().map(|f| row_label(f, is_dark)))
+                        .children(rss_feeds.into_iter().map(|f| row_label(f, exp_row_desc)))
                         .child(
                             div()
                                 .text_xs()
                                 .font_weight(openframe::FontWeight::SEMIBOLD)
-                                .text_color(theme::module_meta_text(is_dark))
+                                .text_color(exp_section_meta)
                                 .pt_1()
                                 .child("Latest Entries"),
                         )
-                        .children(rss_entries.into_iter().map(|e| row_label(e, is_dark))),
+                        .children(rss_entries.into_iter().map(|e| row_label(e, exp_row_desc))),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Showcase ───────────────────────────────────────────────
-                .child(section_header("Showcase", is_dark))
+                .child(section_header("Showcase", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -317,14 +345,17 @@ pub fn late_experimental_panel(
                         .flex_col()
                         .gap_1()
                         .children(if showcase.is_empty() {
-                            vec![row_label("No items yet".to_string(), is_dark)]
+                            vec![row_label("No items yet".to_string(), exp_row_desc)]
                         } else {
-                            showcase.into_iter().map(|s| row_label(s, is_dark)).collect()
+                            showcase
+                                .into_iter()
+                                .map(|s| row_label(s, exp_row_desc))
+                                .collect()
                         }),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Leaderboard ────────────────────────────────────────────
-                .child(section_header("Game Leaderboard", is_dark))
+                .child(section_header("Game Leaderboard", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -333,7 +364,7 @@ pub fn late_experimental_panel(
                         .flex_col()
                         .gap_1()
                         .children(if leaderboard.is_empty() {
-                            vec![row_label("No scores yet".to_string(), is_dark)]
+                            vec![row_label("No scores yet".to_string(), exp_row_desc)]
                         } else {
                             leaderboard
                                 .into_iter()
@@ -341,24 +372,24 @@ pub fn late_experimental_panel(
                                     div()
                                         .text_xs()
                                         .font_family("monospace")
-                                        .text_color(theme::module_description_text(is_dark))
+                                        .text_color(exp_row_desc)
                                         .child(e)
                                 })
                                 .collect()
                         }),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Artboard ───────────────────────────────────────────────
-                .child(section_header("Artboard", is_dark))
+                .child(section_header("Artboard", exp_section_meta))
                 .child(
                     div()
                         .px_4()
                         .pb_2()
-                        .child(pill(artboard_label, is_dark)),
+                        .child(pill(artboard_label, exp_pill_bg, exp_pill_tc)),
                 )
-                .child(divider(is_dark))
+                .child(divider(exp_border))
                 // ── Chips ──────────────────────────────────────────────────
-                .child(section_header("Chips", is_dark))
+                .child(section_header("Chips", exp_section_meta))
                 .child(
                     div()
                         .px_4()
@@ -368,9 +399,12 @@ pub fn late_experimental_panel(
                         .flex_wrap()
                         .gap_1()
                         .children(if chips.is_empty() {
-                            vec![row_label("No chips".to_string(), is_dark)]
+                            vec![row_label("No chips".to_string(), exp_row_desc)]
                         } else {
-                            chips.into_iter().map(|c| pill(c, is_dark)).collect()
+                            chips
+                                .into_iter()
+                                .map(|c| pill(c, exp_pill_bg, exp_pill_tc))
+                                .collect()
                         }),
                 ),
         )
