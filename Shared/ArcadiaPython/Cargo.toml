@@ -8,3 +8,4 @@ license = "MIT"
 [dependencies]
 arcadia-core = { path = "../ArcadiaCore" }
 pyo3 = { version = "0.22", features = ["auto-initialize"] }
+serde_json = "1"

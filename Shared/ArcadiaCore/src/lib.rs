@@ -1,5 +1,9 @@
+pub mod capabilities;
 pub mod config;
 pub mod modules;
 pub mod navigation;
 pub mod platform;
+pub mod scheduling;
 pub mod services;
+pub mod shortcuts;
+pub mod surface_revision;

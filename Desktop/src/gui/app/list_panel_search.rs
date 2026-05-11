@@ -13,6 +13,7 @@ use crate::gui::theme;
 pub(crate) enum ListPanelSearchKind {
     Modules,
     Extensions,
+    Permissions,
 }
 
 pub(crate) fn list_panel_row_matches(q_lower: &str, primary: &str, extras: &[&str]) -> bool {
@@ -40,10 +41,14 @@ impl ArcadiaRoot {
             ListPanelSearchKind::Extensions => {
                 (&self.extensions_search_query, &self.extensions_search_focus)
             }
+            ListPanelSearchKind::Permissions => {
+                (&self.permissions_search_query, &self.permissions_search_focus)
+            }
         };
         let placeholder = match kind {
             ListPanelSearchKind::Modules => "Search modules…",
             ListPanelSearchKind::Extensions => "Search extensions…",
+            ListPanelSearchKind::Permissions => "Search permissions…",
         };
 
         let input_bg = theme::glyph_snapshot(cx)
@@ -91,6 +96,7 @@ impl ArcadiaRoot {
                 let buf = match kind {
                     ListPanelSearchKind::Modules => &mut this.modules_search_query,
                     ListPanelSearchKind::Extensions => &mut this.extensions_search_query,
+                    ListPanelSearchKind::Permissions => &mut this.permissions_search_query,
                 };
                 if key == "backspace" {
                     buf.pop();

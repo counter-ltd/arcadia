@@ -122,24 +122,22 @@ fn lan_stop() {
 
 /// Single source of truth for advertised services. Add entries here when a module exposes a
 /// long-running service that should show up on the Services page.
-pub const SERVICE_DEFINITIONS: &[ServiceDefinition] = &[
-    ServiceDefinition {
-        id: "lan.discovery",
-        page_id: "utility.services",
-        title: "LAN Discovery",
-        description: "Auto-advertises this node and discovers Arcadia peers on UDP broadcast.",
-        required_module: LAN_MODULE_NAME,
-        glyph: "nodes",
-        system_image: "wifi",
-        accent: "cyan",
-        controls: ServiceControls {
-            status_detail: Some(lan_status_detail),
-            start: Some(lan_start),
-            stop: Some(lan_stop),
-            port_for_collision: Some(|| lan::lan_service_info().port),
-        },
+pub const SERVICE_DEFINITIONS: &[ServiceDefinition] = &[ServiceDefinition {
+    id: "lan.discovery",
+    page_id: "utility.services",
+    title: "LAN Discovery",
+    description: "Auto-advertises this node and discovers Arcadia peers on UDP broadcast.",
+    required_module: LAN_MODULE_NAME,
+    glyph: "nodes",
+    system_image: "wifi",
+    accent: "cyan",
+    controls: ServiceControls {
+        status_detail: Some(lan_status_detail),
+        start: Some(lan_start),
+        stop: Some(lan_stop),
+        port_for_collision: Some(|| lan::lan_service_info().port),
     },
-];
+}];
 
 pub fn services_for_page(page_id: &str) -> Vec<&'static ServiceDefinition> {
     SERVICE_DEFINITIONS
@@ -198,7 +196,9 @@ mod tests {
     #[test]
     fn is_port_collision_error_matches_common_messages() {
         assert!(is_port_collision_error("Address already in use"));
-        assert!(is_port_collision_error("bind() failed: address already in use (os error 48)"));
+        assert!(is_port_collision_error(
+            "bind() failed: address already in use (os error 48)"
+        ));
         assert!(is_port_collision_error("UDP port 42424 already in use"));
         assert!(!is_port_collision_error("permission denied"));
         assert!(!is_port_collision_error(""));

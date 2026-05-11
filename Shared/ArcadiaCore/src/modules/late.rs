@@ -145,7 +145,7 @@ pub fn send_ws(msg: String) {
 }
 
 fn ws_loop(server_url: String, ticket: String) {
-    use tungstenite::{Message, connect};
+    use tungstenite::{connect, Message};
 
     let (ws_scheme, host) = if let Some(host) = server_url.strip_prefix("https://") {
         ("wss", host)
@@ -665,51 +665,75 @@ pub fn experimental_refresh(server_url: String, token: String) {
 
             fetch!(
                 http_get_profile(&server_url, &token),
-                |st: &mut LateExperimentalState, v: LateProfile| { st.profile = Some(v); }
+                |st: &mut LateExperimentalState, v: LateProfile| {
+                    st.profile = Some(v);
+                }
             );
             fetch!(
                 http_get_notifications(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateNotification>| { st.notifications = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateNotification>| {
+                    st.notifications = v;
+                }
             );
             fetch!(
                 http_get_notifications_unread(&server_url, &token),
-                |st: &mut LateExperimentalState, v: i64| { st.unread_notifications = v; }
+                |st: &mut LateExperimentalState, v: i64| {
+                    st.unread_notifications = v;
+                }
             );
             fetch!(
                 http_get_articles(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateArticle>| { st.articles = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateArticle>| {
+                    st.articles = v;
+                }
             );
             fetch!(
                 http_get_work_profiles(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateWorkProfile>| { st.work_profiles = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateWorkProfile>| {
+                    st.work_profiles = v;
+                }
             );
             fetch!(
                 http_get_rss_feeds(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateRssFeed>| { st.rss_feeds = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateRssFeed>| {
+                    st.rss_feeds = v;
+                }
             );
             fetch!(
                 http_get_rss_unread(&server_url, &token),
-                |st: &mut LateExperimentalState, v: i64| { st.rss_unread = v; }
+                |st: &mut LateExperimentalState, v: i64| {
+                    st.rss_unread = v;
+                }
             );
             fetch!(
                 http_get_rss_entries(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateRssEntry>| { st.rss_entries = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateRssEntry>| {
+                    st.rss_entries = v;
+                }
             );
             fetch!(
                 http_get_showcase(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateShowcaseItem>| { st.showcase = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateShowcaseItem>| {
+                    st.showcase = v;
+                }
             );
             fetch!(
                 http_get_leaderboard(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateLeaderEntry>| { st.leaderboard = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateLeaderEntry>| {
+                    st.leaderboard = v;
+                }
             );
             fetch!(
                 http_get_chips(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Vec<LateChip>| { st.chips = v; }
+                |st: &mut LateExperimentalState, v: Vec<LateChip>| {
+                    st.chips = v;
+                }
             );
             fetch!(
                 http_get_artboard_size(&server_url, &token),
-                |st: &mut LateExperimentalState, v: Option<(u32, u32)>| { st.artboard_size = v; }
+                |st: &mut LateExperimentalState, v: Option<(u32, u32)>| {
+                    st.artboard_size = v;
+                }
             );
 
             let arc = experimental_state();
@@ -743,7 +767,10 @@ pub fn http_get_profile(server_url: &str, token: &str) -> Result<LateProfile, St
         })
 }
 
-pub fn http_get_notifications(server_url: &str, token: &str) -> Result<Vec<LateNotification>, String> {
+pub fn http_get_notifications(
+    server_url: &str,
+    token: &str,
+) -> Result<Vec<LateNotification>, String> {
     ureq::get(&format!("{server_url}/api/native/notifications"))
         .set("Authorization", &bearer(token))
         .call()
@@ -795,7 +822,10 @@ pub fn http_get_articles(server_url: &str, token: &str) -> Result<Vec<LateArticl
         })
 }
 
-pub fn http_get_work_profiles(server_url: &str, token: &str) -> Result<Vec<LateWorkProfile>, String> {
+pub fn http_get_work_profiles(
+    server_url: &str,
+    token: &str,
+) -> Result<Vec<LateWorkProfile>, String> {
     ureq::get(&format!("{server_url}/api/native/work-profiles?limit=20"))
         .set("Authorization", &bearer(token))
         .call()
@@ -962,7 +992,9 @@ pub fn http_get_artboard_size(server_url: &str, token: &str) -> Result<Option<(u
         .map_err(|e| e.to_string())?;
     let canvas = &val["canvas"];
     let w = canvas["width"].as_u64().or_else(|| canvas["cols"].as_u64());
-    let h = canvas["height"].as_u64().or_else(|| canvas["rows"].as_u64());
+    let h = canvas["height"]
+        .as_u64()
+        .or_else(|| canvas["rows"].as_u64());
     Ok(w.zip(h).map(|(w, h)| (w as u32, h as u32)))
 }
 
@@ -984,42 +1016,52 @@ pub fn commands() -> &'static [ModuleCommand] {
     &[
         ModuleCommand {
             name: "connect",
-            description: "connect to late.sh WebSocket (reads server_url and auth_token from late.toml)",
+            description:
+                "connect to late.sh WebSocket (reads server_url and auth_token from late.toml)",
+            required_permissions: &["late.outbound"],
             run: cmd_connect,
         },
         ModuleCommand {
             name: "disconnect",
             description: "disconnect from late.sh WebSocket",
+            required_permissions: &["late.outbound"],
             run: cmd_disconnect,
         },
         ModuleCommand {
             name: "status",
             description: "connection status and current now-playing as JSON",
+            required_permissions: &[],
             run: cmd_status,
         },
         ModuleCommand {
             name: "send",
             description: "late.send <room_id> <message...> — send a chat message",
+            required_permissions: &["late.outbound"],
             run: cmd_send,
         },
         ModuleCommand {
             name: "vote",
             description: "late.vote lofi|ambient|classic — vote for next music genre",
+            required_permissions: &["late.outbound"],
             run: cmd_vote,
         },
         ModuleCommand {
             name: "water",
             description: "water bonsai and refresh bonsai art",
+            required_permissions: &["late.outbound"],
             run: cmd_water,
         },
         ModuleCommand {
             name: "login",
-            description: "late.login <ssh_key_path> — exchange SSH key for API token (desktop only)",
+            description:
+                "late.login <ssh_key_path> — exchange SSH key for API token (desktop only)",
+            required_permissions: &["late.outbound"],
             run: cmd_login,
         },
         ModuleCommand {
             name: "logout",
             description: "revoke the stored API token and clear it from late.toml",
+            required_permissions: &["late.outbound"],
             run: cmd_logout,
         },
     ]
@@ -1205,9 +1247,12 @@ fn cmd_login(args: &[&str], _ctx: &ExecutionContext) -> String {
 
     let sign_output = std::process::Command::new("ssh-keygen")
         .args([
-            "-Y", "sign",
-            "-f", key_path.as_str(),
-            "-n", "late.sh",
+            "-Y",
+            "sign",
+            "-f",
+            key_path.as_str(),
+            "-n",
+            "late.sh",
             nonce_file.to_str().unwrap_or(""),
         ])
         .output();
@@ -1216,12 +1261,13 @@ fn cmd_login(args: &[&str], _ctx: &ExecutionContext) -> String {
 
     let sig_file = tmp_dir.join("late_nonce.bin.sig");
     let signature_pem = match sign_output {
-        Ok(out) if out.status.success() => {
-            match std::fs::read_to_string(&sig_file) {
-                Ok(s) => { let _ = std::fs::remove_file(&sig_file); s }
-                Err(e) => return format!("error: could not read signature file: {e}"),
+        Ok(out) if out.status.success() => match std::fs::read_to_string(&sig_file) {
+            Ok(s) => {
+                let _ = std::fs::remove_file(&sig_file);
+                s
             }
-        }
+            Err(e) => return format!("error: could not read signature file: {e}"),
+        },
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
             return format!("error: ssh-keygen sign failed: {stderr}");
@@ -1257,7 +1303,13 @@ fn cmd_login(args: &[&str], _ctx: &ExecutionContext) -> String {
     eprintln!("[late] login fingerprint: {fingerprint}");
 
     // Step 4: exchange for token.
-    let token = match http_post_token(&cfg.server_url, &fingerprint, &public_key, &nonce, &signature_pem) {
+    let token = match http_post_token(
+        &cfg.server_url,
+        &fingerprint,
+        &public_key,
+        &nonce,
+        &signature_pem,
+    ) {
         Ok(t) => t,
         Err(e) => return format!("error: token exchange failed: {e}"),
     };
@@ -1270,4 +1322,3 @@ fn cmd_login(args: &[&str], _ctx: &ExecutionContext) -> String {
         Err(e) => format!("error: token received but failed to save late.toml: {e}"),
     }
 }
-

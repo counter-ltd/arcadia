@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::modules::{
     LAN_MODULE_NAME, LATE_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
 };
+use crate::modules::python_registry;
 use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
 
 #[derive(Clone, Copy, Serialize)]
@@ -97,7 +98,10 @@ impl NavigationRegistryOwned {
             groups: GROUP_DEFINITIONS.iter().map(|g| g.into()).collect(),
             global_pages: GLOBAL_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
             top_bar_pages: TOP_BAR_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
-            settings_hub_pages: SETTINGS_HUB_PAGE_IDS.iter().map(|s| (*s).to_string()).collect(),
+            settings_hub_pages: SETTINGS_HUB_PAGE_IDS
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect(),
             services: SERVICE_DEFINITIONS.iter().map(|s| s.into()).collect(),
             default_group: DEFAULT_GROUP_ID.to_string(),
             default_page: DEFAULT_PAGE_ID.to_string(),
@@ -105,12 +109,40 @@ impl NavigationRegistryOwned {
     }
 
     pub fn services_for_page(&self, page_id: &str) -> Vec<&ServiceOwned> {
-        self.services.iter().filter(|s| s.page_id == page_id).collect()
+        self.services
+            .iter()
+            .filter(|s| s.page_id == page_id)
+            .collect()
     }
 
     /// True when at least one service is registered to this page in this registry.
     pub fn page_has_services(&self, page_id: &str) -> bool {
         self.services.iter().any(|s| s.page_id == page_id)
+    }
+
+    /// Static registry plus one Settings hub page per extension that registered `register_tokens`
+    /// without owning an Appearance style (see [`python_registry::standalone_extension_token_modules`]).
+    pub fn with_extension_token_settings_merged() -> Self {
+        let mut r = Self::from_static_registry();
+        r.merge_extension_token_settings_pages();
+        r
+    }
+
+    pub fn merge_extension_token_settings_pages(&mut self) {
+        for (module_id, specs) in python_registry::standalone_extension_token_modules() {
+            if specs.is_empty() {
+                continue;
+            }
+            let id = extension_token_settings_page_id(&module_id);
+            if self.pages.iter().any(|p| p.id == id) {
+                continue;
+            }
+            self.pages
+                .push(build_extension_token_settings_page_owned(&module_id));
+            if !self.settings_hub_pages.iter().any(|p| p == &id) {
+                self.settings_hub_pages.push(id);
+            }
+        }
     }
 }
 
@@ -208,6 +240,24 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         required_module: None,
     },
     NavigationPageDefinition {
+        id: "global.permissions",
+        title: "Permissions",
+        description: "Global capability toggles and per-module or per-extension grants.",
+        glyph: "permissions",
+        system_image: "lock.shield",
+        accent: "indigo",
+        required_module: None,
+    },
+    NavigationPageDefinition {
+        id: "global.shortcuts",
+        title: "Shortcuts",
+        description: "Keyboard, pointer, and OS-global shortcuts; conflicts and overrides.",
+        glyph: "modules",
+        system_image: "keyboard",
+        accent: "indigo",
+        required_module: None,
+    },
+    NavigationPageDefinition {
         id: "network.nodes",
         title: "Nodes",
         description: "Discover LAN peers and manage pairing with lan.scan / lan.node.",
@@ -288,9 +338,78 @@ pub const TOP_BAR_PAGE_IDS: &[&str] = &["python.settings", "global.modules"];
 /// (not the hub header). Omit [`SETTINGS_HUB_ROOT_PAGE_ID`] — the header row is that page.
 /// Extensions (`python.settings`) and Modules live in [`TOP_BAR_PAGE_IDS`]. Logs is opened from the app-title context menu on Desktop, not the top bar.
 pub const SETTINGS_HUB_ROOT_PAGE_ID: &str = "global.settings";
-pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &["global.appearance", "late.settings"];
+pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
+    "global.permissions",
+    "global.shortcuts",
+    "global.appearance",
+    "late.settings",
+];
 pub const DEFAULT_GROUP_ID: &str = "utilities";
 pub const DEFAULT_PAGE_ID: &str = "global.dashboard";
+
+/// Settings hub pages for extensions with standalone `register_tokens` (not style-linked).
+pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "python.extension_tokens|";
+
+pub fn extension_token_settings_page_id(module: &str) -> String {
+    format!("{EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX}{module}")
+}
+
+pub fn parse_extension_token_settings_page_id(page_id: &str) -> Option<&str> {
+    page_id.strip_prefix(EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX)
+}
+
+fn humanize_extension_module_id(id: &str) -> String {
+    id.split(|c: char| c == '-' || c == '_')
+        .filter(|s| !s.is_empty())
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                None => String::new(),
+                Some(f) => f.to_uppercase().chain(c).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn extension_token_settings_page_accent(module_id: &str) -> &'static str {
+    const PALETTE: &[&str] = &[
+        "amber", "emerald", "sky", "violet", "rose", "teal", "fuchsia",
+    ];
+    let mut h: usize = 0;
+    for b in module_id.bytes() {
+        h = h.wrapping_mul(31).wrapping_add(b as usize);
+    }
+    PALETTE[h % PALETTE.len()]
+}
+
+fn build_extension_token_settings_page_owned(module_id: &str) -> NavigationPageOwned {
+    let title = humanize_extension_module_id(module_id);
+    let description = python_registry::list_modules()
+        .into_iter()
+        .find(|(n, _, _, _, _, _)| n == module_id)
+        .and_then(|(_, _, d, _, _, _)| {
+            let t = d.trim();
+            if t.is_empty() || t == "(not loaded)" {
+                None
+            } else {
+                Some(t.replace('\n', " ").chars().take(180).collect::<String>())
+            }
+        })
+        .unwrap_or_else(|| {
+            format!("Token overrides for the {title} extension — same keys as register_tokens.")
+        });
+
+    NavigationPageOwned {
+        id: extension_token_settings_page_id(module_id),
+        title,
+        description,
+        glyph: "extensions".to_string(),
+        system_image: "slider.horizontal.3".to_string(),
+        accent: extension_token_settings_page_accent(module_id).to_string(),
+        required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),
+    }
+}
 
 pub fn page_by_id(page_id: &str) -> Option<&'static NavigationPageDefinition> {
     PAGE_DEFINITIONS.iter().find(|page| page.id == page_id)
@@ -407,6 +526,16 @@ mod tests {
     }
 
     #[test]
+    fn extension_token_settings_page_id_round_trips() {
+        let id = extension_token_settings_page_id("googly-eyes");
+        assert_eq!(
+            parse_extension_token_settings_page_id(&id),
+            Some("googly-eyes")
+        );
+        assert!(parse_extension_token_settings_page_id("global.settings").is_none());
+    }
+
+    #[test]
     fn group_by_id_finds_network() {
         let group = group_by_id("network").expect("network group must exist");
         assert!(group.pages.contains(&"network.nodes"));
@@ -496,10 +625,18 @@ mod tests {
     fn top_bar_pages_round_trip_through_json() {
         let json = default_navigation_registry_json();
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-        let arr = v["top_bar_pages"].as_array().expect("top_bar_pages must serialize as array");
-        let ids: Vec<String> = arr.iter().filter_map(|x| x.as_str().map(String::from)).collect();
+        let arr = v["top_bar_pages"]
+            .as_array()
+            .expect("top_bar_pages must serialize as array");
+        let ids: Vec<String> = arr
+            .iter()
+            .filter_map(|x| x.as_str().map(String::from))
+            .collect();
         let expected: Vec<String> = TOP_BAR_PAGE_IDS.iter().map(|s| (*s).to_string()).collect();
-        assert_eq!(ids, expected, "top_bar_pages JSON must match TOP_BAR_PAGE_IDS");
+        assert_eq!(
+            ids, expected,
+            "top_bar_pages JSON must match TOP_BAR_PAGE_IDS"
+        );
     }
 
     #[test]
@@ -519,9 +656,18 @@ mod tests {
         let arr = v["settings_hub_pages"]
             .as_array()
             .expect("settings_hub_pages must serialize as array");
-        let ids: Vec<String> = arr.iter().filter_map(|x| x.as_str().map(String::from)).collect();
-        let expected: Vec<String> = SETTINGS_HUB_PAGE_IDS.iter().map(|s| (*s).to_string()).collect();
-        assert_eq!(ids, expected, "settings_hub_pages JSON must match SETTINGS_HUB_PAGE_IDS");
+        let ids: Vec<String> = arr
+            .iter()
+            .filter_map(|x| x.as_str().map(String::from))
+            .collect();
+        let expected: Vec<String> = SETTINGS_HUB_PAGE_IDS
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        assert_eq!(
+            ids, expected,
+            "settings_hub_pages JSON must match SETTINGS_HUB_PAGE_IDS"
+        );
     }
 
     #[test]
@@ -544,9 +690,8 @@ mod tests {
 
     #[test]
     fn service_host_page_visibility_follows_required_module() {
-        let visible_when = |module: &str| {
-            is_page_visible_with("utility.services", |name| name == module)
-        };
+        let visible_when =
+            |module: &str| is_page_visible_with("utility.services", |name| name == module);
         assert!(visible_when(crate::config::modules::LAN_MODULE_NAME));
         assert!(!visible_when(crate::config::modules::TERMINAL_MODULE_NAME));
         assert!(!is_page_visible_with("utility.services", |_| false));
@@ -571,7 +716,15 @@ mod tests {
     fn is_page_visible_in_owned_matches_static() {
         let registry = NavigationRegistryOwned::from_static_registry();
         let lan_only = |name: &str| name == crate::config::modules::LAN_MODULE_NAME;
-        assert!(is_page_visible_in_owned(&registry, "utility.services", lan_only));
-        assert!(!is_page_visible_in_owned(&registry, "utility.services", |_| false));
+        assert!(is_page_visible_in_owned(
+            &registry,
+            "utility.services",
+            lan_only
+        ));
+        assert!(!is_page_visible_in_owned(
+            &registry,
+            "utility.services",
+            |_| false
+        ));
     }
 }

@@ -144,6 +144,36 @@ pub fn handle_internal(input: &str) -> String {
     RESPONSE_CAPTURE.with(|capture| capture.borrow_mut().take().unwrap_or_default().join("\n"))
 }
 
+fn handle_permit(parts: &[String]) -> Result<String, String> {
+    use arcadia_core::modules::permissions;
+
+    fn parse_bool(s: &str) -> Result<bool, String> {
+        match s.to_ascii_lowercase().as_str() {
+            "true" | "1" | "yes" | "on" => Ok(true),
+            "false" | "0" | "no" | "off" => Ok(false),
+            _ => Err(format!("Expected true or false, got: {s}")),
+        }
+    }
+
+    match parts.len() {
+        2 => {
+            let perm = parts[0].as_str();
+            let b = parse_bool(&parts[1])?;
+            permissions::apply_global_set(perm, b)
+        }
+        3 => {
+            let subj = permissions::normalize_cli_subject(&parts[0])?;
+            let perm = parts[1].as_str();
+            let b = parse_bool(&parts[2])?;
+            permissions::apply_grant_set(&subj, perm, b)
+        }
+        _ => Err(
+            "Usage: permit <permission-id> <true|false>\n       permit <subject> <permission-id> <true|false>\nSubjects: module:<name>, python:<id>, or a bare registry module / extension id."
+                .to_string(),
+        ),
+    }
+}
+
 fn handle_with(input: &str, mut respond: impl FnMut(&str)) -> CommandResult {
     let trimmed = input.trim();
     let mut parts = trimmed
@@ -162,6 +192,14 @@ fn handle_with(input: &str, mut respond: impl FnMut(&str)) -> CommandResult {
 
     if let Some(first) = parts.first_mut() {
         *first = normalize_command(first);
+    }
+
+    if !parts.is_empty() && parts[0] == "permit" {
+        match handle_permit(&parts[1..]) {
+            Ok(msg) => respond(&msg),
+            Err(err) => respond(&err),
+        }
+        return CommandResult::Continue;
     }
 
     if !parts.is_empty() && parts[0] == "configuration" {
@@ -250,6 +288,15 @@ fn help_lines() -> Vec<String> {
                 lines.push("- module <name> enable|disable: toggle a module".to_string());
                 lines.push(
                     "- module <name> enable -requirements: enable module and required dependencies"
+                        .to_string(),
+                );
+            }
+            "permit" => {
+                lines.push(
+                    "- permit <permission-id> <true|false>: set a global permission flag".to_string(),
+                );
+                lines.push(
+                    "- permit <subject> <permission-id> <true|false>: set per-subject grant (module:<name>, python:<id>, or bare id)"
                         .to_string(),
                 );
             }

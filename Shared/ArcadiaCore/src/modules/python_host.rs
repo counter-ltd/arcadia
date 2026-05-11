@@ -1,7 +1,15 @@
-use crate::modules::{ExecutionContext, ModuleCommand};
 use super::python_registry;
+use crate::config::modules::ModulesConfig;
+use crate::config::ConfigFile;
+use crate::modules::{tray, ExecutionContext, ModuleCommand};
 
 pub const NAME: &str = "python-host";
+
+fn persist_extension_state(name: &str, enabled: bool) -> Result<(), String> {
+    let mut cfg = ModulesConfig::load_or_create().map_err(|e| e.to_string())?;
+    cfg.set_python_extension_enabled(name, enabled);
+    cfg.save().map_err(|e| e.to_string())
+}
 
 fn list(args: &[&str], _context: &ExecutionContext) -> String {
     let _ = args;
@@ -9,14 +17,15 @@ fn list(args: &[&str], _context: &ExecutionContext) -> String {
     let commands = python_registry::list_commands();
 
     if modules.is_empty() && commands.is_empty() {
-        return "No Python extensions loaded. Place .py files in ~/Arcadia/Extensions/.".to_string();
+        return "No Python extensions loaded. Place .py files in ~/Arcadia/Extensions/."
+            .to_string();
     }
 
     let mut lines = Vec::new();
 
     if !modules.is_empty() {
         lines.push("Python modules:".to_string());
-        for (name, version, description, enabled) in &modules {
+        for (name, version, description, enabled, _perms, _plats) in &modules {
             let state = if *enabled { "enabled" } else { "disabled" };
             lines.push(format!("  {name} v{version} [{state}] — {description}"));
         }
@@ -41,7 +50,54 @@ fn extension_enable(args: &[&str], _context: &ExecutionContext) -> String {
     let Some(name) = args.first() else {
         return "Usage: python-host.extension-enable <extension-name>".to_string();
     };
+    if !python_registry::extension_supported_at_runtime(name) {
+        return format!(
+            "Extension '{name}' is not supported on this platform (Platform Not Supported)."
+        );
+    }
+    if let Err(e) = persist_extension_state(name, true) {
+        return format!("Failed to persist enable state for '{name}': {e}");
+    }
     python_registry::set_extension_enabled(name, true);
+
+    // First-enable / re-enable after a restart: the body has never executed (because the
+    // loader skips disabled extensions at startup), so the registry entry is still a stub.
+    // Drive the host loader to actually run `main.py` now that the user has opted in.
+    let needs_body_load = python_registry::list_modules()
+        .iter()
+        .find(|(n, _, _, _, _, _)| n == name)
+        .map(|(_, _, description, _, _, _)| description == "(not loaded)")
+        .unwrap_or(false);
+
+    if needs_body_load {
+        let Some(path) = python_registry::extension_path(name) else {
+            return format!(
+                "Extension '{name}' is enabled in config but no source path is recorded — \
+                 reload the python-host to discover it."
+            );
+        };
+        match python_registry::load_one(name.to_string(), path) {
+            Ok(canonical) if canonical != *name => {
+                // Body declared a different `register_module(name=…)` than the folder-derived
+                // stub id — persist the rename so future toggles work against the canonical
+                // name instead of leaving an orphan key under the old id.
+                if let Ok(mut cfg) = ModulesConfig::load_or_create() {
+                    cfg.python_extensions.remove(*name);
+                    cfg.set_python_extension_enabled(&canonical, true);
+                    let _ = cfg.save();
+                }
+                return format!(
+                    "Extension '{canonical}' enabled (declared name differs from folder \
+                     id '{name}' — collapsed onto the canonical id)."
+                );
+            }
+            Ok(_) => {}
+            Err(e) => {
+                return format!("Extension '{name}' enabled, but failed to load: {e}");
+            }
+        }
+    }
+
     format!("Extension '{name}' enabled.")
 }
 
@@ -49,7 +105,16 @@ fn extension_disable(args: &[&str], _context: &ExecutionContext) -> String {
     let Some(name) = args.first() else {
         return "Usage: python-host.extension-disable <extension-name>".to_string();
     };
+    if let Err(e) = persist_extension_state(name, false) {
+        return format!("Failed to persist disable state for '{name}': {e}");
+    }
     python_registry::set_extension_enabled(name, false);
+
+    // Tear down handlers, tokens, styles, shortcuts, and tray icons owned by this extension
+    // so disabling has an immediate visible effect instead of waiting for the next restart.
+    python_registry::unregister_extension_contributions(name);
+    let _ = tray::remove_items_for_owner(&format!("python:{name}"));
+
     format!("Extension '{name}' disabled.")
 }
 
@@ -74,21 +139,25 @@ pub fn commands() -> &'static [ModuleCommand] {
         ModuleCommand {
             name: "list",
             description: "List loaded Python extensions and their commands.",
+            required_permissions: &[],
             run: list,
         },
         ModuleCommand {
             name: "reload",
             description: "Reload all Python extensions from ~/Arcadia/Extensions/.",
+            required_permissions: &["python.host"],
             run: reload,
         },
         ModuleCommand {
             name: "extension-enable",
             description: "Enable a Python extension by name: python-host.extension-enable <name>",
+            required_permissions: &["python.extension_toggle"],
             run: extension_enable,
         },
         ModuleCommand {
             name: "extension-disable",
             description: "Disable a Python extension by name: python-host.extension-disable <name>",
+            required_permissions: &["python.extension_toggle"],
             run: extension_disable,
         },
     ]

@@ -1,22 +1,30 @@
 //! Generic host UI snapshot + batched patches (extend [`SurfacePatch`] for editors, settings, etc.).
+//!
+//! ## `SurfaceSnapshot.extra` schema (version **1**)
+//!
+//! Host **`extra`** is a JSON object with:
+//! - **`schema_version`**: matches [`SURFACE_EXTRA_SCHEMA_VERSION`].
+//! - **`navigation_registry`**: serialized [`NavigationRegistryOwned`].
+//!
+//! Extend with additional keys as needed; bump **`schema_version`** when semantics change.
+//! Prefer new [`SurfacePatch`] variants over ad-hoc module verbs for mirrored UI state.
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 
 use crate::config::modules::ModulesConfig;
 use crate::config::ConfigFile;
-use crate::navigation::NavigationRegistryOwned;
 use crate::modules::{ExecutionContext, ModuleCommand};
+use crate::navigation::NavigationRegistryOwned;
+use crate::surface_revision::current_surface_revision;
 
 pub const NAME: &str = "surface";
 
-static SURFACE_REVISION: AtomicU64 = AtomicU64::new(1);
+/// Bump when `extra` layout or required fields change (see module docs).
+pub const SURFACE_EXTRA_SCHEMA_VERSION: u32 = 1;
 
-pub fn bump_surface_revision() {
-    SURFACE_REVISION.fetch_add(1, Ordering::SeqCst);
-}
+pub use crate::surface_revision::bump_surface_revision;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SurfaceSnapshot {
@@ -45,6 +53,12 @@ pub struct ParsedSurfaceSnapshot {
     pub navigation_registry: Option<NavigationRegistryOwned>,
 }
 
+/// Lightweight parse for `surface.revision` JSON (`{"revision":…}`).
+pub fn parse_surface_revision(payload: &str) -> Option<u64> {
+    let v: serde_json::Value = serde_json::from_str(payload).ok()?;
+    v.get("revision")?.as_u64()
+}
+
 pub fn parse_surface_snapshot(payload: &str) -> ParsedSurfaceSnapshot {
     serde_json::from_str::<SurfaceSnapshot>(payload)
         .map(|s| ParsedSurfaceSnapshot {
@@ -61,18 +75,26 @@ fn navigation_registry_from_extra(extra: &serde_json::Value) -> Option<Navigatio
         .and_then(|v| serde_json::from_value::<NavigationRegistryOwned>(v.clone()).ok())
 }
 
+fn revision_json(_args: &[&str], _ctx: &ExecutionContext) -> String {
+    serde_json::json!({
+        "revision": current_surface_revision(),
+    })
+    .to_string()
+}
+
 fn snapshot(_args: &[&str], _ctx: &ExecutionContext) -> String {
     let Ok(cfg) = ModulesConfig::load_or_create() else {
         return "{}".to_string();
     };
-    let revision = SURFACE_REVISION.load(Ordering::SeqCst);
-    let navigation_registry = serde_json::to_value(&NavigationRegistryOwned::from_static_registry())
-        .unwrap_or_else(|_| serde_json::json!({}));
+    let revision = current_surface_revision();
+    let navigation_registry =
+        serde_json::to_value(&NavigationRegistryOwned::with_extension_token_settings_merged())
+            .unwrap_or_else(|_| serde_json::json!({}));
     let snap = SurfaceSnapshot {
         modules: cfg.modules.clone(),
         revision,
         extra: serde_json::json!({
-            "schema_version": 1,
+            "schema_version": SURFACE_EXTRA_SCHEMA_VERSION,
             "navigation_registry": navigation_registry,
         }),
     };
@@ -90,11 +112,7 @@ fn patch(args: &[&str], _ctx: &ExecutionContext) -> String {
     let mut messages = Vec::new();
     for p in patches {
         match p {
-            SurfacePatch::ModulesSet {
-                name,
-                enabled,
-                ..
-            } => {
+            SurfacePatch::ModulesSet { name, enabled, .. } => {
                 let mut cfg = match ModulesConfig::load_or_create() {
                     Ok(c) => c,
                     Err(e) => return format!("Error loading config: {e}"),
@@ -115,7 +133,6 @@ fn patch(args: &[&str], _ctx: &ExecutionContext) -> String {
     if messages.is_empty() {
         return "No patches applied".to_string();
     }
-    bump_surface_revision();
     messages.join("\n")
 }
 
@@ -147,13 +164,21 @@ pub fn commands() -> &'static [ModuleCommand] {
         ModuleCommand {
             name: "snapshot",
             description:
-                "JSON SurfaceSnapshot (modules, revision, extra.navigation_registry); bump revision on patch",
+                "JSON SurfaceSnapshot (modules, revision, extra.navigation_registry); revision advances when modules.toml saves",
+            required_permissions: &["surface.read"],
             run: snapshot,
+        },
+        ModuleCommand {
+            name: "revision",
+            description: r#"JSON {"revision":u64} — cheap host generation counter for thin-client polls"#,
+            required_permissions: &["surface.read"],
+            run: revision_json,
         },
         ModuleCommand {
             name: "patch",
             description:
                 "Apply SurfacePatch JSON array (modules_set + optional client_id); shared host state for multi-client",
+            required_permissions: &["surface.control"],
             run: patch,
         },
     ]
@@ -162,6 +187,14 @@ pub fn commands() -> &'static [ModuleCommand] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::navigation::NavigationRegistryOwned;
+
+    #[test]
+    fn parse_surface_revision_reads_counter() {
+        let json = r#"{"revision":99}"#;
+        assert_eq!(parse_surface_revision(json), Some(99));
+        assert_eq!(parse_surface_revision("{}"), None);
+    }
 
     #[test]
     fn parse_snapshot_valid_json() {
@@ -182,7 +215,6 @@ mod tests {
 
     #[test]
     fn parse_snapshot_extracts_navigation_registry() {
-        use crate::navigation::NavigationRegistryOwned;
         let registry = NavigationRegistryOwned::from_static_registry();
         let registry_val = serde_json::to_value(&registry).unwrap();
         let snap = SurfaceSnapshot {
@@ -192,7 +224,9 @@ mod tests {
         };
         let json = serde_json::to_string(&snap).unwrap();
         let parsed = parse_surface_snapshot(&json);
-        let nav = parsed.navigation_registry.expect("navigation_registry must deserialize");
+        let nav = parsed
+            .navigation_registry
+            .expect("navigation_registry must deserialize");
         assert!(!nav.pages.is_empty());
         assert!(!nav.groups.is_empty());
     }
@@ -213,12 +247,39 @@ mod tests {
     }
 
     #[test]
+    fn parse_snapshot_round_trips_navigation_registry_like_snapshot_extra() {
+        let registry = NavigationRegistryOwned::from_static_registry();
+        let registry_val = serde_json::to_value(&registry).unwrap();
+        let snap = SurfaceSnapshot {
+            modules: BTreeMap::from([(
+                crate::config::modules::SURFACE_MODULE_NAME.to_string(),
+                true,
+            )]),
+            revision: 42,
+            extra: serde_json::json!({
+                "schema_version": 1,
+                "navigation_registry": registry_val,
+            }),
+        };
+        let json = serde_json::to_string(&snap).unwrap();
+        let parsed = parse_surface_snapshot(&json);
+        assert_eq!(parsed.revision, 42);
+        let nav = parsed.navigation_registry.expect("navigation_registry");
+        assert_eq!(nav.pages.len(), registry.pages.len());
+        assert_eq!(nav.groups.len(), registry.groups.len());
+    }
+
+    #[test]
     fn surface_patch_modules_set_round_trips() {
         let json = patch_json_modules_set("shell", true, Some("abc"));
         let patches: Vec<SurfacePatch> = serde_json::from_str(&json).unwrap();
         assert_eq!(patches.len(), 1);
         match &patches[0] {
-            SurfacePatch::ModulesSet { name, enabled, client_id } => {
+            SurfacePatch::ModulesSet {
+                name,
+                enabled,
+                client_id,
+            } => {
                 assert_eq!(name, "shell");
                 assert!(*enabled);
                 assert_eq!(client_id.as_deref(), Some("abc"));

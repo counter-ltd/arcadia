@@ -1,4 +1,6 @@
+use arcadia_core::config::modules::supports_runtime_platform_owned;
 use arcadia_core::modules;
+use arcadia_core::modules::python_registry;
 use openframe::{
     AnyElement, IntoElement, InteractiveElement, ParentElement, Styled, Window, div, px,
 };
@@ -26,9 +28,30 @@ impl ArcadiaRoot {
 
         let search_bar = self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Extensions);
 
+        let error_banner: Option<openframe::AnyElement> = self
+            .python_extension_action_error
+            .clone()
+            .map(|msg| {
+                div()
+                    .w_full()
+                    .px_3()
+                    .py_2()
+                    .rounded(px(panel_radius.min(8.0)))
+                    .bg(p.row_bg)
+                    .border_1()
+                    .border_color(p.accent)
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(p.content_body)
+                            .child(format!("Last action failed: {msg}")),
+                    )
+                    .into_any_element()
+            });
+
         let filtered: Vec<_> = all_rows
             .into_iter()
-            .filter(|(name, version, description, _)| {
+            .filter(|(name, version, description, _, _, _)| {
                 list_panel_row_matches(&q, name, &[version.as_str(), description.as_str()])
             })
             .collect();
@@ -74,43 +97,50 @@ impl ArcadiaRoot {
                 .flex()
                 .flex_col()
                 .gap_3()
-                .children(filtered.into_iter().map(|(name, version, description, enabled)| {
-                    Self::python_extension_row(
-                        cx,
-                        name,
-                        version,
-                        description,
-                        enabled,
-                        is_dark,
-                        panel_radius,
-                    )
-                }))
+                .children(filtered.into_iter().map(
+                    |(name, version, description, enabled, _, platforms)| {
+                        let runtime_supported =
+                            supports_runtime_platform_owned(platforms.as_slice());
+                        Self::python_extension_row(
+                            cx,
+                            name,
+                            version,
+                            description,
+                            enabled,
+                            is_dark,
+                            panel_radius,
+                            runtime_supported,
+                        )
+                    },
+                ))
                 .into_any_element()
         };
 
         if let Some(g) = theme::active_glyph(cx) {
+            let inner = div()
+                .w_full()
+                .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+                .p_4()
+                .rounded(px(panel_radius.min(12.0)))
+                .bg(g.surface)
+                .border_1()
+                .border_color(g.border)
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(search_bar);
+            let inner = match error_banner {
+                Some(banner) => inner.child(banner),
+                None => inner,
+            };
             div()
                 .w_full()
                 .flex()
                 .justify_center()
-                .child(
-                    div()
-                        .w_full()
-                        .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
-                        .p_4()
-                        .rounded(px(panel_radius.min(12.0)))
-                        .bg(g.surface)
-                        .border_1()
-                        .border_color(g.border)
-                        .flex()
-                        .flex_col()
-                        .gap_3()
-                        .child(search_bar)
-                        .child(content),
-                )
+                .child(inner.child(content))
                 .into_any_element()
         } else {
-            div()
+            let inner = div()
                 .w_full()
                 .p_4()
                 .rounded(px(panel_radius.min(12.0)))
@@ -120,9 +150,12 @@ impl ArcadiaRoot {
                 .flex()
                 .flex_col()
                 .gap_3()
-                .child(search_bar)
-                .child(content)
-                .into_any_element()
+                .child(search_bar);
+            let inner = match error_banner {
+                Some(banner) => inner.child(banner),
+                None => inner,
+            };
+            inner.child(content).into_any_element()
         }
     }
 
@@ -134,6 +167,7 @@ impl ArcadiaRoot {
         enabled: bool,
         is_dark: bool,
         border_radius: f32,
+        runtime_supported: bool,
     ) -> AnyElement {
         let p = theme::theme_palette(cx, is_dark);
         let is_glyph = theme::glyph_snapshot(cx).is_some();
@@ -195,14 +229,24 @@ impl ArcadiaRoot {
                             .text_xs()
                             .text_color(p.content_body)
                             .child(description),
-                    ),
+                    )
+                    .when(!runtime_supported, |col| {
+                        col.child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(p.ui_subtext)
+                                .child("Platform Not Supported"),
+                        )
+                    }),
             )
             .child(
                 div()
                     .flex()
                     .items_center()
                     .gap_2()
-                    .cursor_pointer()
+                    .when(runtime_supported || enabled, |d| d.cursor_pointer())
+                    .when(!runtime_supported && !enabled, |d| d.cursor_default())
                     .child(
                         div()
                             .text_xs()
@@ -257,20 +301,120 @@ impl ArcadiaRoot {
                                     .bg(p.toggle_knob_off),
                             )
                     })
-                    .on_mouse_down(
+                    .when(runtime_supported || enabled, |d| {
+                        d.on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
+                            use arcadia_core::config::modules::{
+                                ModulesConfig, PYTHON_HOST_MODULE_NAME,
+                            };
+                            use arcadia_core::config::permissions::{
+                                PermissionSubject, PermissionsConfig,
+                            };
+                            use arcadia_core::config::ConfigFile;
+                            use crate::gui::app::PendingPermissionGrant;
+
+                            let enabled_next = !enabled;
+                            if !runtime_supported {
+                                if !enabled {
+                                    return;
+                                }
+                                if enabled_next {
+                                    return;
+                                }
+                            }
+
+                            this.python_extension_action_error = None;
                             let ctx = this.execution_context();
                             let token = if enabled {
                                 "python-host.extension-disable"
                             } else {
                                 "python-host.extension-enable"
                             };
-                            let _ = modules::execute_command(token, &[name.as_str()], &ctx);
+
+                            // Auto-heal: if the python-host module is enabled but its own
+                            // required permissions were never granted (older builds, CLI
+                            // toggles, manual file edits, etc.) the dispatcher rejects every
+                            // extension-enable / disable call. Enabling the module is itself
+                            // the user's consent for the module's declared perms, so fill in
+                            // any missing grants on the `module:python-host` subject before
+                            // routing the command. Only adds — never overrides explicit values.
+                            if let Ok(host_modules) = ModulesConfig::load_or_create() {
+                                if host_modules
+                                    .modules
+                                    .get(PYTHON_HOST_MODULE_NAME)
+                                    .copied()
+                                    .unwrap_or(false)
+                                {
+                                    if let (Some(manifest), Ok(mut pc)) = (
+                                        ModulesConfig::manifest_for(PYTHON_HOST_MODULE_NAME),
+                                        PermissionsConfig::load_or_create(),
+                                    ) {
+                                        let host_subj = PermissionSubject::module(
+                                            PYTHON_HOST_MODULE_NAME.to_string(),
+                                        );
+                                        let needed: Vec<String> = manifest
+                                            .required_permissions
+                                            .iter()
+                                            .map(|s| s.to_string())
+                                            .collect();
+                                        let missing = pc
+                                            .missing_grants_for_declared(
+                                                &host_subj,
+                                                &manifest.required_permissions,
+                                            );
+                                        if !missing.is_empty() {
+                                            let _ = pc.ensure_effective_grants(
+                                                &host_subj,
+                                                &needed,
+                                            );
+                                            let _ = pc.save();
+                                        }
+                                    }
+                                }
+                            }
+
+                            if !enabled {
+                                let decl = python_registry::extension_declared_permissions(&name);
+                                let rf: Vec<&str> = decl.iter().map(String::as_str).collect();
+                                if let Ok(pc) = PermissionsConfig::load_or_create() {
+                                    let subj = PermissionSubject::python(name.clone());
+                                    let miss = pc.missing_grants_for_declared(&subj, &rf);
+                                    if !miss.is_empty() {
+                                        this.pending_permission_grant = Some(
+                                            PendingPermissionGrant::PythonExtension {
+                                                extension: name.clone(),
+                                                missing: miss,
+                                            },
+                                        );
+                                        cx.notify();
+                                        return;
+                                    }
+                                }
+                            }
+                            match modules::execute_command(token, &[name.as_str()], &ctx) {
+                                Ok(Some(msg)) => {
+                                    // Command handlers report load failures via the response
+                                    // string (`extension-enable` returns "...failed to load:
+                                    // ..."). Treat any response that doesn't match the happy
+                                    // path as an error so the panel can surface it.
+                                    if msg.contains("failed") || msg.contains("Failed") {
+                                        this.python_extension_action_error = Some(msg);
+                                    }
+                                }
+                                Ok(None) => {
+                                    this.python_extension_action_error = Some(format!(
+                                        "Command {token} not found — is python-host loaded?"
+                                    ));
+                                }
+                                Err(e) => {
+                                    this.python_extension_action_error = Some(e);
+                                }
+                            }
                             this.reload_python_extensions(cx);
                             cx.notify();
-                        }),
-                    ),
+                        }))
+                    })
             );
 
         if let Some(g) = theme::active_glyph(cx) {

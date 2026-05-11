@@ -31,12 +31,17 @@ fn rgb_from_hex(opt: Option<&String>, fallback: (u8, u8, u8)) -> (u8, u8, u8) {
 }
 
 fn merged_glyph_for_active_style(is_dark: bool) -> Option<GlyphParams> {
-    let active = AppearanceConfig::load_or_create().unwrap_or_default().active_style;
+    let active = AppearanceConfig::load_or_create()
+        .unwrap_or_default()
+        .active_style;
     let style_row = list_styles().into_iter().find(|s| s.name == active)?;
     let mut g = if is_dark {
         style_row.glyph.clone()
     } else {
-        style_row.glyph_light.clone().or_else(|| style_row.glyph.clone())
+        style_row
+            .glyph_light
+            .clone()
+            .or_else(|| style_row.glyph.clone())
     }?;
     if let Some(module) = style_row.module_name.as_deref() {
         if let Ok(file) = extension_tokens::load_module_tokens(module) {
@@ -700,9 +705,7 @@ fn palette_footer(pal: &MotdAnsiPalette) -> String {
     let _ = write!(
         s,
         "\x1b[38;2;{};{};{}m.\x1b[0m ",
-        pal.dim.0,
-        pal.dim.1,
-        pal.dim.2
+        pal.dim.0, pal.dim.1, pal.dim.2
     );
     for &(r, g, b) in &colors {
         let _ = write!(s, "\x1b[38;2;{r};{g};{b}mo\x1b[0m  ");
@@ -730,9 +733,7 @@ fn gather_right_column(pal: &MotdAnsiPalette) -> Vec<String> {
     let sep: String = std::iter::repeat('─').take(sep_n).collect();
     let sep_line = format!(
         "\x1b[38;2;{};{};{}m{sep}\x1b[0m",
-        pal.sep.0,
-        pal.sep.1,
-        pal.sep.2
+        pal.sep.0, pal.sep.1, pal.sep.2
     );
 
     let mut lines = vec![head, sep_line];
@@ -793,6 +794,7 @@ pub fn commands() -> &'static [ModuleCommand] {
     &[ModuleCommand {
         name: "show",
         description: "print Arcadia-style system banner (MOTD)",
+        required_permissions: &[],
         run: show,
     }]
 }

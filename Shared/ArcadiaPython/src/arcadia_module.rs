@@ -1,8 +1,16 @@
-use arcadia_core::modules::{python_registry, ExecutionContext};
+use arcadia_core::config::extension_tokens;
+use arcadia_core::config::permissions::{PermissionSubject, PermissionsConfig};
+use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::python_registry::{StyleTokenKind, StyleTokenSpec};
+use arcadia_core::modules::{
+    cursor as core_cursor, python_registry, tray as core_tray, ExecutionContext,
+};
+use arcadia_core::scheduling;
+use arcadia_core::shortcuts::ShortcutRegistrationOwned;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict, PyList};
 use std::sync::Arc;
+use std::time::Duration;
 
 fn glyph_from_fields(
     bg: Option<String>,
@@ -60,15 +68,30 @@ fn glyph_from_fields(
 }
 
 #[pyfunction]
-fn register_module(name: String, version: String, description: String) {
-    python_registry::register_module(name, version, description);
+#[pyo3(signature = (name, version, description, permissions=None, platforms=None))]
+fn register_module(
+    name: String,
+    version: String,
+    description: String,
+    permissions: Option<Vec<String>>,
+    platforms: Option<Vec<String>>,
+) {
+    python_registry::register_module(
+        name,
+        version,
+        description,
+        permissions.unwrap_or_default(),
+        platforms.unwrap_or_default(),
+    );
 }
 
 #[pyfunction]
+#[pyo3(signature = (token, description, handler, permissions=None))]
 fn register_command(
     token: String,
     description: String,
     handler: PyObject,
+    permissions: Option<Vec<String>>,
 ) -> PyResult<()> {
     let token_err = token.clone();
     let handler_fn: Arc<dyn Fn(Vec<String>) -> String + Send + Sync> =
@@ -83,7 +106,12 @@ fn register_command(
                 }
             })
         });
-    python_registry::register_command(token, description, handler_fn);
+    python_registry::register_command(
+        token,
+        description,
+        handler_fn,
+        permissions.unwrap_or_default(),
+    );
     Ok(())
 }
 
@@ -263,6 +291,18 @@ fn register_tokens(module: String, tokens: Bound<'_, PyAny>) -> PyResult<()> {
 }
 
 #[pyfunction]
+fn register_shortcut_json(extension_id: String, json_spec: String) -> PyResult<()> {
+    let reg: ShortcutRegistrationOwned = serde_json::from_str(&json_spec)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+    let eff = reg
+        .into_effective(&extension_id)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+    python_registry::register_extension_shortcut(eff)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+    Ok(())
+}
+
+#[pyfunction]
 fn execute(py: Python<'_>, token: String, args: Vec<String>) -> String {
     let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     let context = ExecutionContext::default();
@@ -276,12 +316,204 @@ fn execute(py: Python<'_>, token: String, args: Vec<String>) -> String {
     })
 }
 
+/// Verify that `python:<extension_id>` has been granted `permission_id` and that the global
+/// gate is on. Returns a `PermissionError` mapped to `PyPermissionError` when missing — the
+/// extension is expected to declare the permission in `register_module(permissions=[...])`
+/// so the first-enable flow asks the user to accept.
+fn ensure_python_permission(extension_id: &str, permission_id: &str) -> PyResult<()> {
+    let cfg = PermissionsConfig::load_or_create()
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    let subj = PermissionSubject::python(extension_id.to_string());
+    if cfg.effective_allowed(&subj, permission_id) {
+        Ok(())
+    } else {
+        Err(PyErr::new::<pyo3::exceptions::PyPermissionError, _>(
+            format!("Permission denied: {permission_id} for python:{extension_id}"),
+        ))
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (extension_id, label, tooltip=None))]
+fn tray_register(extension_id: String, label: String, tooltip: Option<String>) -> PyResult<String> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    let id = core_tray::register_item(format!("python:{extension_id}"), label);
+    if let Some(text) = tooltip {
+        core_tray::set_tooltip(&id, text)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+    }
+    Ok(id)
+}
+
+#[pyfunction]
+fn tray_set_image(
+    extension_id: String,
+    tray_id: String,
+    rgba: &Bound<'_, PyBytes>,
+    width: u32,
+    height: u32,
+) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    let bytes = rgba.as_bytes().to_vec();
+    core_tray::set_image(&tray_id, bytes, width, height)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn tray_set_tooltip(extension_id: String, tray_id: String, text: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    core_tray::set_tooltip(&tray_id, text)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn tray_set_menu(extension_id: String, tray_id: String, items: Bound<'_, PyList>) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    let mut menu: Vec<core_tray::TrayMenuItem> = Vec::new();
+    for entry in items.iter() {
+        let d = entry.downcast::<PyDict>()?;
+
+        let is_sep = d
+            .get_item("separator")?
+            .and_then(|v| v.extract::<bool>().ok())
+            .unwrap_or(false);
+        if is_sep {
+            menu.push(core_tray::TrayMenuItem {
+                label: String::new(),
+                command_token: String::new(),
+                args: Vec::new(),
+            });
+            continue;
+        }
+
+        let label: String = d
+            .get_item("label")?
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("menu item missing 'label'")
+            })?
+            .extract()?;
+        let command_token: String = d
+            .get_item("command")?
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>("menu item missing 'command'")
+            })?
+            .extract()?;
+        let args: Vec<String> = match d.get_item("args")? {
+            Some(v) => v.extract().unwrap_or_default(),
+            None => Vec::new(),
+        };
+        menu.push(core_tray::TrayMenuItem {
+            label,
+            command_token,
+            args,
+        });
+    }
+    core_tray::set_menu(&tray_id, menu)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn tray_remove(extension_id: String, tray_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    core_tray::remove_item(&tray_id).map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+/// Returns `(x, y, width, height, pixels_per_point)` for the tray item, or `None`.
+/// See `arcadia_core::modules::tray::icon_screen_bounds` for coordinate semantics.
+#[pyfunction]
+fn tray_icon_screen_bounds(
+    extension_id: String,
+    tray_item_id: String,
+) -> PyResult<Option<(f64, f64, f64, f64, f64)>> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    Ok(core_tray::icon_screen_bounds(&tray_item_id))
+}
+
+#[pyfunction]
+fn cursor_position(extension_id: String) -> PyResult<Option<(f64, f64)>> {
+    ensure_python_permission(&extension_id, "cursor.global_position")?;
+    Ok(core_cursor::position().map(|p| (p.x, p.y)))
+}
+
+#[pyfunction]
+fn screen_size(extension_id: String) -> PyResult<Option<(u32, u32)>> {
+    ensure_python_permission(&extension_id, "cursor.global_position")?;
+    Ok(core_cursor::primary_screen_size().map(|s| (s.width, s.height)))
+}
+
+#[pyfunction]
+fn set_timer(extension_id: String, interval_ms: u64, callback: PyObject) -> PyResult<u64> {
+    if interval_ms == 0 {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "interval_ms must be > 0",
+        ));
+    }
+    let ext_id = extension_id.clone();
+    let callback = Arc::new(callback);
+    let task = scheduling::spawn_interval_on_lane(
+        scheduling::TaskLane::PythonTimer,
+        Duration::from_millis(interval_ms),
+        move || {
+            // Skip ticks for disabled or unloaded extensions to avoid stale callbacks chewing CPU
+            // after the user disables a Python module without restarting.
+            if !python_registry::extension_enabled(&ext_id) {
+                return;
+            }
+            let cb = Arc::clone(&callback);
+            Python::with_gil(|py| {
+                if let Err(e) = cb.call0(py) {
+                    eprintln!("set_timer({ext_id}) callback error: {e}");
+                }
+            });
+        },
+    );
+    Ok(task)
+}
+
+#[pyfunction]
+fn cancel_timer(task_id: u64) {
+    scheduling::cancel(task_id);
+}
+
+/// Read persisted token values declared with `register_tokens` for an extension.
+/// Returns a dict mapping each token key to its current value (merged with the default).
+/// Values are strings; the extension parses them to int/float/bool as appropriate using
+/// the token kind it declared.
+#[pyfunction]
+fn read_tokens<'py>(py: Python<'py>, module: String) -> PyResult<Bound<'py, PyDict>> {
+    let file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
+    let specs = python_registry::list_style_tokens()
+        .into_iter()
+        .find(|(m, _)| m == &module)
+        .map(|(_, s)| s)
+        .unwrap_or_default();
+    let result = PyDict::new_bound(py);
+    for spec in specs {
+        let display =
+            extension_tokens::merged_display_for_key(&spec.key, &spec.default_value, &file);
+        result.set_item(spec.key, display)?;
+    }
+    Ok(result)
+}
+
 #[pymodule]
 pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_module, m)?)?;
     m.add_function(wrap_pyfunction!(register_command, m)?)?;
     m.add_function(wrap_pyfunction!(register_style, m)?)?;
     m.add_function(wrap_pyfunction!(register_tokens, m)?)?;
+    m.add_function(wrap_pyfunction!(register_shortcut_json, m)?)?;
     m.add_function(wrap_pyfunction!(execute, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_register, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_set_image, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_set_tooltip, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_set_menu, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_remove, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_icon_screen_bounds, m)?)?;
+    m.add_function(wrap_pyfunction!(cursor_position, m)?)?;
+    m.add_function(wrap_pyfunction!(screen_size, m)?)?;
+    m.add_function(wrap_pyfunction!(set_timer, m)?)?;
+    m.add_function(wrap_pyfunction!(cancel_timer, m)?)?;
+    m.add_function(wrap_pyfunction!(read_tokens, m)?)?;
     Ok(())
 }

@@ -11,7 +11,7 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "appearance" => "icons/appearance.svg",
         "extensions" => "icons/python.svg",
         "python" => "icons/python.svg",
-        "modules" => "icons/modules.svg",
+        "permissions" => "icons/permissions.svg",
         "nodes" => "icons/nodes.svg",
         "tools" => "icons/tools.svg",
         "services" => "icons/services.svg",

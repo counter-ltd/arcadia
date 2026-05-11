@@ -126,32 +126,6 @@ impl ArcadiaRoot {
         cx.notify();
     }
 
-    pub(crate) fn handle_global_key_down(
-        &mut self,
-        event: &KeyDownEvent,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if event.keystroke.key.as_str() == "escape"
-            && (self.app_menu_open || self.session_route_menu_open)
-        {
-            self.app_menu_open = false;
-            self.session_route_menu_open = false;
-            cx.notify();
-            return;
-        }
-        if self.active_page_id.as_str() != "utility.shell" {
-            return;
-        }
-        let key = event.keystroke.key.as_str();
-        let mods = event.keystroke.modifiers;
-        if key == "tab" && mods.shift && self.active_terminal().tui_session.is_none() {
-            let new_mode = self.active_terminal().shell_mode.toggle();
-            self.active_terminal_mut().shell_mode = new_mode;
-            cx.notify();
-        }
-    }
-
     pub(crate) fn run_internal_quit_command(&mut self) {
         if let crate::cli::CommandResult::Quit = cli::handle("quit") {
             std::process::exit(0);

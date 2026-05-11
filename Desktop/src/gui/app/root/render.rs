@@ -14,7 +14,52 @@ use openframe::AnyElement;
 use crate::gui::app::navigation::NavGroupRef;
 use crate::gui::app::splash::SPLASH_TOTAL_MS;
 use crate::gui::app::{window_controls_top_padding, ArcadiaRoot};
+#[cfg(feature = "gui")]
 use crate::gui::theme::render_icon;
+
+impl ArcadiaRoot {
+    pub(crate) fn render_remote_stale_banner(
+        &mut self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> openframe::Div {
+        let p = crate::gui::theme::theme_palette(cx, is_dark);
+        div()
+            .w_full()
+            .flex()
+            .flex_shrink_0()
+            .items_center()
+            .justify_between()
+            .gap_3()
+            .px_3()
+            .py_2()
+            .bg(p.badge_info_bg)
+            .border_b_1()
+            .border_color(p.border)
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(p.badge_info_fg)
+                    .child("Host surface revision changed — reload to sync modules and navigation."),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(openframe::FontWeight::SEMIBOLD)
+                    .cursor_pointer()
+                    .text_color(p.accent)
+                    .child("Reload")
+                    .on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.reload_modules();
+                            this.ensure_valid_navigation_selection();
+                            cx.notify();
+                        }),
+                    ),
+            )
+    }
+}
 
 impl Render for ArcadiaRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -24,8 +69,12 @@ impl Render for ArcadiaRoot {
         }
         #[cfg(feature = "gui")]
         self.sync_peer_remote_exec_side_effects(window, cx);
-        #[cfg(feature = "gui")]
+        #[cfg(all(feature = "gui", not(target_os = "ios")))]
+        crate::gui::app::shortcuts::poll_global_hotkey_events(self, window, cx);
+        #[cfg(any(feature = "gui", feature = "ios-gui"))]
         self.ensure_text_caret_blink_task(window, cx);
+        #[cfg(any(feature = "gui", feature = "ios-gui"))]
+        self.ensure_remote_revision_poll_task(window, cx);
         self.ensure_lan_poll_task(window, cx);
         self.ensure_late_poll_task(window, cx);
         #[cfg(feature = "gui")]
@@ -37,6 +86,25 @@ impl Render for ArcadiaRoot {
             WindowAppearance::Dark | WindowAppearance::VibrantDark
         );
         self.refresh_style_for_mode(is_dark, cx);
+        if self.thin_client_nav_waiting_host() {
+            let glyph = crate::gui::theme::active_glyph(cx);
+            let ui_font_family = crate::gui::theme::active_ui_font_family(cx).map(str::to_string);
+            return div()
+                .relative()
+                .size_full()
+                .when_some(ui_font_family, |d, f| d.font_family(f))
+                .bg(if let Some(g) = glyph {
+                    g.bg
+                } else if is_dark {
+                    rgb(0x0f1115)
+                } else {
+                    rgb(0xffffff)
+                })
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(self.render_thin_client_waiting_panel(cx, is_dark));
+        }
         let visible_groups = self.visible_groups_effective();
         let fallback_group = NavGroupRef::Static(
             navigation::group_by_id(navigation::DEFAULT_GROUP_ID)
@@ -77,7 +145,8 @@ impl Render for ArcadiaRoot {
             .flex()
             .on_mouse_down(
                 openframe::MouseButton::Left,
-                cx.listener(|this, _, _, cx| {
+                cx.listener(|this, ev, window, cx| {
+                    this.handle_shortcut_mouse_down(ev, window, cx);
                     let mut changed = false;
                     if this.app_menu_open {
                         this.app_menu_open = false;
@@ -106,10 +175,19 @@ impl Render for ArcadiaRoot {
                     }
                 }),
             )
+            .on_mouse_up(
+                openframe::MouseButton::Left,
+                cx.listener(|this, ev, window, cx| {
+                    this.handle_shortcut_mouse_up(ev, window, cx);
+                }),
+            )
+            .on_mouse_move(cx.listener(|this, ev, window, cx| {
+                this.handle_shortcut_pointer_move(ev, window, cx);
+            }))
             .on_key_down(cx.listener({
-                #[cfg(feature = "gui")]
+                #[cfg(any(feature = "gui", feature = "ios-gui"))]
                 { Self::handle_global_key_down }
-                #[cfg(not(feature = "gui"))]
+                #[cfg(not(any(feature = "gui", feature = "ios-gui")))]
                 { |_this: &mut ArcadiaRoot, _ev, _window, _cx| {} }
             }))
             .child(if self.sidebar_visible {
@@ -135,6 +213,11 @@ impl Render for ArcadiaRoot {
                         active_page_glyph,
                         is_dark,
                     ))
+                    .child(if self.remote_route.is_some() && self.remote_surface_stale {
+                        self.render_remote_stale_banner(cx, is_dark)
+                    } else {
+                        div()
+                    })
                     .child(
                         if self.active_page_id.as_str() == "utility.shell"
                             || self.active_page_id.as_str() == "late.now_playing"
@@ -156,6 +239,7 @@ impl Render for ArcadiaRoot {
                     ),
             )
             .child(self.requirements_modal(cx, is_dark))
+            .child(self.permission_grant_modal(cx, is_dark))
             .child(self.kill_existing_port_modal(cx, is_dark))
             .child(self.color_picker_modal(cx, is_dark))
             .child({

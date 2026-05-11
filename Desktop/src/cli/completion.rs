@@ -8,6 +8,8 @@ use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{Context, Helper};
 
+use arcadia_core::config::permissions::PERMISSION_REGISTRY;
+
 use super::args::{normalize_command, resolve_command, COMMAND_SPECS};
 use super::config_cmds::{modules_keys, provider_names, scoped_key_candidates};
 
@@ -121,6 +123,26 @@ pub fn completion_candidates(line: &str, pos: usize) -> (usize, Vec<String>) {
             1 => modules_keys().unwrap_or_default(),
             2 => vec!["enable".to_string(), "disable".to_string()],
             3 if tokens.get(2).copied() == Some("enable") => vec!["-requirements".to_string()],
+            _ => Vec::new(),
+        },
+        "permit" => match active_index {
+            1 => {
+                let mut v: Vec<String> =
+                    PERMISSION_REGISTRY.iter().map(|p| p.id.to_string()).collect();
+                if let Ok(mk) = modules_keys() {
+                    v.extend(mk.into_iter().map(|k| format!("module:{k}")));
+                }
+                v
+            }
+            2 => {
+                if let Some(first) = tokens.get(1).copied() {
+                    if PERMISSION_REGISTRY.iter().any(|p| p.id == first) {
+                        return (start, vec!["true".to_string(), "false".to_string()]);
+                    }
+                }
+                PERMISSION_REGISTRY.iter().map(|p| p.id.to_string()).collect()
+            }
+            3 => vec!["true".to_string(), "false".to_string()],
             _ => Vec::new(),
         },
         other => match active_index {

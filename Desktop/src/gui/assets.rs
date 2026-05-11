@@ -61,6 +61,9 @@ impl AssetSource for EmbeddedAssets {
             "icons/python.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/python.svg"
             )))),
+            "icons/permissions.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/permissions.svg"
+            )))),
             "icons/app-icon.png" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../../Resources/Icons/Production/Final-1-appicon.png"
             )))),

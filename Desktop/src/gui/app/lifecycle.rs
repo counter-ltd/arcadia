@@ -19,9 +19,11 @@ use arcadia_core::modules;
 use arcadia_core::modules::python_registry::StyleInfo;
 #[cfg(feature = "gui")]
 use arcadia_core::modules::shell_motd;
-use arcadia_core::modules::surface::parse_surface_snapshot;
+use arcadia_core::modules::surface::{parse_surface_revision, parse_surface_snapshot};
 use arcadia_core::navigation;
 use openframe::{Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
+#[cfg(feature = "ios-gui")]
+use openframe::ScrollHandle;
 use crate::gui::theme::{
     ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
     ActiveGlyphUiFontFamily, GlyphBorderTypography, GlyphStyleConfig,
@@ -180,6 +182,8 @@ impl ArcadiaRoot {
     pub fn new(cx: &mut openframe::Context<Self>) -> Self {
         #[cfg(feature = "gui")]
         let shell_focus = cx.focus_handle();
+        #[cfg(feature = "ios-gui")]
+        let ios_shell_focus = cx.focus_handle();
         let late_compose_focus = cx.focus_handle();
         let late_settings_server_url_focus = cx.focus_handle();
         let late_settings_username_focus = cx.focus_handle();
@@ -187,6 +191,7 @@ impl ArcadiaRoot {
         let extension_token_focus = cx.focus_handle();
         let modules_search_focus = cx.focus_handle();
         let extensions_search_focus = cx.focus_handle();
+        let permissions_search_focus = cx.focus_handle();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
@@ -219,13 +224,17 @@ impl ArcadiaRoot {
             active_group_id: navigation::DEFAULT_GROUP_ID.to_string(),
             modules_search_query: String::new(),
             extensions_search_query: String::new(),
+            permissions_search_query: String::new(),
             modules_search_focus,
             extensions_search_focus,
+            permissions_search_focus,
             module_rows,
             python_extension_rows: Vec::new(),
             active_style,
             available_styles,
             pending_module_enable: None,
+            pending_permission_grant: None,
+            python_extension_action_error: None,
             #[cfg(feature = "gui")]
             terminals: vec![first_terminal],
             #[cfg(feature = "gui")]
@@ -253,8 +262,12 @@ impl ArcadiaRoot {
             session_route_menu_open: false,
             remote_route: None,
             remote_nav: None,
+            local_navigation_registry: navigation::NavigationRegistryOwned::from_static_registry(),
             surface_client_id: ThinClientConfig::load_surface_client_id(),
             last_surface_revision: None,
+            navigation_from_host_only: false,
+            remote_surface_stale: false,
+            remote_revision_poll_started: false,
             lan_discovered_peers: Vec::new(),
             lan_command_feedback: String::new(),
             lan_service_feedback: String::new(),
@@ -278,7 +291,33 @@ impl ArcadiaRoot {
             last_color_scheme_dark: None,
             #[cfg(feature = "gui")]
             shell_motd_prefix_lines: initial_motd_n,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_history: Vec::new(),
+            #[cfg(feature = "ios-gui")]
+            ios_shell_input: String::new(),
+            #[cfg(feature = "ios-gui")]
+            ios_shell_cursor: 0,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_command_history: Vec::new(),
+            #[cfg(feature = "ios-gui")]
+            ios_shell_history_index: None,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_focus,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_scroll: ScrollHandle::new(),
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_sequence_pending: None,
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_sequence_deadline: None,
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_edge_drag_start: None,
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_hot_corner_dwell: std::collections::HashMap::new(),
         };
+
+        if let Ok(tc) = ThinClientConfig::load_or_create() {
+            root.navigation_from_host_only = tc.navigation_from_host_only;
+        }
 
         // Thin client bootstrap: ARCADIA_NET_AS overrides persisted thin-client.toml route.
         let mut picked_route: Option<String> = None;
@@ -316,13 +355,22 @@ impl ArcadiaRoot {
             root.available_styles = merged_available_styles();
         }
 
+        root.refresh_local_navigation_registry();
         root.refresh_extension_token_cache();
 
         // Apply persisted style (may activate a glyph config from an extension).
         let active = root.active_style.clone();
         root.apply_style(active, true, cx);
 
+        #[cfg(all(feature = "gui", not(target_os = "ios")))]
+        super::shortcuts::sync_os_global_hotkeys();
+
         root
+    }
+
+    pub(crate) fn refresh_local_navigation_registry(&mut self) {
+        self.local_navigation_registry =
+            navigation::NavigationRegistryOwned::with_extension_token_settings_merged();
     }
 
     pub(super) fn refresh_extension_token_cache(&mut self) {
@@ -382,6 +430,7 @@ impl ArcadiaRoot {
         };
         self.available_styles = styles;
         self.refresh_extension_token_cache();
+        self.refresh_local_navigation_registry();
         self.apply_style(active, self.current_color_scheme_dark(), cx);
     }
 
@@ -466,21 +515,27 @@ impl ArcadiaRoot {
                     self.module_rows = parsed.modules;
                     self.remote_nav = parsed.navigation_registry;
                     self.last_surface_revision = Some(parsed.revision);
+                    self.remote_surface_stale = false;
                 }
                 _ => {
                     self.module_rows = Vec::new();
                     self.remote_nav = None;
                     self.last_surface_revision = None;
+                    self.remote_surface_stale = false;
                 }
             }
         } else {
             self.remote_nav = None;
             self.last_surface_revision = None;
+            self.remote_surface_stale = false;
             self.module_rows = ModulesConfig::load_or_create()
                 .map(|cfg| cfg.modules.into_iter().collect())
                 .unwrap_or_default();
         }
+        self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();
+        #[cfg(all(feature = "gui", not(target_os = "ios")))]
+        super::shortcuts::sync_os_global_hotkeys();
     }
 
     #[cfg(feature = "gui")]
@@ -555,7 +610,7 @@ impl ArcadiaRoot {
         .detach();
     }
 
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
     pub fn ensure_text_caret_blink_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.text_caret_blink_task_started {
             return;
@@ -579,6 +634,68 @@ impl ArcadiaRoot {
                             })
                             .unwrap_or(true);
                         if should_stop {
+                            break;
+                        }
+                    }
+                }
+            },
+        )
+        .detach();
+    }
+
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub fn ensure_remote_revision_poll_task(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.remote_revision_poll_started {
+            return;
+        }
+        if self.remote_route.is_none() {
+            return;
+        }
+        self.remote_revision_poll_started = true;
+        cx.spawn_in(
+            window,
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                let mut cx = cx.clone();
+                async move {
+                    loop {
+                        Timer::after(Duration::from_secs(12)).await;
+                        let stop = cx
+                            .update(|_, app| {
+                                view.update(app, |this, cx| {
+                                    if this.remote_route.is_none() {
+                                        this.remote_revision_poll_started = false;
+                                        return true;
+                                    }
+                                    let Some(route) = this.remote_route.clone() else {
+                                        this.remote_revision_poll_started = false;
+                                        return true;
+                                    };
+                                    let ctx = modules::ExecutionContext {
+                                        net_as: Some(route),
+                                        net_timeout_ms: Some(8000),
+                                    };
+                                    if let Ok(Some(json)) =
+                                        modules::execute_command("surface.revision", &[], &ctx)
+                                    {
+                                        if let Some(rev) = parse_surface_revision(&json) {
+                                            if let Some(last) = this.last_surface_revision {
+                                                if rev != last {
+                                                    this.remote_surface_stale = true;
+                                                    cx.notify();
+                                                }
+                                            }
+                                        }
+                                    }
+                                    false
+                                })
+                                .unwrap_or(true)
+                            })
+                            .unwrap_or(true);
+                        if stop {
                             break;
                         }
                     }

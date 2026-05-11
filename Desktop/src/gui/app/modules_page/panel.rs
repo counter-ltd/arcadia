@@ -1,4 +1,4 @@
-use arcadia_core::config::modules::ModulesConfig;
+use arcadia_core::config::modules::{ModulesConfig, supports_runtime_platform};
 use openframe::{AnyElement, Window, div, px};
 use openframe::{Context, FontWeight, IntoElement, ParentElement, Styled};
 
@@ -29,12 +29,17 @@ impl ArcadiaRoot {
         let rows: Vec<_> = rows_src
             .into_iter()
             .map(|(module_name, enabled)| {
+                let manifest = ModulesConfig::manifest_for(module_name);
+                let runtime_supported = manifest
+                    .map(|m| supports_runtime_platform(m.supported_platforms))
+                    .unwrap_or(true);
                 Self::module_row_item(
                     cx,
                     module_name.clone(),
                     *enabled,
-                    ModulesConfig::manifest_for(module_name),
+                    manifest,
                     is_dark,
+                    runtime_supported,
                 )
             })
             .collect();

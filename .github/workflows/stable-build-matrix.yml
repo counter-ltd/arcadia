@@ -10,6 +10,30 @@ permissions:
   contents: write
 
 jobs:
+  ios-cross-compile-check:
+    name: ios-gui cross-check + C ABI header
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain (iOS target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: Desktop -> ../Builds/workspace
+
+      - name: Verify ArcadiaBridge.h matches ios_lib.rs
+        shell: bash
+        run: bash Shared/Scripts/check-ios-bridge-header.sh
+
+      - name: Cargo check (aarch64-apple-ios, ios-gui)
+        run: cargo check -p arcadia --manifest-path Desktop/Cargo.toml --target aarch64-apple-ios --no-default-features --features ios-gui
+
   build-desktop:
     name: ${{ matrix.artifact_name }}
     runs-on: ${{ matrix.os }}
@@ -143,7 +167,7 @@ jobs:
 
   release:
     name: Create Stable Release
-    needs: [build-desktop, build-mobile-ios]
+    needs: [build-desktop, build-mobile-ios, ios-cross-compile-check]
     runs-on: ubuntu-latest
     steps:
       - name: Download matrix artifacts

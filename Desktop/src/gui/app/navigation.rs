@@ -111,14 +111,12 @@ impl NavGroupRef<'_> {
 
 impl ArcadiaRoot {
     pub(crate) fn page_ref(&self, page_id: &str) -> Option<NavPageRef<'_>> {
-        if let Some(nav) = &self.remote_nav {
-            nav.pages
-                .iter()
-                .find(|p| p.id == page_id)
-                .map(NavPageRef::Remote)
-        } else {
-            navigation::page_by_id(page_id).map(NavPageRef::Static)
+        if let Some(nav) = self.navigation_registry() {
+            if let Some(p) = nav.pages.iter().find(|p| p.id == page_id) {
+                return Some(NavPageRef::Remote(p));
+            }
         }
+        navigation::page_by_id(page_id).map(NavPageRef::Static)
     }
 
     pub(crate) fn effective_group(&self, group_id: &str) -> Option<NavGroupRef<'_>> {
@@ -128,33 +126,30 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn global_page_ids_effective(&self) -> Vec<&str> {
-        if let Some(nav) = &self.remote_nav {
-            nav.global_pages.iter().map(|s| s.as_str()).collect()
-        } else {
-            navigation::GLOBAL_PAGE_IDS.iter().copied().collect()
-        }
+        self.navigation_registry()
+            .map(|nav| nav.global_pages.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_else(|| navigation::GLOBAL_PAGE_IDS.iter().copied().collect())
     }
 
     pub(crate) fn top_bar_page_ids_effective(&self) -> Vec<&str> {
-        let mut v: Vec<&str> = if let Some(nav) = &self.remote_nav {
-            nav.top_bar_pages.iter().map(|s| s.as_str()).collect()
-        } else {
-            navigation::TOP_BAR_PAGE_IDS.iter().copied().collect()
-        };
+        let mut v: Vec<&str> = self
+            .navigation_registry()
+            .map(|nav| nav.top_bar_pages.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_else(|| navigation::TOP_BAR_PAGE_IDS.iter().copied().collect());
         v.retain(|&id| id != navigation::LOGS_PAGE_ID);
         v
     }
 
     pub(crate) fn settings_hub_page_ids_effective(&self) -> Vec<&str> {
-        if let Some(nav) = &self.remote_nav {
-            if nav.settings_hub_pages.is_empty() {
-                navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect()
-            } else {
-                nav.settings_hub_pages.iter().map(|s| s.as_str()).collect()
-            }
-        } else {
-            navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect()
-        }
+        self.navigation_registry()
+            .map(|nav| {
+                if nav.settings_hub_pages.is_empty() {
+                    navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect()
+                } else {
+                    nav.settings_hub_pages.iter().map(|s| s.as_str()).collect()
+                }
+            })
+            .unwrap_or_else(|| navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect())
     }
 
     /// Expand the Settings hub when the active page is the hub root or a nested registry target.
@@ -171,13 +166,10 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn visible_groups_effective(&self) -> Vec<NavGroupRef<'_>> {
-        let all: Vec<NavGroupRef<'_>> = if let Some(nav) = &self.remote_nav {
+        let all: Vec<NavGroupRef<'_>> = if let Some(nav) = self.navigation_registry() {
             nav.groups.iter().map(NavGroupRef::Remote).collect()
         } else {
-            navigation::GROUP_DEFINITIONS
-                .iter()
-                .map(NavGroupRef::Static)
-                .collect()
+            Vec::new()
         };
         all.into_iter()
             .filter(|g| g.page_ids().iter().any(|pid| self.is_page_visible(pid)))
@@ -185,10 +177,65 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn effective_default_page(&self) -> &str {
-        self.remote_nav
-            .as_ref()
+        self.navigation_registry()
             .map(|n| n.default_page.as_str())
-            .unwrap_or(navigation::DEFAULT_PAGE_ID)
+            .unwrap_or_else(|| {
+                if self.remote_navigation_required() {
+                    "__thin.nav_waiting__"
+                } else {
+                    navigation::DEFAULT_PAGE_ID
+                }
+            })
+    }
+
+    pub(crate) fn render_thin_client_waiting_panel(
+        &mut self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> Div {
+        let p = theme::theme_palette(cx, is_dark);
+        div()
+            .w_full()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .gap_4()
+            .p_8()
+            .child(
+                div()
+                    .text_lg()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(p.content_title)
+                    .child("Waiting for host navigation"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(p.content_body)
+                    .child(
+                        "navigation_from_host_only is set in thin-client.toml but the host snapshot has no navigation_registry yet.",
+                    ),
+            )
+            .child(
+                div()
+                    .px_4()
+                    .py_2()
+                    .rounded(px(8.))
+                    .cursor_pointer()
+                    .bg(p.accent)
+                    .text_color(p.on_accent)
+                    .child("Reload from host")
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.reload_modules();
+                            this.ensure_valid_navigation_selection();
+                            cx.notify();
+                        }),
+                    ),
+            )
     }
 
     pub(crate) fn render_active_content(
@@ -197,6 +244,9 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> Div {
+        if self.thin_client_nav_waiting_host() {
+            return self.render_thin_client_waiting_panel(cx, is_dark);
+        }
         #[cfg(feature = "gui")]
         if self.active_page_id.as_str() == "utility.shell" {
             return div()
@@ -205,6 +255,15 @@ impl ArcadiaRoot {
                 .min_h_0()
                 .p_2()
                 .child(self.shell_panel(window, cx));
+        }
+        #[cfg(all(feature = "ios-gui", not(feature = "gui")))]
+        if self.active_page_id.as_str() == "utility.shell" {
+            return div()
+                .flex_1()
+                .h_full()
+                .min_h_0()
+                .p_2()
+                .child(self.ios_execute_shell_panel(window, cx));
         }
         if self.active_page_id.as_str() == "global.modules" {
             return div().w_full().p_6().child(self.modules_panel(window, cx, is_dark));
@@ -231,8 +290,26 @@ impl ArcadiaRoot {
         if self.active_page_id.as_str() == "python.settings" {
             return div().w_full().p_6().child(self.python_settings_panel(window, cx, is_dark));
         }
+        let active = self.active_page_id.clone();
+        if let Some(mid) = navigation::parse_extension_token_settings_page_id(&active) {
+            return div().w_full().p_6().child(
+                self.extension_token_settings_panel_for_module(window, cx, is_dark, mid),
+            );
+        }
         if self.active_page_id.as_str() == "global.appearance" {
             return div().w_full().p_6().child(self.appearance_panel(window, cx, is_dark));
+        }
+        if self.active_page_id.as_str() == "global.permissions" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.permissions_panel(window, cx, is_dark));
+        }
+        if self.active_page_id.as_str() == "global.shortcuts" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.shortcuts_panel(window, cx, is_dark));
         }
         if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
             return div()
@@ -394,8 +471,8 @@ impl ArcadiaRoot {
     }
 
     pub fn is_page_visible(&self, page_id: &str) -> bool {
-        if let Some(remote) = &self.remote_nav {
-            return navigation::is_page_visible_in_owned(remote, page_id, |name| {
+        if let Some(nav) = self.navigation_registry() {
+            return navigation::is_page_visible_in_owned(nav, page_id, |name| {
                 self.is_module_enabled(name)
             });
         }
@@ -420,7 +497,7 @@ impl ArcadiaRoot {
                 None
             } else if let Some(group) = visible_groups.first() {
                 Some(group.id().to_string())
-            } else if let Some(nav) = &self.remote_nav {
+            } else if let Some(nav) = self.navigation_registry() {
                 Some(nav.default_group.clone())
             } else {
                 Some(navigation::DEFAULT_GROUP_ID.to_string())

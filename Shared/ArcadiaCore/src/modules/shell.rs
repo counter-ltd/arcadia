@@ -1,3 +1,4 @@
+use crate::capabilities::SHELL_INTERNAL_NO_RUNTIME;
 use crate::modules::{ExecutionContext, ModuleCommand};
 use std::sync::OnceLock;
 
@@ -41,7 +42,7 @@ fn execute(args: &[&str], context: &ExecutionContext) -> String {
 
     #[cfg(target_os = "ios")]
     {
-        return "shell.execute is not available on iOS".to_string();
+        return crate::capabilities::SHELL_EXECUTE_UNAVAILABLE_IOS_LOCAL.to_string();
     }
 
     #[cfg(not(target_os = "ios"))]
@@ -93,7 +94,7 @@ fn internal(args: &[&str], context: &ExecutionContext) -> String {
     let command_line = args.join(" ");
     match INTERNAL_EXECUTOR.get() {
         Some(executor) => executor(&command_line),
-        None => "shell.internal is not available in this runtime".to_string(),
+        None => SHELL_INTERNAL_NO_RUNTIME.to_string(),
     }
 }
 
@@ -102,11 +103,13 @@ pub fn commands() -> &'static [ModuleCommand] {
         ModuleCommand {
             name: "execute",
             description: "execute shell command(s): shell.execute <command...>",
+            required_permissions: &["shell.run"],
             run: execute,
         },
         ModuleCommand {
             name: "internal",
             description: "execute internal CLI command(s): shell.internal <command...>",
+            required_permissions: &["shell.bridge"],
             run: internal,
         },
     ]

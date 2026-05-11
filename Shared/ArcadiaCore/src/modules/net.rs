@@ -21,6 +21,7 @@ pub fn commands() -> &'static [ModuleCommand] {
     &[ModuleCommand {
         name: "help",
         description: "show net context and global net flag usage",
+        required_permissions: &[],
         run: help,
     }]
 }

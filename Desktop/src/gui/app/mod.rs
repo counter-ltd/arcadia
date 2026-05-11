@@ -8,6 +8,7 @@ mod entry;
 #[cfg(feature = "ios-gui")]
 pub mod entry_ios;
 mod appearance;
+mod extension_token_settings;
 mod lan_nodes;
 mod late;
 mod lifecycle;
@@ -15,18 +16,25 @@ mod list_panel_search;
 mod text_input_caret;
 mod modules_page;
 mod navigation;
+mod permissions_panel;
 mod python_settings;
 mod root;
 mod services;
 #[cfg(feature = "gui")]
 mod shell;
+#[cfg(feature = "ios-gui")]
+mod shell_ios;
 mod sidebar;
 mod splash;
+#[cfg(any(feature = "gui", feature = "ios-gui"))]
+mod shortcuts;
+mod shortcuts_panel;
 
 #[cfg(feature = "gui")]
 pub use entry::run;
 
 use std::collections::HashMap;
+use std::time::Instant;
 
 use arcadia_core::modules::python_registry::StyleInfo;
 use arcadia_core::navigation::NavigationRegistryOwned;
@@ -95,6 +103,18 @@ impl ShellMode {
     }
 }
 
+#[derive(Clone)]
+pub enum PendingPermissionGrant {
+    NativeModule {
+        module: String,
+        missing: Vec<String>,
+    },
+    PythonExtension {
+        extension: String,
+        missing: Vec<String>,
+    },
+}
+
 #[cfg(feature = "gui")]
 pub struct TerminalInstance {
     pub id: usize,
@@ -128,16 +148,24 @@ pub struct ArcadiaRoot {
     pub modules_search_query: String,
     /// Filters rows on python.settings (UI-only).
     pub extensions_search_query: String,
+    /// Filters rows on global.permissions (UI-only).
+    pub permissions_search_query: String,
     pub modules_search_focus: FocusHandle,
     pub extensions_search_focus: FocusHandle,
+    pub permissions_search_focus: FocusHandle,
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
-    pub python_extension_rows: Vec<(String, String, String, bool)>,
+    pub python_extension_rows: Vec<(String, String, String, bool, Vec<String>, Vec<String>)>,
     /// Active render style name ("default", "tui", or python-registered).
     pub active_style: String,
     /// Built-in styles prepended, then python-registered styles appended on extension reload.
     pub available_styles: Vec<StyleInfo>,
     pub pending_module_enable: Option<(String, Vec<String>)>,
+    pub pending_permission_grant: Option<PendingPermissionGrant>,
+    /// Most recent error surfaced by a Python extension toggle (enable / disable). Cleared on
+    /// the next toggle attempt so the panel can show "couldn't load: …" inline instead of
+    /// swallowing the result of `python-host.extension-enable`.
+    pub python_extension_action_error: Option<String>,
     #[cfg(feature = "gui")]
     pub terminals: Vec<TerminalInstance>,
     #[cfg(feature = "gui")]
@@ -170,8 +198,15 @@ pub struct ArcadiaRoot {
     pub remote_route: Option<String>,
     /// Host navigation JSON from `surface.snapshot` when connected remotely (multi-client shared truth).
     pub remote_nav: Option<NavigationRegistryOwned>,
+    /// Static pages plus extension token settings pages (when not using host-only thin navigation).
+    pub local_navigation_registry: NavigationRegistryOwned,
     pub surface_client_id: String,
     pub last_surface_revision: Option<u64>,
+    /// When `true` and [`Self::remote_route`] is set, use only host snapshot navigation (see `thin-client.toml`).
+    pub navigation_from_host_only: bool,
+    /// Host `surface.revision` differed from last loaded snapshot (thin client).
+    pub remote_surface_stale: bool,
+    pub remote_revision_poll_started: bool,
     pub lan_discovered_peers: Vec<(String, String)>,
     pub lan_command_feedback: String,
     pub lan_service_feedback: String,
@@ -202,6 +237,29 @@ pub struct ArcadiaRoot {
     /// Lines at top of each terminal transcript occupied by shell MOTD (incl. trailing blank), when enabled.
     #[cfg(feature = "gui")]
     pub shell_motd_prefix_lines: usize,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_history: Vec<String>,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_input: String,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_cursor: usize,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_command_history: Vec<String>,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_history_index: Option<usize>,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_focus: FocusHandle,
+    #[cfg(feature = "ios-gui")]
+    pub ios_shell_scroll: ScrollHandle,
+    /// Leader-sequence state: `(shortcut_id, next_step_index)`.
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub shortcut_sequence_pending: Option<(String, usize)>,
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub shortcut_sequence_deadline: Option<Instant>,
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub shortcut_edge_drag_start: Option<(f32, f32)>,
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub shortcut_hot_corner_dwell: HashMap<String, u32>,
 }
 
 impl ArcadiaRoot {
@@ -227,6 +285,23 @@ impl ArcadiaRoot {
         arcadia_core::modules::ExecutionContext {
             net_as: self.remote_route.clone(),
             net_timeout_ms: None,
+        }
+    }
+
+    pub(crate) fn remote_navigation_required(&self) -> bool {
+        self.navigation_from_host_only && self.remote_route.is_some()
+    }
+
+    pub(crate) fn thin_client_nav_waiting_host(&self) -> bool {
+        self.remote_navigation_required() && self.remote_nav.is_none()
+    }
+
+    /// Host snapshot when thin-client host-only mode supplies it; otherwise merged local registry.
+    pub(crate) fn navigation_registry(&self) -> Option<&NavigationRegistryOwned> {
+        if self.remote_navigation_required() {
+            self.remote_nav.as_ref()
+        } else {
+            Some(self.remote_nav.as_ref().unwrap_or(&self.local_navigation_registry))
         }
     }
 }

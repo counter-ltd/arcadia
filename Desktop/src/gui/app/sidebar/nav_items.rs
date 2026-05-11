@@ -60,6 +60,7 @@ impl ArcadiaRoot {
                     cx.notify();
                 }),
             )
+            .accessibility_label("Toggle sidebar")
     }
 
     pub fn sidebar_group_item(

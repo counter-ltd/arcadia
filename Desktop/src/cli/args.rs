@@ -28,6 +28,11 @@ pub const COMMAND_SPECS: &[CommandSpec] = &[
         subcommands: &["enable", "disable"],
     },
     CommandSpec {
+        name: "permit",
+        aliases: &[],
+        subcommands: &[],
+    },
+    CommandSpec {
         name: "quit",
         aliases: &[],
         subcommands: &[],

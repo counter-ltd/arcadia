@@ -15,6 +15,7 @@ impl ArcadiaRoot {
         enabled: bool,
         manifest: Option<&'static ModuleManifest>,
         is_dark: bool,
+        runtime_supported: bool,
     ) -> AnyElement {
         let version = manifest.map(|m| m.version).unwrap_or("unknown");
         let description = manifest
@@ -89,7 +90,16 @@ impl ArcadiaRoot {
                             .text_xs()
                             .text_color(desc_c)
                             .child(description),
-                    ),
+                    )
+                    .when(!runtime_supported, |col| {
+                        col.child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(p.ui_subtext)
+                                .child("Platform Not Supported"),
+                        )
+                    }),
             )
             .child(Self::row_toggle(
                 cx,
@@ -98,6 +108,7 @@ impl ArcadiaRoot {
                 is_dark,
                 is_glyph,
                 radius,
+                runtime_supported,
             ));
 
         if let Some(g) = theme::active_glyph(cx) {
@@ -130,6 +141,7 @@ impl ArcadiaRoot {
         is_dark: bool,
         is_glyph: bool,
         radius: f32,
+        allow_enable: bool,
     ) -> impl IntoElement {
         let p = theme::theme_palette(cx, is_dark);
         let r_track = radius.min(8.0_f32).max(0.0);
@@ -138,7 +150,8 @@ impl ArcadiaRoot {
             .flex()
             .items_center()
             .gap_2()
-            .cursor_pointer()
+            .when(allow_enable || enabled, |d| d.cursor_pointer())
+            .when(!allow_enable && !enabled, |d| d.cursor_default())
             .child(
                 div()
                     .text_xs()
@@ -195,9 +208,18 @@ impl ArcadiaRoot {
                         )
                 },
             )
-            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+            .when(allow_enable || enabled, |d| {
+                d.on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                let enabled_next = !enabled;
+                if !allow_enable {
+                    if !enabled {
+                        return;
+                    }
+                    if enabled_next {
+                        return;
+                    }
+                }
                 if this.remote_route.is_some() {
-                    let enabled_next = !enabled;
                     let ctx = this.execution_context();
                     let name = module_name.clone();
                     let payload = arcadia_core::modules::surface::patch_json_modules_set(
@@ -231,11 +253,27 @@ impl ArcadiaRoot {
                             this.pending_module_enable = Some((module_name.clone(), missing));
                         }
                         Ok(_) => {
+                            use arcadia_core::config::permissions::PermissionsConfig;
+                            use crate::gui::app::PendingPermissionGrant;
+                            if let Ok(pc) = PermissionsConfig::load_or_create() {
+                                let miss = pc.missing_grants_for_module_enable(&module_name);
+                                if !miss.is_empty() {
+                                    this.pending_permission_grant = Some(
+                                        PendingPermissionGrant::NativeModule {
+                                            module: module_name.clone(),
+                                            missing: miss,
+                                        },
+                                    );
+                                    cx.notify();
+                                    return;
+                                }
+                            }
                             if let Ok(mut cfg) = ModulesConfig::load_or_create() {
                                 let _ = cfg.enable_with_requirements(&module_name);
                                 let _ = cfg.save();
                             }
                             this.pending_module_enable = None;
+                            this.pending_permission_grant = None;
                             this.reload_modules();
                         }
                         Err(err) => eprintln!("{err}"),
@@ -244,5 +282,6 @@ impl ArcadiaRoot {
                 }
                 cx.notify();
             }))
+            })
     }
 }

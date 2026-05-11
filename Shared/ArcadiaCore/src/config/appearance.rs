@@ -9,7 +9,9 @@ pub struct AppearanceConfig {
 
 impl Default for AppearanceConfig {
     fn default() -> Self {
-        Self { active_style: "default".to_string() }
+        Self {
+            active_style: "default".to_string(),
+        }
     }
 }
 
@@ -19,10 +21,12 @@ impl ConfigFile for AppearanceConfig {
     }
 
     fn merge_defaults(&mut self) -> bool {
-        // Style id renames: Terminal → Flux → Shell (same Python extension).
+        // Style id renames for the same Python extension: terminal → flux → shell → terminal
+        // (back to the original name to match the native `terminal` module). All old ids
+        // collapse onto `terminal`.
         match self.active_style.as_str() {
-            "terminal" | "flux" => {
-                self.active_style = "shell".to_string();
+            "flux" | "shell" => {
+                self.active_style = "terminal".to_string();
                 true
             }
             _ => false,

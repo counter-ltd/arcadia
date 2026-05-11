@@ -6,7 +6,10 @@ fn main() {
     modules::load_all();
     arcadia_core::modules::shell::set_internal_executor(cli::handle_internal);
 
-    #[cfg(feature = "python-extensions")]
+    // Desktop GUI boots the Python host from `ArcadiaRoot::new` after `tray_backend::install`
+    // so `tray_register` / `run_on_main` see a live tray backend. Starting here too would run
+    // every extension body twice (duplicate tray rows + interval timers) whenever `gui` is on.
+    #[cfg(all(feature = "python-extensions", not(feature = "gui")))]
     {
         use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
         use arcadia_core::config::{modules::ModulesConfig, ConfigFile};
