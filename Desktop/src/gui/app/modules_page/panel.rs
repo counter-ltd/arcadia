@@ -1,26 +1,20 @@
 use arcadia_core::config::modules::ModulesConfig;
-use openframe::div;
+use openframe::{AnyElement, div, px};
 use openframe::{Context, IntoElement, ParentElement, Styled};
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme;
+use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
-    pub fn modules_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
+    pub fn modules_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> AnyElement {
         if self.active_page_id.as_str() != "global.modules" {
-            return div();
+            return div().into_any_element();
         }
-        div()
-            .w_full()
-            .p_4()
-            .rounded_lg()
-            .bg(theme::module_panel_bg(is_dark))
-            .border_1()
-            .border_color(theme::module_panel_stroke(is_dark))
-            .flex()
-            .flex_col()
-            .gap_3()
-            .children(self.module_rows.iter().map(|(module_name, enabled)| {
+        let glyph_cfg = theme::glyph_snapshot(cx);
+        let rows: Vec<_> = self
+            .module_rows
+            .iter()
+            .map(|(module_name, enabled)| {
                 Self::module_row_item(
                     cx,
                     module_name.clone(),
@@ -28,6 +22,42 @@ impl ArcadiaRoot {
                     ModulesConfig::manifest_for(module_name),
                     is_dark,
                 )
-            }))
+            })
+            .collect();
+        if let Some(ref g) = glyph_cfg {
+            let radius = g.border_radius.min(12.0);
+            div()
+                .w_full()
+                .flex()
+                .justify_center()
+                .child(
+                    div()
+                        .w_full()
+                        .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+                        .p_4()
+                        .rounded(px(radius))
+                        .bg(g.surface)
+                        .border_1()
+                        .border_color(g.border)
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .children(rows.into_iter()),
+                )
+                .into_any_element()
+        } else {
+            div()
+                .w_full()
+                .p_4()
+                .rounded(px(8.))
+                .bg(theme::module_panel_bg(is_dark))
+                .border_1()
+                .border_color(theme::module_panel_stroke(is_dark))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .children(rows)
+                .into_any_element()
+        }
     }
 }

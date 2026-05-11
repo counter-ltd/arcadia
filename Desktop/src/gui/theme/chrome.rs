@@ -1,40 +1,29 @@
-use openframe::Rgba;
+use openframe::{App, Rgba};
 
-/// Neutral compact pill in the main top bar (matches cwd / small actions).
+use super::palette::{
+    fallback_chrome_pill_bg, fallback_chrome_pill_fg, fallback_chrome_pill_hover_bg, theme_palette,
+};
+
+/// Top-bar and inline action pills — [`ThemePalette::chrome_pill_*`].
+pub fn action_pill_bg(cx: &App, is_dark: bool) -> Rgba {
+    theme_palette(cx, is_dark).chrome_pill_bg
+}
+
+pub fn action_pill_text(cx: &App, is_dark: bool) -> Rgba {
+    theme_palette(cx, is_dark).chrome_pill_fg
+}
+
+pub fn action_pill_hover_bg(cx: &App, is_dark: bool) -> Rgba {
+    theme_palette(cx, is_dark).chrome_pill_hover_bg
+}
+
+/// Neutral compact pill in the main top bar — falls back to [`super::palette`] neutrals.
 pub fn top_bar_pill_bg(is_dark: bool) -> Rgba {
-    if is_dark {
-        Rgba {
-            r: 0.122,
-            g: 0.161,
-            b: 0.216,
-            a: 1.0,
-        }
-    } else {
-        Rgba {
-            r: 0.953,
-            g: 0.957,
-            b: 0.961,
-            a: 1.0,
-        }
-    }
+    fallback_chrome_pill_bg(is_dark)
 }
 
 pub fn top_bar_pill_text(is_dark: bool) -> Rgba {
-    if is_dark {
-        Rgba {
-            r: 0.820,
-            g: 0.847,
-            b: 0.859,
-            a: 1.0,
-        }
-    } else {
-        Rgba {
-            r: 0.294,
-            g: 0.337,
-            b: 0.388,
-            a: 1.0,
-        }
-    }
+    fallback_chrome_pill_fg(is_dark)
 }
 
 /// Non-selected sidebar / top-bar nav labels (neutral). Icons use `NavAccentPalette::icon_idle`.
@@ -44,24 +33,11 @@ pub fn sidebar_nav_idle_foreground(is_dark: bool) -> Rgba {
 }
 
 pub fn top_bar_pill_hover_bg(is_dark: bool) -> Rgba {
-    if is_dark {
-        Rgba {
-            r: 0.165,
-            g: 0.212,
-            b: 0.278,
-            a: 1.0,
-        }
-    } else {
-        Rgba {
-            r: 0.922,
-            g: 0.929,
-            b: 0.941,
-            a: 1.0,
-        }
-    }
+    fallback_chrome_pill_hover_bg(is_dark)
 }
 
 /// Selected top-bar nav pill (e.g. Logs when that page is active).
+#[allow(dead_code)]
 pub fn top_bar_pill_active_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
@@ -80,6 +56,7 @@ pub fn top_bar_pill_active_bg(is_dark: bool) -> Rgba {
     }
 }
 
+#[allow(dead_code)]
 pub fn top_bar_pill_active_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
@@ -98,6 +75,7 @@ pub fn top_bar_pill_active_text(is_dark: bool) -> Rgba {
     }
 }
 
+#[allow(dead_code)]
 pub fn top_bar_pill_active_hover_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {

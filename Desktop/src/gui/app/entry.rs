@@ -27,5 +27,8 @@ pub fn run() {
             |_window, app| app.new(|cx| ArcadiaRoot::new(cx)),
         )
         .expect("failed to open GPUI window");
+        // Foreground the app and key window (e.g. when started from a terminal, the previous
+        // app would otherwise stay active despite WindowOptions::focus defaulting to true).
+        app.activate(true);
     });
 }

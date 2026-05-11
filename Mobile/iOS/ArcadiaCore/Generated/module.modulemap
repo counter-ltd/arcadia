@@ -1,4 +1,0 @@
-module arcadia_coreFFI {
-    header "arcadia_coreFFI.h"
-    export *
-}

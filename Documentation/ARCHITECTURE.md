@@ -75,30 +75,37 @@ Every surface calls `list_modules()` → `Vec<ModuleStatus>` and renders whateve
 
 Navigation structure lives entirely in `navigation.rs` as two static slices:
 
-**`PAGE_DEFINITIONS`** — 7 pages:
+**`PAGE_DEFINITIONS`** — pages:
 
 | ID | Title | Required Module |
 |----|-------|-----------------|
-| `utility.shell` | Shell | `shell` |
+| `utility.shell` | Terminal | `terminal` |
+| `utility.services` | Services | _service-driven (any service active)_ |
 | `global.dashboard` | Dashboard | — |
 | `global.logs` | Logs | — |
 | `global.settings` | Settings | — |
 | `global.modules` | Modules | — |
-| `network.overview` | Network | `net` |
 | `network.nodes` | Nodes | `lan` |
 
-**`GROUP_DEFINITIONS`** — 2 groups:
+**`GROUP_DEFINITIONS`** — groups:
 
 | ID | Label | Pages |
 |----|-------|-------|
-| `utilities` | Utilities | `utility.shell` |
-| `network` | Network | `network.overview`, `network.nodes` |
+| `utilities` | Utilities | `utility.shell`, `utility.services` |
+| `network` | Network | `network.nodes` |
+| `social` | Social | `late.now_playing`, `late.experimental` |
+
+**`SERVICE_DEFINITIONS`** (`services.rs`) — modules register here to advertise long-running services on a service-host page. A page becomes service-driven as soon as any entry targets its `page_id`: it is visible iff at least one of its services has its `required_module` enabled, regardless of the page's own `required_module`. Each service may carry `controls` (function pointers for `start` / `stop` / `status_detail`) which the desktop Services panel renders directly; iOS dispatches the equivalent FFI calls per service.
+
+| Service | Page | Required Module | Controls |
+|---------|------|-----------------|----------|
+| `lan.discovery` | `utility.services` | `lan` | start, stop, status_detail |
 
 **`GLOBAL_PAGE_IDS`** — pages rendered in the sidebar global section: `global.dashboard`, `global.settings`.
 
 **`TOP_BAR_PAGE_IDS`** — pages rendered as compact controls in the surface top bar: `global.logs`, `global.modules`. Each surface chooses how to render them (Desktop pill, iOS toolbar item) — registry stays the source of truth.
 
-`NavigationPageDefinition.required_module` drives visibility — surfaces query `is_module_enabled(page.required_module)`, never hardcode per-page logic. The full registry serializes to JSON via `default_navigation_registry_json()` for:
+`NavigationPageDefinition.required_module` drives visibility for non-service-host pages — surfaces query `is_module_enabled(page.required_module)`, never hardcode per-page logic. Service-host pages (any page that has at least one entry in `SERVICE_DEFINITIONS` targeting it) are visible iff one of their services' `required_module` is enabled; surfaces use the central helper `arcadia_core::navigation::is_page_visible_with` (or `is_page_visible_in_owned` for thin clients consuming a remote registry) so the rule stays in one place. The full registry serializes to JSON via `default_navigation_registry_json()` for:
 
 - iOS FFI: `navigation_registry_json()` → deserializes into `NavigationRegistry` Swift struct
 - Thin-client: embedded in `surface.snapshot` extra field so remote clients get host's nav without a local copy

@@ -1,6 +1,6 @@
 use openframe::{
     div, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, StatefulInteractiveElement, Styled,
+    ParentElement, StatefulInteractiveElement, Styled, px,
 };
 
 use arcadia_core::modules::late::{send_ws, state, LateMessage};
@@ -110,11 +110,14 @@ impl ArcadiaRoot {
         let input_text = self.late_compose_text.clone();
         let room = self.late_active_room;
 
+        let compose_border = theme::ui_border(cx, is_dark);
+        let compose_input_bg = theme::ui_surface(cx, is_dark);
+        let compose_radius = theme::ui_radius(cx);
         div()
             .px_3()
             .py_2()
             .border_t_1()
-            .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+            .border_color(compose_border)
             .flex()
             .flex_row()
             .gap_2()
@@ -124,10 +127,10 @@ impl ArcadiaRoot {
                     .flex_1()
                     .px_3()
                     .py_2()
-                    .rounded_lg()
-                    .bg(if is_dark { rgb(0x0f172a) } else { rgb(0xf8fafc) })
+                    .rounded(px(compose_radius))
+                    .bg(compose_input_bg)
                     .border_1()
-                    .border_color(if is_dark { rgb(0x1e293b) } else { rgb(0xe2e8f0) })
+                    .border_color(compose_border)
                     .text_sm()
                     .text_color(theme::module_title_text(is_dark))
                     .track_focus(&self.late_compose_focus)
@@ -176,11 +179,11 @@ impl ArcadiaRoot {
                     .cursor_pointer()
                     .px_3()
                     .py_2()
-                    .rounded_lg()
-                    .bg(if is_dark { rgb(0x0d9488) } else { rgb(0x14b8a6) })
+                    .rounded(px(compose_radius))
+                    .bg(theme::ui_accent(cx))
                     .text_sm()
                     .font_weight(openframe::FontWeight::SEMIBOLD)
-                    .text_color(rgb(0xf0fdfa))
+                    .text_color(theme::ui_accent_fg(cx))
                     .child("Send")
                     .on_mouse_down(
                         MouseButton::Left,

@@ -16,6 +16,12 @@ impl AssetSource for EmbeddedAssets {
             "icons/logs.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/logs.svg"
             )))),
+            "icons/log-out.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/log-out.svg"
+            )))),
+            "icons/x.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/x.svg"
+            )))),
             "icons/settings.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/settings.svg"
             )))),
@@ -27,6 +33,9 @@ impl AssetSource for EmbeddedAssets {
             )))),
             "icons/tools.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/tools.svg"
+            )))),
+            "icons/services.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/services.svg"
             )))),
             "icons/network.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/network.svg"
@@ -43,8 +52,20 @@ impl AssetSource for EmbeddedAssets {
             "icons/coffee.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/coffee.svg"
             )))),
+            "icons/appearance.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/appearance.svg"
+            )))),
+            "icons/extensions.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/extensions.svg"
+            )))),
+            "icons/python.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/python.svg"
+            )))),
             "icons/app-icon.png" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../../Resources/Icons/Production/Final-1-appicon.png"
+            )))),
+            "icons/app-icon-tui.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/app-icon-tui.svg"
             )))),
             _ => Ok(None),
         }

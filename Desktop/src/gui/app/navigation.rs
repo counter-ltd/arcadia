@@ -1,7 +1,11 @@
 use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
-use openframe::{div, rgb, Context, Div, FontWeight, ParentElement, Styled, Window};
+use openframe::{
+    div, px, Context, Div, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Styled, Window,
+};
 
 use super::ArcadiaRoot;
+use crate::gui::theme::{self, render_icon};
 
 #[derive(Clone, Copy)]
 pub(crate) enum NavPageRef<'a> {
@@ -51,6 +55,7 @@ impl NavPageRef<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn required_module(&self) -> Option<&str> {
         match self {
             NavPageRef::Static(p) => p.required_module,
@@ -81,6 +86,7 @@ impl NavGroupRef<'_> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn system_image(&self) -> &str {
         match self {
             NavGroupRef::Static(g) => g.system_image,
@@ -130,11 +136,13 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn top_bar_page_ids_effective(&self) -> Vec<&str> {
-        if let Some(nav) = &self.remote_nav {
+        let mut v: Vec<&str> = if let Some(nav) = &self.remote_nav {
             nav.top_bar_pages.iter().map(|s| s.as_str()).collect()
         } else {
             navigation::TOP_BAR_PAGE_IDS.iter().copied().collect()
-        }
+        };
+        v.retain(|&id| id != navigation::LOGS_PAGE_ID);
+        v
     }
 
     pub(crate) fn settings_hub_page_ids_effective(&self) -> Vec<&str> {
@@ -184,12 +192,12 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn render_active_content(
-        &self,
+        &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        active_page: Option<NavPageRef<'_>>,
         is_dark: bool,
     ) -> Div {
+        #[cfg(feature = "gui")]
         if self.active_page_id.as_str() == "utility.shell" {
             return div()
                 .flex_1()
@@ -201,17 +209,18 @@ impl ArcadiaRoot {
         if self.active_page_id.as_str() == "global.modules" {
             return div().w_full().p_6().child(self.modules_panel(cx, is_dark));
         }
-        if self.active_page_id.as_str() == "network.overview" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.network_overview_panel(cx, is_dark));
-        }
         if self.active_page_id.as_str() == "network.nodes" {
             return div()
                 .w_full()
                 .p_6()
                 .child(self.lan_nodes_panel(cx, is_dark));
+        }
+        // TODO: dispatch via page registry; see anti-pattern #3 in AGENTS.md.
+        if self.active_page_id.as_str() == "utility.services" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.services_panel(cx, is_dark));
         }
         if self.active_page_id.as_str() == "late.now_playing" {
             return self.render_late_now_playing(window, cx, is_dark);
@@ -222,53 +231,175 @@ impl ArcadiaRoot {
         if self.active_page_id.as_str() == "python.settings" {
             return div().w_full().p_6().child(self.python_settings_panel(cx, is_dark));
         }
+        if self.active_page_id.as_str() == "global.appearance" {
+            return div().w_full().p_6().child(self.appearance_panel(cx, is_dark));
+        }
+        if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.settings_hub_landing_panel(cx, is_dark));
+        }
+        {
+            let active_page = self
+                .active_page_if_visible()
+                .or_else(|| self.page_ref(self.effective_default_page()));
+            div()
+                .w_full()
+                .p_6()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap_3()
+                .py_16()
+                .child(
+                    div()
+                        .text_3xl()
+                        .font_weight(FontWeight::BOLD)
+                        .child(self.title.clone()),
+                )
+                .child(
+                    div()
+                        .text_2xl()
+                        .text_color(theme::ui_text(cx, is_dark))
+                        .child(active_page.map_or_else(|| "Page".to_string(), |page| page.title().to_string())),
+                )
+                .child(
+                    div()
+                        .text_base()
+                        .text_color(theme::ui_subtext(cx, is_dark))
+                        .child(active_page.map_or_else(
+                            || "Page definition not found.".to_string(),
+                            |page| page.description().to_string(),
+                        )),
+                )
+        }
+    }
+
+    /// Hub root (`global.settings`): grid of all nested settings pages from the registry.
+    fn settings_hub_landing_panel(&mut self, cx: &mut Context<Self>, is_dark: bool) -> Div {
+        let p = theme::theme_palette(cx, is_dark);
+        let hub = self.page_ref(navigation::SETTINGS_HUB_ROOT_PAGE_ID);
+
+        let tiles: Vec<_> = self
+            .settings_hub_page_ids_effective()
+            .into_iter()
+            .filter_map(|page_id| {
+                if !self.is_page_visible(page_id) {
+                    return None;
+                }
+                let page = self.page_ref(page_id)?;
+                let page_id_owned = page_id.to_string();
+                let pal = theme::nav_accent_palette(page.accent(), is_dark);
+                let r = p.radius_md.min(12.0);
+                Some(
+                    div()
+                        .w(px(280.))
+                        .cursor_pointer()
+                        .p_4()
+                        .rounded(px(r))
+                        .bg(p.panel_bg)
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .hover(move |s| {
+                            s.bg(p.row_bg).border_color(pal.row_hover)
+                        })
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(
+                            div()
+                                .flex()
+                                .gap_3()
+                                .items_center()
+                                .child(
+                                    render_icon(page.glyph())
+                                        .size_6()
+                                        .text_color(pal.icon_active),
+                                )
+                                .child(
+                                    div()
+                                        .text_base()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(p.content_title)
+                                        .flex_1()
+                                        .child(page.title().to_string()),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(p.content_body)
+                                .child(page.description().to_string()),
+                        )
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.active_page_id = page_id_owned.clone();
+                                if page_id_owned.as_str() == "global.modules" {
+                                    this.reload_modules();
+                                }
+                                this.sync_settings_hub_expanded_from_active_page();
+                                cx.notify();
+                            }),
+                        )
+                        .into_any_element(),
+                )
+            })
+            .collect();
+
         div()
             .w_full()
-            .p_6()
             .flex()
             .flex_col()
-            .items_center()
-            .gap_3()
-            .py_16()
+            .gap_6()
+            .items_start()
             .child(
                 div()
-                    .text_3xl()
-                    .font_weight(FontWeight::BOLD)
-                    .child(self.title.clone()),
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_3xl()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(p.content_title)
+                            .child(hub.map(|h| h.title().to_string()).unwrap_or_else(|| "Settings".into())),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(p.content_meta)
+                            .child(
+                                hub.map(|h| h.description().to_string())
+                                    .unwrap_or_else(|| "Choose a settings area.".into()),
+                            ),
+                    ),
             )
-            .child(
+            .child(if tiles.is_empty() {
                 div()
-                    .text_2xl()
-                    .text_color(if is_dark {
-                        rgb(0xe5e7eb)
-                    } else {
-                        rgb(0x1f2937)
-                    })
-                    .child(active_page.map_or_else(|| "Page".to_string(), |page| page.title().to_string())),
-            )
-            .child(
+                    .text_sm()
+                    .text_color(p.content_meta)
+                    .child("No settings pages are available right now.")
+                    .into_any_element()
+            } else {
                 div()
-                    .text_base()
-                    .text_color(if is_dark {
-                        rgb(0x9ca3af)
-                    } else {
-                        rgb(0x6b7280)
-                    })
-                    .child(active_page.map_or_else(
-                        || "Page definition not found.".to_string(),
-                        |page| page.description().to_string(),
-                    )),
-            )
+                    .flex()
+                    .flex_row()
+                    .flex_wrap()
+                    .gap_4()
+                    .children(tiles)
+                    .into_any_element()
+            })
     }
 
     pub fn is_page_visible(&self, page_id: &str) -> bool {
-        let Some(page) = self.page_ref(page_id) else {
-            return false;
-        };
-        match page.required_module() {
-            Some(module_name) => self.is_module_enabled(module_name),
-            None => true,
+        if let Some(remote) = &self.remote_nav {
+            return navigation::is_page_visible_in_owned(remote, page_id, |name| {
+                self.is_module_enabled(name)
+            });
         }
+        navigation::is_page_visible_with(page_id, |name| self.is_module_enabled(name))
     }
 
     pub fn active_page_if_visible(&self) -> Option<NavPageRef<'_>> {

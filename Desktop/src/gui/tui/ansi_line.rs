@@ -1,6 +1,6 @@
 //! Parse ANSI SGR sequences in plain strings for shell transcript rendering.
 
-use openframe::{div, px, rgb, Div, FontWeight, ParentElement, Rgba, Styled};
+use openframe::{div, px, Div, FontWeight, ParentElement, Rgba, Styled};
 
 /// Must match `shell/execute.rs` `CHAR_W` / `CHAR_H` (PTY ↔ transcript cell grid).
 const MONO_CELL_W: f32 = 8.4;
@@ -214,11 +214,7 @@ fn parse_ansi_runs(line: &str, default_fg: Rgba, is_dark: bool) -> Vec<Run> {
 }
 
 pub(crate) fn shell_history_line(line: &str, is_dark: bool) -> Div {
-    let default_fg = if is_dark {
-        rgb(0xe5e7eb)
-    } else {
-        rgb(0x1f2937)
-    };
+    let default_fg = colors::default_fg(is_dark);
 
     let runs = parse_ansi_runs(line, default_fg, is_dark);
     if runs.is_empty() {

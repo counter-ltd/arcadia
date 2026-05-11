@@ -1,4 +1,6 @@
+pub mod appearance;
 pub mod commandline;
+pub mod extension_tokens;
 pub mod late;
 pub mod modules;
 pub mod thin_client;

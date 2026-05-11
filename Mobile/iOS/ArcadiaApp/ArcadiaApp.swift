@@ -1,22 +1,17 @@
-import SwiftUI
+import UIKit
 
 @main
-struct ArcadiaApp: App {
-    init() {
-        let fm = FileManager.default
-        if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let configRoot = appSupport
-                .appendingPathComponent("Arcadia", isDirectory: true)
-                .appendingPathComponent("Configuration", isDirectory: true)
-            try? fm.createDirectory(at: configRoot, withIntermediateDirectories: true)
-            setConfigRootPath(path: configRoot.path)
-        }
-        setLocalHostname(name: ProcessInfo.processInfo.hostName)
-    }
+class ArcadiaAppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
 
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = MetalHostViewController()
+        window.makeKeyAndVisible()
+        self.window = window
+        return true
     }
 }

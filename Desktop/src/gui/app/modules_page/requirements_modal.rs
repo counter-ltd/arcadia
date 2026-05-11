@@ -1,8 +1,9 @@
-use openframe::{div, rgb};
-use openframe::{Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
-use crate::cli;
+use arcadia_core::config::ConfigFile;
+use arcadia_core::config::modules::ModulesConfig;
 use crate::gui::app::ArcadiaRoot;
+use crate::gui::theme;
 
 impl ArcadiaRoot {
     pub fn requirements_modal(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
@@ -44,10 +45,10 @@ impl ArcadiaRoot {
                         div()
                             .w_128()
                             .p_5()
-                            .rounded_lg()
-                            .bg(if is_dark { rgb(0x111827) } else { rgb(0xffffff) })
+                            .rounded(px(theme::ui_radius(cx)))
+                            .bg(theme::ui_surface(cx, is_dark))
                             .border_1()
-                            .border_color(if is_dark { rgb(0x374151) } else { rgb(0xe2e8f0) })
+                            .border_color(theme::ui_border(cx, is_dark))
                             .flex()
                             .flex_col()
                             .gap_3()
@@ -55,13 +56,13 @@ impl ArcadiaRoot {
                                 div()
                                     .text_lg()
                                     .font_weight(openframe::FontWeight::BOLD)
-                                    .text_color(if is_dark { rgb(0xf9fafb) } else { rgb(0x111827) })
+                                    .text_color(theme::ui_text(cx, is_dark))
                                     .child("Enable with requirements?"),
                             )
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(if is_dark { rgb(0xd1d5db) } else { rgb(0x374151) })
+                                    .text_color(theme::ui_subtext(cx, is_dark))
                                     .child(format!(
                                         "To enable {module_name}, Arcadia needs to enable: {requirements}."
                                     )),
@@ -75,10 +76,10 @@ impl ArcadiaRoot {
                                         div()
                                             .px_3()
                                             .py_2()
-                                            .rounded_md()
+                                            .rounded(px(theme::ui_radius(cx)))
                                             .cursor_pointer()
-                                            .bg(if is_dark { rgb(0x374151) } else { rgb(0xe5e7eb) })
-                                            .text_color(if is_dark { rgb(0xf3f4f6) } else { rgb(0x1f2937) })
+                                            .bg(theme::ui_surface2(cx, is_dark))
+                                            .text_color(theme::ui_text(cx, is_dark))
                                             .child("Cancel")
                                             .on_mouse_down(
                                                 openframe::MouseButton::Left,
@@ -92,10 +93,10 @@ impl ArcadiaRoot {
                                         div()
                                             .px_3()
                                             .py_2()
-                                            .rounded_md()
+                                            .rounded(px(theme::ui_radius(cx)))
                                             .cursor_pointer()
-                                            .bg(rgb(0xdbeafe))
-                                            .text_color(rgb(0x1d4ed8))
+                                            .bg(theme::ui_accent(cx))
+                                            .text_color(theme::ui_accent_fg(cx))
                                             .child("Enable")
                                             .on_mouse_down(
                                                 openframe::MouseButton::Left,
@@ -103,9 +104,10 @@ impl ArcadiaRoot {
                                                     if let Some((module_name, _)) =
                                                         this.pending_module_enable.clone()
                                                     {
-                                                        let _ = cli::handle(&format!(
-                                                            "module {module_name} enable -requirements"
-                                                        ));
+                                                        if let Ok(mut cfg) = ModulesConfig::load_or_create() {
+                                                            let _ = cfg.enable_with_requirements(&module_name);
+                                                            let _ = cfg.save();
+                                                        }
                                                         this.reload_modules();
                                                     }
                                                     this.pending_module_enable = None;

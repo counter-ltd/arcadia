@@ -1,7 +1,12 @@
-use openframe::{div, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::prelude::FluentBuilder as _;
 
-use crate::gui::app::{ArcadiaRoot, ShellMode};
-use crate::gui::theme;
+use arcadia_core::modules;
+
+use crate::gui::app::ArcadiaRoot;
+#[cfg(feature = "gui")]
+use crate::gui::app::ShellMode;
+use crate::gui::theme::{self};
 
 const LATE_ROOMS: &[(&str, u32)] = &[("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)];
 
@@ -13,15 +18,24 @@ impl ArcadiaRoot {
         active_page_glyph: openframe::SharedString,
         is_dark: bool,
     ) -> impl IntoElement {
+        let glyph = theme::glyph_snapshot(cx);
+        let is_glyph    = glyph.is_some();
+        let glyph_border = glyph.as_ref().map(|g| g.border);
+        let title_color  = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| if is_dark { rgb(0xe5e7eb) } else { rgb(0x1f2937) });
+        let action_pill_bg = theme::action_pill_bg(cx, is_dark);
+        let action_pill_tc = theme::action_pill_text(cx, is_dark);
+        let action_pill_hover = theme::action_pill_hover_bg(cx, is_dark);
+        let shell_mode_generic_bg = theme::ui_surface(cx, is_dark);
+        let shell_mode_alt_bg = theme::ui_surface2(cx, is_dark);
+        let shell_mode_generic_fg = theme::ui_accent(cx);
+        let shell_mode_alt_fg = theme::ui_subtext(cx, is_dark);
+        let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(6.0);
         div()
             .w_full()
             .px_3()
             .py_2()
-            .border_b_1()
-            .border_color(if is_dark {
-                rgb(0x2a3340)
-            } else {
-                rgb(0xe6e8ef)
+            .when(!is_glyph, |d| {
+                d.border_b_1().border_color(if is_dark { rgb(0x2a3340) } else { rgb(0xe6e8ef) })
             })
             .child(
                 div()
@@ -34,18 +48,43 @@ impl ArcadiaRoot {
                             .flex()
                             .items_center()
                             .gap_3()
-                            .child(Self::sidebar_toggle_button(cx, active_page_glyph.as_ref(), is_dark))
+                            .child(Self::sidebar_toggle_button(cx, active_page_glyph.as_ref(), is_dark, glyph))
                             .child(
                                 div()
                                     .text_sm()
                                     .font_weight(openframe::FontWeight::SEMIBOLD)
-                                    .text_color(if is_dark {
-                                        rgb(0xe5e7eb)
-                                    } else {
-                                        rgb(0x1f2937)
-                                    })
+                                    .text_color(title_color)
                                     .child(active_page_title),
                             )
+                            .child({
+                                if self.active_page_id.as_str() == "python.settings" {
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded(px(radius))
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .bg(action_pill_bg)
+                                        .text_color(action_pill_tc)
+                                        .hover(move |style| style.bg(action_pill_hover))
+                                        .child("Reload Extensions")
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, _, _, cx| {
+                                                let ctx = this.execution_context();
+                                                let _ = modules::execute_command(
+                                                    "python-host.reload",
+                                                    &[],
+                                                    &ctx,
+                                                );
+                                                this.reload_python_extensions(cx);
+                                                cx.notify();
+                                            }),
+                                        )
+                                } else {
+                                    div()
+                                }
+                            })
                             .child(if self.active_page_id.as_str() == "late.now_playing" {
                                 div()
                                     .flex()
@@ -58,22 +97,22 @@ impl ArcadiaRoot {
                                             .cursor_pointer()
                                             .px_2()
                                             .py_0p5()
-                                            .rounded_md()
+                                            .rounded(px(radius))
                                             .text_xs()
                                             .font_weight(openframe::FontWeight::SEMIBOLD)
                                             .bg(if is_active {
                                                 if is_dark { rgb(0x0d9488) } else { rgb(0x99f6e4) }
                                             } else {
-                                                theme::top_bar_pill_bg(is_dark)
+                                                action_pill_bg
                                             })
                                             .text_color(if is_active {
                                                 if is_dark { rgb(0xf0fdfa) } else { rgb(0x134e4a) }
                                             } else {
-                                                theme::top_bar_pill_text(is_dark)
+                                                action_pill_tc
                                             })
                                             .hover(move |style| {
                                                 if !is_active {
-                                                    style.bg(theme::top_bar_pill_hover_bg(is_dark))
+                                                    style.bg(action_pill_hover)
                                                 } else {
                                                     style
                                                 }
@@ -93,104 +132,110 @@ impl ArcadiaRoot {
                             } else {
                                 div()
                             })
-                            .child(if self.active_page_id.as_str() == "utility.shell" {
-                                div()
-                                    .px_2()
-                                    .py_0p5()
-                                    .rounded_md()
-                                    .text_xs()
-                                    .bg(if self.active_terminal().shell_mode == ShellMode::Generic {
-                                        if is_dark {
-                                            rgb(0x1e3a5f)
-                                        } else {
-                                            rgb(0xdbeafe)
-                                        }
-                                    } else {
-                                        if is_dark {
-                                            rgb(0x422006)
-                                        } else {
-                                            rgb(0xffedd5)
-                                        }
-                                    })
-                                    .text_color(if self.active_terminal().shell_mode == ShellMode::Generic {
-                                        if is_dark {
-                                            rgb(0x93c5fd)
-                                        } else {
-                                            rgb(0x1d4ed8)
-                                        }
-                                    } else {
-                                        if is_dark {
-                                            rgb(0xfdba74)
-                                        } else {
-                                            rgb(0xc2410c)
-                                        }
-                                    })
-                                    .child(self.active_terminal().shell_mode.label())
-                            } else {
-                                div()
-                            })
-                            .child(
-                                if self.active_page_id.as_str() == "utility.shell"
-                                    && self.active_terminal().shell_mode == ShellMode::Generic
+                            .child({
+                                #[cfg(feature = "gui")]
                                 {
-                                    div()
-                                        .px_2()
-                                        .py_0p5()
-                                        .rounded_md()
-                                        .text_xs()
-                                        .bg(theme::top_bar_pill_bg(is_dark))
-                                        .text_color(theme::top_bar_pill_text(is_dark))
-                                        .child(self.shell_working_directory_label())
-                                } else {
-                                    div().hidden()
-                                },
-                            )
-                            .child(if self.active_page_id.as_str() == "utility.shell" {
-                                div()
-                                    .px_2()
-                                    .py_0p5()
-                                    .rounded_md()
-                                    .cursor_pointer()
-                                    .text_xs()
-                                    .bg(theme::top_bar_pill_bg(is_dark))
-                                    .text_color(theme::top_bar_pill_text(is_dark))
-                                    .hover(move |style| {
-                                        style.bg(theme::top_bar_pill_hover_bg(is_dark))
-                                    })
-                                    .child("Reset")
-                                    .on_mouse_down(
-                                        openframe::MouseButton::Left,
-                                        cx.listener(|this, _, _, cx| {
-                                            this.reset_shell_state();
-                                            cx.notify();
-                                        }),
-                                    )
-                            } else {
-                                div()
+                                    if self.active_page_id.as_str() == "utility.shell" {
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .rounded(px(radius))
+                                            .text_xs()
+                                            .bg(if self.active_terminal().shell_mode == ShellMode::Generic {
+                                                shell_mode_generic_bg
+                                            } else {
+                                                shell_mode_alt_bg
+                                            })
+                                            .text_color(if self.active_terminal().shell_mode == ShellMode::Generic {
+                                                shell_mode_generic_fg
+                                            } else {
+                                                shell_mode_alt_fg
+                                            })
+                                            .child(self.active_terminal().shell_mode.label())
+                                    } else {
+                                        div()
+                                    }
+                                }
+                                #[cfg(not(feature = "gui"))]
+                                { div() }
                             })
-                            .child(if self.active_page_id.as_str() == "utility.shell" {
-                                div()
-                                    .px_2()
-                                    .py_0p5()
-                                    .rounded_md()
-                                    .cursor_pointer()
-                                    .text_xs()
-                                    .bg(theme::top_bar_pill_bg(is_dark))
-                                    .text_color(theme::top_bar_pill_text(is_dark))
-                                    .hover(move |style| {
-                                        style.bg(theme::top_bar_pill_hover_bg(is_dark))
-                                    })
-                                    .child("Clear")
-                                    .on_mouse_down(
-                                        openframe::MouseButton::Left,
-                                        cx.listener(|this, _, _, cx| {
-                                            this.active_terminal_mut().shell_history.clear();
-                                            this.active_terminal_mut().shell_output_scroll.scroll_to_bottom();
-                                            cx.notify();
-                                        }),
-                                    )
-                            } else {
-                                div()
+                            .child({
+                                #[cfg(feature = "gui")]
+                                {
+                                    if self.active_page_id.as_str() == "utility.shell"
+                                        && self.active_terminal().shell_mode == ShellMode::Generic
+                                    {
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .rounded(px(radius))
+                                            .text_xs()
+                                            .bg(action_pill_bg)
+                                            .text_color(action_pill_tc)
+                                            .child(self.shell_working_directory_label())
+                                    } else {
+                                        div().hidden()
+                                    }
+                                }
+                                #[cfg(not(feature = "gui"))]
+                                { div() }
+                            })
+                            .child({
+                                #[cfg(feature = "gui")]
+                                {
+                                    if self.active_page_id.as_str() == "utility.shell" {
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .rounded(px(radius))
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .bg(action_pill_bg)
+                                            .text_color(action_pill_tc)
+                                            .hover(move |style| style.bg(action_pill_hover))
+                                            .child("Reset")
+                                            .on_mouse_down(
+                                                openframe::MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.reset_shell_state();
+                                                    cx.notify();
+                                                }),
+                                            )
+                                    } else {
+                                        div()
+                                    }
+                                }
+                                #[cfg(not(feature = "gui"))]
+                                { div() }
+                            })
+                            .child({
+                                #[cfg(feature = "gui")]
+                                {
+                                    if self.active_page_id.as_str() == "utility.shell" {
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .rounded(px(radius))
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .bg(action_pill_bg)
+                                            .text_color(action_pill_tc)
+                                            .hover(move |style| style.bg(action_pill_hover))
+                                            .child("Clear")
+                                            .on_mouse_down(
+                                                openframe::MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.active_terminal_mut().shell_history.clear();
+                                                    this.active_terminal_mut().shell_output_scroll.scroll_to_bottom();
+                                                    cx.notify();
+                                                }),
+                                            )
+                                    } else {
+                                        div()
+                                    }
+                                }
+                                #[cfg(not(feature = "gui"))]
+                                { div() }
                             }),
                     )
                     .child(
@@ -212,10 +257,22 @@ impl ArcadiaRoot {
                                         self.active_page_id.as_str() == page.id(),
                                         is_dark,
                                         page.accent().to_string(),
+                                        glyph,
                                     ))
                                 },
                             )),
                     ),
             )
+            .when_some(glyph_border, |d, border| {
+                d.child(
+                    div()
+                        .w_full()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_xs()
+                        .text_color(border)
+                        .child("─".repeat(300)),
+                )
+            })
     }
 }

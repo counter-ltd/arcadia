@@ -8,50 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		A00000000000000000000010 /* ArcadiaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* ArcadiaApp.swift */; };
-		A00000000000000000000011 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* ContentView.swift */; };
-		A00000000000000000000012 /* arcadia_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* arcadia_core.swift */; };
-		A00000000000000000000013 /* ArcadiaCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* ArcadiaCore.xcframework */; };
 		A00000000000000000000014 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* Assets.xcassets */; };
-		A00000000000000000000090 /* NavigationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000080 /* NavigationModels.swift */; };
-		A00000000000000000000091 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000081 /* AppTheme.swift */; };
-		A00000000000000000000092 /* GlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000082 /* GlassComponents.swift */; };
-		A00000000000000000000093 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000083 /* SidebarView.swift */; };
-		A00000000000000000000094 /* ShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000084 /* ShellView.swift */; };
-		A00000000000000000000095 /* ModulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000085 /* ModulesView.swift */; };
-		A00000000000000000000096 /* ContentView+Layout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000086 /* ContentView+Layout.swift */; };
-		A00000000000000000000097 /* ContentView+NavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000087 /* ContentView+NavigationState.swift */; };
-		A00000000000000000000098 /* ContentView+Actions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000088 /* ContentView+Actions.swift */; };
-		A00000000000000000000099 /* ContentView+Registry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000089 /* ContentView+Registry.swift */; };
-		A00000000000000000000101 /* SplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000100 /* SplashView.swift */; };
-		A00000000000000000000103 /* ModuleNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000102 /* ModuleNames.swift */; };
-		A00000000000000000000105 /* LanNodesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000104 /* LanNodesView.swift */; };
-		A00000000000000000000107 /* NetworkOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000106 /* NetworkOverviewView.swift */; };
-		A00000000000000000000109 /* LateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000108 /* LateView.swift */; };
+		A00000000000000000000120 /* MetalHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000119 /* MetalHostView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A00000000000000000000000 /* ArcadiaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArcadiaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000001 /* ArcadiaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArcadiaApp.swift; sourceTree = "<group>"; };
-		A00000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A00000000000000000000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A00000000000000000000005 /* arcadia_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArcadiaCore/Generated/arcadia_core.swift; sourceTree = SOURCE_ROOT; };
-		A00000000000000000000006 /* ArcadiaCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = ArcadiaCore/ArcadiaCore.xcframework; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A00000000000000000000080 /* NavigationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationModels.swift; sourceTree = "<group>"; };
-		A00000000000000000000081 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
-		A00000000000000000000082 /* GlassComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassComponents.swift; sourceTree = "<group>"; };
-		A00000000000000000000083 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
-		A00000000000000000000084 /* ShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellView.swift; sourceTree = "<group>"; };
-		A00000000000000000000085 /* ModulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulesView.swift; sourceTree = "<group>"; };
-		A00000000000000000000086 /* ContentView+Layout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Layout.swift"; sourceTree = "<group>"; };
-		A00000000000000000000087 /* ContentView+NavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+NavigationState.swift"; sourceTree = "<group>"; };
-		A00000000000000000000088 /* ContentView+Actions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Actions.swift"; sourceTree = "<group>"; };
-		A00000000000000000000089 /* ContentView+Registry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Registry.swift"; sourceTree = "<group>"; };
-		A00000000000000000000100 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
-		A00000000000000000000102 /* ModuleNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleNames.swift; sourceTree = "<group>"; };
-		A00000000000000000000104 /* LanNodesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanNodesView.swift; sourceTree = "<group>"; };
-		A00000000000000000000106 /* NetworkOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkOverviewView.swift; sourceTree = "<group>"; };
-		A00000000000000000000108 /* LateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LateView.swift; sourceTree = "<group>"; };
+		A00000000000000000000119 /* MetalHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalHostView.swift; sourceTree = "<group>"; };
+		A00000000000000000000121 /* ArcadiaBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcadiaBridge.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,7 +26,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00000000000000000000013 /* ArcadiaCore.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,36 +44,12 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000001 /* ArcadiaApp.swift */,
-				A00000000000000000000002 /* ContentView.swift */,
-				A00000000000000000000086 /* ContentView+Layout.swift */,
-				A00000000000000000000087 /* ContentView+NavigationState.swift */,
-				A00000000000000000000088 /* ContentView+Actions.swift */,
-				A00000000000000000000089 /* ContentView+Registry.swift */,
-				A00000000000000000000100 /* SplashView.swift */,
-				A00000000000000000000102 /* ModuleNames.swift */,
-				A00000000000000000000080 /* NavigationModels.swift */,
-				A00000000000000000000081 /* AppTheme.swift */,
-				A00000000000000000000082 /* GlassComponents.swift */,
-				A00000000000000000000083 /* SidebarView.swift */,
-				A00000000000000000000084 /* ShellView.swift */,
-				A00000000000000000000085 /* ModulesView.swift */,
-				A00000000000000000000104 /* LanNodesView.swift */,
-				A00000000000000000000106 /* NetworkOverviewView.swift */,
-				A00000000000000000000108 /* LateView.swift */,
+				A00000000000000000000119 /* MetalHostView.swift */,
+				A00000000000000000000121 /* ArcadiaBridge.h */,
 				A00000000000000000000004 /* Info.plist */,
 				A00000000000000000000007 /* Assets.xcassets */,
-				A00000000000000000000033 /* ArcadiaCore */,
 			);
 			path = ArcadiaApp;
-			sourceTree = "<group>";
-		};
-		A00000000000000000000033 /* ArcadiaCore */ = {
-			isa = PBXGroup;
-			children = (
-				A00000000000000000000005 /* arcadia_core.swift */,
-				A00000000000000000000006 /* ArcadiaCore.xcframework */,
-			);
-			path = ArcadiaCore;
 			sourceTree = "<group>";
 		};
 		A00000000000000000000032 /* Products */ = {
@@ -125,6 +67,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A00000000000000000000050 /* Build configuration list for PBXNativeTarget "ArcadiaApp" */;
 			buildPhases = (
+				A00000000000000000000023 /* Build Rust (cargo) */,
 				A00000000000000000000021 /* Sources */,
 				A00000000000000000000020 /* Frameworks */,
 				A00000000000000000000022 /* Resources */,
@@ -183,29 +126,35 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		A00000000000000000000023 /* Build Rust (cargo) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust (cargo)";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(CARGO_LIB_OUT)/libarcadia_ios.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\n\nexport PATH=\"$HOME/.cargo/bin:$PATH\"\n\nREPO_ROOT=\"$(cd \"$SRCROOT/../..\" && pwd)\"\n\nif [[ \"$PLATFORM_NAME\" == *simulator* ]]; then\n  CARGO_TARGET=\"aarch64-apple-ios-sim\"\nelse\n  CARGO_TARGET=\"aarch64-apple-ios\"\nfi\n\nif [[ \"$CONFIGURATION\" == \"Release\" ]]; then\n  PROFILE=\"--release\"\n  PROFILE_DIR=\"release\"\nelse\n  PROFILE=\"\"\n  PROFILE_DIR=\"debug\"\nfi\n\ncargo build \\\n  -p arcadia \\\n  --manifest-path \"$REPO_ROOT/Desktop/Cargo.toml\" \\\n  --target \"$CARGO_TARGET\" \\\n  --features ios-gui \\\n  --lib \\\n  $PROFILE\n\nLIB_PATH=\"$REPO_ROOT/Desktop/target/$CARGO_TARGET/$PROFILE_DIR/libarcadia_ios.a\"\necho \"CARGO_LIB_OUT=$REPO_ROOT/Desktop/target/$CARGO_TARGET/$PROFILE_DIR\" >> \"$SCRIPT_OUTPUT_FILE_0\" 2>/dev/null || true\ncp \"$LIB_PATH\" \"$BUILT_PRODUCTS_DIR/libarcadia_ios.a\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		A00000000000000000000021 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000010 /* ArcadiaApp.swift in Sources */,
-				A00000000000000000000011 /* ContentView.swift in Sources */,
-				A00000000000000000000096 /* ContentView+Layout.swift in Sources */,
-				A00000000000000000000097 /* ContentView+NavigationState.swift in Sources */,
-				A00000000000000000000098 /* ContentView+Actions.swift in Sources */,
-				A00000000000000000000099 /* ContentView+Registry.swift in Sources */,
-				A00000000000000000000101 /* SplashView.swift in Sources */,
-				A00000000000000000000103 /* ModuleNames.swift in Sources */,
-				A00000000000000000000012 /* arcadia_core.swift in Sources */,
-				A00000000000000000000090 /* NavigationModels.swift in Sources */,
-				A00000000000000000000091 /* AppTheme.swift in Sources */,
-				A00000000000000000000092 /* GlassComponents.swift in Sources */,
-				A00000000000000000000093 /* SidebarView.swift in Sources */,
-				A00000000000000000000094 /* ShellView.swift in Sources */,
-				A00000000000000000000095 /* ModulesView.swift in Sources */,
-				A00000000000000000000105 /* LanNodesView.swift in Sources */,
-				A00000000000000000000107 /* NetworkOverviewView.swift in Sources */,
-				A00000000000000000000109 /* LateView.swift in Sources */,
+				A00000000000000000000120 /* MetalHostView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -223,32 +172,34 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 8248296AJX;
-				ENABLE_PREVIEWS = YES;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/ArcadiaCore",
-				);
+				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/ArcadiaCore/Generated",
+					"$(SRCROOT)/ArcadiaApp",
 				);
-				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ArcadiaApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-larcadia_ios",
+					"-framework Metal",
+					"-framework QuartzCore",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.stacknode.arcadia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/ArcadiaCore/Generated",
-				);
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = ArcadiaApp/ArcadiaBridge.h;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -265,31 +216,34 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8248296AJX;
 				ENABLE_NS_ASSERTIONS = NO;
-				FRAMEWORK_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/ArcadiaCore",
-				);
+				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/ArcadiaCore/Generated",
+					"$(SRCROOT)/ArcadiaApp",
 				);
-				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ArcadiaApp/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-larcadia_ios",
+					"-framework Metal",
+					"-framework QuartzCore",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.stacknode.arcadia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
-				SWIFT_INCLUDE_PATHS = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/ArcadiaCore/Generated",
-				);
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = ArcadiaApp/ArcadiaBridge.h;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -317,6 +271,7 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
 	};
 	rootObject = A00000000000000000000060 /* Project object */;
 }

@@ -1,5 +1,9 @@
 use openframe::Rgba;
 
+/// Max width for glyph-style `GlyphBorder` panels (modules, Python extensions). Keeps box-drawing
+/// borders at a scale where corners read cleanly instead of stretching edge-to-edge on wide windows.
+pub const GLYPH_PANEL_CONTENT_MAX_W_PX: f32 = 768.;
+
 pub fn module_panel_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
