@@ -52,15 +52,28 @@ pub struct ExtensionTokensFile {
     pub tokens: HashMap<String, Value>,
 }
 
-pub fn load_module_tokens(module: &str) -> io::Result<HashMap<String, Value>> {
-    let path = tokens_file_for_module(module)?;
-    if !path.exists() {
-        return Ok(HashMap::new());
-    }
-    let raw = fs::read_to_string(&path)?;
+fn load_tokens_file(path: &PathBuf) -> io::Result<HashMap<String, Value>> {
+    let raw = fs::read_to_string(path)?;
     let file: ExtensionTokensFile =
         toml::from_str(&raw).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     Ok(file.tokens)
+}
+
+pub fn load_module_tokens(module: &str) -> io::Result<HashMap<String, Value>> {
+    let path = tokens_file_for_module(module)?;
+    if path.exists() {
+        return load_tokens_file(&path);
+    }
+    // Legacy token files before `shell-theme` (`flux-theme`, `terminal-theme`).
+    if module == "shell-theme" {
+        for legacy in ["flux-theme", "terminal-theme"] {
+            let p = tokens_file_for_module(legacy)?;
+            if p.exists() {
+                return load_tokens_file(&p);
+            }
+        }
+    }
+    Ok(HashMap::new())
 }
 
 pub fn save_module_tokens(module: &str, tokens: &HashMap<String, Value>) -> io::Result<()> {

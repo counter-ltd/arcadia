@@ -10,6 +10,7 @@ build/
 .DS_Store
 .claude/
 .cursor/
+.windsurf/
 
 # SwiftPM / local launcher build output (not source)
 Launchers/Development/OSX/.build/

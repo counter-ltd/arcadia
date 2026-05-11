@@ -70,7 +70,7 @@ pub struct StyleInfo {
     pub glyph: Option<GlyphParams>,
     /// Optional light-mode glyph params for mode-specific alternates.
     pub glyph_light: Option<GlyphParams>,
-    /// Owning Python extension module id (e.g. `tui-style`) for token files + overrides.
+    /// Owning Python extension module id (e.g. `shell-theme`) for token files + overrides.
     pub module_name: Option<String>,
 }
 
