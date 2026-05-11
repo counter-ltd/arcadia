@@ -1,6 +1,8 @@
 use arcadia_core::config::modules::REMOTE_SESSION_MODULE_NAME;
 use arcadia_core::navigation;
+#[cfg(not(feature = "gui"))]
 use arcadia_core::config::thin_client::ThinClientConfig;
+#[cfg(not(feature = "gui"))]
 use arcadia_core::modules::lan::connected_approved_session_peers;
 use openframe::{
     div, img, px, rgb, AnyElement, Context, Div, IntoElement, InteractiveElement, ParentElement,
@@ -58,9 +60,17 @@ impl ArcadiaRoot {
                             .gap_2()
                             .on_mouse_down(
                                 openframe::MouseButton::Right,
-                                cx.listener(|this, _, _, cx| {
+                                cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
                                     this.session_route_menu_open = false;
                                     this.app_menu_open = true;
+                                    #[cfg(feature = "gui")]
+                                    {
+                                        this.terminal_context_menu_open = false;
+                                        this.terminal_kill_menu = None;
+                                        this.context_menu_position = event.position;
+                                    }
+                                    #[cfg(not(feature = "gui"))]
+                                    let _ = event;
                                     cx.notify();
                                 }),
                             )
@@ -107,7 +117,6 @@ impl ArcadiaRoot {
                                                 .child("local"),
                                         )
                                 } else {
-                                    let peers = connected_approved_session_peers();
                                     div()
                                         .relative()
                                         .ml_2()
@@ -139,161 +148,237 @@ impl ArcadiaRoot {
                                                 )
                                                 .on_mouse_down(
                                                     openframe::MouseButton::Left,
-                                                    cx.listener(|this, _, _, cx| {
+                                                    cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
                                                         cx.stop_propagation();
-                                                        this.session_route_menu_open =
-                                                            !this.session_route_menu_open;
+                                                        let opening = !this.session_route_menu_open;
+                                                        this.session_route_menu_open = opening;
+                                                        #[cfg(feature = "gui")]
+                                                        if opening {
+                                                            this.terminal_context_menu_open = false;
+                                                            this.terminal_kill_menu = None;
+                                                            this.session_route_menu_position =
+                                                                event.position;
+                                                        }
+                                                        #[cfg(not(feature = "gui"))]
+                                                        let _ = event;
                                                         this.app_menu_open = false;
                                                         cx.notify();
                                                     }),
                                                 ),
                                         )
-                                        .child(if self.session_route_menu_open {
-                                            div()
-                                                .absolute()
-                                                .top(px(30.))
-                                                .left(px(0.))
-                                                .min_w(px(200.))
-                                                .p_1()
-                                                .rounded(px(radius))
-                                                .border_1()
-                                                .border_color(if is_dark {
-                                                    rgb(0x374151)
-                                                } else {
-                                                    rgb(0xd1d5db)
-                                                })
-                                                .bg(if is_dark {
-                                                    rgb(0x111827)
-                                                } else {
-                                                    rgb(0xffffff)
-                                                })
-                                                .child(
+                                        .child({
+                                            #[cfg(feature = "gui")]
+                                            {
+                                                div().hidden()
+                                            }
+                                            #[cfg(not(feature = "gui"))]
+                                            {
+                                                let peers = connected_approved_session_peers();
+                                                if self.session_route_menu_open {
                                                     div()
-                                                        .w_full()
-                                                        .px_2()
-                                                        .py_1()
+                                                        .absolute()
+                                                        .top(px(30.))
+                                                        .left(px(0.))
+                                                        .min_w(px(200.))
+                                                        .p_1()
                                                         .rounded(px(radius))
-                                                        .cursor_pointer()
-                                                        .text_sm()
-                                                        .text_color(if is_dark {
-                                                            rgb(0xe5e7eb)
+                                                        .border_1()
+                                                        .border_color(if is_dark {
+                                                            rgb(0x374151)
                                                         } else {
-                                                            rgb(0x1f2937)
+                                                            rgb(0xd1d5db)
                                                         })
-                                                        .hover(move |style| {
-                                                            style.bg(if is_dark {
-                                                                rgb(0x1f2937)
-                                                            } else {
-                                                                rgb(0xf3f4f6)
-                                                            })
+                                                        .bg(if is_dark {
+                                                            rgb(0x111827)
+                                                        } else {
+                                                            rgb(0xffffff)
                                                         })
-                                                        .child("Local")
-                                                        .on_mouse_down(
-                                                            openframe::MouseButton::Left,
-                                                            cx.listener(|this, _, _, cx| {
-                                                                let _ = ThinClientConfig::set_preferred_remote_route(None);
-                                                                this.remote_route = None;
-                                                                this.session_route_menu_open = false;
-                                                                this.reload_modules();
-                                                                cx.notify();
-                                                            }),
-                                                        ),
-                                                )
-                                                .children(peers.into_iter().map(
-                                                    |(ip, hostname)| {
-                                                        let route = format!("lan:{ip}");
-                                                        let label = format!("{hostname} ({ip})");
-                                                        div()
-                                                            .w_full()
-                                                            .px_2()
-                                                            .py_1()
-                                                            .rounded(px(radius))
-                                                            .cursor_pointer()
-                                                            .text_sm()
-                                                            .text_color(if is_dark {
-                                                                rgb(0xe5e7eb)
-                                                            } else {
-                                                                rgb(0x1f2937)
-                                                            })
-                                                            .hover(move |style| {
-                                                                style.bg(if is_dark {
-                                                                    rgb(0x1f2937)
+                                                        .child(
+                                                            div()
+                                                                .w_full()
+                                                                .px_2()
+                                                                .py_1()
+                                                                .rounded(px(radius))
+                                                                .cursor_pointer()
+                                                                .text_sm()
+                                                                .text_color(if is_dark {
+                                                                    rgb(0xe5e7eb)
                                                                 } else {
-                                                                    rgb(0xf3f4f6)
+                                                                    rgb(0x1f2937)
                                                                 })
-                                                            })
-                                                            .child(label)
-                                                            .on_mouse_down(
-                                                                openframe::MouseButton::Left,
-                                                                cx.listener(move |this, _, _, cx| {
-                                                                    let _ = ThinClientConfig::set_preferred_remote_route(Some(&route));
-                                                                    this.remote_route =
-                                                                        Some(route.clone());
-                                                                    this.session_route_menu_open =
-                                                                        false;
-                                                                    this.reload_modules();
-                                                                    cx.notify();
-                                                                }),
-                                                            )
-                                                    },
-                                                ))
-                                        } else {
-                                            div().hidden()
+                                                                .hover(move |style| {
+                                                                    style.bg(if is_dark {
+                                                                        rgb(0x1f2937)
+                                                                    } else {
+                                                                        rgb(0xf3f4f6)
+                                                                    })
+                                                                })
+                                                                .child("Local")
+                                                                .on_mouse_down(
+                                                                    openframe::MouseButton::Left,
+                                                                    cx.listener(|this, _, _, cx| {
+                                                                        let _ = ThinClientConfig::set_preferred_remote_route(None);
+                                                                        this.remote_route = None;
+                                                                        this.session_route_menu_open = false;
+                                                                        this.reload_modules();
+                                                                        cx.notify();
+                                                                    }),
+                                                                ),
+                                                        )
+                                                        .children(peers.into_iter().map(
+                                                            |(ip, hostname)| {
+                                                                let route = format!("lan:{ip}");
+                                                                let label = format!("{hostname} ({ip})");
+                                                                div()
+                                                                    .w_full()
+                                                                    .px_2()
+                                                                    .py_1()
+                                                                    .rounded(px(radius))
+                                                                    .cursor_pointer()
+                                                                    .text_sm()
+                                                                    .text_color(if is_dark {
+                                                                        rgb(0xe5e7eb)
+                                                                    } else {
+                                                                        rgb(0x1f2937)
+                                                                    })
+                                                                    .hover(move |style| {
+                                                                        style.bg(if is_dark {
+                                                                            rgb(0x1f2937)
+                                                                        } else {
+                                                                            rgb(0xf3f4f6)
+                                                                        })
+                                                                    })
+                                                                    .child(label)
+                                                                    .on_mouse_down(
+                                                                        openframe::MouseButton::Left,
+                                                                        cx.listener(move |this, _, _, cx| {
+                                                                            let _ = ThinClientConfig::set_preferred_remote_route(Some(&route));
+                                                                            this.remote_route =
+                                                                                Some(route.clone());
+                                                                            this.session_route_menu_open =
+                                                                                false;
+                                                                            this.reload_modules();
+                                                                            cx.notify();
+                                                                        }),
+                                                                    )
+                                                            },
+                                                        ))
+                                                        .into_any_element()
+                                                } else {
+                                                    div().hidden().into_any_element()
+                                                }
+                                            }
                                         })
                                 }
                             }),
                     )
-                    .child(if self.app_menu_open {
-                        div()
-                            .absolute()
-                            .top(px(40.))
-                            .left(px(0.))
-                            .w(px(112.))
-                            .p_1()
-                            .rounded(px(radius))
-                            .border_1()
-                            .border_color(if is_dark {
-                                rgb(0x374151)
-                            } else {
-                                rgb(0xd1d5db)
-                            })
-                            .bg(if is_dark {
-                                rgb(0x111827)
-                            } else {
-                                rgb(0xffffff)
-                            })
-                            .child(
+                    .child({
+                        #[cfg(feature = "gui")]
+                        {
+                            div().hidden()
+                        }
+                        #[cfg(not(feature = "gui"))]
+                        {
+                            if self.app_menu_open {
                                 div()
-                                    .w_full()
-                                    .px_2()
-                                    .py_1()
+                                    .absolute()
+                                    .top(px(40.))
+                                    .left(px(0.))
+                                    .min_w(px(128.))
+                                    .p_1()
                                     .rounded(px(radius))
-                                    .cursor_pointer()
-                                    .text_sm()
-                                    .text_color(if is_dark {
-                                        rgb(0xfca5a5)
+                                    .border_1()
+                                    .border_color(if is_dark {
+                                        rgb(0x374151)
                                     } else {
-                                        rgb(0x991b1b)
+                                        rgb(0xd1d5db)
                                     })
-                                    .hover(move |style| {
-                                        style.bg(if is_dark {
+                                    .bg(if is_dark {
+                                        rgb(0x111827)
+                                    } else {
+                                        rgb(0xffffff)
+                                    })
+                                    .child({
+                                        let logs_fg = if is_dark {
+                                            rgb(0xe5e7eb)
+                                        } else {
+                                            rgb(0x1f2937)
+                                        };
+                                        let logs_hover = if is_dark {
+                                            rgb(0x1f2937)
+                                        } else {
+                                            rgb(0xf3f4f6)
+                                        };
+                                        div()
+                                            .w_full()
+                                            .px_2()
+                                            .py_1()
+                                            .rounded(px(radius))
+                                            .cursor_pointer()
+                                            .text_sm()
+                                            .hover(move |style| style.bg(logs_hover))
+                                            .flex()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                theme::render_icon("logs")
+                                                    .size_4()
+                                                    .text_color(logs_fg),
+                                            )
+                                            .child(div().text_color(logs_fg).child("Logs"))
+                                            .on_mouse_down(
+                                                openframe::MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.active_page_id =
+                                                        arcadia_core::navigation::LOGS_PAGE_ID
+                                                            .to_string();
+                                                    this.app_menu_open = false;
+                                                    cx.notify();
+                                                }),
+                                            )
+                                    })
+                                    .child({
+                                        let quit_fg = if is_dark {
+                                            rgb(0xfca5a5)
+                                        } else {
+                                            rgb(0x991b1b)
+                                        };
+                                        let quit_hover = if is_dark {
                                             rgb(0x1f2937)
                                         } else {
                                             rgb(0xfef2f2)
-                                        })
+                                        };
+                                        div()
+                                            .w_full()
+                                            .px_2()
+                                            .py_1()
+                                            .rounded(px(radius))
+                                            .cursor_pointer()
+                                            .text_sm()
+                                            .hover(move |style| style.bg(quit_hover))
+                                            .flex()
+                                            .gap_2()
+                                            .items_center()
+                                            .child(
+                                                theme::render_icon("log-out")
+                                                    .size_4()
+                                                    .text_color(quit_fg),
+                                            )
+                                            .child(div().text_color(quit_fg).child("Quit"))
+                                            .on_mouse_down(
+                                                openframe::MouseButton::Left,
+                                                cx.listener(|this, _, _, _| {
+                                                    this.app_menu_open = false;
+                                                    #[cfg(feature = "gui")]
+                                                    this.run_internal_quit_command();
+                                                }),
+                                            )
                                     })
-                                    .child("Quit")
-                                    .on_mouse_down(
-                                        openframe::MouseButton::Left,
-                                        cx.listener(|this, _, _, _| {
-                                            this.app_menu_open = false;
-                                            #[cfg(feature = "gui")]
-                                            this.run_internal_quit_command();
-                                        }),
-                                    ),
-                            )
-                    } else {
-                        div().hidden()
+                                    .into_any_element()
+                            } else {
+                                div().hidden().into_any_element()
+                            }
+                        }
                     })
                     .child(
                         div()

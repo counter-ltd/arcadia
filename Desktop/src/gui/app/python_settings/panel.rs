@@ -36,7 +36,6 @@ impl ArcadiaRoot {
                         .text_color(p.content_meta)
                         .child("Drop a .py file or a folder with main.py into ~/Arcadia/Extensions/ and reload."),
                 )
-                .child(Self::python_reload_button(cx, p.accent, p.on_accent, panel_radius))
         } else {
             div()
                 .flex()
@@ -53,12 +52,6 @@ impl ArcadiaRoot {
                         panel_radius,
                     )
                 }))
-                .child(div().pt_2().child(Self::python_reload_button(
-                    cx,
-                    p.accent,
-                    p.on_accent,
-                    panel_radius,
-                )))
         };
 
         if let Some(g) = theme::active_glyph(cx) {
@@ -263,32 +256,5 @@ impl ArcadiaRoot {
                 .child(row_inner)
                 .into_any_element()
         }
-    }
-
-    fn python_reload_button(
-        cx: &mut Context<Self>,
-        btn_bg: openframe::Rgba,
-        btn_text: openframe::Rgba,
-        radius: f32,
-    ) -> impl IntoElement {
-        div()
-            .cursor_pointer()
-            .px_4()
-            .py_2()
-            .rounded(px(radius.min(12.0)))
-            .bg(btn_bg)
-            .text_sm()
-            .font_weight(FontWeight::SEMIBOLD)
-            .text_color(btn_text)
-            .child("Reload Extensions")
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, _, cx| {
-                    let ctx = this.execution_context();
-                    let _ = modules::execute_command("python-host.reload", &[], &ctx);
-                    this.reload_python_extensions(cx);
-                    cx.notify();
-                }),
-            )
     }
 }

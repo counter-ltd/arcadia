@@ -238,8 +238,8 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         id: "late.settings",
         title: "Late.sh",
         description: "Configure Late.sh server URL, credentials, and connection preferences.",
-        glyph: "settings",
-        system_image: "gearshape",
+        glyph: "coffee",
+        system_image: "cup.and.saucer.fill",
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
     },
@@ -282,10 +282,11 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
 ];
 
 pub const GLOBAL_PAGE_IDS: &[&str] = &["global.dashboard", "global.settings"];
-pub const TOP_BAR_PAGE_IDS: &[&str] = &["global.logs", "python.settings", "global.modules"];
+pub const LOGS_PAGE_ID: &str = "global.logs";
+pub const TOP_BAR_PAGE_IDS: &[&str] = &["python.settings", "global.modules"];
 /// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; these are **nested only**
 /// (not the hub header). Omit [`SETTINGS_HUB_ROOT_PAGE_ID`] — the header row is that page.
-/// Logs, Extensions (python.settings), and modules are omitted because they are listed in [`TOP_BAR_PAGE_IDS`].
+/// Extensions (`python.settings`) and Modules live in [`TOP_BAR_PAGE_IDS`]. Logs is opened from the app-title context menu on Desktop, not the top bar.
 pub const SETTINGS_HUB_ROOT_PAGE_ID: &str = "global.settings";
 pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &["global.appearance", "late.settings"];
 pub const DEFAULT_GROUP_ID: &str = "utilities";

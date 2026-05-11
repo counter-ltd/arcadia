@@ -1,4 +1,8 @@
 use arcadia_core::navigation;
+#[cfg(feature = "gui")]
+use arcadia_core::config::thin_client::ThinClientConfig;
+#[cfg(feature = "gui")]
+use arcadia_core::modules::lan::connected_approved_session_peers;
 use openframe::{
     div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Render,
     StatefulInteractiveElement, Styled, Window, WindowAppearance,
@@ -10,6 +14,7 @@ use openframe::AnyElement;
 use crate::gui::app::navigation::NavGroupRef;
 use crate::gui::app::splash::SPLASH_TOTAL_MS;
 use crate::gui::app::{window_controls_top_padding, ArcadiaRoot};
+use crate::gui::theme::render_icon;
 
 impl Render for ArcadiaRoot {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -176,7 +181,10 @@ impl ArcadiaRoot {
         let hover_bg = crate::gui::theme::ui_surface2(cx, is_dark);
         let radius = crate::gui::theme::ui_radius(cx);
 
-        let menu_item = move |label: &'static str, hover_bg| {
+        let menu_row = move |glyph: &'static str,
+                             label: openframe::SharedString,
+                             text_color: openframe::Rgba,
+                             icon_color: openframe::Rgba| {
             div()
                 .w_full()
                 .px_2()
@@ -184,9 +192,12 @@ impl ArcadiaRoot {
                 .rounded(px(radius))
                 .cursor_pointer()
                 .text_sm()
-                .text_color(text_color)
                 .hover(move |s| s.bg(hover_bg))
-                .child(label)
+                .flex()
+                .gap_2()
+                .items_center()
+                .child(render_icon(glyph).size_4().text_color(icon_color))
+                .child(div().text_color(text_color).child(label))
         };
 
         if self.terminal_context_menu_open {
@@ -194,7 +205,7 @@ impl ArcadiaRoot {
                 .absolute()
                 .left(pos.x)
                 .top(pos.y)
-                .w(px(160.))
+                .min_w(px(172.))
                 .p_1()
                 .rounded_md()
                 .border_1()
@@ -202,7 +213,12 @@ impl ArcadiaRoot {
                 .bg(bg_color)
                 .occlude()
                 .child(
-                    menu_item("New Terminal", hover_bg)
+                    menu_row(
+                        "terminal",
+                        "New Terminal".into(),
+                        text_color,
+                        text_color,
+                    )
                         .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
                             this.create_new_terminal();
                             cx.notify();
@@ -214,11 +230,12 @@ impl ArcadiaRoot {
                 .map(|t| t.label.clone())
                 .unwrap_or_else(|| "Terminal".to_string());
             let kill_label = format!("Kill {label}");
+            let danger = crate::gui::theme::ui_danger(cx, is_dark);
             div()
                 .absolute()
                 .left(pos.x)
                 .top(pos.y)
-                .w(px(160.))
+                .min_w(px(172.))
                 .p_1()
                 .rounded_md()
                 .border_1()
@@ -226,20 +243,88 @@ impl ArcadiaRoot {
                 .bg(bg_color)
                 .occlude()
                 .child(
-                    div()
-                        .w_full()
-                        .px_2()
-                        .py_1()
-                        .rounded_md()
-                        .cursor_pointer()
-                        .text_sm()
-                        .text_color(crate::gui::theme::ui_danger(cx, is_dark))
-                        .hover(move |s| s.bg(hover_bg))
-                        .child(kill_label)
-                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                    menu_row("x", kill_label.into(), danger, danger).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
                             this.kill_terminal(kill_idx);
                             cx.notify();
-                        })),
+                        }),
+                    ),
+                )
+                .into_any_element()
+        } else if self.session_route_menu_open {
+            let sess_pos = self.session_route_menu_position;
+            let peers = connected_approved_session_peers();
+            div()
+                .absolute()
+                .left(sess_pos.x)
+                .top(sess_pos.y)
+                .min_w(px(200.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("home", "Local".into(), text_color, text_color).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            let _ = ThinClientConfig::set_preferred_remote_route(None);
+                            this.remote_route = None;
+                            this.session_route_menu_open = false;
+                            this.reload_modules();
+                            cx.notify();
+                        }),
+                    ),
+                )
+                .children(peers.into_iter().map(|(ip, hostname)| {
+                    let route = format!("lan:{ip}");
+                    let label = format!("{hostname} ({ip})");
+                    menu_row("nodes", label.into(), text_color, text_color).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            let _ =
+                                ThinClientConfig::set_preferred_remote_route(Some(&route));
+                            this.remote_route = Some(route.clone());
+                            this.session_route_menu_open = false;
+                            this.reload_modules();
+                            cx.notify();
+                        }),
+                    )
+                }))
+                .into_any_element()
+        } else if self.app_menu_open {
+            let danger = crate::gui::theme::ui_danger(cx, is_dark);
+            div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(176.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("logs", "Logs".into(), text_color, text_color).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.active_page_id = navigation::LOGS_PAGE_ID.to_string();
+                            this.app_menu_open = false;
+                            cx.notify();
+                        }),
+                    ),
+                )
+                .child(
+                    menu_row("log-out", "Quit".into(), danger, danger).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(|this, _, _, _| {
+                            this.app_menu_open = false;
+                            this.run_internal_quit_command();
+                        }),
+                    ),
                 )
                 .into_any_element()
         } else {

@@ -1,6 +1,8 @@
 use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 use openframe::prelude::FluentBuilder as _;
 
+use arcadia_core::modules;
+
 use crate::gui::app::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use crate::gui::app::ShellMode;
@@ -54,6 +56,35 @@ impl ArcadiaRoot {
                                     .text_color(title_color)
                                     .child(active_page_title),
                             )
+                            .child({
+                                if self.active_page_id.as_str() == "python.settings" {
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded(px(radius))
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .bg(action_pill_bg)
+                                        .text_color(action_pill_tc)
+                                        .hover(move |style| style.bg(action_pill_hover))
+                                        .child("Reload Extensions")
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, _, _, cx| {
+                                                let ctx = this.execution_context();
+                                                let _ = modules::execute_command(
+                                                    "python-host.reload",
+                                                    &[],
+                                                    &ctx,
+                                                );
+                                                this.reload_python_extensions(cx);
+                                                cx.notify();
+                                            }),
+                                        )
+                                } else {
+                                    div()
+                                }
+                            })
                             .child(if self.active_page_id.as_str() == "late.now_playing" {
                                 div()
                                     .flex()

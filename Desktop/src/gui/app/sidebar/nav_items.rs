@@ -417,6 +417,7 @@ impl ArcadiaRoot {
                     if _is_shell_page {
                         this.terminal_context_menu_open = true;
                         this.terminal_kill_menu = None;
+                        this.session_route_menu_open = false;
                         this.context_menu_position = event.position;
                         cx.notify();
                     }
@@ -475,6 +476,7 @@ impl ArcadiaRoot {
                     {
                         this.terminal_kill_menu = Some(terminal_id);
                         this.terminal_context_menu_open = false;
+                        this.session_route_menu_open = false;
                         this.context_menu_position = event.position;
                     }
                     #[cfg(not(feature = "gui"))]

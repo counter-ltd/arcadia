@@ -233,6 +233,8 @@ impl ArcadiaRoot {
             #[cfg(feature = "gui")]
             context_menu_position: openframe::Point::default(),
             #[cfg(feature = "gui")]
+            session_route_menu_position: openframe::Point::default(),
+            #[cfg(feature = "gui")]
             shell_focus,
             late_compose_focus,
             #[cfg(feature = "gui")]

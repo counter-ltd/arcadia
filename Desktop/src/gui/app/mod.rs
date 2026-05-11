@@ -142,6 +142,9 @@ pub struct ArcadiaRoot {
     pub terminal_kill_menu: Option<usize>,
     #[cfg(feature = "gui")]
     pub context_menu_position: openframe::Point<openframe::Pixels>,
+    /// Anchor for remote-session route picker (`session_route_menu_open`); desktop overlay only.
+    #[cfg(feature = "gui")]
+    pub session_route_menu_position: openframe::Point<openframe::Pixels>,
     #[cfg(feature = "gui")]
     pub shell_focus: FocusHandle,
     pub late_compose_focus: FocusHandle,
@@ -152,7 +155,7 @@ pub struct ArcadiaRoot {
     pub splash_elapsed_ms: f32,
     pub splash_tick_started: bool,
     pub sidebar_visible: bool,
-    /// When true, the sidebar Settings hub lists Logs / Modules / Settings rows.
+    /// When true, the sidebar Settings hub shows nested rows under the Settings header.
     pub settings_hub_expanded: bool,
     pub app_menu_open: bool,
     pub session_route_menu_open: bool,

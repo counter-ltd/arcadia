@@ -132,8 +132,11 @@ impl ArcadiaRoot {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if event.keystroke.key.as_str() == "escape" && self.app_menu_open {
+        if event.keystroke.key.as_str() == "escape"
+            && (self.app_menu_open || self.session_route_menu_open)
+        {
             self.app_menu_open = false;
+            self.session_route_menu_open = false;
             cx.notify();
             return;
         }
