@@ -1,22 +1,39 @@
 use arcadia_core::modules;
 use openframe::{
-    AnyElement, IntoElement, InteractiveElement, ParentElement, Styled, div, px,
+    AnyElement, IntoElement, InteractiveElement, ParentElement, Styled, Window, div, px,
 };
 use openframe::{Context, FontWeight, MouseButton};
 use openframe::prelude::FluentBuilder as _;
 
+use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
-    pub fn python_settings_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> AnyElement {
+    pub fn python_settings_panel(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> AnyElement {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
         let panel_radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
-        let rows = self.python_extension_rows.clone();
+        let all_rows = self.python_extension_rows.clone();
+        let none_loaded = all_rows.is_empty();
+        let q = self.extensions_search_query.trim().to_ascii_lowercase();
 
-        let content = if rows.is_empty() {
+        let search_bar = self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Extensions);
+
+        let filtered: Vec<_> = all_rows
+            .into_iter()
+            .filter(|(name, version, description, _)| {
+                list_panel_row_matches(&q, name, &[version.as_str(), description.as_str()])
+            })
+            .collect();
+
+        let content = if none_loaded {
             div()
                 .flex()
                 .flex_col()
@@ -36,12 +53,28 @@ impl ArcadiaRoot {
                         .text_color(p.content_meta)
                         .child("Drop a .py file or a folder with main.py into ~/Arcadia/Extensions/ and reload."),
                 )
+                .into_any_element()
+        } else if filtered.is_empty() && !self.extensions_search_query.trim().is_empty() {
+            div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap_2()
+                .py_10()
+                .child(
+                    div()
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(p.content_title)
+                        .child("No matching extensions"),
+                )
+                .into_any_element()
         } else {
             div()
                 .flex()
                 .flex_col()
                 .gap_3()
-                .children(rows.into_iter().map(|(name, version, description, enabled)| {
+                .children(filtered.into_iter().map(|(name, version, description, enabled)| {
                     Self::python_extension_row(
                         cx,
                         name,
@@ -52,6 +85,7 @@ impl ArcadiaRoot {
                         panel_radius,
                     )
                 }))
+                .into_any_element()
         };
 
         if let Some(g) = theme::active_glyph(cx) {
@@ -71,6 +105,7 @@ impl ArcadiaRoot {
                         .flex()
                         .flex_col()
                         .gap_3()
+                        .child(search_bar)
                         .child(content),
                 )
                 .into_any_element()
@@ -85,6 +120,7 @@ impl ArcadiaRoot {
                 .flex()
                 .flex_col()
                 .gap_3()
+                .child(search_bar)
                 .child(content)
                 .into_any_element()
         }

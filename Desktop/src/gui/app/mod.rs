@@ -11,6 +11,8 @@ mod appearance;
 mod lan_nodes;
 mod late;
 mod lifecycle;
+mod list_panel_search;
+mod text_input_caret;
 mod modules_page;
 mod navigation;
 mod python_settings;
@@ -122,6 +124,12 @@ pub struct ArcadiaRoot {
     pub title: SharedString,
     pub active_page_id: String,
     pub active_group_id: String,
+    /// Filters rows on global.modules (UI-only).
+    pub modules_search_query: String,
+    /// Filters rows on python.settings (UI-only).
+    pub extensions_search_query: String,
+    pub modules_search_focus: FocusHandle,
+    pub extensions_search_focus: FocusHandle,
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
     pub python_extension_rows: Vec<(String, String, String, bool)>,
@@ -148,10 +156,9 @@ pub struct ArcadiaRoot {
     #[cfg(feature = "gui")]
     pub shell_focus: FocusHandle,
     pub late_compose_focus: FocusHandle,
-    #[cfg(feature = "gui")]
-    pub shell_caret_visible: bool,
-    #[cfg(feature = "gui")]
-    pub shell_caret_task_started: bool,
+    /// Shared blink phase for focused single-line text fields (shell, compose, settings inputs).
+    pub text_caret_blink_visible: bool,
+    pub text_caret_blink_task_started: bool,
     pub splash_elapsed_ms: f32,
     pub splash_tick_started: bool,
     pub sidebar_visible: bool,

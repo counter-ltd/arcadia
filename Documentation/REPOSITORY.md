@@ -2,117 +2,106 @@
 
 ```
 Shared/
+  Cargo.toml                          # workspace: ArcadiaCore, ArcadiaPython
   ArcadiaCore/
-    Cargo.toml                        # crate-type: staticlib + cdylib + lib
+    Cargo.toml                        # crate-type: lib (no staticlib/cdylib — iOS lib lives in Desktop)
     src/
-      lib.rs                          # root, exports + UniFFI scaffolding
-      ffi.rs                          # UniFFI → Swift (iOS bridge)
+      lib.rs                          # module declarations
       navigation.rs                   # PAGE_DEFINITIONS, GROUP_DEFINITIONS, registry JSON
+      services.rs                     # SERVICE_DEFINITIONS, service-host helpers
       config/
-        mod.rs                        # ConfigFile trait, config root path
+        mod.rs                        # ConfigFile trait, CONFIG_ROOT_OVERRIDE (iOS sets this)
         modules.rs                    # MODULE_REGISTRY, ModulesConfig, migrations
+        appearance.rs                 # appearance.toml (theme tokens)
         commandline.rs                # CLI preferences
+        extension_tokens.rs           # extension theme/glyph token resolution
+        late.rs                       # late.toml (WS chat config)
         thin_client.rs                # ThinClientConfig → thin-client.toml
       modules/
-        mod.rs                        # execute_command dispatcher, module lifecycle
-        shell.rs                      # shell.execute, shell.internal, PTY
+        mod.rs                        # execute_command dispatcher, module_commands() lookup
+        shell.rs                      # shell.execute, shell.internal
         shell_motd.rs                 # MOTD banner
-        surface.rs                    # surface.snapshot / surface.patch
+        surface.rs                    # surface.snapshot / surface.patch / revision
         remote_session.rs             # routing manifest entry (no standalone commands)
-        remote_mirror.rs              # host transcript queue + FFI drain
+        remote_mirror.rs              # host transcript queue + drain
         net.rs                        # networking foundation
-        lan/                          # LAN subsystem (see REFERENCE.md)
+        late.rs                       # WebSocket chat / now-playing / votes
+        python_host.rs                # Python extension host
+        python_registry.rs            # Python extension manifest registry
+        lan/                          # LAN subsystem
           mod.rs, discovery.rs, handlers.rs, config.rs, peers.rs, protocol.rs
       platform/
         mod.rs, macos.rs, ios.rs, linux.rs, windows.rs, unknown.rs
+  ArcadiaPython/                      # Python extension runtime (workspace member)
   Scripts/
-    Builds/build-ios-framework.sh               # Rebuild xcframework + Swift bindings
-    Installers/install-global-commands-macos.sh # Install ~/.local/bin wrappers
-    Installers/install-git-hooks.sh             # Enable repo .githooks (FFI pre-commit, etc.)
-    Launchers/Launcher.sh / Launcher.ps1        # Shell launcher menus
-  Tools/uniffi-bindgen/               # UniFFI bindgen binary (workspace member)
+    Builds/build-ios-app.sh           # Builds libarcadia_ios.a (for manual invocation)
+    Builds/build-paths.sh             # Shared path helpers for Builds/ tree
+    Installers/install-global-commands-macos.sh
+    Launchers/Launcher.sh, Launcher.ps1
 
 Libraries/
-  OpenFrame/                          # Submodule (GPUI fork) — `git@github-counter:counter-ltd/openframe.git`
+  OpenFrame/                          # Submodule (GPUI fork; supports macOS, Linux, Windows, iOS)
 
-Extensions/                           # Submodule — `git@github-counter:counter-ltd/arcadia-haven.git` (extension catalog; shipped hello demo under `hello/`)
+Extensions/                           # Submodule (extension catalog; shipped demos)
 
 Desktop/
-  Cargo.toml                          # features: headless (default), gui
+  Cargo.toml                          # package `arcadia`
+                                      #   [[bin]] arcadia  (src/main.rs)
+                                      #   [lib]   arcadia_ios (src/ios_lib.rs, crate-type=staticlib)
+                                      # features: headless (default), gui, ios-gui, python-extensions
   src/
     main.rs                           # binary entry, feature-gated GUI vs headless
+    ios_lib.rs                        # iOS C ABI (arcadia_ios_start, arcadia_ios_inject_touch)
     cli/
       mod.rs                          # REPL loop, startup messages
-      args.rs                         # argument parsing
-      completion.rs                   # shell completion
-      config_cmds.rs                  # module/config CLI commands
-      module_cmds.rs                  # module shortcut commands
+      args.rs, completion.rs, config_cmds.rs, module_cmds.rs
     gui/
-      mod.rs
-      assets.rs                       # embedded SVG asset loading
+      mod.rs, assets.rs
       app/
-        mod.rs                        # ArcadiaRoot state, ShellMode enum
-        entry.rs                      # GPUI initialization
+        mod.rs                        # ArcadiaRoot state
+        entry.rs                      # Desktop GPUI bootstrap
+        entry_ios.rs                  # iOS OpenFrame bootstrap (called from arcadia_ios_start)
         lifecycle.rs                  # focus, resize, module reload
         navigation.rs                 # nav state and page routing
-        root/mod.rs, render.rs        # root layout + render
-        root/top_bar.rs               # title bar, session chip, shell mode toggle
-        sidebar/mod.rs, layout.rs, nav_items.rs
-        shell/mod.rs, panel.rs, execute.rs, keys.rs, tui_screen.rs, mirror.rs
-        modules_page/mod.rs, panel.rs, row.rs, requirements_modal.rs
-        lan_nodes/mod.rs, panel.rs
-        splash/mod.rs, view.rs, draw_*.rs, math.rs
+        root/, sidebar/, shell/, modules_page/, lan_nodes/, splash/,
+        appearance/, late/, python_settings/, services/, list_panel_search.rs,
+        text_input_caret.rs
       theme/
         mod.rs                        # icon_path(), color constants
-        chrome.rs                     # window chrome
-        icons.rs                      # icon metadata
-        splash_colors.rs
-        modules/                      # component tokens (buttons, panel, rows, toggles, typography)
-        nav_accents/                  # per-accent palettes (mod.rs, palette.rs, 9 accents)
-      tui/
-        mod.rs, session.rs            # PTY session lifecycle
-        ansi_line.rs                  # ANSI escape parsing
-        colors.rs                     # terminal color palette
-        cd_builtin.rs, cwd.rs, env.rs # shell builtins + CWD tracking
-        keys.rs                       # PTY keyboard events
-        vt_history.rs                 # VT100 history buffer
-  assets/icons/                       # SVG icons (home, terminal, logs, settings, nodes, modules, tools)
+        chrome.rs, icons.rs, splash_colors.rs
+        modules/                      # component tokens
+        nav_accents/                  # per-accent palettes
+      tui/                            # PTY/TUI terminal emulator (desktop only)
+  assets/icons/                       # SVG icons
 
 Mobile/iOS/
+  ArcadiaApp.xcodeproj/               # Xcode project — "Build Rust (cargo)" build phase
   ArcadiaApp/
-    ArcadiaApp.swift                  # @main, config root setup
-    ContentView.swift                 # top-level coordinator + Actions/Layout/NavigationState/Registry extensions
-    NavigationModels.swift            # Swift structs mirroring NavigationRegistry
-    AppTheme.swift                    # all iOS colors as computed properties
-    SidebarView.swift                 # sidebar rendering + remote session picker
-    SplashView.swift                  # animated splash
-    ShellView.swift                   # shell command input + history
-    ModulesView.swift                 # module toggle list
-    LanNodesView.swift                # LAN peer discovery + pairing
-    ModuleNames.swift                 # string constants mirroring MODULE_REGISTRY
-    GlassComponents.swift             # reusable glassmorphism components
-  ArcadiaCore/                        # Generated Swift + ArcadiaCore.xcframework (rebuild after ffi.rs changes)
+    ArcadiaApp.swift                  # UIKit @main; bootstraps Metal layer; calls arcadia_ios_start
+    MetalHostView.swift               # CAMetalLayer host; forwards UITouch → arcadia_ios_inject_touch
+    ArcadiaBridge.h                   # C ABI declarations matching Desktop/src/ios_lib.rs
+    Info.plist, Assets.xcassets
 
 Configuration/                        # Layout reference (runtime: ~/Arcadia/Configuration on Desktop)
   modules.toml                        # module enable/disable state
   commandline.toml                    # CLI preferences
   thin-client.toml                    # preferred_remote_route, surface_client_id
+  appearance.toml                     # theme tokens
+  late.toml                           # late module state
 
 Resources/
-  Wallpapers/                         # Landscape.png, Portrait.png, Landscape-Refined.png
-  Sounds/                             # Notification_* (Warm, Pop, Minimal, Glass, Deep, Airy)
-  Icons/                              # App icon prototypes + Final-1-appicon.png
+  Wallpapers/, Sounds/, Icons/
 
 Launchers/Development/OSX/            # SwiftPM menu bar launcher (optional, dev only)
-  Package.swift
-  Sources/ArcadiaDevelopmentLauncher/main.swift
-  build-app.sh, README.md
+
+Builds/workspace/                     # Unified Cargo target-dir (gitignored) — driven by /.cargo/config.toml
+Builds/Mobile/iOS/DerivedData/        # Xcode -derivedDataPath
 
 .github/workflows/
-  stable-build-matrix.yml             # Desktop + iOS simulator CI
-  FUNDING.yml                         # GitHub Sponsors
+  core-tests.yml                      # arcadia-core unit tests
+  stable-build-matrix.yml             # Desktop matrix + iOS simulator build on stable
 
-Documentation/GAPS.md                 # Deliberate limitations, thin-client gaps, iOS OpenFrame migration
+Documentation/                        # ARCHITECTURE, BUILD, CONFIGURATION, CONTRIBUTING, GAPS, ROADMAP, VISION
 CLAUDE.md                             # Contributor guide (architecture patterns)
 AGENTS.md                             # Agent rules (registry discipline, anti-patterns)
 ```

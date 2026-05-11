@@ -207,7 +207,7 @@ impl ArcadiaRoot {
                 .child(self.shell_panel(window, cx));
         }
         if self.active_page_id.as_str() == "global.modules" {
-            return div().w_full().p_6().child(self.modules_panel(cx, is_dark));
+            return div().w_full().p_6().child(self.modules_panel(window, cx, is_dark));
         }
         if self.active_page_id.as_str() == "network.nodes" {
             return div()
@@ -226,13 +226,13 @@ impl ArcadiaRoot {
             return self.render_late_now_playing(window, cx, is_dark);
         }
         if self.active_page_id.as_str() == "late.settings" {
-            return div().w_full().p_6().child(self.late_settings_panel(cx, is_dark));
+            return div().w_full().p_6().child(self.late_settings_panel(window, cx, is_dark));
         }
         if self.active_page_id.as_str() == "python.settings" {
-            return div().w_full().p_6().child(self.python_settings_panel(cx, is_dark));
+            return div().w_full().p_6().child(self.python_settings_panel(window, cx, is_dark));
         }
         if self.active_page_id.as_str() == "global.appearance" {
-            return div().w_full().p_6().child(self.appearance_panel(cx, is_dark));
+            return div().w_full().p_6().child(self.appearance_panel(window, cx, is_dark));
         }
         if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
             return div()

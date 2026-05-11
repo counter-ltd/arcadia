@@ -53,16 +53,25 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
-            Desktop -> Builds/workspace
+            Desktop -> ../Builds/workspace
 
       - name: Install Linux GUI build dependencies
         if: runner.os == 'Linux' && matrix.feature == 'gui'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libxcb1-dev \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libfontconfig1-dev \
+            libwayland-dev \
             libxkbcommon-dev \
-            libxkbcommon-x11-dev
+            libxkbcommon-x11-dev \
+            libxcb1-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxcb-cursor-dev
 
       - name: Build Arcadia
         run: cargo build --manifest-path Desktop/Cargo.toml --no-default-features --features ${{ matrix.feature }}
@@ -95,6 +104,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: Desktop -> ../Builds/workspace
 
       - name: Build iOS app (simulator)
         shell: bash

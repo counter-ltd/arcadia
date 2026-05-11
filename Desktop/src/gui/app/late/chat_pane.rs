@@ -1,10 +1,11 @@
 use openframe::{
-    div, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    Window, div, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
     ParentElement, StatefulInteractiveElement, Styled, px,
 };
 
 use arcadia_core::modules::late::{send_ws, state, LateMessage};
 
+use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -106,9 +107,16 @@ impl ArcadiaRoot {
             })
     }
 
-    pub(super) fn late_compose_box(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
+    pub(super) fn late_compose_box(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
         let input_text = self.late_compose_text.clone();
         let room = self.late_active_room;
+        let compose_focused = self.late_compose_focus.is_focused(window);
+        let blink = self.text_caret_blink_visible;
 
         let compose_border = theme::ui_border(cx, is_dark);
         let compose_input_bg = theme::ui_surface(cx, is_dark);
@@ -141,11 +149,21 @@ impl ArcadiaRoot {
                         }),
                     )
                     .child(if input_text.is_empty() {
-                        div()
-                            .text_color(theme::module_meta_text(is_dark))
-                            .child("Type a message…")
+                        if compose_focused && blink {
+                            div()
+                                .text_color(theme::module_title_text(is_dark))
+                                .child(TEXT_INPUT_CARET_CHAR.to_string())
+                        } else {
+                            div()
+                                .text_color(theme::module_meta_text(is_dark))
+                                .child("Type a message…")
+                        }
                     } else {
-                        div().child(input_text.clone())
+                        div().child(text_with_trailing_caret(
+                            input_text.as_str(),
+                            compose_focused,
+                            blink,
+                        ))
                     })
                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                         let key = event.keystroke.key.as_str();

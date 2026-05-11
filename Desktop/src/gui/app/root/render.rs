@@ -25,7 +25,7 @@ impl Render for ArcadiaRoot {
         #[cfg(feature = "gui")]
         self.sync_peer_remote_exec_side_effects(window, cx);
         #[cfg(feature = "gui")]
-        self.ensure_shell_caret_task(window, cx);
+        self.ensure_text_caret_blink_task(window, cx);
         self.ensure_lan_poll_task(window, cx);
         self.ensure_late_poll_task(window, cx);
         #[cfg(feature = "gui")]

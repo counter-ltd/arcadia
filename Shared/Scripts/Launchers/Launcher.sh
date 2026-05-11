@@ -47,7 +47,6 @@ deploy_ios_device() {
   fi
   local configuration="$1"
   local project_path="${ROOT_DIR}/../Mobile/iOS/ArcadiaApp.xcodeproj"
-  local shared_build_script="${ROOT_DIR}/Scripts/Builds/build-ios-framework.sh"
   local derived_data_path="${ROOT_DIR}/../${ARCADIA_IOS_DERIVED_DEVICE_REL}"
   local bundle_id="com.stacknode.arcadia"
   local preferred_device_name="${ARCADIA_IOS_DEVICE_NAME:-}"
@@ -65,10 +64,7 @@ deploy_ios_device() {
     return 1
   fi
 
-  if [[ ! -f "${shared_build_script}" ]]; then
-    echo "Error: shared iOS build script not found at ${shared_build_script}"
-    return 1
-  fi
+  rustup target add aarch64-apple-ios >/dev/null 2>&1 || true
 
   destinations="$(
     xcodebuild \
@@ -102,10 +98,6 @@ deploy_ios_device() {
     echo "Hint: set ARCADIA_IOS_DEVICE_NAME to your device name and retry."
     return 1
   fi
-
-  echo
-  echo "Building shared iOS artifacts..."
-  bash "${shared_build_script}" || return 1
 
   echo
   echo "Running: xcodebuild -project Mobile/iOS/ArcadiaApp.xcodeproj -scheme ArcadiaApp -configuration ${configuration} -destination id=${device_udid} build"

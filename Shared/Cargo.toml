@@ -2,6 +2,5 @@
 members = [
     "ArcadiaCore",
     "ArcadiaPython",
-    "Tools/uniffi-bindgen",
 ]
 resolver = "2"

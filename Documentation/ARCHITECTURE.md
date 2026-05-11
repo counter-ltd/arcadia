@@ -4,7 +4,7 @@
 
 **Fat core, thin shells.**
 
-`Shared/ArcadiaCore` owns everything. Desktop and iOS read registries, render what those registries say, and `execute_command` back into core. They do not re-implement module graphs or navigation trees.
+`Shared/ArcadiaCore` owns everything. The Rust UI layer reads registries, renders what those registries say, and `execute_command`s back into core. Desktop and iOS use the **same** UI layer (`Desktop/src/gui/app/` rendered via OpenFrame) — they do not re-implement module graphs or navigation trees, and neither does the OS-specific shell around the UI.
 
 **Single sources of truth — enforced, not hoped for.**
 
@@ -13,8 +13,7 @@
 | Module manifests + deps | `MODULE_REGISTRY` · `config/modules.rs` | surface state booleans |
 | Navigation pages + groups | `PAGE_DEFINITIONS` / `GROUP_DEFINITIONS` · `navigation.rs` | surface match arms |
 | Serializable nav for snapshots | `NavigationRegistryOwned` · embedded in `surface.snapshot` | hardcoded Swift arrays |
-| Desktop theme tokens | `gui/theme/` | inline `rgb(0x...)` in views |
-| iOS theme tokens | `AppTheme.swift` | inline `Color(hex:)` in views |
+| Theme tokens | `gui/theme/` | inline `rgb(0x...)` in views |
 | Config schema | `ModulesConfig` · `config/modules.rs` | per-platform config parsers |
 
 **Extend the registry, not scatter `if pageId == …`.**
@@ -43,7 +42,7 @@ execute_command(token: &str, args: &str, context: ExecutionContext) -> String
 - **`ExecutionContext`** carries `net_as` (optional LAN routing, e.g. `lan:192.168.1.10`) and `net_timeout_ms`.
 - When `net_as` is set, `execute_command` forwards the token + args over UDP to the target peer instead of dispatching locally. The peer runs the command under its own module rules.
 - LAN forwarding requires local `remote-session`, `lan`, and `net` modules enabled; the peer enforces its own module requirements for the token.
-- FFI exposes this identically to iOS and Desktop — same logical API, same routing semantics.
+- Both surfaces call `execute_command` directly — iOS through the Rust UI running on top of OpenFrame, desktop through GPUI — so routing semantics are identical.
 
 ---
 
@@ -95,7 +94,7 @@ Navigation structure lives entirely in `navigation.rs` as two static slices:
 | `network` | Network | `network.nodes` |
 | `social` | Social | `late.now_playing`, `late.experimental` |
 
-**`SERVICE_DEFINITIONS`** (`services.rs`) — modules register here to advertise long-running services on a service-host page. A page becomes service-driven as soon as any entry targets its `page_id`: it is visible iff at least one of its services has its `required_module` enabled, regardless of the page's own `required_module`. Each service may carry `controls` (function pointers for `start` / `stop` / `status_detail`) which the desktop Services panel renders directly; iOS dispatches the equivalent FFI calls per service.
+**`SERVICE_DEFINITIONS`** (`services.rs`) — modules register here to advertise long-running services on a service-host page. A page becomes service-driven as soon as any entry targets its `page_id`: it is visible iff at least one of its services has its `required_module` enabled, regardless of the page's own `required_module`. Each service may carry `controls` (function pointers for `start` / `stop` / `status_detail`) which the Services panel renders directly on whichever surface is hosting the GUI.
 
 | Service | Page | Required Module | Controls |
 |---------|------|-----------------|----------|
@@ -105,10 +104,7 @@ Navigation structure lives entirely in `navigation.rs` as two static slices:
 
 **`TOP_BAR_PAGE_IDS`** — pages rendered as compact controls in the surface top bar: `global.logs`, `global.modules`. Each surface chooses how to render them (Desktop pill, iOS toolbar item) — registry stays the source of truth.
 
-`NavigationPageDefinition.required_module` drives visibility for non-service-host pages — surfaces query `is_module_enabled(page.required_module)`, never hardcode per-page logic. Service-host pages (any page that has at least one entry in `SERVICE_DEFINITIONS` targeting it) are visible iff one of their services' `required_module` is enabled; surfaces use the central helper `arcadia_core::navigation::is_page_visible_with` (or `is_page_visible_in_owned` for thin clients consuming a remote registry) so the rule stays in one place. The full registry serializes to JSON via `default_navigation_registry_json()` for:
-
-- iOS FFI: `navigation_registry_json()` → deserializes into `NavigationRegistry` Swift struct
-- Thin-client: embedded in `surface.snapshot` extra field so remote clients get host's nav without a local copy
+`NavigationPageDefinition.required_module` drives visibility for non-service-host pages — surfaces query `is_module_enabled(page.required_module)`, never hardcode per-page logic. Service-host pages (any page that has at least one entry in `SERVICE_DEFINITIONS` targeting it) are visible iff one of their services' `required_module` is enabled; surfaces use the central helper `arcadia_core::navigation::is_page_visible_with` (or `is_page_visible_in_owned` for thin clients consuming a remote registry) so the rule stays in one place. The full registry serializes to JSON via `default_navigation_registry_json()` for the thin-client snapshot path — it is embedded in `surface.snapshot.extra` so remote clients get the host's nav without a local copy.
 
 Lookup helpers: `page_by_id(id)`, `group_by_id(id)`.
 
@@ -157,7 +153,7 @@ Arcadia supports a **headless host + GUI client** pattern over LAN:
 
 ## Remote mirror
 
-When this machine executes an inbound `NODE_EXEC` for a remote peer, `modules/remote_mirror.rs` enqueues transcript lines plus a `sync_local_surface` flag. Surfaces drain this via `drain_remote_mirror_batch()` (FFI) on a timer (iOS: 250ms) to:
+When this machine executes an inbound `NODE_EXEC` for a remote peer, `modules/remote_mirror.rs` enqueues transcript lines plus a `sync_local_surface` flag. The GUI drains this batch on a timer to:
 
 1. Display remote command output locally.
 2. Trigger a `reload_modules()` when `sync_local_surface` is true (host state changed).
@@ -166,52 +162,34 @@ When this machine executes an inbound `NODE_EXEC` for a remote peer, `modules/re
 
 ## Theme system
 
-**Desktop** (`Desktop/src/gui/theme/`):
+`Desktop/src/gui/theme/`:
 - Named color constants and helper functions — never inline `rgb(0x...)` in view files.
 - `icon_path(glyph: &str) -> &str` — maps glyph keys to SVG asset paths.
 - `nav_accents/` — per-accent palettes (amber, cyan, emerald, fuchsia, indigo, orange, sky, teal, violet).
 - Component tokens under `modules/` — buttons, panels, rows, toggles, typography.
 
-**iOS** (`AppTheme.swift`):
-- All colors as computed properties on `AppTheme(isDark:)`.
-- No `Color(hex:)` inline anywhere in view files.
+The same theme tokens drive both desktop and iOS rendering because both surfaces use the same Rust UI code (OpenFrame).
 
 ---
 
-## FFI bridge
+## iOS surface
 
-`ffi.rs` is the UniFFI boundary. All iOS ↔ Rust communication goes through it. Key exports:
+iOS is not a separate UI implementation. The `arcadia` package builds a static lib (`libarcadia_ios.a`) with `--features ios-gui` that contains the same Rust GUI as the desktop binary, rendered through OpenFrame onto a `CAMetalLayer`. The Swift host is a thin UIKit shell.
 
-**Setup:**
-- `set_config_root_path(path: String)` — must be called first on iOS (app sandbox path)
+**C ABI** (`Desktop/src/ios_lib.rs`, mirrored in `Mobile/iOS/ArcadiaApp/ArcadiaBridge.h`):
 
-**Command execution:**
-- `execute_command(token, args, context: ExecutionContextFfi) -> String`
-- `list_commands() -> Vec<CommandInfo>`
-
-**Module control:**
-- `list_modules() -> Vec<ModuleStatus>`
-- `set_module_enabled(name, enabled) -> String`
-- `set_module_enabled_with_requirements(name, enabled) -> String`
-- `probe_module_toggle(name, enabled) -> ModuleToggleResult` — preflight check, returns missing deps
-
-**Navigation:**
-- `navigation_registry_json() -> String`
-- `platform_name() -> String`
-
-**Thin-client:**
-- `thin_client_surface_client_id() -> String`
-- `thin_client_preferred_route_get() -> Option<String>`
-- `thin_client_preferred_route_set(route: String) -> String`
-
-**LAN:**
-- `lan_start()`, `lan_stop()`
-
-**Mirror:**
-- `drain_remote_mirror_batch() -> RemoteMirrorDrain`
-
-After any change to `ffi.rs` or exported types, run:
-```sh
-bash Shared/Scripts/Builds/build-ios-framework.sh
+```c
+void arcadia_ios_start(uintptr_t metal_layer_ptr, const char* config_root);
+void arcadia_ios_inject_touch(float x, float y, uint8_t phase);
 ```
-This regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcframework`.
+
+`arcadia_ios_start`:
+1. Calls `arcadia_core::config::set_config_root(path)` with the app's Documents directory.
+2. Calls `arcadia_core::modules::load_all()`.
+3. Hands control to `gui::app::entry_ios::run(metal_layer_ptr)`, which boots OpenFrame against the supplied Metal layer.
+
+`arcadia_ios_inject_touch` forwards `UITouch` phases (0=began, 1=moved, 2=ended, 3=cancelled) into OpenFrame's event loop.
+
+**Build:** the Xcode project `Mobile/iOS/ArcadiaApp.xcodeproj` has a "Build Rust (cargo)" phase that runs `cargo build -p arcadia --features ios-gui --lib --target aarch64-apple-ios[-sim]`, with `--target-dir Builds/workspace` matching the repo-wide cargo config, and copies the resulting `libarcadia_ios.a` into `BUILT_PRODUCTS_DIR` for linking. No UniFFI, no Swift bindings, no `xcframework` rebuild step.
+
+Extending the iOS surface usually means adding a panel under `Desktop/src/gui/app/` (which renders on both surfaces). Add to the C ABI only when you need a new platform-level capability that can't go through `execute_command`.

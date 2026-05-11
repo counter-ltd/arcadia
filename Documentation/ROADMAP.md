@@ -6,9 +6,9 @@
 
 | Gap | Problem | Direction |
 |----|---------|-----------|
-| **Revision coverage** | `surface.revision` only advances on `surface.patch`. CLI writes and FFI writes bypass it — clients can miss updates. | Bump revision from every `ModulesConfig::save`. |
+| **Revision coverage** | `surface.revision` only advances on `surface.patch`. CLI writes bypass it — clients can miss updates. | Bump revision from every `ModulesConfig::save`. |
 | **Testing discipline** | No automated tests for snapshot round-trips, thin-client prefs, or LAN routing. | Add targeted `arcadia-core` unit + integration tests. |
-| **FFI drift detection** | No CI check that `Generated/` matches `ffi.rs`. | Workflow step: rebuild and fail if diff. |
+| **iOS C ABI drift** | No CI check that `Mobile/iOS/ArcadiaApp/ArcadiaBridge.h` matches the `extern "C"` exports in `Desktop/src/ios_lib.rs`. | Workflow step: compare ABI surface and fail on mismatch. |
 
 ## P1 — Needed for real multi-user / multi-surface use
 
@@ -29,8 +29,8 @@
 
 | Gap | Problem | Direction |
 |----|---------|-----------|
-| **iOS OpenFrame migration** | SwiftUI shell while Desktop uses OpenFrame; embedding/a11y/build story not done. | **§11** in `Documentation/GAPS.md` — spike, iOS shell crate, registry-driven OF UI, then cut SwiftUI. |
-| **Surface parity** | Desktop has PTY/TUI paths; iOS is shell.execute only; not all panels are execute-only. | Converge per capability class with explicit "unavailable on this surface" from core. |
+| **iOS OpenFrame migration** | Initial OpenFrame-on-iOS surface is in place via `--features ios-gui` and a 2-function C ABI; OpenFrame iOS embedding, accessibility, and lifecycle polish are still ongoing. | Continue closing parity gaps inside `gui/app/entry_ios.rs` and OpenFrame's iOS platform layer. |
+| **Surface parity** | Desktop has PTY/TUI paths; iOS is `shell.execute` only; not all panels are execute-only. | Converge per capability class with explicit "unavailable on this surface" from core. |
 | **Renderer-only client** | Surfaces still bundle compiled nav — no enforced "remote-only" profile. | Optional build flag that refuses static nav when `remote_route` is mandatory. |
 | **`extra` schema** | `extra.navigation_registry` is wired; broader extra buckets and corresponding `SurfacePatch` variants are undefined. | Define schema + version fields inside `extra`; extend `SurfacePatch` incrementally. |
 
@@ -53,4 +53,4 @@ What this means in practice:
 
 `.github/workflows/` — `stable-build-matrix.yml` builds Desktop targets and iOS simulator configs on selected branches. See individual workflow files for triggers and matrix.
 
-Gaps in CI coverage: FFI drift detection, core integration tests. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Gaps in CI coverage: iOS C ABI drift detection, core integration tests. See [CONTRIBUTING.md](CONTRIBUTING.md).

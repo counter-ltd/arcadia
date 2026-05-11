@@ -66,7 +66,7 @@ pub struct ServiceDefinition {
     /// SF Symbol for iOS.
     pub system_image: &'static str,
     pub accent: &'static str,
-    /// Runtime hooks; never serialized — control routes go through FFI/native calls per surface.
+    /// Runtime hooks; never serialized — control routes go through native calls per surface.
     #[serde(skip)]
     pub controls: ServiceControls,
 }

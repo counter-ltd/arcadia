@@ -9,7 +9,7 @@ This document tracks intentional limitations and follow-up work for the LAN-rout
 The revision counter advances only after a successful **`surface.patch`** batch on the host. Other writers can change **`modules.toml`** without bumping revision — for example:
 
 - **`module …`** via CLI
-- **`set_module_enabled`** / related paths through FFI
+- Direct **`ModulesConfig::save`** from any in-process call path
 
 Clients that infer freshness **only** from **`surface.revision`** can miss updates until another **`surface.patch`** occurs or they reload from disk/snapshot for other reasons.
 
@@ -92,9 +92,9 @@ There is limited automated coverage for:
 - Thin-client preference persistence  
 - LAN routing integration
 
-iOS **`ArcadiaCore.xcframework`** rebuild after FFI changes is **manual** unless CI encodes **`Shared/Scripts/Builds/build-ios-framework.sh`**.
+The iOS app build runs cargo automatically from the Xcode project's "Build Rust (cargo)" phase; CI exercises it via `xcodebuild` in `stable-build-matrix.yml`. There is no automated check that `Mobile/iOS/ArcadiaApp/ArcadiaBridge.h` stays in sync with the `extern "C"` exports in `Desktop/src/ios_lib.rs`.
 
-**Directions:** add targeted **`arcadia-core`** tests + workflow step that fails when Generated bindings / xcframework drift from **`ffi.rs`**. For the OpenFrame iOS shell, add **`cargo check --target aarch64-apple-ios`** (or the chosen package) in CI once the crate exists.
+**Directions:** add targeted **`arcadia-core`** tests and a workflow step that fails when the iOS C ABI surface drifts from `ArcadiaBridge.h`. Add **`cargo check -p arcadia --target aarch64-apple-ios --features ios-gui`** to a fast CI lane.
 
 ---
 
@@ -122,39 +122,29 @@ Behavior differs across surfaces for historical reasons:
 
 ---
 
-## 11. iOS OpenFrame migration
+## 11. iOS OpenFrame surface
 
-**Intent:** Replace the SwiftUI shell under **`Mobile/iOS/ArcadiaApp/`** with an **OpenFrame**-based shell (same UI stack family as Desktop’s GPUI fork in **`Libraries/OpenFrame/`**), while keeping **all business logic in `arcadia-core`** and **registry-driven** navigation (no new per-module booleans, no hardcoded page visibility — see **`AGENTS.md`**).
+**Status:** The OpenFrame-on-iOS surface is wired up and shipping in the repo. iOS now links **`libarcadia_ios.a`** (built from the `arcadia` package with `--features ios-gui`), and the Swift host is a thin UIKit shell (~50 lines: `ArcadiaApp.swift` + `MetalHostView.swift` + 2-function `ArcadiaBridge.h`). All UI and business logic live in Rust — there is no SwiftUI surface left to migrate. The previous **`ArcadiaCore.xcframework`** + UniFFI + `Generated/` flow has been removed.
 
-OpenFrame documents an **iOS platform backend** (UIKit, Metal, GCD, pasteboard, keyboard) and an **embedding model**: `UIApplicationMain` owns the run loop; Rust schedules on the main queue; host code bridges **touches → `PlatformInput`** and optional **`CAMetalLayer`** via **`IosWindow`**. **Arcadia has not yet shipped** a full OF iOS app — this section tracks **gaps and phases** until SwiftUI can be removed.
-
-### 11.1 Migration-specific gaps
+### 11.1 Remaining gaps
 
 | Gap | Description | Directions |
 |-----|-------------|------------|
-| **Build / link model** | Today iOS links **`ArcadiaCore.xcframework`** (UniFFI from Swift). An OF shell needs a clear **Rust artifact** layout: e.g. **one iOS static lib** combining **`arcadia-core` + `openframe`**, with **minimal Swift** for `UIApplication` + Metal layer + input injection — or a deliberately designed **xcframework** story. Avoid **Rust → Swift → Rust** for hot paths; prefer the shell crate **calling `arcadia_core` directly** where possible. | Spike **Phase 0**; document the chosen **single entrypoint** and update **`build-ios-framework.sh`** / Xcode only as needed. |
-| **OpenFrame iOS maturity** | Platform code exists under **`Libraries/OpenFrame/src/platform/ios/`** but is **unproven** at Arcadia’s scale (scenes, multitasking, safe areas, software keyboard, focus). | Time-boxed **device spike**; fix issues **in OpenFrame** when they are framework bugs. |
-| **Accessibility** | SwiftUI provides **VoiceOver, Dynamic Type, system materials** with little effort. GPUI/OpenFrame on iOS must **explicitly** address **a11y and contrast** or accept regression until implemented. | Milestone before calling migration “done”: define **minimum a11y bar** (labels, focus, type scaling or explicit opt-out). |
-| **Visual parity** | Current iOS UI uses **glass / `.ultraThinMaterial`** and custom gradients. OF may not match **pixel-parity**; need a product decision: **match desktop OF aesthetic** vs **iOS-specific OF theme**. | Centralize tokens in **Rust theme** (mirror Desktop **`gui/theme/`**), not inline colors in views. |
-| **Dispatch anti-pattern** | **`ContentView+Layout`** uses **hardcoded `activePage.id` branches** for page content. The new shell must **not** transcribe this to Rust — use **registry-driven** routing and **`required_module`** for visibility. | Implement page dispatch via **navigation registry** + shared patterns with Desktop where reasonable. |
-| **Icons** | iOS uses **SF Symbols** (`system_image` in JSON); Desktop uses **SVG** via **`icon_path()`**. | Choose one strategy: **ship SVG assets on iOS**, or **map glyphs to OF-rendered assets / labels** for consistency. |
+| **OpenFrame iOS maturity** | Platform code exists under **`Libraries/OpenFrame/src/platform/ios/`** but is still being exercised at Arcadia’s scale (scenes, multitasking, safe areas, software keyboard, focus, gesture recognizers). | Continue device testing; fix issues **in OpenFrame** when they are framework bugs. |
+| **Accessibility** | SwiftUI would have provided **VoiceOver, Dynamic Type, system materials** with little effort. OpenFrame on iOS must **explicitly** address **a11y and contrast**. | Define and meet a **minimum a11y bar** (labels, focus, type scaling). |
+| **Visual parity vs iOS conventions** | The iOS surface renders the same Rust theme tokens as desktop. Where iOS conventions differ (haptics, native-feeling sheets, glass materials), the theme layer must decide between desktop-faithful and iOS-feeling rendering. | Centralize the decision in **Rust theme** (mirror Desktop **`gui/theme/`**), not inline colors in views. |
+| **Shell on iOS** | `shell.execute` only — no PTY/TUI. The desktop `gui/tui/` paths depend on `portable-pty`/`vt100` which are not part of the `ios-gui` feature. | Either ship a constrained terminal panel on iOS that uses `shell.execute` round-trips, or keep the shell route LAN-routed by default. |
+| **Icons** | SVG icons are loaded through `icon_path()` for both surfaces. | Continue using SVG; no SF Symbols path is needed since iOS renders the Rust UI directly. |
 
-### 11.2 Phased plan (reference)
+### 11.2 What changed from the previous plan
 
-1. **Phase 0 — Spike:** `cargo check --target aarch64-apple-ios` for OF + new shell crate; **minimal Swift** + **Metal + touch injection**; run on **device**.  
-2. **Phase 1 — Infrastructure:** iOS **Rust shell crate** in repo; **CI** `cargo check` for `aarch64-apple-ios`; document **lifecycle + Metal** embedding.  
-3. **Phase 2 — Chrome:** Sidebar, **remote route**, top-bar quick pages, **navigation registry** load (bundled JSON + **`surface.snapshot`** merge — same semantics as today’s **`reloadModules()`**).  
-4. **Phase 3 — Features:** Migrate **Modules → Shell (`shell.execute`) → LAN / network → Late / experimental → Splash**, reusing Desktop OF patterns where applicable.  
-5. **Phase 4 — Thin client:** Mirror drain timer, route persistence, align with **§1–2** (do not trust **`surface.revision`** alone).  
-6. **Phase 5 — Cutover:** Remove SwiftUI views; **delete duplicated theme** once Rust theme owns tokens.
-
-**Exit criteria:** Feature parity **no worse** than current SwiftUI app; **registry-driven** shell; **no duplicated core logic** in the surface; **`surface.*`** only for mirrored UI state.
+The earlier multi-phase migration plan (replace SwiftUI with OpenFrame in stages, retire `ArcadiaCore.xcframework`) is complete. The remaining work is incremental polish inside `Desktop/src/gui/app/entry_ios.rs`, OpenFrame's iOS platform layer, and the panels under `Desktop/src/gui/app/` as iOS-specific issues surface.
 
 ### 11.3 Interaction with other gaps
 
-- **§10** — OF iOS shell must use **`execute_command`** for capabilities and surface **“unavailable on this surface”** from core for PTY/TUI-class features.  
-- **§6** — Any new mirrored fields stay under **`SurfaceSnapshot.extra`** / **`SurfacePatch`**.  
-- **§8** — Extend CI with the OF iOS crate **after** the crate lands.
+- **§10** — The OF iOS surface must use **`execute_command`** for capabilities and surface **"unavailable on this surface"** from core for PTY/TUI-class features.
+- **§6** — Any new mirrored fields stay under **`SurfaceSnapshot.extra`** / **`SurfacePatch`**.
+- **§8** — Extend CI with `cargo check -p arcadia --target aarch64-apple-ios --features ios-gui` plus an iOS C ABI drift check.
 
 ---
 
@@ -162,4 +152,4 @@ OpenFrame documents an **iOS platform backend** (UIKit, Metal, GCD, pasteboard, 
 
 The shipped model is **good enough for feature development** on a **trusted LAN** with **one logical host** and **thin clients** that periodically **`surface.snapshot`**. Closing gaps **1–10** moves toward **stronger freshness guarantees**, **safer multi-writer behavior**, and **production-grade sync/security**.
 
-**§11** tracks the **iOS SwiftUI → OpenFrame** migration: embedding, parity, accessibility, and **registry-first** UI — until the SwiftUI shell can be **removed** without losing thin-client or module functionality.
+**§11** now tracks **iOS surface polish** — accessibility, native-feel decisions, and PTY/TUI parity — rather than a migration; the OpenFrame-on-iOS surface itself is in place.

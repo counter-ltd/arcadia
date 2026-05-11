@@ -40,7 +40,6 @@ function Invoke-IosDeviceDeploy {
 
     $configuration = if ($Release) { "Release" } else { "Debug" }
     $projectPath = Join-Path $RootDir "../Mobile/iOS/ArcadiaApp.xcodeproj"
-    $sharedBuildScript = Join-Path $RootDir "Scripts/Builds/build-ios-framework.sh"
     $derivedDataPath = Join-Path (Join-Path $RootDir "..") "Builds/Mobile/iOS/DerivedData/Device"
     $bundleId = "com.stacknode.arcadia"
     $preferredDeviceName = $env:ARCADIA_IOS_DEVICE_NAME
@@ -55,9 +54,7 @@ function Invoke-IosDeviceDeploy {
         throw "iOS project not found at $projectPath"
     }
 
-    if (-not (Test-Path $sharedBuildScript)) {
-        throw "Shared iOS build script not found at $sharedBuildScript"
-    }
+    & rustup target add aarch64-apple-ios 2>$null | Out-Null
 
     $destinations = & xcodebuild `
         -project $projectPath `
@@ -82,13 +79,6 @@ function Invoke-IosDeviceDeploy {
 
     if ([string]::IsNullOrWhiteSpace($deviceUdid)) {
         throw "No connected physical iOS device found. Hint: set ARCADIA_IOS_DEVICE_NAME to your device name."
-    }
-
-    Write-Host ""
-    Write-Host "Building shared iOS artifacts..."
-    & bash $sharedBuildScript
-    if ($LASTEXITCODE -ne 0) {
-        throw "Shared iOS artifact build failed."
     }
 
     Push-Location (Join-Path $RootDir "..")

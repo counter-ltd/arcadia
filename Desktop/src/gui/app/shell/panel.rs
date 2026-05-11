@@ -1,5 +1,3 @@
-use std::env;
-
 use openframe::{
     div, px, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
     Styled, Window, WindowAppearance,
@@ -9,6 +7,7 @@ use crate::gui::tui::shell_history_line;
 use crate::gui::theme;
 
 use super::super::ArcadiaRoot;
+use super::super::text_input_caret::TEXT_INPUT_CARET_CHAR;
 
 impl ArcadiaRoot {
     pub(crate) fn shell_panel(
@@ -126,26 +125,20 @@ impl ArcadiaRoot {
         let cursor = term.shell_cursor.min(chars.len());
         let mut out = String::with_capacity(chars.len() + 1);
         for (idx, ch) in chars.iter().enumerate() {
-            if idx == cursor && is_focused && self.shell_caret_visible {
-                out.push('|');
+            if idx == cursor && is_focused && self.text_caret_blink_visible {
+                out.push(TEXT_INPUT_CARET_CHAR);
             }
             out.push(*ch);
         }
-        if cursor == chars.len() && is_focused && self.shell_caret_visible {
-            out.push('|');
+        if cursor == chars.len() && is_focused && self.text_caret_blink_visible {
+            out.push(TEXT_INPUT_CARET_CHAR);
         }
         out
     }
 
     pub(crate) fn shell_working_directory_label(&self) -> String {
-        let term = self.active_terminal();
-        if term.tui_session.is_some() {
-            term.shell_display_cwd.clone()
-        } else {
-            env::current_dir()
-                .ok()
-                .and_then(|path| path.to_str().map(ToOwned::to_owned))
-                .unwrap_or_else(|| "cwd: unavailable".to_string())
-        }
+        // Always use per-terminal logical cwd (updated after each `spawn_tui_command` and while
+        // a live PTY runs). `env::current_dir()` is the GUI process — wrong between transcript prompts.
+        self.active_terminal().shell_display_cwd.clone()
     }
 }

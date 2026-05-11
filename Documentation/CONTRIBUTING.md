@@ -6,8 +6,8 @@ Read `AGENTS.md` — it has the registry-discipline rules and the full list of a
 2. **No per-module booleans in surface state.** One generic `is_module_enabled(name)` query.
 3. **No hardcoded page ID match arms in visibility logic.** Derive from `required_module` in `PageDefinition`.
 4. **No inline colors.** Theme layer only.
-5. **Cross-platform logic belongs in core.** If you're writing the same thing in `app.rs` and `ContentView.swift`, it's core logic.
-6. **After FFI changes:** run `Shared/Scripts/Builds/build-ios-framework.sh` and commit `Generated/` + `xcframework`.
+5. **Cross-platform logic belongs in core.** Desktop and iOS share the same Rust UI — if you're writing the same thing in `Desktop/src/main.rs` and `Mobile/iOS/ArcadiaApp/`, it almost certainly belongs in `arcadia-core` or `gui/app/`.
+6. **iOS C ABI changes:** edit `Desktop/src/ios_lib.rs` and mirror in `Mobile/iOS/ArcadiaApp/ArcadiaBridge.h`. Commit both.
 
 If something's missing: open a PR, draft a module, or file an issue with a concrete repro.
 
@@ -26,7 +26,7 @@ If something's missing: open a PR, draft a module, or file an issue with a concr
 
 1. Add `NavigationPageDefinition` to `PAGE_DEFINITIONS` in `navigation.rs`. Set `required_module` if visibility depends on a module.
 2. Add the page ID to the relevant `GROUP_DEFINITIONS.pages` slice, or create a new group.
-3. Implement the page panel: Desktop → `gui/app/` new panel file; iOS → new view file.
+3. Implement the page panel under `Desktop/src/gui/app/` — the same panel renders on desktop and iOS via OpenFrame.
 4. Route it in the surface content switch via the page ID — derive visibility from `required_module`, not a hardcoded match.
 
 ### New icon/glyph
@@ -37,13 +37,12 @@ If something's missing: open a PR, draft a module, or file an issue with a concr
 
 ### New theme color
 
-- Desktop: add named constant or helper fn to `Desktop/src/gui/theme/mod.rs` or the relevant component token file under `theme/modules/`.
-- iOS: add computed property to `AppTheme` in `AppTheme.swift`.
-- Never inline `rgb(0x...)` or `Color(hex:)` in view files.
+- Add named constant or helper fn to `Desktop/src/gui/theme/mod.rs` or the relevant component token file under `theme/modules/`.
+- Never inline `rgb(0x...)` in view files.
 
 ### New mirrored state
 
-Extend `SurfaceSnapshot.extra` and add a `SurfacePatch` variant in `modules/surface.rs`. Wire both surfaces to consume the new extra field from snapshot. Do not create ad-hoc `remote-session.*` verbs — keep the protocol under `surface.*`.
+Extend `SurfaceSnapshot.extra` and add a `SurfacePatch` variant in `modules/surface.rs`. Wire the consuming panel to read the new extra field from snapshot. Do not create ad-hoc `remote-session.*` verbs — keep the protocol under `surface.*`.
 
 ### Renaming a module
 
@@ -68,4 +67,4 @@ cd Shared && cargo test -p arcadia-core
 # - Module enable/disable with dependency enforcement
 ```
 
-iOS `ArcadiaCore.xcframework` rebuild after FFI changes is currently manual. Adding a CI step that fails when `Generated/` drifts from `ffi.rs` is a high-priority gap — see [ROADMAP.md](ROADMAP.md).
+The iOS static lib is built automatically by the Xcode project's "Build Rust (cargo)" phase whenever you build `ArcadiaApp` — no separate rebuild step. CI replicates this via `xcodebuild` after installing the `aarch64-apple-ios-sim` target.

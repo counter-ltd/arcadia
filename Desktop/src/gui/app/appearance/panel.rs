@@ -1,10 +1,11 @@
 use arcadia_core::modules::python_registry::{list_style_tokens, StyleTokenKind};
 use openframe::{
-    AnyElement, Rgba, div, px, rgb, Context, FontWeight, InteractiveElement,
+    AnyElement, Rgba, Window, div, px, rgb, Context, FontWeight, InteractiveElement,
     IntoElement, KeyDownEvent, MouseButton, ParentElement, Styled,
 };
 use openframe::prelude::FluentBuilder as _;
 
+use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -27,6 +28,7 @@ fn token_kind_label(kind: StyleTokenKind) -> &'static str {
 impl ArcadiaRoot {
     pub(crate) fn appearance_panel(
         &mut self,
+        window: &Window,
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
@@ -271,6 +273,9 @@ impl ArcadiaRoot {
                                     }))
                                     .into_any_element()
                             } else if is_editing {
+                                let show_caret =
+                                    ext_token_focus.is_focused(window) && is_editing;
+                                let blink = self.text_caret_blink_visible;
                                 div()
                                     .px_3()
                                     .py_2()
@@ -287,7 +292,11 @@ impl ArcadiaRoot {
                                             this.extension_token_focus.focus(window);
                                         }),
                                     )
-                                    .child(div().child(display_val.clone()))
+                                    .child(div().child(text_with_trailing_caret(
+                                        display_val.as_str(),
+                                        show_caret,
+                                        blink,
+                                    )))
                                     .on_key_down(cx.listener({
                                         let m = row_module.clone();
                                         let k = row_key.clone();

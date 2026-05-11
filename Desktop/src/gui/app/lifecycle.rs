@@ -185,6 +185,8 @@ impl ArcadiaRoot {
         let late_settings_username_focus = cx.focus_handle();
         let late_settings_default_room_focus = cx.focus_handle();
         let extension_token_focus = cx.focus_handle();
+        let modules_search_focus = cx.focus_handle();
+        let extensions_search_focus = cx.focus_handle();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
@@ -215,6 +217,10 @@ impl ArcadiaRoot {
             title: openframe::SharedString::new_static("Arcadia"),
             active_page_id: navigation::DEFAULT_PAGE_ID.to_string(),
             active_group_id: navigation::DEFAULT_GROUP_ID.to_string(),
+            modules_search_query: String::new(),
+            extensions_search_query: String::new(),
+            modules_search_focus,
+            extensions_search_focus,
             module_rows,
             python_extension_rows: Vec::new(),
             active_style,
@@ -237,10 +243,8 @@ impl ArcadiaRoot {
             #[cfg(feature = "gui")]
             shell_focus,
             late_compose_focus,
-            #[cfg(feature = "gui")]
-            shell_caret_visible: true,
-            #[cfg(feature = "gui")]
-            shell_caret_task_started: false,
+            text_caret_blink_visible: true,
+            text_caret_blink_task_started: false,
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
             sidebar_visible: true,
@@ -552,11 +556,11 @@ impl ArcadiaRoot {
     }
 
     #[cfg(feature = "gui")]
-    pub fn ensure_shell_caret_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.shell_caret_task_started {
+    pub fn ensure_text_caret_blink_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.text_caret_blink_task_started {
             return;
         }
-        self.shell_caret_task_started = true;
+        self.text_caret_blink_task_started = true;
         cx.spawn_in(
             window,
             move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
@@ -567,11 +571,7 @@ impl ArcadiaRoot {
                         let should_stop = cx
                             .update(|_, app| {
                                 view.update(app, |this, cx| {
-                                    if !this.is_module_enabled(TERMINAL_MODULE_NAME) {
-                                        this.shell_caret_task_started = false;
-                                        return true;
-                                    }
-                                    this.shell_caret_visible = !this.shell_caret_visible;
+                                    this.text_caret_blink_visible = !this.text_caret_blink_visible;
                                     cx.notify();
                                     false
                                 })
