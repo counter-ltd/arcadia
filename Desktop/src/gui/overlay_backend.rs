@@ -4,14 +4,17 @@
 //! [`crate::gui::app::entry::spawn_main_thread_pump`]) so we never store `AsyncApp` in a `Send`
 //! mutex. Closing the main Arcadia window tears down the `App`, which drops all windows including
 //! this overlay. macOS notch/menu-bar stacking may need a higher window level later.
+//!
+//! HUD **sprite** updates are **not** applied via `AsyncApp::update` — the overlay root view pulls
+//! [`arcadia_core::modules::overlay_hud_sprite`] inside [`crate::gui::overlay_hud::OverlayHudRoot::render`]
+//! to avoid nested `App::borrow_mut` when the timer pump overlaps an in-flight UI update.
 
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Mutex;
 
 use arcadia_core::modules::overlay::{self, OverlayBackend, OverlayStackingToken};
+use arcadia_core::modules::overlay_hud_sprite;
 use openframe::{AnyWindowHandle, AsyncApp, WindowStacking};
-
-use super::overlay_hud::OverlayHudRoot;
 
 static OVERLAY_HANDLE: Mutex<Option<AnyWindowHandle>> = Mutex::new(None);
 static OVERLAY_VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -25,6 +28,9 @@ const STACK_PENDING_SYSTEM_UI: u8 = 4;
 
 static OVERLAY_STACKING_PENDING: AtomicU8 = AtomicU8::new(STACK_PENDING_NONE);
 static OVERLAY_STACKING_DIRTY: AtomicBool = AtomicBool::new(false);
+
+/// Last [`overlay_hud_sprite::version`] we requested a full window refresh for.
+static SPRITE_REFRESHED_AT_VERSION: AtomicU64 = AtomicU64::new(u64::MAX);
 
 struct DesktopOverlayBackendThunk;
 
@@ -66,11 +72,12 @@ pub fn init_overlay_module() {
     overlay::set_backend(Box::new(DesktopOverlayBackendThunk));
 }
 
-pub fn register_overlay_window(handle: openframe::WindowHandle<OverlayHudRoot>) {
+pub fn register_overlay_window(handle: openframe::WindowHandle<super::overlay_hud::OverlayHudRoot>) {
     let any: AnyWindowHandle = handle.into();
     if let Ok(mut g) = OVERLAY_HANDLE.lock() {
         *g = Some(any);
     }
+    SPRITE_REFRESHED_AT_VERSION.store(u64::MAX, Ordering::Release);
     overlay::set_stacking_status_label("hud");
 }
 
@@ -78,6 +85,7 @@ pub fn register_overlay_window(handle: openframe::WindowHandle<OverlayHudRoot>) 
 pub fn poll_overlay(async_app: &mut AsyncApp) {
     poll_overlay_visibility(async_app);
     poll_overlay_stacking(async_app);
+    poll_overlay_sprite_refresh(async_app);
 }
 
 fn poll_overlay_stacking(async_app: &mut AsyncApp) {
@@ -123,4 +131,17 @@ pub fn poll_overlay_visibility(async_app: &mut AsyncApp) {
             Ok(())
         });
     });
+}
+
+/// When Python (or any thread) bumps the HUD sprite revision, schedule a redraw. Uses
+/// [`AsyncApp::refresh`] only (no root `update`) to reduce nested `App::borrow_mut` pressure vs
+/// pushing pixels through `WindowHandle::update`.
+fn poll_overlay_sprite_refresh(async_app: &AsyncApp) {
+    let v = overlay_hud_sprite::version();
+    let prev = SPRITE_REFRESHED_AT_VERSION.load(Ordering::Acquire);
+    if v == prev {
+        return;
+    }
+    SPRITE_REFRESHED_AT_VERSION.store(v, Ordering::Release);
+    let _ = async_app.refresh();
 }

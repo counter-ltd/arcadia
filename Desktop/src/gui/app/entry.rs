@@ -59,7 +59,7 @@ pub fn run() {
         app.activate(true);
 
         // Main-thread pump: drains the scheduling queue (tray image/menu updates marshal here)
-        // and forwards tray-icon menu clicks to the Arcadia command dispatcher.
+        // and forwards tray-icon menu clicks + tray surface clicks (Python handlers).
         spawn_main_thread_pump(app);
     });
 }

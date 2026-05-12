@@ -21,9 +21,22 @@ pub struct ScreenSize {
     pub height: u32,
 }
 
+/// Global cursor position plus primary mouse buttons when the active cursor backend supports it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CursorSnapshot {
+    pub x: f64,
+    pub y: f64,
+    pub left_button: bool,
+    pub right_button: bool,
+}
+
 pub trait CursorBackend: Send + Sync {
     fn position(&self) -> Option<CursorPosition>;
     fn primary_screen_size(&self) -> Option<ScreenSize>;
+    /// OS-global mouse sample including left/right button down state, or `None` if unavailable.
+    fn snapshot(&self) -> Option<CursorSnapshot> {
+        None
+    }
 }
 
 fn backend_slot() -> &'static Mutex<Option<Box<dyn CursorBackend>>> {
@@ -49,6 +62,13 @@ pub fn primary_screen_size() -> Option<ScreenSize> {
         .lock()
         .ok()
         .and_then(|slot| slot.as_ref().and_then(|b| b.primary_screen_size()))
+}
+
+pub fn snapshot() -> Option<CursorSnapshot> {
+    backend_slot()
+        .lock()
+        .ok()
+        .and_then(|slot| slot.as_ref().and_then(|b| b.snapshot()))
 }
 
 fn cmd_position(_args: &[&str], _ctx: &ExecutionContext) -> String {

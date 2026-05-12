@@ -1,9 +1,14 @@
 //! Shared extension token editor (persisted under `extension_tokens/`).
 
-use arcadia_core::modules::python_registry::{StyleTokenKind, StyleTokenSpec};
+use arcadia_core::modules::python_registry::{
+    format_slider_value, resolve_slider_numeric, snap_slider_value, style_token_row_visible,
+    StyleTokenKind, StyleTokenNumericGranularity, StyleTokenSpec,
+};
+use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, Rgba, Styled, Window, div, px, rgb,
+    AnyElement, AppContext, Bounds, Context, DragMoveEvent, FontWeight, Hitbox, InteractiveElement,
+    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render,
+    Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div, px, relative, rgb,
 };
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::ArcadiaRoot;
@@ -25,6 +30,41 @@ fn token_kind_label(kind: StyleTokenKind) -> &'static str {
     }
 }
 
+#[derive(Clone)]
+struct ExtensionTokenSliderDrag {
+    module: String,
+    key: String,
+    kind: StyleTokenKind,
+    lo: f64,
+    hi: f64,
+    step: f64,
+    granularity: StyleTokenNumericGranularity,
+}
+
+struct SliderDragGhost;
+
+impl Render for SliderDragGhost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<'_, Self>) -> impl IntoElement {
+        div().w(px(1.)).h(px(1.))
+    }
+}
+
+fn bool_from_display(s: &str) -> bool {
+    matches!(
+        s.trim().to_ascii_lowercase().as_str(),
+        "true" | "1" | "yes" | "on"
+    )
+}
+
+fn slider_t_from_hit(bounds: &Bounds<Pixels>, position: &Point<Pixels>) -> f64 {
+    let w = bounds.size.width.to_f64();
+    if w <= f64::EPSILON {
+        return 0.;
+    }
+    let x = position.x.to_f64() - bounds.origin.x.to_f64();
+    (x / w).clamp(0., 1.)
+}
+
 impl ArcadiaRoot {
     pub(crate) fn extension_tokens_settings_card(
         &mut self,
@@ -37,7 +77,7 @@ impl ArcadiaRoot {
         help: String,
         extension_label: Option<String>,
     ) -> openframe::Div {
-        let (panel_bg, panel_stroke, panel_radius, header_color, subtext_color, _is_glyph) = {
+        let (panel_bg, panel_stroke, panel_radius, header_color, subtext_color, is_glyph) = {
             let g = theme::active_glyph(cx);
             (
                 g.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::module_panel_bg(is_dark)),
@@ -52,6 +92,7 @@ impl ArcadiaRoot {
                 g.is_some(),
             )
         };
+        let p = theme::theme_palette(cx, is_dark);
         let ext_token_focus = self.extension_token_focus.clone();
         let input_bg = theme::glyph_snapshot(cx)
             .map(|g| g.surface)
@@ -61,7 +102,17 @@ impl ArcadiaRoot {
             .unwrap_or_else(|| theme::ui_border(cx, is_dark));
 
         let module_owned = module_id.to_string();
-        let rows = specs.iter().map(|spec| {
+        let rows = specs
+            .iter()
+            .filter(|spec| {
+                style_token_row_visible(
+                    &spec.visibility,
+                    module_id,
+                    specs,
+                    &self.extension_token_values,
+                )
+            })
+            .map(|spec| {
             let key = spec.key.clone();
             let label = spec.label.clone();
             let kind = spec.kind;
@@ -159,6 +210,254 @@ impl ArcadiaRoot {
                                 }
                             }))
                             .into_any_element()
+                    } else if kind == StyleTokenKind::Bool {
+                        let enabled = bool_from_display(display_val.as_str());
+                        let r_track = panel_radius.min(8.0_f32).max(0.0);
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .justify_between()
+                            .cursor_pointer()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(if enabled {
+                                        p.accent
+                                    } else {
+                                        p.ui_subtext
+                                    })
+                                    .child(if enabled { "ON" } else { "OFF" }),
+                            )
+                            .child(if enabled {
+                                div()
+                                    .w_10()
+                                    .h_6()
+                                    .px_0p5()
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(r_track))
+                                    .border_1()
+                                    .border_color(p.border)
+                                    .bg(p.accent)
+                                    .flex()
+                                    .items_center()
+                                    .justify_end()
+                                    .child(
+                                        div()
+                                            .w_4()
+                                            .h_4()
+                                            .when(!is_glyph, |d| d.rounded_full())
+                                            .rounded(px(r_track))
+                                            .bg(p.on_accent),
+                                    )
+                            } else {
+                                div()
+                                    .w_10()
+                                    .h_6()
+                                    .px_0p5()
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(r_track))
+                                    .border_1()
+                                    .border_color(p.border)
+                                    .bg(p.surface_elevated)
+                                    .flex()
+                                    .items_center()
+                                    .justify_start()
+                                    .child(
+                                        div()
+                                            .w_4()
+                                            .h_4()
+                                            .when(!is_glyph, |d| d.rounded_full())
+                                            .rounded(px(r_track))
+                                            .bg(p.toggle_knob_off),
+                                    )
+                            })
+                            .on_mouse_down(MouseButton::Left, cx.listener({
+                                let m = row_module.clone();
+                                let k = row_key.clone();
+                                move |this, _, _, cx| {
+                                    if let Some((ref em, ref ek)) = this.extension_token_editing.clone() {
+                                        if em != &m || ek != &k {
+                                            this.flush_extension_token_edit(em.clone(), ek.clone(), cx);
+                                        }
+                                    }
+                                    this.extension_token_editing = None;
+                                    let pair = (m.clone(), k.clone());
+                                    let cur = this
+                                        .extension_token_values
+                                        .get(&pair)
+                                        .map(String::as_str)
+                                        .unwrap_or("false");
+                                    let next = (!bool_from_display(cur)).to_string();
+                                    this.extension_token_values.insert(pair, next);
+                                    this.flush_extension_token_edit(m.clone(), k.clone(), cx);
+                                    cx.notify();
+                                }
+                            }))
+                            .into_any_element()
+                    } else if matches!(kind, StyleTokenKind::Int | StyleTokenKind::Float) {
+                        match resolve_slider_numeric(spec, display_val.as_str()) {
+                            Some(res) => {
+                        let lo = res.lo;
+                        let hi = res.hi.max(lo + 1e-6);
+                        let step = res.step;
+                        let gran = res.granularity;
+                        let cur_raw = display_val.trim().parse::<f64>().unwrap_or(lo);
+                        let cur = snap_slider_value(cur_raw, lo, hi, step, kind);
+                        let fill_t = (((cur - lo) / (hi - lo)) as f32).clamp(0., 1.);
+                        let fill_basis = fill_t.max(0.0001);
+                        let weak = cx.weak_entity();
+                        let drag_payload = ExtensionTokenSliderDrag {
+                            module: row_module.clone(),
+                            key: row_key.clone(),
+                            kind,
+                            lo,
+                            hi,
+                            step,
+                            granularity: gran,
+                        };
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .flex_1()
+                                            .min_w(px(120.))
+                                            .h(px(12.))
+                                            .rounded(px(6.))
+                                            .overflow_hidden()
+                                            .border_1()
+                                            .border_color(input_border)
+                                            .cursor_pointer()
+                                            .on_mouse_down_with_hitbox(
+                                                MouseButton::Left,
+                                                {
+                                                    let m = row_module.clone();
+                                                    let k = row_key.clone();
+                                                    let weak = weak.clone();
+                                                    move |ev: &MouseDownEvent, hb: &Hitbox, _, cx| {
+                                                        let _ = weak.update(cx, |this, cx| {
+                                                            if let Some((ref em, ref ek)) =
+                                                                this.extension_token_editing.clone()
+                                                            {
+                                                                if em != &m || ek != &k {
+                                                                    this.flush_extension_token_edit(
+                                                                        em.clone(),
+                                                                        ek.clone(),
+                                                                        cx,
+                                                                    );
+                                                                }
+                                                            }
+                                                            this.extension_token_editing = None;
+                                                            let t = slider_t_from_hit(&hb.bounds, &ev.position);
+                                                            let v = lo + t * (hi - lo);
+                                                            let v = snap_slider_value(v, lo, hi, step, kind);
+                                                            let s =
+                                                                format_slider_value(v, kind, gran);
+                                                            this.extension_token_values
+                                                                .insert((m.clone(), k.clone()), s);
+                                                            this.flush_extension_token_edit(m.clone(), k.clone(), cx);
+                                                            cx.notify();
+                                                        });
+                                                    }
+                                                }
+                                            )
+                                            .id((
+                                                SharedString::from(format!(
+                                                    "ext-tok-slider-{}-{}",
+                                                    module_owned, row_key
+                                                )),
+                                                0usize,
+                                            ))
+                                            .on_drag(drag_payload.clone(), |_, _, _, cx| {
+                                                cx.new(|_| SliderDragGhost)
+                                            })
+                                            .on_drag_move(cx.listener({
+                                                let row_module = row_module.clone();
+                                                let row_key = row_key.clone();
+                                                move |this, ev: &DragMoveEvent<ExtensionTokenSliderDrag>, _, cx| {
+                                                    let (module, key, lo, hi, kind, step, gran) = {
+                                                        let pl = ev.drag(&*cx);
+                                                        if pl.module != row_module || pl.key != row_key {
+                                                            return;
+                                                        }
+                                                        (
+                                                            pl.module.clone(),
+                                                            pl.key.clone(),
+                                                            pl.lo,
+                                                            pl.hi,
+                                                            pl.kind,
+                                                            pl.step,
+                                                            pl.granularity,
+                                                        )
+                                                    };
+                                                    let t = slider_t_from_hit(&ev.bounds, &ev.event.position);
+                                                    let v = lo + t * (hi - lo);
+                                                    let v = snap_slider_value(v, lo, hi, step, kind);
+                                                    let s =
+                                                        format_slider_value(v, kind, gran);
+                                                    if let Some((ref em, ref ek)) =
+                                                        this.extension_token_editing.clone()
+                                                    {
+                                                        if em != &module || ek != &key {
+                                                            this.flush_extension_token_edit(
+                                                                em.clone(),
+                                                                ek.clone(),
+                                                                cx,
+                                                            );
+                                                        }
+                                                    }
+                                                    this.extension_token_editing = None;
+                                                    let pair = (module.clone(), key.clone());
+                                                    let prev = this
+                                                        .extension_token_values
+                                                        .get(&pair)
+                                                        .cloned();
+                                                    if prev.as_deref() == Some(s.as_str()) {
+                                                        return;
+                                                    }
+                                                    this.extension_token_values
+                                                        .insert(pair, s);
+                                                    this.flush_extension_token_edit(module, key, cx);
+                                                    cx.notify();
+                                                }
+                                            }))
+                                            .child(
+                                                div()
+                                                    .h_full()
+                                                    .flex_none()
+                                                    .flex_basis(relative(fill_basis))
+                                                    .bg(p.accent),
+                                            )
+                                            .child(div().h_full().flex_1().bg(input_bg)),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(subtext_color)
+                                            .min_w(px(40.))
+                                            .child(display_val.clone()),
+                                    ),
+                            )
+                            .into_any_element()
+                            }
+                            None => div()
+                                .text_xs()
+                                .text_color(subtext_color)
+                                .child("(invalid numeric default)")
+                                .into_any_element(),
+                        }
                     } else if is_editing {
                         let show_caret = ext_token_focus.is_focused(window) && is_editing;
                         let blink = self.text_caret_blink_visible;
@@ -260,7 +559,7 @@ impl ArcadiaRoot {
                     };
                     edit_cell
                 })
-        });
+            });
 
         let mut outer = div()
             .w_full()

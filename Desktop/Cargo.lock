@@ -90,6 +90,7 @@ dependencies = [
  "device_query",
  "display-info",
  "global-hotkey",
+ "image",
  "libc",
  "openframe",
  "portable-pty",

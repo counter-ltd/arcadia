@@ -1,8 +1,17 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::config::modules::supports_runtime_platform_owned;
+use crate::modules::style_tokens;
+
+pub use style_tokens::{
+    clamp_numeric_display_for_spec, effective_token_display, format_slider_value,
+    merge_token_numeric_bounds, numeric_clamp_lo_hi, parse_granularity_str, resolve_slider_numeric,
+    snap_slider_value, style_token_row_visible, StyleTokenCompareOp, StyleTokenKind,
+    StyleTokenNumericBounds, StyleTokenNumericGranularity, StyleTokenNumericPartial, StyleTokenSpec,
+    StyleTokenVisibility,
+};
 
 pub struct PythonModuleInfo {
     pub name: String,
@@ -23,6 +32,7 @@ pub struct PythonModuleInfo {
 }
 
 type DynCommandFn = Arc<dyn Fn(Vec<String>) -> String + Send + Sync + 'static>;
+type TrayIconClickFn = Arc<dyn Fn(Vec<String>) + Send + Sync + 'static>;
 type ReloadFn = Arc<dyn Fn() -> Result<(), String> + Send + Sync + 'static>;
 /// Loader for a single extension: takes the stub id the host knows the file by plus the
 /// on-disk path, and returns the canonical module name the body actually registered (often
@@ -45,9 +55,11 @@ struct PythonRegistry {
     load_one_fn: Option<LoadOneFn>,
     styles: Vec<StyleInfo>,
     /// Extension module id → token declarations from `register_tokens`.
-    style_tokens: HashMap<String, Vec<StyleTokenSpec>>,
+    style_tokens: HashMap<String, Vec<style_tokens::StyleTokenSpec>>,
     /// Shortcuts registered via `register_extension_shortcut` (cleared on reload).
     shortcuts: Vec<crate::shortcuts::EffectiveMergedShortcut>,
+    /// Per-extension tray-icon click handler: `(tray_item_id, button)` as `["tray-1","left"]`.
+    tray_icon_click_handlers: HashMap<String, TrayIconClickFn>,
 }
 
 /// Glyph rendering parameters provided by a Python extension when registering a style.
@@ -83,25 +95,6 @@ pub struct GlyphParams {
     pub border_radius: f32,
 }
 
-/// Declared UI/config token for a styling extension (persisted under `extension_tokens/`).
-#[derive(Clone, Debug)]
-pub struct StyleTokenSpec {
-    pub key: String,
-    pub label: String,
-    pub kind: StyleTokenKind,
-    /// Serialized default (same representation saved in TOML).
-    pub default_value: String,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StyleTokenKind {
-    Color,
-    Float,
-    String,
-    Bool,
-    Int,
-}
-
 /// Metadata for a render style registered by a Python extension.
 #[derive(Clone, Debug)]
 pub struct StyleInfo {
@@ -126,6 +119,7 @@ impl PythonRegistry {
             styles: Vec::new(),
             style_tokens: HashMap::new(),
             shortcuts: Vec::new(),
+            tray_icon_click_handlers: HashMap::new(),
         }
     }
 }
@@ -238,6 +232,55 @@ pub fn extension_path(name: &str) -> Option<PathBuf> {
         .and_then(|m| m.path.clone())
 }
 
+/// On-disk directory for one extension bundle: parent of `main.py` or of a loose `.py` entry.
+///
+/// Layout for import/download: `…/Extensions/<folder>/main.py` plus `…/Extensions/<folder>/Assets/*`.
+pub fn extension_bundle_root(extension_module_id: &str) -> Option<PathBuf> {
+    let path = extension_path(extension_module_id)?;
+    path.parent().map(|p| p.to_path_buf())
+}
+
+/// Canonical asset directory: `<extension_bundle_root>/Assets`.
+pub fn extension_assets_dir(extension_module_id: &str) -> Option<PathBuf> {
+    Some(extension_bundle_root(extension_module_id)?.join("Assets"))
+}
+
+fn validate_extension_asset_relative(relative: &str) -> Result<(), String> {
+    let s = relative.trim();
+    if s.is_empty() {
+        return Err("empty relative asset path".into());
+    }
+    let p = Path::new(s);
+    if p.is_absolute() {
+        return Err("absolute asset paths are not allowed".into());
+    }
+    for c in p.components() {
+        match c {
+            Component::Normal(os) => {
+                if os.to_str().is_none() {
+                    return Err("asset path must be UTF-8".into());
+                }
+            }
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err("invalid asset path".into());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Resolved path under [`extension_assets_dir`] for a safe relative path (no `..`, not absolute).
+pub fn resolve_extension_asset_path(
+    extension_module_id: &str,
+    relative_under_assets: &str,
+) -> Result<PathBuf, String> {
+    validate_extension_asset_relative(relative_under_assets)?;
+    let base = extension_assets_dir(extension_module_id)
+        .ok_or_else(|| format!("no on-disk path for extension '{extension_module_id}'"))?;
+    Ok(base.join(relative_under_assets.trim_start_matches(['/', '\\'])))
+}
+
 /// Snapshot of all currently-registered module ids, in registration order. Used by the loader
 /// to detect entries created during a single `load_extension` call so we can collapse the
 /// stub onto the body's declared canonical name (folder rename / declared-name mismatch).
@@ -262,6 +305,7 @@ pub fn remove_module(name: &str) {
             .retain(|s| s.module_name.as_deref() != Some(name));
         reg.shortcuts
             .retain(|s| s.source_extension_id.as_deref() != Some(name));
+        reg.tray_icon_click_handlers.remove(name);
         let prefix = format!("{name}.");
         reg.commands.retain(|token, _| !token.starts_with(&prefix));
     }
@@ -295,6 +339,7 @@ pub fn unregister_extension_contributions(name: &str) {
         reg.style_tokens.remove(name);
         reg.shortcuts
             .retain(|s| s.source_extension_id.as_deref() != Some(name));
+        reg.tray_icon_click_handlers.remove(name);
         if let Some(m) = reg.modules.iter_mut().find(|m| m.name == name) {
             m.loaded = false;
         }
@@ -375,6 +420,57 @@ pub fn register_command(
     }
 }
 
+pub fn register_tray_icon_click_handler(extension_id: String, handler: TrayIconClickFn) {
+    if extension_id.is_empty() {
+        return;
+    }
+    if let Ok(mut reg) = registry().lock() {
+        reg.tray_icon_click_handlers.insert(extension_id, handler);
+    }
+}
+
+/// Tray-icon primary click (from desktop `tray-icon`); forwards to the owning Python extension
+/// when it registered [`register_tray_icon_click_handler`].
+pub fn dispatch_tray_icon_click(tray_item_id: String, button: String) {
+    use crate::modules::tray;
+
+    let Some(item) = tray::get_item(&tray_item_id) else {
+        return;
+    };
+    let rest = item.owner.strip_prefix("python:");
+    let Some(rest) = rest else {
+        return;
+    };
+    let ext_id = rest
+        .split_once("::")
+        .map(|(base, _)| base.to_string())
+        .unwrap_or_else(|| rest.to_string());
+
+    let handler = {
+        let Ok(reg) = registry().lock() else {
+            return;
+        };
+        if let Some(m) = reg.modules.iter().find(|m| m.name == ext_id) {
+            if !m.enabled {
+                return;
+            }
+            if !supports_runtime_platform_owned(&m.supported_platforms) {
+                return;
+            }
+        }
+        reg.tray_icon_click_handlers.get(&ext_id).cloned()
+    };
+    let Some(handler) = handler else {
+        return;
+    };
+
+    let tid = tray_item_id.clone();
+    let btn = button.clone();
+    crate::scheduling::spawn(move || {
+        handler(vec![tid, btn]);
+    });
+}
+
 pub fn set_reload_handler(f: ReloadFn) {
     if let Ok(mut reg) = registry().lock() {
         reg.reload_fn = Some(f);
@@ -431,13 +527,13 @@ pub fn register_style(
     }
 }
 
-pub fn register_tokens(module_name: String, tokens: Vec<StyleTokenSpec>) {
+pub fn register_tokens(module_name: String, tokens: Vec<style_tokens::StyleTokenSpec>) {
     if let Ok(mut reg) = registry().lock() {
         reg.style_tokens.insert(module_name, tokens);
     }
 }
 
-pub fn list_style_tokens() -> Vec<(String, Vec<StyleTokenSpec>)> {
+pub fn list_style_tokens() -> Vec<(String, Vec<style_tokens::StyleTokenSpec>)> {
     let Ok(reg) = registry().lock() else {
         return Vec::new();
     };
@@ -462,7 +558,7 @@ pub fn extension_tokens_editable_under_appearance(module_id: &str) -> bool {
 }
 
 /// Extensions with `register_tokens` entries that are **not** tied to an Appearance style.
-pub fn standalone_extension_token_modules() -> Vec<(String, Vec<StyleTokenSpec>)> {
+pub fn standalone_extension_token_modules() -> Vec<(String, Vec<style_tokens::StyleTokenSpec>)> {
     let Ok(reg) = registry().lock() else {
         return Vec::new();
     };
@@ -515,6 +611,7 @@ pub fn clear() {
         reg.styles.clear();
         reg.style_tokens.clear();
         reg.shortcuts.clear();
+        reg.tray_icon_click_handlers.clear();
     }
 }
 
@@ -642,4 +739,62 @@ pub fn list_commands() -> Vec<(String, String)> {
         .iter()
         .map(|(token, rec)| (token.clone(), rec.description.clone()))
         .collect()
+}
+
+#[cfg(test)]
+mod extension_asset_path_tests {
+    use super::*;
+
+    #[test]
+    fn bundle_and_assets_under_main_py() {
+        register_discovered(
+            "asset-test-a".into(),
+            PathBuf::from("/fake/Arcadia/Extensions/my_ext/main.py"),
+            false,
+            vec![],
+            vec![],
+        );
+        assert_eq!(
+            extension_bundle_root("asset-test-a").unwrap(),
+            PathBuf::from("/fake/Arcadia/Extensions/my_ext")
+        );
+        assert_eq!(
+            extension_assets_dir("asset-test-a").unwrap(),
+            PathBuf::from("/fake/Arcadia/Extensions/my_ext/Assets")
+        );
+        assert_eq!(
+            resolve_extension_asset_path("asset-test-a", "icons/x.png").unwrap(),
+            PathBuf::from("/fake/Arcadia/Extensions/my_ext/Assets/icons/x.png")
+        );
+        remove_module("asset-test-a");
+    }
+
+    #[test]
+    fn bundle_root_for_loose_py_is_parent_dir() {
+        register_discovered(
+            "asset-test-b".into(),
+            PathBuf::from("/fake/Arcadia/Extensions/oneoff.py"),
+            false,
+            vec![],
+            vec![],
+        );
+        assert_eq!(
+            extension_assets_dir("asset-test-b").unwrap(),
+            PathBuf::from("/fake/Arcadia/Extensions/Assets")
+        );
+        remove_module("asset-test-b");
+    }
+
+    #[test]
+    fn rejects_parent_dir_in_relative() {
+        register_discovered(
+            "asset-test-c".into(),
+            PathBuf::from("/fake/Arcadia/Extensions/z/main.py"),
+            false,
+            vec![],
+            vec![],
+        );
+        assert!(resolve_extension_asset_path("asset-test-c", "../secret").is_err());
+        remove_module("asset-test-c");
+    }
 }

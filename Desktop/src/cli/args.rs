@@ -94,6 +94,7 @@ pub fn parse_execution_context(
         modules::ExecutionContext {
             net_as,
             net_timeout_ms,
+            ..Default::default()
         },
     ))
 }

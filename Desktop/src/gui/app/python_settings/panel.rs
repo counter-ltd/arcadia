@@ -74,7 +74,7 @@ impl ArcadiaRoot {
                     div()
                         .text_xs()
                         .text_color(p.content_meta)
-                        .child("Drop a .py file or a folder with main.py into ~/Arcadia/Extensions/ and reload."),
+                        .child("Drop a folder with main.py into ~/Arcadia/Extensions/ (static files in that folder's Assets/). Or a single .py file. Then reload."),
                 )
                 .into_any_element()
         } else if filtered.is_empty() && !self.extensions_search_query.trim().is_empty() {

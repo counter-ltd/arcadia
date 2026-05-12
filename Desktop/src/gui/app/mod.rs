@@ -285,6 +285,7 @@ impl ArcadiaRoot {
         arcadia_core::modules::ExecutionContext {
             net_as: self.remote_route.clone(),
             net_timeout_ms: None,
+            ..Default::default()
         }
     }
 

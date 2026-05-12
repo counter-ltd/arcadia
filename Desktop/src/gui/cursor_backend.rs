@@ -5,24 +5,35 @@
 //!
 //! macOS note: `device_query::DeviceState::new()` calls `application_is_trusted_with_prompt()`
 //! which surfaces the system Accessibility permission prompt and panics if the user has not
-//! granted access. We must NOT initialise the underlying `DeviceState` until the user has
-//! explicitly granted `cursor.global_position` inside Arcadia's permission settings — otherwise
-//! the OS prompt fires on every launch even when no extension/module uses the cursor backend.
+//! granted access. We must NOT initialise the underlying `DeviceState` until the user has turned
+//! on at least one of `cursor.global_position` or `cursor.global_mouse_buttons` in Arcadia's
+//! permission settings — otherwise the OS prompt fires on every launch even when no
+//! extension/module uses the cursor backend.
 //!
 //! Strategy:
 //!   1. `install()` does nothing more than wire the trait object into `cursor::set_backend`.
-//!   2. `DeviceState` is created lazily inside `position()`/`primary_screen_size()`, and only
-//!      after `PermissionsConfig::global_allowed("cursor.global_position")` is `true`.
+//!   2. `DeviceState` is created lazily inside `position()` / `snapshot()`, and only after
+//!      `PermissionsConfig::global_allowed("cursor.global_position")` or
+//!      `global_allowed("cursor.global_mouse_buttons")` is `true`.
 //!   3. We use `DeviceState::checked_new()` (returns `Option`) so a withdrawn grant never panics.
 
 use std::sync::Mutex;
 
 use arcadia_core::config::permissions::PermissionsConfig;
 use arcadia_core::config::ConfigFile;
-use arcadia_core::modules::cursor::{self, CursorBackend, CursorPosition, ScreenSize};
+use arcadia_core::modules::cursor::{self, CursorBackend, CursorPosition, CursorSnapshot, ScreenSize};
 use device_query::{DeviceQuery, DeviceState};
 
 const CURSOR_GLOBAL_POSITION_PERMISSION: &str = "cursor.global_position";
+const CURSOR_GLOBAL_MOUSE_BUTTONS_PERMISSION: &str = "cursor.global_mouse_buttons";
+
+fn cursor_os_input_global_enabled() -> bool {
+    let Ok(cfg) = PermissionsConfig::load_or_create() else {
+        return false;
+    };
+    cfg.global_allowed(CURSOR_GLOBAL_POSITION_PERMISSION)
+        || cfg.global_allowed(CURSOR_GLOBAL_MOUSE_BUTTONS_PERMISSION)
+}
 
 pub struct DesktopCursorBackend {
     device: Mutex<Option<DeviceState>>,
@@ -35,16 +46,15 @@ impl DesktopCursorBackend {
         }
     }
 
-    /// Lazy-init `DeviceState` on first use, gated on the global `cursor.global_position`
-    /// permission. Returns `None` if the permission is off or the OS hasn't granted access.
+    /// Lazy-init `DeviceState` on first use, gated on global cursor input permissions.
+    /// Returns `None` if both globals are off or the OS hasn't granted access.
     fn with_device<R>(&self, f: impl FnOnce(&DeviceState) -> R) -> Option<R> {
         let mut guard = self.device.lock().ok()?;
         if guard.is_none() {
-            // Refuse to even touch `device_query` unless the user has flipped the
-            // `cursor.global_position` global toggle in Arcadia. Without this check the OS
-            // Accessibility prompt would appear at launch regardless of user intent.
-            let cfg = PermissionsConfig::load_or_create().ok()?;
-            if !cfg.global_allowed(CURSOR_GLOBAL_POSITION_PERMISSION) {
+            // Refuse to touch `device_query` unless the user enabled at least one global
+            // cursor-input permission. Without this check the OS Accessibility prompt would
+            // appear at launch regardless of user intent.
+            if !cursor_os_input_global_enabled() {
                 return None;
             }
             // `checked_new()` returns `None` if Accessibility isn't granted by macOS instead of
@@ -58,11 +68,18 @@ impl DesktopCursorBackend {
 
 impl CursorBackend for DesktopCursorBackend {
     fn position(&self) -> Option<CursorPosition> {
+        self.snapshot()
+            .map(|s| CursorPosition { x: s.x, y: s.y })
+    }
+
+    fn snapshot(&self) -> Option<CursorSnapshot> {
         self.with_device(|dev| {
-            let mouse = dev.get_mouse();
-            CursorPosition {
-                x: mouse.coords.0 as f64,
-                y: mouse.coords.1 as f64,
+            let m = dev.get_mouse();
+            CursorSnapshot {
+                x: m.coords.0 as f64,
+                y: m.coords.1 as f64,
+                left_button: m.button_pressed.get(1).copied().unwrap_or(false),
+                right_button: m.button_pressed.get(2).copied().unwrap_or(false),
             }
         })
     }

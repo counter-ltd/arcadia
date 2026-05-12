@@ -3,9 +3,11 @@ pub mod lan;
 pub mod late;
 pub mod net;
 pub mod overlay;
+pub mod overlay_hud_sprite;
 pub mod permissions;
 pub mod python_host;
 pub mod python_registry;
+pub mod style_tokens;
 pub mod remote_mirror;
 pub mod remote_session;
 pub mod shell;
@@ -25,6 +27,9 @@ use crate::config::ConfigFile;
 pub struct ExecutionContext {
     pub net_as: Option<String>,
     pub net_timeout_ms: Option<u64>,
+    /// When set (e.g. Python extension on the stack), native command permission checks also
+    /// accept matching grants on `python:<this id>` for the same permission ids.
+    pub invoking_python_extension: Option<String>,
 }
 
 pub struct ModuleCommand {
@@ -93,6 +98,7 @@ fn ensure_permissions(subject: &PermissionSubject, required: &[&str]) -> Result<
 fn ensure_command_permissions(
     command_module_prefix: &str,
     required: &[&str],
+    context: &ExecutionContext,
 ) -> Result<(), String> {
     if required.is_empty() {
         return Ok(());
@@ -102,7 +108,23 @@ fn ensure_command_permissions(
             "Permission check: unknown command namespace '{command_module_prefix}'"
         ));
     };
-    ensure_permissions(&subject, required)
+    let cfg = PermissionsConfig::load_or_create().map_err(|e| e.to_string())?;
+    for pid in required {
+        if cfg.effective_allowed(&subject, pid) {
+            continue;
+        }
+        if let Some(ext) = context.invoking_python_extension.as_deref() {
+            let py = PermissionSubject::python(ext.to_string());
+            if cfg.effective_allowed(&py, pid) {
+                continue;
+            }
+        }
+        return Err(format!(
+            "Permission denied: {pid} (subject {}, global or per-module grant missing)",
+            subject.storage_key()
+        ));
+    }
+    Ok(())
 }
 
 fn module_enabled(namespace: &str) -> Result<bool, String> {
@@ -224,7 +246,7 @@ pub fn execute_command(
                 }
                 let remote_subj = PermissionSubject::module(REMOTE_SESSION_MODULE_NAME.to_string());
                 ensure_permissions(&remote_subj, &["session.remote_route"])?;
-                ensure_command_permissions(module_name, command.required_permissions)?;
+                ensure_command_permissions(module_name, command.required_permissions, context)?;
                 let response =
                     lan::execute_remote_command(target, token, args, context.net_timeout_ms)?;
                 return Ok(Some(response));
@@ -243,7 +265,7 @@ pub fn execute_command(
             ));
         }
 
-        ensure_command_permissions(module_name, command.required_permissions)?;
+        ensure_command_permissions(module_name, command.required_permissions, context)?;
 
         return Ok(Some((command.run)(args, context)));
     }

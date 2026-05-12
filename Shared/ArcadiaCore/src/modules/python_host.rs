@@ -1,9 +1,54 @@
 use super::python_registry;
-use crate::config::modules::ModulesConfig;
+use crate::config::modules::{ModulesConfig, OVERLAY_MODULE_NAME};
+use crate::config::permissions::{PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
 use crate::modules::{tray, ExecutionContext, ModuleCommand};
 
 pub const NAME: &str = "python-host";
+
+/// When an extension body declares `overlay.hud`, ensure the native `overlay` module is enabled
+/// and `module:overlay` has the same permission — otherwise `overlay.show` never runs (defaults
+/// keep `overlay` off in `modules.toml`).
+pub fn ensure_native_companions_for_loaded_extension(extension_id: &str) {
+    let declares_overlay = python_registry::list_modules()
+        .into_iter()
+        .find(|(n, _, _, _, _, _)| n == extension_id)
+        .map(|(_, _, _, _, perms, _)| perms.iter().any(|p| p == "overlay.hud"))
+        .unwrap_or(false);
+    if !declares_overlay {
+        return;
+    }
+    let Ok(mut modules_cfg) = ModulesConfig::load_or_create() else {
+        return;
+    };
+    if modules_cfg
+        .modules
+        .get(OVERLAY_MODULE_NAME)
+        .copied()
+        .unwrap_or(false)
+    {
+        return;
+    }
+    let Ok(mut perms) = PermissionsConfig::load_or_create() else {
+        return;
+    };
+    let subj = PermissionSubject::module(OVERLAY_MODULE_NAME.to_string());
+    if let Err(e) = perms.ensure_effective_grants(&subj, &[String::from("overlay.hud")]) {
+        eprintln!("python-host: overlay companion: permissions: {e}");
+        return;
+    }
+    if let Err(e) = perms.save() {
+        eprintln!("python-host: overlay companion: save permissions: {e}");
+        return;
+    }
+    if let Err(e) = modules_cfg.enable_with_requirements(OVERLAY_MODULE_NAME) {
+        eprintln!("python-host: overlay companion: enable overlay module: {e}");
+        return;
+    }
+    if let Err(e) = modules_cfg.save() {
+        eprintln!("python-host: overlay companion: save modules: {e}");
+    }
+}
 
 fn persist_extension_state(name: &str, enabled: bool) -> Result<(), String> {
     let mut cfg = ModulesConfig::load_or_create().map_err(|e| e.to_string())?;

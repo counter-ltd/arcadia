@@ -1,8 +1,10 @@
 mod arcadia_module;
+mod python_scope;
 use arcadia_module::arcadia as arcadia_pymodule;
 
 use arcadia_core::config::modules::ModulesConfig;
 use arcadia_core::config::ConfigFile;
+use arcadia_core::modules::python_host;
 use arcadia_core::modules::python_registry;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -13,6 +15,9 @@ static PYTHON_INITIALIZED: OnceLock<()> = OnceLock::new();
 
 /// One on-disk extension found in `~/Arcadia/Extensions/`. `id` is derived from the file
 /// name / directory and used as the persistence key in `ModulesConfig.python_extensions`.
+///
+/// Bundle layout: `Extensions/<folder>/main.py` with static files under
+/// `Extensions/<folder>/Assets/` (see `arcadia.extension_assets_path` / `read_extension_asset`).
 #[derive(Clone, Debug)]
 struct DiscoveredExtension {
     id: String,
@@ -272,12 +277,23 @@ arcadia.register_module(
     name="googly-eyes",
     version="0.1.0",
     description="...",
-    permissions=["tray.create", "cursor.global_position"],
+    permissions=[
+        "tray.create",
+        "cursor.global_position",
+        "cursor.global_mouse_buttons",
+    ],
 )
 "#,
         );
         let perms = parse_declared_permissions(&path).unwrap();
-        assert_eq!(perms, vec!["tray.create", "cursor.global_position"]);
+        assert_eq!(
+            perms,
+            vec![
+                "tray.create",
+                "cursor.global_position",
+                "cursor.global_mouse_buttons",
+            ]
+        );
     }
 
     #[test]
@@ -361,22 +377,26 @@ arcadia.register_module(
 fn load_and_merge(stub_id: &str, path: &Path) -> Result<String, String> {
     let before: std::collections::HashSet<String> =
         python_registry::module_names().into_iter().collect();
-    load_extension(path)?;
+    load_extension(path, stub_id)?;
     let after: Vec<String> = python_registry::module_names();
     let new_modules: Vec<String> = after.into_iter().filter(|n| !before.contains(n)).collect();
-    if new_modules.len() == 1 && new_modules[0] != stub_id {
+    let canonical = if new_modules.len() == 1 && new_modules[0] != stub_id {
         let canonical = new_modules.into_iter().next().unwrap();
         python_registry::attach_path(&canonical, path.to_path_buf());
         python_registry::remove_module(stub_id);
-        Ok(canonical)
+        canonical
     } else {
-        Ok(stub_id.to_string())
-    }
+        stub_id.to_string()
+    };
+    python_host::ensure_native_companions_for_loaded_extension(&canonical);
+    Ok(canonical)
 }
 
-fn load_extension(path: &Path) -> Result<(), String> {
+fn load_extension(path: &Path, stub_id: &str) -> Result<(), String> {
     let code = std::fs::read_to_string(path)
         .map_err(|e| format!("Cannot read {}: {e}", path.display()))?;
+
+    let _scope = python_scope::PythonExtensionScope::enter(stub_id.to_string());
 
     Python::with_gil(|py| -> PyResult<()> {
         let globals = PyDict::new_bound(py);

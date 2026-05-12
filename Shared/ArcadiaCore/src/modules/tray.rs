@@ -18,7 +18,7 @@ use crate::scheduling;
 
 pub const NAME: &str = "tray";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TrayMenuItem {
     pub label: String,
     /// Empty token = separator (label ignored).
@@ -48,6 +48,11 @@ pub struct TrayItem {
 pub trait TrayBackend: Send + Sync {
     fn apply(&self, item: &TrayItem);
     fn remove(&self, id: &str);
+
+    /// Forward to `tray_icon::TrayIcon::set_show_menu_on_left_click` when supported.
+    fn set_show_menu_on_left_click(&self, tray_item_id: &str, enable: bool) {
+        let _ = (tray_item_id, enable);
+    }
 
     /// Global on-screen bounds for `tray_item_id` when the platform can report them.
     ///
@@ -238,6 +243,32 @@ pub fn list_items() -> Vec<TrayItem> {
         .unwrap_or_default()
 }
 
+/// Clone a tray item by id for routing (e.g. tray-icon click → extension owner).
+pub fn get_item(id: &str) -> Option<TrayItem> {
+    state()
+        .items
+        .lock()
+        .ok()
+        .and_then(|m| m.get(id).cloned())
+}
+
+/// When `false`, left-click on the tray icon does not open the context menu (macOS/Windows).
+/// Extensions can use left-click for custom actions; menu remains available via right-click.
+pub fn set_show_menu_on_left_click(id: &str, enable: bool) -> Result<(), String> {
+    if get_item(id).is_none() {
+        return Err(format!("unknown tray item: {id}"));
+    }
+    let id = id.to_string();
+    scheduling::run_on_main(move || {
+        if let Ok(slot) = backend_slot().lock() {
+            if let Some(backend) = slot.as_ref() {
+                backend.set_show_menu_on_left_click(&id, enable);
+            }
+        }
+    });
+    Ok(())
+}
+
 /// Query the tray icon's screen bounds + primary display `pixels_per_point`.
 ///
 /// Must run through the UI main queue (see [`scheduling::main_queue_active`]); returns `None`
@@ -258,18 +289,22 @@ pub fn icon_screen_bounds(tray_item_id: &str) -> Option<(f64, f64, f64, f64, f64
     rx.recv_timeout(Duration::from_millis(100)).ok().flatten()
 }
 
-/// Remove every tray item registered under `owner` (e.g. `python:googly-eyes`). Called when a
-/// Python extension is disabled so its menu-bar icons disappear immediately instead of lingering
-/// until the next app launch.
+/// Remove every tray item registered under `owner` (e.g. `python:googly-eyes`). Also removes
+/// multi-slot items whose owner is `owner + "::" + …` (see Python `tray_register(..., instance=…)`).
+/// Called when a Python extension is disabled so its menu-bar icons disappear immediately instead
+/// of lingering until the next app launch.
 pub fn remove_items_for_owner(owner: &str) -> usize {
     let removed: Vec<String> = {
         let mut items = match state().items.lock() {
             Ok(g) => g,
             Err(_) => return 0,
         };
+        let slot_prefix = format!("{owner}::");
         let ids: Vec<String> = items
             .iter()
-            .filter_map(|(id, it)| (it.owner == owner).then(|| id.clone()))
+            .filter_map(|(id, it)| {
+                (it.owner == owner || it.owner.starts_with(&slot_prefix)).then(|| id.clone())
+            })
             .collect();
         for id in &ids {
             items.remove(id);
@@ -377,6 +412,15 @@ mod tests {
     }
 
     #[test]
+    fn register_item_distinct_owner_slots() {
+        let a = register_item("python:test-owner::0", "a");
+        let b = register_item("python:test-owner::1", "b");
+        assert_ne!(a, b);
+        assert_eq!(remove_items_for_owner("python:test-owner"), 2);
+        assert!(list_items().iter().all(|it| it.id != a && it.id != b));
+    }
+
+    #[test]
     fn set_image_rejects_size_mismatch() {
         let id = register_item("tray-test-set-image-mismatch", "img");
         let err = set_image(&id, vec![0; 9], 2, 2).unwrap_err();
@@ -395,5 +439,13 @@ mod tests {
         assert_eq!(img.height, 2);
         assert_eq!(img.rgba.len(), 16);
         remove_item(&id).unwrap();
+    }
+
+    #[test]
+    fn get_item_none_after_remove() {
+        let id = register_item("tray-test-get-item", "g");
+        assert_eq!(get_item(&id).as_ref().map(|i| i.owner.as_str()), Some("tray-test-get-item"));
+        remove_item(&id).unwrap();
+        assert!(get_item(&id).is_none());
     }
 }

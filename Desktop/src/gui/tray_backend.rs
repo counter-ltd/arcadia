@@ -13,15 +13,21 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use arcadia_core::modules::tray::{self, TrayBackend, TrayItem, TrayMenuItem};
+use arcadia_core::modules::{python_registry, tray};
+use arcadia_core::modules::tray::{TrayBackend, TrayItem, TrayMenuItem};
 
 use display_info::DisplayInfo;
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
-use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+use tray_icon::{
+    Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent,
+};
 
 struct ItemState {
     tray: TrayIcon,
     menu_map: HashMap<MenuId, TrayMenuItem>,
+    /// Last menu pushed to the platform tray. When unchanged, skip `set_menu` so rapid
+    /// `set_icon` updates (e.g. animated tray icons) do not dismiss an open context menu.
+    applied_menu: Vec<TrayMenuItem>,
 }
 
 thread_local! {
@@ -44,8 +50,6 @@ fn build_menu(source: &[TrayMenuItem]) -> (Menu, HashMap<MenuId, TrayMenuItem>) 
 }
 
 fn apply_on_main(item: &TrayItem) {
-    let (menu, menu_map) = build_menu(&item.menu);
-
     let icon = if let Some(image) = item.image.as_ref() {
         Icon::from_rgba(image.rgba.clone(), image.width, image.height).ok()
     } else {
@@ -60,11 +64,16 @@ fn apply_on_main(item: &TrayItem) {
                 let _ = existing.tray.set_icon(Some(icon));
             }
             let _ = existing.tray.set_tooltip(Some(item.tooltip.as_str()));
-            let _ = existing.tray.set_menu(Some(Box::new(menu)));
-            existing.menu_map = menu_map;
+            if existing.applied_menu != item.menu {
+                let (menu, menu_map) = build_menu(&item.menu);
+                let _ = existing.tray.set_menu(Some(Box::new(menu)));
+                existing.menu_map = menu_map;
+                existing.applied_menu = item.menu.clone();
+            }
             return;
         }
 
+        let (menu, menu_map) = build_menu(&item.menu);
         let mut builder = TrayIconBuilder::new()
             .with_id(item.id.clone())
             .with_menu(Box::new(menu))
@@ -74,7 +83,14 @@ fn apply_on_main(item: &TrayItem) {
         }
         match builder.build() {
             Ok(tray) => {
-                state.insert(item.id.clone(), ItemState { tray, menu_map });
+                state.insert(
+                    item.id.clone(),
+                    ItemState {
+                        tray,
+                        menu_map,
+                        applied_menu: item.menu.clone(),
+                    },
+                );
             }
             Err(e) => eprintln!("tray-icon build failed for {}: {e}", item.id),
         }
@@ -123,6 +139,14 @@ impl TrayBackend for DesktopTrayBackend {
         });
         out
     }
+
+    fn set_show_menu_on_left_click(&self, tray_item_id: &str, enable: bool) {
+        STATE.with(|s| {
+            if let Some(st) = s.borrow_mut().get_mut(tray_item_id) {
+                st.tray.set_show_menu_on_left_click(enable);
+            }
+        });
+    }
 }
 
 /// Install the desktop tray backend with the core `tray` module. Idempotent.
@@ -130,12 +154,12 @@ pub fn install() {
     tray::set_backend(Box::new(DesktopTrayBackend));
 }
 
-/// Poll `tray-icon` `MenuEvent` channel and forward clicks into the Arcadia command
-/// dispatcher. Must be called on the main thread (the same thread that drains
-/// `scheduling::run_on_main`); call once per GUI tick from the foreground executor.
+/// Poll `tray-icon` menu + tray-icon click channels. Must be called on the main thread
+/// (the same thread that drains `scheduling::run_on_main`); call once per GUI tick from
+/// the foreground executor.
 pub fn poll_menu_events() {
-    let rx = MenuEvent::receiver();
-    while let Ok(evt) = rx.try_recv() {
+    let menu_rx = MenuEvent::receiver();
+    while let Ok(evt) = menu_rx.try_recv() {
         let lookup = STATE.with(|s| {
             s.borrow()
                 .values()
@@ -143,6 +167,28 @@ pub fn poll_menu_events() {
         });
         if let Some(spec) = lookup {
             tray::dispatch_menu_command(&spec.command_token, &spec.args);
+        }
+    }
+
+    let tray_rx = TrayIconEvent::receiver();
+    while let Ok(evt) = tray_rx.try_recv() {
+        if let TrayIconEvent::Click {
+            id,
+            button,
+            button_state,
+            ..
+        } = evt
+        {
+            if button_state != MouseButtonState::Up {
+                continue;
+            }
+            let tray_id = id.as_ref().to_string();
+            let button_s = match button {
+                MouseButton::Left => "left",
+                MouseButton::Right => "right",
+                MouseButton::Middle => "middle",
+            };
+            python_registry::dispatch_tray_icon_click(tray_id, button_s.to_string());
         }
     }
 }

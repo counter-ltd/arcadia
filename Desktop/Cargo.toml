@@ -8,7 +8,7 @@ license = "MIT"
 [features]
 default = ["headless"]
 headless = []
-gui-any = ["dep:openframe"]
+gui-any = ["dep:openframe", "dep:image"]
 gui     = ["gui-any", "dep:libc", "dep:portable-pty", "dep:vt100", "dep:global-hotkey", "dep:tray-icon", "dep:device_query", "dep:display-info", "python-extensions"]
 ios-gui = ["gui-any"]
 python-extensions = ["dep:arcadia-python"]
@@ -27,6 +27,7 @@ arcadia-core     = { path = "../Shared/ArcadiaCore" }
 arcadia-python   = { path = "../Shared/ArcadiaPython", optional = true }
 serde_json       = "1"
 openframe        = { path = "../Libraries/OpenFrame", optional = true }
+image            = { version = "0.25.1", optional = true }
 global-hotkey    = { version = "0.8", optional = true }
 libc             = { version = "0.2", optional = true }
 rustyline        = "18.0.0"

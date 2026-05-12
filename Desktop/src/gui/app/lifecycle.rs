@@ -16,7 +16,7 @@ use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
-use arcadia_core::modules::python_registry::StyleInfo;
+use arcadia_core::modules::python_registry::{clamp_numeric_display_for_spec, StyleInfo, StyleTokenKind};
 #[cfg(feature = "gui")]
 use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::{parse_surface_revision, parse_surface_snapshot};
@@ -349,6 +349,8 @@ impl ArcadiaRoot {
             if let Err(e) = arcadia_python::PythonExtensionHost::start(ext_dir) {
                 eprintln!("python-host: {e}");
             }
+            // Startup may co-enable native modules (e.g. `overlay` for HUD extensions).
+            root.reload_modules();
             root.python_extension_rows =
                 arcadia_core::modules::python_registry::list_modules();
             // Merge styles from Python extensions into available_styles.
@@ -390,20 +392,24 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn flush_extension_token_edit(&mut self, module: String, key: String, cx: &mut Context<Self>) {
-        let kind = arcadia_core::modules::python_registry::list_style_tokens()
+        let spec = arcadia_core::modules::python_registry::list_style_tokens()
             .into_iter()
             .find(|(m, _)| m == &module)
-            .and_then(|(_, specs)| specs.into_iter().find(|s| s.key == key))
-            .map(|s| s.kind);
-        let Some(kind) = kind else {
+            .and_then(|(_, specs)| specs.into_iter().find(|s| s.key == key));
+        let Some(spec) = spec else {
             return;
         };
         let pair = (module.clone(), key.clone());
         let Some(raw) = self.extension_token_values.get(&pair).cloned() else {
             return;
         };
+        let text_in = if matches!(spec.kind, StyleTokenKind::Int | StyleTokenKind::Float) {
+            clamp_numeric_display_for_spec(&spec, raw.trim()).unwrap_or(raw)
+        } else {
+            raw
+        };
         let mut file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
-        match extension_tokens::parse_input_to_value(kind, &raw) {
+        match extension_tokens::parse_input_to_value(spec.kind, &text_in) {
             Ok(val) => {
                 file.insert(key.clone(), val.clone());
                 if extension_tokens::save_module_tokens(&module, &file).is_ok() {
@@ -508,6 +514,7 @@ impl ArcadiaRoot {
             let ctx = modules::ExecutionContext {
                 net_as: Some(route.clone()),
                 net_timeout_ms: None,
+                ..Default::default()
             };
             match modules::execute_command("surface.snapshot", &[], &ctx) {
                 Ok(Some(json)) => {
@@ -677,6 +684,7 @@ impl ArcadiaRoot {
                                     let ctx = modules::ExecutionContext {
                                         net_as: Some(route),
                                         net_timeout_ms: Some(8000),
+                                        ..Default::default()
                                     };
                                     if let Ok(Some(json)) =
                                         modules::execute_command("surface.revision", &[], &ctx)
