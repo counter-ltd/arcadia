@@ -22,6 +22,8 @@ pub fn poll_global_hotkey_events(
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use arcadia_core::config::shortcuts::ShortcutsConfig;
+use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use arcadia_core::navigation;
 use arcadia_core::shortcuts::{
@@ -100,6 +102,18 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
     if this.permissions_search_focus.contains_focused(window, cx) {
         return true;
     }
+    if this.shortcuts_search_focus.contains_focused(window, cx) {
+        return true;
+    }
+    if this.shortcut_create_label_focus.contains_focused(window, cx) {
+        return true;
+    }
+    if this.shortcut_create_token_focus.contains_focused(window, cx) {
+        return true;
+    }
+    if this.shortcut_create_args_focus.contains_focused(window, cx) {
+        return true;
+    }
     false
 }
 
@@ -110,6 +124,76 @@ impl ArcadiaRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> bool {
+        // Draft chord recording — next key sets draft.chord for the create modal.
+        if self.shortcut_draft_recording_chord {
+            self.shortcut_draft_recording_chord = false;
+            let chord = keystroke_to_chord(event);
+            if chord.key != "escape" {
+                if let Some(ref mut draft) = self.shortcut_create_draft {
+                    draft.chord = Some(chord);
+                }
+            }
+            cx.notify();
+            return true;
+        }
+
+        // Draft sequence recording — accumulate keys into draft.sequence.
+        if self.shortcut_draft_recording_seq {
+            let chord = keystroke_to_chord(event);
+            if chord.key == "escape" {
+                self.shortcut_draft_recording_seq = false;
+            } else if let Some(ref mut draft) = self.shortcut_create_draft {
+                draft.sequence.push(chord);
+                if draft.sequence.len() < draft.sequence_total {
+                    self.shortcut_listen_focus.focus(window);
+                } else {
+                    self.shortcut_draft_recording_seq = false;
+                }
+            }
+            cx.notify();
+            return true;
+        }
+
+        // Chord capture mode: grab the next keystroke as a single chord override.
+        if let Some(id) = self.shortcut_listening_id.take() {
+            let chord = keystroke_to_chord(event);
+            if chord.key != "escape" {
+                if let Ok(mut cfg) = ShortcutsConfig::load_or_create() {
+                    let entry = cfg.overrides.entry(id).or_default();
+                    entry.chord = Some(chord);
+                    let _ = cfg.save();
+                }
+                sync_os_global_hotkeys();
+            }
+            cx.notify();
+            return true;
+        }
+
+        // Sequence capture mode: accumulate keystrokes step-by-step.
+        if self.shortcut_listening_sequence.is_some() {
+            let chord = keystroke_to_chord(event);
+            let (id, mut captured, total) = self.shortcut_listening_sequence.take().unwrap();
+            if chord.key == "escape" {
+                // cancel — leave shortcut_listening_sequence as None
+            } else {
+                captured.push(chord);
+                if captured.len() >= total {
+                    if let Ok(mut cfg) = ShortcutsConfig::load_or_create() {
+                        let entry = cfg.overrides.entry(id).or_default();
+                        entry.sequence = Some(captured);
+                        let _ = cfg.save();
+                    }
+                    sync_os_global_hotkeys();
+                } else {
+                    // More steps remain; keep focus so next key comes through.
+                    self.shortcut_listen_focus.focus(window);
+                    self.shortcut_listening_sequence = Some((id, captured, total));
+                }
+            }
+            cx.notify();
+            return true;
+        }
+
         let incoming = keystroke_to_chord(event);
         let block_text = text_like_focus_blocks(self, window, cx);
         let now = Instant::now();

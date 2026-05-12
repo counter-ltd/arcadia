@@ -242,6 +242,7 @@ impl Render for ArcadiaRoot {
             .child(self.permission_grant_modal(cx, is_dark))
             .child(self.kill_existing_port_modal(cx, is_dark))
             .child(self.color_picker_modal(cx, is_dark))
+            .child(self.shortcut_create_modal(window, cx, is_dark))
             .child({
                 #[cfg(feature = "gui")]
                 { self.render_context_menu_overlay(cx, is_dark) }

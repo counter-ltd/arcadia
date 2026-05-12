@@ -28,7 +28,9 @@ mod sidebar;
 mod splash;
 #[cfg(any(feature = "gui", feature = "ios-gui"))]
 mod shortcuts;
+mod shortcuts_create_modal;
 mod shortcuts_panel;
+mod shortcuts_row;
 
 #[cfg(feature = "gui")]
 pub use entry::run;
@@ -37,6 +39,7 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use arcadia_core::modules::python_registry::StyleInfo;
+use arcadia_core::shortcuts::KeyChordSpec;
 use arcadia_core::navigation::NavigationRegistryOwned;
 use openframe::{FocusHandle, ScrollHandle, SharedString};
 
@@ -103,6 +106,32 @@ impl ShellMode {
     }
 }
 
+#[derive(Clone, PartialEq)]
+pub enum ShortcutCreateTriggerKind {
+    Chord,
+    Sequence,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ShortcutCreateActionKind {
+    Navigate,
+    ExecuteCommand,
+}
+
+#[derive(Clone)]
+pub struct ShortcutCreateDraft {
+    pub label: String,
+    pub trigger_kind: ShortcutCreateTriggerKind,
+    pub chord: Option<KeyChordSpec>,
+    pub sequence: Vec<KeyChordSpec>,
+    pub sequence_total: usize,
+    pub action_kind: ShortcutCreateActionKind,
+    pub action_page_id: String,
+    pub action_command_token: String,
+    pub action_command_args: String,
+    pub error: Option<String>,
+}
+
 #[derive(Clone)]
 pub enum PendingPermissionGrant {
     NativeModule {
@@ -150,9 +179,27 @@ pub struct ArcadiaRoot {
     pub extensions_search_query: String,
     /// Filters rows on global.permissions (UI-only).
     pub permissions_search_query: String,
+    /// Filters rows on global.shortcuts (UI-only).
+    pub shortcuts_search_query: String,
     pub modules_search_focus: FocusHandle,
     pub extensions_search_focus: FocusHandle,
     pub permissions_search_focus: FocusHandle,
+    pub shortcuts_search_focus: FocusHandle,
+    /// When `Some(id)`, shortcuts panel captures the next keystroke as a new chord override for that shortcut.
+    pub shortcut_listening_id: Option<String>,
+    /// When `Some((id, captured_steps, total_steps))`, captures successive keystrokes into a sequence override.
+    pub shortcut_listening_sequence: Option<(String, Vec<arcadia_core::shortcuts::KeyChordSpec>, usize)>,
+    /// Focused while listening (chord or sequence) so key events reach the root `on_key_down`.
+    pub shortcut_listen_focus: FocusHandle,
+    /// Draft state for the Create Shortcut modal.
+    pub shortcut_create_draft: Option<ShortcutCreateDraft>,
+    /// When true, next key event goes to `shortcut_create_draft.chord`.
+    pub shortcut_draft_recording_chord: bool,
+    /// When true, next key events accumulate into `shortcut_create_draft.sequence`.
+    pub shortcut_draft_recording_seq: bool,
+    pub shortcut_create_label_focus: FocusHandle,
+    pub shortcut_create_token_focus: FocusHandle,
+    pub shortcut_create_args_focus: FocusHandle,
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
     pub python_extension_rows: Vec<(String, String, String, bool, Vec<String>, Vec<String>)>,

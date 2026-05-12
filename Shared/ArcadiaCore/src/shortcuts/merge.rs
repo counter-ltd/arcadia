@@ -9,8 +9,8 @@ use crate::modules::python_registry;
 use crate::navigation;
 
 use super::model::{
-    EffectiveMergedShortcut, GestureEdge, HotCornerQuadrant, KeyChordSpec, ShortcutScopeStatic,
-    ShortcutTrigger,
+    EffectiveMergedShortcut, GestureEdge, HotCornerQuadrant, KeyChordSpec, ShortcutScope,
+    ShortcutScopeStatic, ShortcutTrigger, ShortcutVisibility,
 };
 use super::registry::SHORTCUT_DEFINITIONS;
 
@@ -34,6 +34,19 @@ fn apply_chord_override(
         .cloned()
         .collect();
     out.insert(0, ShortcutTrigger::Chord(chord.clone()));
+    out
+}
+
+fn apply_sequence_override(
+    triggers: &[ShortcutTrigger],
+    seq: &[KeyChordSpec],
+) -> Vec<ShortcutTrigger> {
+    let mut out: Vec<ShortcutTrigger> = triggers
+        .iter()
+        .filter(|t| !matches!(t, ShortcutTrigger::Sequence(_)))
+        .cloned()
+        .collect();
+    out.insert(0, ShortcutTrigger::Sequence(seq.to_vec()));
     out
 }
 
@@ -62,6 +75,27 @@ fn gather_module_gated_static(cfg: &ModulesConfig) -> Vec<EffectiveMergedShortcu
         });
     }
     out
+}
+
+fn gather_custom_shortcuts(sc: &ShortcutsConfig) -> Vec<EffectiveMergedShortcut> {
+    sc.custom
+        .iter()
+        .map(|c| EffectiveMergedShortcut {
+            id: c.id.clone(),
+            label: c.label.clone(),
+            owner: "user".to_string(),
+            required_registry_module: None,
+            scope: ShortcutScope::ArcadiaWide,
+            visibility: ShortcutVisibility::GlobalPrefsOnly,
+            priority: 0,
+            consumes: true,
+            bypass_text_focus: false,
+            system_wide: false,
+            triggers: vec![c.trigger.clone()],
+            actions: c.actions.clone(),
+            source_extension_id: None,
+        })
+        .collect()
 }
 
 fn gather_python_shortcuts(cfg: &ModulesConfig) -> Vec<EffectiveMergedShortcut> {
@@ -103,6 +137,9 @@ fn apply_overrides(
         if let Some(ref ch) = o.chord {
             item.triggers = apply_chord_override(&item.triggers, ch);
         }
+        if let Some(ref seq) = o.sequence {
+            item.triggers = apply_sequence_override(&item.triggers, seq);
+        }
     }
     list.into_iter()
         .filter(|s| !s.triggers.is_empty())
@@ -120,6 +157,7 @@ pub fn merged_shortcuts() -> Vec<EffectiveMergedShortcut> {
 
     let mut list = gather_module_gated_static(&cfg);
     list.extend(gather_python_shortcuts(&cfg));
+    list.extend(gather_custom_shortcuts(&sc));
     apply_overrides(list, &sc.overrides)
 }
 
