@@ -7,7 +7,7 @@ use arcadia_core::modules::style_tokens::{
     StyleTokenSpec, StyleTokenVisibility,
 };
 use arcadia_core::modules::{
-    cursor as core_cursor, overlay_hud_sprite, python_registry, tray as core_tray,
+    animation, cursor as core_cursor, overlay_hud_sprite, python_registry, tray as core_tray,
     ExecutionContext,
 };
 use arcadia_core::scheduling;
@@ -630,6 +630,53 @@ fn overlay_hud_clear_sprite(extension_id: String) -> PyResult<()> {
     Ok(())
 }
 
+/// Start a tween. `callback(t: float)` is called on the Python timer lane every ~16 ms with
+/// eased `t ∈ [0.0, 1.0]`. Returns a tween id that can be passed to `cancel_animation`.
+///
+/// `easing` is one of: `"linear"`, `"ease_out_cubic"`, `"ease_in_cubic"`,
+/// `"ease_in_out_cubic"`, `"ease_out_elastic"`.
+#[pyfunction]
+#[pyo3(signature = (extension_id, duration_ms, easing, callback))]
+fn animate(
+    extension_id: String,
+    duration_ms: u64,
+    easing: String,
+    callback: PyObject,
+) -> PyResult<u64> {
+    let easing_val = animation::Easing::from_str(&easing).ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "Unknown easing '{}'. Choose from: linear, ease_out_cubic, ease_in_cubic, ease_in_out_cubic, ease_out_elastic",
+            easing
+        ))
+    })?;
+    let ext_id = extension_id.clone();
+    let callback = Arc::new(callback);
+    let id = animation::tween_with_completion(
+        duration_ms,
+        easing_val,
+        move |t| {
+            if !python_registry::extension_enabled(&ext_id) {
+                return;
+            }
+            let _scope = python_scope::PythonExtensionScope::enter(ext_id.clone());
+            let cb = Arc::clone(&callback);
+            Python::with_gil(|py| {
+                if let Err(e) = cb.call1(py, (t,)) {
+                    eprintln!("animate({ext_id}) callback error: {e}");
+                }
+            });
+        },
+        None,
+        Some(extension_id),
+    );
+    Ok(id.0)
+}
+
+#[pyfunction]
+fn cancel_animation(tween_id: u64) {
+    animation::cancel(animation::TweenId(tween_id));
+}
+
 #[pyfunction]
 fn set_timer(extension_id: String, interval_ms: u64, callback: PyObject) -> PyResult<u64> {
     if interval_ms == 0 {
@@ -730,6 +777,8 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(overlay_display_size, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_set_sprite, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_clear_sprite, m)?)?;
+    m.add_function(wrap_pyfunction!(animate, m)?)?;
+    m.add_function(wrap_pyfunction!(cancel_animation, m)?)?;
     m.add_function(wrap_pyfunction!(set_timer, m)?)?;
     m.add_function(wrap_pyfunction!(cancel_timer, m)?)?;
     m.add_function(wrap_pyfunction!(read_tokens, m)?)?;
