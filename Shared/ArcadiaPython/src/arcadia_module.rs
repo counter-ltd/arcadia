@@ -759,6 +759,97 @@ fn read_tokens<'py>(py: Python<'py>, module: String) -> PyResult<Bound<'py, PyDi
     Ok(result)
 }
 
+/// Declare that this extension's tokens should appear in the Editor settings panel
+/// rather than as a standalone settings page in the sidebar.
+#[pyfunction]
+fn register_editor_token_module(extension_id: String) {
+    python_registry::register_editor_token_module(extension_id);
+}
+
+/// Register a syntax highlight provider for `language` (e.g. `"rust"`).
+///
+/// `handler(text: str) -> list[tuple[int, int, str]]` — returns (start_byte, end_byte, token_name)
+/// tuples covering the document. Overlapping spans are not defined; non-overlapping and ordered
+/// is simplest. The editor calls this once per render cycle for the active tab.
+#[pyfunction]
+fn register_highlight_provider(
+    extension_id: String,
+    language: String,
+    handler: PyObject,
+) {
+    let handler = Arc::new(handler);
+    python_registry::register_highlight_provider(
+        language,
+        extension_id,
+        Arc::new(move |text: &str| {
+            let text = text.to_string();
+            let h = Arc::clone(&handler);
+            Python::with_gil(|py| -> Vec<python_registry::HighlightSpan> {
+                let result = match h.call1(py, (&text,)) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("highlight_provider error: {e}");
+                        return Vec::new();
+                    }
+                };
+                let Ok(list) = result.downcast_bound::<pyo3::types::PyList>(py) else {
+                    return Vec::new();
+                };
+                list.iter()
+                    .filter_map(|item| {
+                        let tup = item.downcast::<pyo3::types::PyTuple>().ok()?;
+                        let start: usize = tup.get_item(0).ok()?.extract().ok()?;
+                        let end: usize = tup.get_item(1).ok()?.extract().ok()?;
+                        let token: String = tup.get_item(2).ok()?.extract().ok()?;
+                        Some(python_registry::HighlightSpan { start, end, token })
+                    })
+                    .collect()
+            })
+        }),
+    );
+}
+
+/// Register a decoration provider that adds coloured boxes behind each line.
+///
+/// `handler(line: str, line_idx: int) -> list[dict]` — each dict must contain:
+/// `col_start` (int), `col_width` (int), `r` (int 0-255), `g`, `b`, `a`.
+/// Multiple decoration providers can coexist (one per extension).
+#[pyfunction]
+fn register_decoration_provider(extension_id: String, handler: PyObject) {
+    let handler = Arc::new(handler);
+    python_registry::register_decoration_provider(
+        extension_id,
+        Arc::new(move |line: &str, line_idx: usize| {
+            let line = line.to_string();
+            let h = Arc::clone(&handler);
+            Python::with_gil(|py| -> Vec<python_registry::DecorationRect> {
+                let result = match h.call1(py, (&line, line_idx)) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("decoration_provider error: {e}");
+                        return Vec::new();
+                    }
+                };
+                let Ok(list) = result.downcast_bound::<pyo3::types::PyList>(py) else {
+                    return Vec::new();
+                };
+                list.iter()
+                    .filter_map(|item| {
+                        let d = item.downcast::<PyDict>().ok()?;
+                        let col_start: usize = d.get_item("col_start").ok()??.extract().ok()?;
+                        let col_width: usize = d.get_item("col_width").ok()??.extract().ok()?;
+                        let r: u8 = d.get_item("r").ok()??.extract().ok()?;
+                        let g: u8 = d.get_item("g").ok()??.extract().ok()?;
+                        let b: u8 = d.get_item("b").ok()??.extract().ok()?;
+                        let a: u8 = d.get_item("a").ok()??.extract().ok()?;
+                        Some(python_registry::DecorationRect { col_start, col_width, r, g, b, a })
+                    })
+                    .collect()
+            })
+        }),
+    );
+}
+
 #[pymodule]
 pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_module, m)?)?;
@@ -788,5 +879,8 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(read_tokens, m)?)?;
     m.add_function(wrap_pyfunction!(extension_assets_path, m)?)?;
     m.add_function(wrap_pyfunction!(read_extension_asset, m)?)?;
+    m.add_function(wrap_pyfunction!(register_editor_token_module, m)?)?;
+    m.add_function(wrap_pyfunction!(register_highlight_provider, m)?)?;
+    m.add_function(wrap_pyfunction!(register_decoration_provider, m)?)?;
     Ok(())
 }

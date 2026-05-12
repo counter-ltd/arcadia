@@ -34,11 +34,34 @@ pub struct PythonModuleInfo {
 type DynCommandFn = Arc<dyn Fn(Vec<String>) -> String + Send + Sync + 'static>;
 type TrayIconClickFn = Arc<dyn Fn(Vec<String>) + Send + Sync + 'static>;
 type ReloadFn = Arc<dyn Fn() -> Result<(), String> + Send + Sync + 'static>;
+type DynHighlightFn = Arc<dyn Fn(&str) -> Vec<HighlightSpan> + Send + Sync + 'static>;
+type DynDecorationFn = Arc<dyn Fn(&str, usize) -> Vec<DecorationRect> + Send + Sync + 'static>;
 /// Loader for a single extension: takes the stub id the host knows the file by plus the
 /// on-disk path, and returns the canonical module name the body actually registered (often
 /// the same as the stub id, but may differ when the folder name and `register_module(name=…)`
 /// disagree — see `load_and_merge` in `arcadia-python`).
 type LoadOneFn = Arc<dyn Fn(String, PathBuf) -> Result<String, String> + Send + Sync + 'static>;
+
+/// A syntax-highlighted byte range within the document. `token` is the semantic name
+/// declared by the extension (e.g. `"keyword"`, `"string"`, `"comment"`).
+#[derive(Clone)]
+pub struct HighlightSpan {
+    pub start: usize,
+    pub end: usize,
+    pub token: String,
+}
+
+/// A coloured decoration box covering `col_width` columns at `col_start` within a line.
+/// Rendered behind text as a translucent rectangle.
+#[derive(Clone)]
+pub struct DecorationRect {
+    pub col_start: usize,
+    pub col_width: usize,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
 
 struct CommandRecord {
     description: String,
@@ -60,6 +83,13 @@ struct PythonRegistry {
     shortcuts: Vec<crate::shortcuts::EffectiveMergedShortcut>,
     /// Per-extension tray-icon click handler: `(tray_item_id, button)` as `["tray-1","left"]`.
     tray_icon_click_handlers: HashMap<String, TrayIconClickFn>,
+    /// Language id → (ext_id, fn). One provider per language; later registration wins.
+    highlight_providers: HashMap<String, (String, DynHighlightFn)>,
+    /// Ordered list of decoration providers: (ext_id, fn).
+    decoration_providers: Vec<(String, DynDecorationFn)>,
+    /// Extension ids whose tokens should appear in the editor settings panel instead of as
+    /// standalone settings pages.
+    editor_token_modules: std::collections::HashSet<String>,
 }
 
 /// Glyph rendering parameters provided by a Python extension when registering a style.
@@ -120,6 +150,9 @@ impl PythonRegistry {
             style_tokens: HashMap::new(),
             shortcuts: Vec::new(),
             tray_icon_click_handlers: HashMap::new(),
+            highlight_providers: HashMap::new(),
+            decoration_providers: Vec::new(),
+            editor_token_modules: std::collections::HashSet::new(),
         }
     }
 }
@@ -340,6 +373,9 @@ pub fn unregister_extension_contributions(name: &str) {
         reg.shortcuts
             .retain(|s| s.source_extension_id.as_deref() != Some(name));
         reg.tray_icon_click_handlers.remove(name);
+        reg.highlight_providers.retain(|_, (id, _)| id != name);
+        reg.decoration_providers.retain(|(id, _)| id != name);
+        reg.editor_token_modules.remove(name);
         if let Some(m) = reg.modules.iter_mut().find(|m| m.name == name) {
             m.loaded = false;
         }
@@ -427,6 +463,95 @@ pub fn register_tray_icon_click_handler(extension_id: String, handler: TrayIconC
     if let Ok(mut reg) = registry().lock() {
         reg.tray_icon_click_handlers.insert(extension_id, handler);
     }
+}
+
+/// Register a syntax highlight provider for `language` (e.g. `"rust"`). One provider per
+/// language; a later call replaces the previous one. Lock is released before calling the fn.
+pub fn register_highlight_provider(language: String, ext_id: String, f: DynHighlightFn) {
+    if language.is_empty() || ext_id.is_empty() {
+        return;
+    }
+    if let Ok(mut reg) = registry().lock() {
+        reg.highlight_providers.insert(language, (ext_id, f));
+    }
+}
+
+/// Register a decoration provider (coloured boxes per line). Multiple providers coexist.
+pub fn register_decoration_provider(ext_id: String, f: DynDecorationFn) {
+    if ext_id.is_empty() {
+        return;
+    }
+    if let Ok(mut reg) = registry().lock() {
+        reg.decoration_providers.retain(|(id, _)| id != &ext_id);
+        reg.decoration_providers.push((ext_id, f));
+    }
+}
+
+/// Mark an extension's tokens as editor-scoped so they render inside the Editor settings
+/// panel instead of appearing as a separate standalone settings page.
+pub fn register_editor_token_module(ext_id: String) {
+    if ext_id.is_empty() {
+        return;
+    }
+    if let Ok(mut reg) = registry().lock() {
+        reg.editor_token_modules.insert(ext_id);
+    }
+}
+
+/// Token modules registered via [`register_editor_token_module`], filtered to those that
+/// have token specs and are enabled + platform-compatible. Sorted by module id.
+pub fn editor_scoped_token_modules() -> Vec<(String, Vec<style_tokens::StyleTokenSpec>)> {
+    let Ok(reg) = registry().lock() else {
+        return Vec::new();
+    };
+    let mut out: Vec<(String, Vec<StyleTokenSpec>)> = reg
+        .style_tokens
+        .iter()
+        .filter(|(k, specs)| {
+            if specs.is_empty() || !reg.editor_token_modules.contains(k.as_str()) {
+                return false;
+            }
+            reg.modules
+                .iter()
+                .find(|m| m.name == **k)
+                .map(|m| supports_runtime_platform_owned(&m.supported_platforms))
+                .unwrap_or(true)
+        })
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
+/// Call the highlight provider registered for `language`, if any. Lock is acquired just to
+/// clone the Arc, then released before calling the fn (which may acquire the Python GIL).
+pub fn call_highlight_provider(language: &str, text: &str) -> Vec<HighlightSpan> {
+    let handler = {
+        let Ok(reg) = registry().lock() else {
+            return Vec::new();
+        };
+        reg.highlight_providers
+            .get(language)
+            .map(|(_, f)| Arc::clone(f))
+    };
+    handler.map(|f| f(text)).unwrap_or_default()
+}
+
+/// Call all registered decoration providers for `line` at `line_idx`, collecting results.
+pub fn call_decoration_providers(line: &str, line_idx: usize) -> Vec<DecorationRect> {
+    let handlers: Vec<DynDecorationFn> = {
+        let Ok(reg) = registry().lock() else {
+            return Vec::new();
+        };
+        reg.decoration_providers
+            .iter()
+            .map(|(_, f)| Arc::clone(f))
+            .collect()
+    };
+    handlers
+        .into_iter()
+        .flat_map(|f| f(line, line_idx))
+        .collect()
 }
 
 /// Tray-icon primary click (from desktop `tray-icon`); forwards to the owning Python extension
@@ -571,7 +696,10 @@ pub fn standalone_extension_token_modules() -> Vec<(String, Vec<style_tokens::St
         .style_tokens
         .iter()
         .filter(|(k, specs)| {
-            if specs.is_empty() || style_modules.contains(k.as_str()) {
+            if specs.is_empty()
+                || style_modules.contains(k.as_str())
+                || reg.editor_token_modules.contains(k.as_str())
+            {
                 return false;
             }
             let plat_ok = reg
@@ -612,6 +740,9 @@ pub fn clear() {
         reg.style_tokens.clear();
         reg.shortcuts.clear();
         reg.tray_icon_click_handlers.clear();
+        reg.highlight_providers.clear();
+        reg.decoration_providers.clear();
+        reg.editor_token_modules.clear();
     }
 }
 

@@ -31,6 +31,13 @@ mod shortcuts;
 mod shortcuts_create_modal;
 mod shortcuts_panel;
 mod shortcuts_row;
+mod ai_chat_panel;
+mod ai_models_panel;
+mod ai_settings_panel;
+mod llama_cpp_create_model_modal;
+pub mod llama_cpp_runtime;
+mod code_editor_panel;
+mod code_editor_settings;
 mod workspace_create_modal;
 mod workspace_panel;
 mod workspace_row;
@@ -41,10 +48,12 @@ pub use entry::run;
 use std::collections::HashMap;
 use std::time::Instant;
 
-use arcadia_core::modules::python_registry::StyleInfo;
+use arcadia_core::modules::python_registry::{DecorationRect, HighlightSpan, StyleInfo};
 use arcadia_core::shortcuts::KeyChordSpec;
 use arcadia_core::navigation::NavigationRegistryOwned;
-use openframe::{FocusHandle, ScrollHandle, SharedString};
+use openframe::{Bounds, FocusHandle, Pixels, ScrollHandle, SharedString};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[cfg(feature = "gui")]
 use super::tui::TuiSession;
@@ -135,6 +144,58 @@ pub struct ShortcutCreateDraft {
     pub error: Option<String>,
 }
 
+pub struct CodeEditorTab {
+    pub id: usize,
+    pub title: String,
+    pub content: String,
+    pub cursor: usize,
+    pub selection_anchor: Option<usize>,
+    /// Language identifier derived from the file extension (e.g. `"rust"`, `"python"`).
+    /// Used to select a syntax highlight provider. `None` = no highlighting.
+    pub language: Option<String>,
+    /// Cached syntax highlight spans — recomputed only when `highlight_dirty` is true.
+    pub hl_spans: Vec<HighlightSpan>,
+    /// Cached decoration rects per line — recomputed only when `highlight_dirty` is true.
+    pub decorations: Vec<Vec<DecorationRect>>,
+    /// Set to `true` whenever `content` changes; cleared after caches are rebuilt.
+    pub highlight_dirty: bool,
+    /// Workspace directory path bound to this tab, if any.
+    pub workspace_path: Option<String>,
+    /// Absolute path to the file on disk. `None` = new unsaved buffer.
+    pub file_path: Option<String>,
+    /// Content at last save. Used for dirty detection and Restore.
+    pub saved_content: String,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum AiMessageRole {
+    User,
+    Assistant,
+}
+
+#[derive(Clone)]
+pub struct AiMessage {
+    pub role: AiMessageRole,
+    pub content: String,
+}
+
+pub struct AiChat {
+    pub id: usize,
+    pub title: String,
+    pub messages: Vec<AiMessage>,
+    pub input_draft: String,
+    pub is_loading: bool,
+}
+
+#[derive(Clone)]
+pub struct LlamaCppModelCreateDraft {
+    pub name: String,
+    pub path: String,
+    pub mmproj_path: String,
+    pub model_type: arcadia_core::config::llama_cpp::LlamaCppModelType,
+    pub error: Option<String>,
+}
+
 #[derive(Clone)]
 pub struct WorkspaceCreateDraft {
     pub label: String,
@@ -213,6 +274,58 @@ pub struct ArcadiaRoot {
     pub shortcut_create_label_focus: FocusHandle,
     pub shortcut_create_token_focus: FocusHandle,
     pub shortcut_create_args_focus: FocusHandle,
+    pub code_editor_show_indentation_marks: bool,
+    pub code_editor_workspace_picker_open: bool,
+    pub code_editor_explorer_open: bool,
+    pub code_editor_explorer_expanded: std::collections::HashSet<String>,
+    pub code_editor_char_width_override: Option<f32>,
+    pub code_editor_char_width_draft: String,
+    pub code_editor_char_width_editing: bool,
+    pub code_editor_tabs: Vec<CodeEditorTab>,
+    pub active_code_editor_tab: usize,
+    pub code_editor_next_id: usize,
+    pub code_editor_focus: FocusHandle,
+    pub code_editor_char_width_focus: FocusHandle,
+    pub code_editor_context_menu_open: bool,
+    pub code_editor_show_dashboard: bool,
+    pub code_editor_tab_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
+    pub code_editor_close_confirm: Option<usize>,
+    pub code_editor_line_bounds: Rc<RefCell<Vec<Bounds<Pixels>>>>,
+    pub code_editor_is_dragging: bool,
+    pub ai_chats: Vec<AiChat>,
+    pub active_ai_chat_id: usize,
+    pub ai_next_id: usize,
+    pub ai_context_menu_open: bool,
+    pub ai_chat_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
+    pub ai_input_focus: FocusHandle,
+    pub ai_default_system_prompt: String,
+    /// Model selected for use in chat (model ID string).
+    pub ai_chat_model_id: Option<String>,
+    /// Whether the model picker dropdown is open.
+    pub ai_chat_model_picker_open: bool,
+    /// Workspace scoping the AI chat context (workspace ID string).
+    pub ai_chat_workspace_id: Option<String>,
+    /// Whether the workspace picker dropdown is open.
+    pub ai_chat_workspace_picker_open: bool,
+    /// Background inference runtime (lazy-started on first send).
+    pub llama_cpp_runtime: Option<llama_cpp_runtime::LlamaCppRuntime>,
+    /// Which chat ID is currently receiving streamed tokens.
+    pub llama_cpp_stream_chat_id: Option<usize>,
+    /// Whether the 50ms inference poll task is running.
+    pub llama_cpp_poll_task_started: bool,
+    /// Module name of the provider selected in the Models sidebar (e.g. `"ai-provider-llama-cpp"`).
+    pub active_ai_provider_module: String,
+    /// Models loaded from llama-cpp.toml.
+    pub llama_cpp_models: Vec<arcadia_core::config::llama_cpp::LlamaCppModel>,
+    /// ID of the model sub-item selected under llama.cpp in the sidebar.
+    pub active_llama_cpp_model_id: Option<String>,
+    /// Right-click context menu on the llama.cpp provider sidebar item.
+    pub llama_cpp_provider_menu: Option<openframe::Point<openframe::Pixels>>,
+    /// Draft state for Create Model modal.
+    pub llama_cpp_create_draft: Option<LlamaCppModelCreateDraft>,
+    pub llama_cpp_create_name_focus: FocusHandle,
+    pub llama_cpp_create_path_focus: FocusHandle,
+    pub llama_cpp_create_mmproj_focus: FocusHandle,
     pub workspace_create_draft: Option<WorkspaceCreateDraft>,
     pub workspace_create_label_focus: FocusHandle,
     pub workspace_create_path_focus: FocusHandle,

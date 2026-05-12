@@ -1,4 +1,7 @@
+pub mod ai;
 pub mod appearance;
+pub mod llama_cpp;
+pub mod code_editor;
 pub mod commandline;
 pub mod extension_tokens;
 pub mod late;

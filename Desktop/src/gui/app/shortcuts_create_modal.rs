@@ -605,6 +605,9 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_4()
+                            .on_mouse_down(MouseButton::Left, cx.listener(|_, _, _, cx| {
+                                cx.stop_propagation();
+                            }))
                             // Header
                             .child(
                                 div()

@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::modules::{
-    LAN_MODULE_NAME, LATE_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
-    WORKSPACE_MODULE_NAME,
+    AI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, LAN_MODULE_NAME, LATE_MODULE_NAME,
+    PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use crate::modules::python_registry;
 use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
@@ -312,6 +312,51 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "indigo",
         required_module: Some(PYTHON_HOST_MODULE_NAME),
     },
+    NavigationPageDefinition {
+        id: "editor.main",
+        title: "Editor",
+        description: "Open and edit files. Each open file appears as a tab in the sidebar.",
+        glyph: "code",
+        system_image: "doc.text",
+        accent: "sky",
+        required_module: Some(CODE_EDITOR_MODULE_NAME),
+    },
+    NavigationPageDefinition {
+        id: "editor.settings",
+        title: "Editor",
+        description: "Code editor preferences — indentation, display, and formatting options.",
+        glyph: "code",
+        system_image: "doc.text",
+        accent: "sky",
+        required_module: Some(CODE_EDITOR_MODULE_NAME),
+    },
+    NavigationPageDefinition {
+        id: "ai.chat",
+        title: "Chat",
+        description: "AI chat sessions. Each conversation appears as a sub-item in the sidebar.",
+        glyph: "message",
+        system_image: "message",
+        accent: "violet",
+        required_module: Some(AI_MODULE_NAME),
+    },
+    NavigationPageDefinition {
+        id: "ai.settings",
+        title: "AI",
+        description: "AI module preferences — default system prompt and provider configuration.",
+        glyph: "message",
+        system_image: "message",
+        accent: "violet",
+        required_module: Some(AI_MODULE_NAME),
+    },
+    NavigationPageDefinition {
+        id: "ai.models",
+        title: "Models",
+        description: "Configure and manage AI model providers.",
+        glyph: "modules",
+        system_image: "cpu",
+        accent: "violet",
+        required_module: Some(AI_MODULE_NAME),
+    },
 ];
 
 pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
@@ -339,6 +384,22 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
         pages: &["late.now_playing", "late.experimental"],
         accent: "teal",
     },
+    NavigationGroupDefinition {
+        id: "code",
+        label: "Code",
+        glyph: "code",
+        system_image: "doc.text",
+        pages: &["editor.main"],
+        accent: "sky",
+    },
+    NavigationGroupDefinition {
+        id: "ai",
+        label: "AI",
+        glyph: "message",
+        system_image: "message",
+        pages: &["ai.chat", "ai.models"],
+        accent: "violet",
+    },
 ];
 
 pub const GLOBAL_PAGE_IDS: &[&str] = &["global.dashboard", "global.settings"];
@@ -354,6 +415,8 @@ pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
     "global.appearance",
     "global.workspaces",
     "late.settings",
+    "editor.settings",
+    "ai.settings",
 ];
 pub const DEFAULT_GROUP_ID: &str = "utilities";
 pub const DEFAULT_PAGE_ID: &str = "global.dashboard";

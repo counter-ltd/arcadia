@@ -1,8 +1,11 @@
+use arcadia_core::config::modules::AI_MODULE_NAME;
+use arcadia_core::modules::ai::any_ai_provider_enabled;
 use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
 use openframe::{
     div, px, Context, Div, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Styled, Window,
 };
+use openframe::prelude::FluentBuilder as _;
 
 use super::ArcadiaRoot;
 use crate::gui::theme::{self, render_icon};
@@ -311,11 +314,175 @@ impl ArcadiaRoot {
                 .p_6()
                 .child(self.shortcuts_panel(window, cx, is_dark));
         }
+        if self.active_page_id.as_str() == "editor.main" {
+            let active_idx = self.active_code_editor_tab
+                .min(self.code_editor_tabs.len().saturating_sub(1));
+            let ws_path = self.code_editor_tabs
+                .get(active_idx)
+                .and_then(|t| t.workspace_path.clone())
+                .unwrap_or_default();
+            let show_explorer = self.code_editor_explorer_open && !ws_path.is_empty();
+            let sidebar_bg = if is_dark { openframe::rgb(0x141920) } else { openframe::rgb(0xf3f4f6) };
+            let border_color = if is_dark { openframe::rgb(0x2a3340) } else { openframe::rgb(0xe5e7eb) };
+            let text_color = if is_dark { openframe::rgb(0xd1d5db) } else { openframe::rgb(0x374151) };
+            let dim_color = if is_dark { openframe::rgb(0x6b7280) } else { openframe::rgb(0x9ca3af) };
+            let hover_bg = if is_dark { openframe::rgb(0x1e2530) } else { openframe::rgb(0xe5e7eb) };
+            let mut row = div().w_full().h_full().flex().flex_row();
+            if show_explorer {
+                // Collect flat entry list with depth via recursive walk
+                let mut flat: Vec<(String, String, bool, usize)> = Vec::new(); // (full_path, name, is_dir, depth)
+                collect_explorer_entries(&ws_path, 0, &self.code_editor_explorer_expanded, &mut flat);
+
+                let mut sidebar = div()
+                    .w(px(220.))
+                    .h_full()
+                    .flex_shrink_0()
+                    .bg(sidebar_bg)
+                    .border_r_1()
+                    .border_color(border_color)
+                    .flex()
+                    .flex_col()
+                    .overflow_hidden();
+
+                // Header
+                sidebar = sidebar.child(
+                    div()
+                        .px_3()
+                        .py_2()
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(text_color)
+                        .border_b_1()
+                        .border_color(border_color)
+                        .child(ws_path.rsplit('/').next().unwrap_or(&ws_path).to_string()),
+                );
+
+                let active_file_path = self.code_editor_tabs
+                    .get(active_idx)
+                    .and_then(|t| t.file_path.clone());
+                let active_row_bg = if is_dark { openframe::rgb(0x1a2d45) } else { openframe::rgb(0xdbeafe) };
+                let active_row_text = if is_dark { openframe::rgb(0x93c5fd) } else { openframe::rgb(0x1d4ed8) };
+
+                if flat.is_empty() {
+                    sidebar = sidebar.child(
+                        div().px_3().py_2().text_xs().text_color(dim_color).child("No files found."),
+                    );
+                } else {
+                    for (full_path, name, is_dir, depth) in flat {
+                        let full_path2 = full_path.clone();
+                        let is_expanded = self.code_editor_explorer_expanded.contains(&full_path);
+                        let is_active_file = !is_dir && active_file_path.as_deref() == Some(full_path.as_str());
+                        let folder_icon = if is_expanded { "folder-open" } else { "folder" };
+                        let file_icon = file_icon_for(&name);
+                        let indent_px = px(8. + depth as f32 * 16.);
+                        let row_text = if is_active_file { active_row_text } else { text_color };
+
+                        let entry_row = div()
+                            .pl(indent_px)
+                            .pr_2()
+                            .py(px(3.))
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1p5()
+                            .text_xs()
+                            .text_color(row_text)
+                            .cursor_pointer()
+                            .when(is_active_file, |s| s.bg(active_row_bg))
+                            .hover(move |s| s.bg(hover_bg));
+
+                        let entry_row = if is_dir {
+                            let chevron = if is_expanded { "chevron-down" } else { "chevron-right" };
+                            entry_row
+                                .child(theme::render_icon(chevron).size_3().text_color(dim_color))
+                                .child(theme::render_icon(folder_icon).size_3().text_color(text_color))
+                                .child(name)
+                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                    if this.code_editor_explorer_expanded.contains(&full_path2) {
+                                        this.code_editor_explorer_expanded.remove(&full_path2);
+                                    } else {
+                                        this.code_editor_explorer_expanded.insert(full_path2.clone());
+                                    }
+                                    cx.notify();
+                                }))
+                        } else {
+                            entry_row
+                                .child(div().size_3()) // spacer aligns with dir chevron
+                                .child(theme::render_icon(file_icon).size_3().text_color(row_text))
+                                .child(name)
+                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                    // Switch to existing tab if already open.
+                                    if let Some(existing) = this.code_editor_tabs
+                                        .iter()
+                                        .position(|t| t.file_path.as_deref() == Some(full_path2.as_str()))
+                                    {
+                                        this.active_code_editor_tab = existing;
+                                        this.code_editor_show_dashboard = false;
+                                        cx.notify();
+                                        return;
+                                    }
+                                    if let Ok(text) = std::fs::read_to_string(&full_path2) {
+                                        let lang = crate::gui::app::code_editor_panel::detect_language(&full_path2);
+                                        let title = std::path::Path::new(&full_path2)
+                                            .file_name()
+                                            .map(|n| n.to_string_lossy().to_string())
+                                            .unwrap_or_else(|| full_path2.clone());
+                                        let idx = this.active_code_editor_tab
+                                            .min(this.code_editor_tabs.len().saturating_sub(1));
+                                        if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                            tab.saved_content = text.clone();
+                                            tab.content = text;
+                                            tab.file_path = Some(full_path2.clone());
+                                            tab.title = title;
+                                            tab.language = lang;
+                                            tab.cursor = 0;
+                                            tab.selection_anchor = None;
+                                            tab.highlight_dirty = true;
+                                        }
+                                        cx.notify();
+                                    }
+                                }))
+                        };
+                        sidebar = sidebar.child(entry_row);
+                    }
+                }
+                row = row.child(sidebar);
+            }
+            return row.child(
+                div()
+                    .flex_1()
+                    .h_full()
+                    .overflow_hidden()
+                    .child(self.code_editor_panel(window, cx, is_dark)),
+            );
+        }
+        if self.active_page_id.as_str() == "editor.settings" {
+            return div().w_full().p_6().child(self.code_editor_settings_panel(window, cx, is_dark));
+        }
         if self.active_page_id.as_str() == "global.workspaces" {
             return div()
                 .w_full()
                 .p_6()
                 .child(self.workspace_panel(window, cx, is_dark));
+        }
+        if self.active_page_id.as_str() == "ai.chat" {
+            return div()
+                .flex_1()
+                .h_full()
+                .min_h_0()
+                .child(self.ai_chat_panel(window, cx, is_dark));
+        }
+        if self.active_page_id.as_str() == "ai.settings" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.ai_settings_panel(window, cx, is_dark));
+        }
+        if self.active_page_id.as_str() == "ai.models" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.ai_models_panel(window, cx, is_dark));
         }
         if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
             return div()
@@ -477,6 +644,10 @@ impl ArcadiaRoot {
     }
 
     pub fn is_page_visible(&self, page_id: &str) -> bool {
+        if page_id == "ai.models" {
+            return self.is_module_enabled(AI_MODULE_NAME)
+                && any_ai_provider_enabled(&self.module_rows);
+        }
         if let Some(nav) = self.navigation_registry() {
             return navigation::is_page_visible_in_owned(nav, page_id, |name| {
                 self.is_module_enabled(name)
@@ -535,5 +706,41 @@ impl ArcadiaRoot {
             self.active_page_id = p;
         }
     }
+}
 
+fn collect_explorer_entries(
+    dir: &str,
+    depth: usize,
+    expanded: &std::collections::HashSet<String>,
+    out: &mut Vec<(String, String, bool, usize)>,
+) {
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let mut entries: Vec<(String, bool)> = rd
+        .flatten()
+        .map(|e| {
+            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            (e.file_name().to_string_lossy().to_string(), is_dir)
+        })
+        .filter(|(name, _)| !name.starts_with('.'))
+        .collect();
+    entries.sort_by(|(a, a_dir), (b, b_dir)| b_dir.cmp(a_dir).then(a.cmp(b)));
+    for (name, is_dir) in entries {
+        let full = format!("{}/{}", dir, name);
+        out.push((full.clone(), name, is_dir, depth));
+        if is_dir && expanded.contains(&full) {
+            collect_explorer_entries(&full, depth + 1, expanded, out);
+        }
+    }
+}
+
+fn file_icon_for(name: &str) -> &'static str {
+    let ext = name.rsplit('.').next().unwrap_or("");
+    match ext {
+        "rs" | "js" | "ts" | "jsx" | "tsx" | "py" | "go" | "java" | "c" | "cpp" | "h" |
+        "hpp" | "cs" | "rb" | "php" | "swift" | "kt" | "sh" | "bash" | "zsh" |
+        "html" | "css" | "scss" | "sass" | "json" | "toml" | "yaml" | "yml" |
+        "xml" | "sql" | "lua" | "r" | "dart" | "ex" | "exs" => "file-code",
+        "md" | "txt" | "rst" | "org" | "tex" | "log" => "file-text",
+        _ => "file",
+    }
 }

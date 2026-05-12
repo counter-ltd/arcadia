@@ -454,6 +454,116 @@ impl ArcadiaRoot {
                                             );
                                         }
                                     }
+                                    #[cfg(feature = "gui")]
+                                    if page_id == "editor.main" {
+                                        for i in 0..self.code_editor_tabs.len() {
+                                            let label = self.code_editor_tabs[i].title.clone();
+                                            let is_sub_active = is_page_active
+                                                && self.active_code_editor_tab == i
+                                                && !self.code_editor_show_dashboard;
+                                            let ws_label = self.code_editor_tabs[i]
+                                                .workspace_path
+                                                .as_deref()
+                                                .map(|p| {
+                                                    arcadia_core::config::workspace::list_workspaces()
+                                                        .into_iter()
+                                                        .find(|w| w.path == p)
+                                                        .map(|w| if w.label.is_empty() {
+                                                            p.rsplit('/').next().unwrap_or(p).to_string()
+                                                        } else {
+                                                            w.label.clone()
+                                                        })
+                                                        .unwrap_or_else(|| {
+                                                            p.rsplit('/').next().unwrap_or(p).to_string()
+                                                        })
+                                                });
+                                            items.push(
+                                                Self::sidebar_code_editor_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from(label),
+                                                    ws_label,
+                                                    i,
+                                                    is_sub_active,
+                                                    is_dark,
+                                                    glyph,
+                                                )
+                                                .into_any_element(),
+                                            );
+                                        }
+                                    }
+                                    if page_id == "ai.models" {
+                                        let providers = arcadia_core::modules::ai::enabled_ai_providers(&self.module_rows);
+                                        for provider in providers {
+                                            let module_name = provider.module_name.to_string();
+                                            let label = provider.display_name.to_string();
+                                            let is_sub_active = is_page_active
+                                                && self.active_ai_provider_module == provider.module_name
+                                                && self.active_llama_cpp_model_id.is_none();
+                                            items.push(
+                                                Self::sidebar_ai_provider_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from(label),
+                                                    module_name.clone(),
+                                                    is_sub_active,
+                                                    is_dark,
+                                                    glyph,
+                                                )
+                                                .into_any_element(),
+                                            );
+                                            if module_name == arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME {
+                                                for model in &self.llama_cpp_models {
+                                                    let model_id = model.id.clone();
+                                                    let model_label = model.name.clone();
+                                                    let is_model_active = is_page_active
+                                                        && self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
+                                                    items.push(
+                                                        Self::sidebar_llama_cpp_model_sub_item(
+                                                            cx,
+                                                            openframe::SharedString::from(model_label),
+                                                            model_id,
+                                                            is_model_active,
+                                                            is_dark,
+                                                            glyph,
+                                                        )
+                                                        .into_any_element(),
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if page_id == "ai.chat" {
+                                        if self.ai_chats.is_empty() {
+                                            let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+                                            items.push(
+                                                div()
+                                                    .ml_7()
+                                                    .pl_2()
+                                                    .py_1()
+                                                    .text_xs()
+                                                    .text_color(dim)
+                                                    .child("Right-click to create")
+                                                    .into_any_element(),
+                                            );
+                                        } else {
+                                            for chat in &self.ai_chats {
+                                                let label = chat.title.clone();
+                                                let chat_id = chat.id;
+                                                let is_sub_active = is_page_active
+                                                    && self.active_ai_chat_id == chat_id;
+                                                items.push(
+                                                    Self::sidebar_ai_chat_sub_item(
+                                                        cx,
+                                                        openframe::SharedString::from(label),
+                                                        chat_id,
+                                                        is_sub_active,
+                                                        is_dark,
+                                                        glyph,
+                                                    )
+                                                    .into_any_element(),
+                                                );
+                                            }
+                                        }
+                                    }
                                 }
                                 div().flex().flex_col().gap_1().children(items)
                             })

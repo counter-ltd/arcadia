@@ -3,7 +3,10 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use arcadia_core::config::ai::AiConfig;
+use arcadia_core::config::llama_cpp::LlamaCppConfig;
 use arcadia_core::config::appearance::AppearanceConfig;
+use arcadia_core::config::code_editor::CodeEditorConfig;
 use arcadia_core::config::extension_tokens;
 use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::modules::{
@@ -200,7 +203,16 @@ impl ArcadiaRoot {
         let workspace_search_focus = cx.focus_handle();
         let workspace_create_label_focus = cx.focus_handle();
         let workspace_create_path_focus = cx.focus_handle();
+        let code_editor_focus = cx.focus_handle();
+        let code_editor_char_width_focus = cx.focus_handle();
+        let ai_input_focus = cx.focus_handle();
+        let llama_cpp_create_name_focus = cx.focus_handle();
+        let llama_cpp_create_path_focus = cx.focus_handle();
+        let llama_cpp_create_mmproj_focus = cx.focus_handle();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
+        let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
+        let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
+        let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
@@ -249,6 +261,49 @@ impl ArcadiaRoot {
             shortcut_create_label_focus,
             shortcut_create_token_focus,
             shortcut_create_args_focus,
+            code_editor_show_indentation_marks: code_editor_cfg.show_indentation_marks,
+            code_editor_char_width_override: code_editor_cfg.char_width_override,
+            code_editor_char_width_draft: code_editor_cfg
+                .char_width_override
+                .map(|v| format!("{:.2}", v))
+                .unwrap_or_default(),
+            code_editor_char_width_editing: false,
+            code_editor_tabs: vec![],
+            active_code_editor_tab: 0,
+            code_editor_next_id: 1,
+            code_editor_focus,
+            code_editor_char_width_focus,
+            code_editor_workspace_picker_open: false,
+            code_editor_explorer_open: false,
+            code_editor_explorer_expanded: std::collections::HashSet::new(),
+            code_editor_context_menu_open: false,
+            code_editor_show_dashboard: false,
+            code_editor_tab_menu: None,
+            code_editor_close_confirm: None,
+            code_editor_line_bounds: std::rc::Rc::new(std::cell::RefCell::new(vec![])),
+            code_editor_is_dragging: false,
+            ai_chats: vec![],
+            active_ai_chat_id: 0,
+            ai_next_id: 1,
+            ai_context_menu_open: false,
+            ai_chat_menu: None,
+            ai_input_focus,
+            ai_default_system_prompt: ai_cfg.default_system_prompt,
+            ai_chat_model_id: None,
+            ai_chat_model_picker_open: false,
+            ai_chat_workspace_id: None,
+            ai_chat_workspace_picker_open: false,
+            llama_cpp_runtime: None,
+            llama_cpp_stream_chat_id: None,
+            llama_cpp_poll_task_started: false,
+            active_ai_provider_module: String::new(),
+            llama_cpp_models: llama_cpp_cfg.models,
+            active_llama_cpp_model_id: None,
+            llama_cpp_provider_menu: None,
+            llama_cpp_create_draft: None,
+            llama_cpp_create_name_focus,
+            llama_cpp_create_path_focus,
+            llama_cpp_create_mmproj_focus,
             workspace_create_draft: None,
             workspace_create_label_focus,
             workspace_create_path_focus,
@@ -565,6 +620,9 @@ impl ArcadiaRoot {
         }
         self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();
+        for tab in &mut self.code_editor_tabs {
+            tab.highlight_dirty = true;
+        }
         #[cfg(all(feature = "gui", not(target_os = "ios")))]
         super::shortcuts::sync_os_global_hotkeys();
     }
@@ -601,6 +659,106 @@ impl ArcadiaRoot {
             self.active_terminal_id -= 1;
         }
         self.terminal_kill_menu = None;
+    }
+
+    pub fn ensure_llama_cpp_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.llama_cpp_poll_task_started {
+            return;
+        }
+        self.llama_cpp_poll_task_started = true;
+        cx.spawn_in(
+            window,
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                let mut cx = cx.clone();
+                async move {
+                    loop {
+                        Timer::after(Duration::from_millis(50)).await;
+                        let should_stop = cx
+                            .update(|_, app| {
+                                view.update(app, |this, cx| {
+                                    let had_event = this.poll_llama_cpp_events(cx);
+                                    // Keep running while inference is active or runtime exists.
+                                    if had_event || this.llama_cpp_stream_chat_id.is_some() {
+                                        false
+                                    } else {
+                                        // Idle — stop task so it restarts on next send.
+                                        this.llama_cpp_poll_task_started = false;
+                                        true
+                                    }
+                                })
+                                .unwrap_or(true)
+                            })
+                            .unwrap_or(true);
+                        if should_stop {
+                            break;
+                        }
+                    }
+                }
+            },
+        )
+        .detach();
+    }
+
+    /// Drain the inference event channel. Returns `true` if any event was processed.
+    pub fn poll_llama_cpp_events(&mut self, cx: &mut Context<Self>) -> bool {
+        use crate::gui::app::llama_cpp_runtime::RuntimeEvent;
+        use crate::gui::app::{AiMessage, AiMessageRole};
+
+        let Some(ref runtime) = self.llama_cpp_runtime else {
+            return false;
+        };
+
+        let mut any = false;
+        loop {
+            match runtime.event_rx.try_recv() {
+                Ok(RuntimeEvent::Token(s)) => {
+                    any = true;
+                    if let Some(chat_id) = self.llama_cpp_stream_chat_id {
+                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                            if let Some(last) = chat.messages.last_mut() {
+                                if last.role == AiMessageRole::Assistant {
+                                    last.content.push_str(&s);
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(RuntimeEvent::Done) => {
+                    any = true;
+                    if let Some(chat_id) = self.llama_cpp_stream_chat_id {
+                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                            chat.is_loading = false;
+                        }
+                    }
+                    self.llama_cpp_stream_chat_id = None;
+                }
+                Ok(RuntimeEvent::Error(e)) => {
+                    any = true;
+                    if let Some(chat_id) = self.llama_cpp_stream_chat_id {
+                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                            chat.is_loading = false;
+                            if let Some(last) = chat.messages.last_mut() {
+                                if last.role == AiMessageRole::Assistant && last.content.is_empty() {
+                                    last.content = format!("Error: {e}");
+                                } else {
+                                    chat.messages.push(AiMessage {
+                                        role: AiMessageRole::Assistant,
+                                        content: format!("Error: {e}"),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    self.llama_cpp_stream_chat_id = None;
+                }
+                Err(_) => break,
+            }
+        }
+
+        if any {
+            cx.notify();
+        }
+        any
     }
 
     pub fn ensure_lan_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {

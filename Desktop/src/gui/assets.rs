@@ -65,6 +65,30 @@ impl AssetSource for EmbeddedAssets {
             "icons/permissions.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/permissions.svg"
             )))),
+            "icons/folder.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/folder.svg"
+            )))),
+            "icons/folder-open.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/folder-open.svg"
+            )))),
+            "icons/file.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/file.svg"
+            )))),
+            "icons/file-code.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/file-code.svg"
+            )))),
+            "icons/file-text.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/file-text.svg"
+            )))),
+            "icons/chevron-right.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/chevron-right.svg"
+            )))),
+            "icons/chevron-down.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/chevron-down.svg"
+            )))),
+            "icons/message.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
+                "../../assets/icons/message.svg"
+            )))),
             "icons/app-icon.png" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../../Resources/Icons/Production/Final-1-appicon.png"
             )))),

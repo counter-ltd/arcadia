@@ -1,11 +1,12 @@
 use arcadia_core::navigation;
+use arcadia_core::config::ConfigFile as _;
 #[cfg(feature = "gui")]
 use arcadia_core::config::thin_client::ThinClientConfig;
 #[cfg(feature = "gui")]
 use arcadia_core::modules::lan::connected_approved_session_peers;
 use openframe::{
-    div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement, Styled, Window, WindowAppearance,
+    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Render, StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
 use openframe::prelude::FluentBuilder as _;
 #[cfg(feature = "gui")]
@@ -13,7 +14,7 @@ use openframe::AnyElement;
 
 use crate::gui::app::navigation::NavGroupRef;
 use crate::gui::app::splash::SPLASH_TOTAL_MS;
-use crate::gui::app::{window_controls_top_padding, ArcadiaRoot};
+use crate::gui::app::{window_controls_top_padding, AiChat, ArcadiaRoot, CodeEditorTab};
 #[cfg(feature = "gui")]
 use crate::gui::theme::render_icon;
 
@@ -166,6 +167,36 @@ impl Render for ArcadiaRoot {
                         this.terminal_kill_menu = None;
                         changed = true;
                     }
+                    #[cfg(feature = "gui")]
+                    if this.code_editor_context_menu_open {
+                        this.code_editor_context_menu_open = false;
+                        changed = true;
+                    }
+                    #[cfg(feature = "gui")]
+                    if this.code_editor_workspace_picker_open {
+                        this.code_editor_workspace_picker_open = false;
+                        changed = true;
+                    }
+                    if this.ai_context_menu_open {
+                        this.ai_context_menu_open = false;
+                        changed = true;
+                    }
+                    if this.ai_chat_menu.is_some() {
+                        this.ai_chat_menu = None;
+                        changed = true;
+                    }
+                    if this.llama_cpp_provider_menu.is_some() {
+                        this.llama_cpp_provider_menu = None;
+                        changed = true;
+                    }
+                    if this.ai_chat_model_picker_open {
+                        this.ai_chat_model_picker_open = false;
+                        changed = true;
+                    }
+                    if this.ai_chat_workspace_picker_open {
+                        this.ai_chat_workspace_picker_open = false;
+                        changed = true;
+                    }
                     if this.color_picker_modal.is_some() {
                         this.color_picker_modal = None;
                         changed = true;
@@ -221,6 +252,8 @@ impl Render for ArcadiaRoot {
                     .child(
                         if self.active_page_id.as_str() == "utility.shell"
                             || self.active_page_id.as_str() == "late.now_playing"
+                            || self.active_page_id.as_str() == "editor.main"
+                            || self.active_page_id.as_str() == "ai.chat"
                         {
                             div()
                                 .flex_1()
@@ -244,6 +277,8 @@ impl Render for ArcadiaRoot {
             .child(self.color_picker_modal(cx, is_dark))
             .child(self.shortcut_create_modal(window, cx, is_dark))
             .child(self.workspace_create_modal(window, cx, is_dark))
+            .child(self.llama_cpp_create_model_modal(window, cx, is_dark))
+            .child(self.code_editor_close_confirm_modal(cx, is_dark))
             .child({
                 #[cfg(feature = "gui")]
                 { self.render_context_menu_overlay(cx, is_dark) }
@@ -286,7 +321,201 @@ impl ArcadiaRoot {
                 .child(div().text_color(text_color).child(label))
         };
 
-        if self.terminal_context_menu_open {
+        if self.ai_chat_model_picker_open {
+            let all_models: Vec<(String, String, &'static str)> = {
+                let mut v = Vec::new();
+                for model in &self.llama_cpp_models {
+                    v.push((model.id.clone(), model.name.clone(), model.model_type.label()));
+                }
+                v
+            };
+            let mut picker = div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(220.))
+                .max_w(px(320.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|_, _, _, cx| {
+                    cx.stop_propagation();
+                }));
+            if all_models.is_empty() {
+                picker = picker.child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(text_color)
+                        .child("No models configured. Enable ai-provider-llama-cpp and create a model."),
+                );
+            } else {
+                for (model_id, model_name, type_label) in all_models {
+                    let is_active = self.ai_chat_model_id.as_deref() == Some(model_id.as_str());
+                    let model_id2 = model_id.clone();
+                    picker = picker.child(
+                        div()
+                            .w_full()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(crate::gui::theme::ui_radius(cx)))
+                            .cursor_pointer()
+                            .text_sm()
+                            .hover(move |s| s.bg(hover_bg))
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .text_color(if is_active { crate::gui::theme::ui_accent(cx) } else { text_color })
+                                    .child(model_name),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(text_color)
+                                    .opacity(0.5)
+                                    .child(type_label),
+                            )
+                            .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                this.ai_chat_model_id = if is_active { None } else { Some(model_id2.clone()) };
+                                this.ai_chat_model_picker_open = false;
+                                cx.notify();
+                            })),
+                    );
+                }
+            }
+            picker.into_any_element()
+        } else if self.ai_chat_workspace_picker_open {
+            let workspaces = arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
+                .map(|cfg| cfg.workspaces)
+                .unwrap_or_default();
+            let mut picker = div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(220.))
+                .max_w(px(320.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|_, _, _, cx| {
+                    cx.stop_propagation();
+                }));
+            if workspaces.is_empty() {
+                picker = picker.child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(text_color)
+                        .child("No workspaces configured."),
+                );
+            } else {
+                // "None" option to clear selection
+                let is_none = self.ai_chat_workspace_id.is_none();
+                picker = picker.child(
+                    div()
+                        .w_full()
+                        .px_2()
+                        .py_1()
+                        .rounded(px(crate::gui::theme::ui_radius(cx)))
+                        .cursor_pointer()
+                        .text_sm()
+                        .hover(move |s| s.bg(hover_bg))
+                        .text_color(if is_none { crate::gui::theme::ui_accent(cx) } else { text_color })
+                        .child("None")
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            this.ai_chat_workspace_id = None;
+                            this.ai_chat_workspace_picker_open = false;
+                            cx.notify();
+                        })),
+                );
+                for ws in workspaces {
+                    let is_active = self.ai_chat_workspace_id.as_deref() == Some(ws.id.as_str());
+                    let ws_id = ws.id.clone();
+                    let ws_path = ws.path.clone();
+                    picker = picker.child(
+                        div()
+                            .w_full()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(crate::gui::theme::ui_radius(cx)))
+                            .cursor_pointer()
+                            .text_sm()
+                            .hover(move |s| s.bg(hover_bg))
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .text_color(if is_active { crate::gui::theme::ui_accent(cx) } else { text_color })
+                                    .child(ws.label.clone()),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(text_color)
+                                    .opacity(0.5)
+                                    .child(ws_path),
+                            )
+                            .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                this.ai_chat_workspace_id = if is_active { None } else { Some(ws_id.clone()) };
+                                this.ai_chat_workspace_picker_open = false;
+                                cx.notify();
+                            })),
+                    );
+                }
+            }
+            picker.into_any_element()
+        } else if self.code_editor_context_menu_open {
+            div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("code", "New Editor".into(), text_color, text_color)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
+                            let id = this.code_editor_next_id;
+                            let title = format!("untitled-{id}");
+                            this.code_editor_tabs.push(CodeEditorTab {
+                                id,
+                                title,
+                                content: String::new(),
+                                cursor: 0,
+                                selection_anchor: None,
+                                language: None,
+                                hl_spans: vec![],
+                                decorations: vec![],
+                                highlight_dirty: true,
+                                workspace_path: None,
+                                file_path: None,
+                                saved_content: String::new(),
+                            });
+                            this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
+                            this.code_editor_next_id += 1;
+                            this.active_page_id = "editor.main".to_string();
+                            this.code_editor_context_menu_open = false;
+                            this.code_editor_focus.focus(window);
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        } else if self.terminal_context_menu_open {
             div()
                 .absolute()
                 .left(pos.x)
@@ -380,6 +609,169 @@ impl ArcadiaRoot {
                     )
                 }))
                 .into_any_element()
+        } else if self.code_editor_workspace_picker_open {
+            let workspaces = arcadia_core::config::workspace::list_workspaces();
+            let active_idx = self
+                .active_code_editor_tab
+                .min(self.code_editor_tabs.len().saturating_sub(1));
+            let current_path = self
+                .code_editor_tabs
+                .get(active_idx)
+                .and_then(|t| t.workspace_path.clone());
+            let mut picker = div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(220.))
+                .max_w(px(320.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|_, _, _, cx| {
+                    cx.stop_propagation();
+                }));
+            if workspaces.is_empty() {
+                picker = picker.child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(text_color)
+                        .child("No workspaces registered."),
+                );
+            } else {
+                for ws in &workspaces {
+                    let is_active = current_path.as_deref() == Some(ws.path.as_str());
+                    let ws_path = ws.path.clone();
+                    let ws_label = ws.label.clone();
+                    let display = if ws_label.is_empty() {
+                        ws_path
+                            .rsplit('/')
+                            .next()
+                            .unwrap_or(&ws_path)
+                            .to_string()
+                    } else {
+                        ws_label.clone()
+                    };
+                    let ws_path2 = ws.path.clone();
+                    picker = picker.child(
+                        menu_row("folder", display.into(), text_color, if is_active { crate::gui::theme::ui_accent(cx) } else { text_color })
+                            .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                let idx = this.active_code_editor_tab.min(this.code_editor_tabs.len().saturating_sub(1));
+                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                    tab.workspace_path = if is_active { None } else { Some(ws_path2.clone()) };
+                                }
+                                this.code_editor_workspace_picker_open = false;
+                                cx.notify();
+                            })),
+                    );
+                }
+            }
+            if current_path.is_some() {
+                picker = picker.child(
+                    menu_row("x", "Clear Workspace".into(), text_color, text_color)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
+                            let idx = this.active_code_editor_tab.min(this.code_editor_tabs.len().saturating_sub(1));
+                            if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                tab.workspace_path = None;
+                            }
+                            this.code_editor_workspace_picker_open = false;
+                            cx.notify();
+                        })),
+                );
+            }
+            picker.into_any_element()
+        } else if let Some(menu_pos) = self.llama_cpp_provider_menu {
+            div()
+                .absolute()
+                .left(menu_pos.x)
+                .top(menu_pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("modules", "Create Model".into(), text_color, text_color)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
+                            this.llama_cpp_provider_menu = None;
+                            this.llama_cpp_create_draft = Some(crate::gui::app::LlamaCppModelCreateDraft {
+                                name: String::new(),
+                                path: String::new(),
+                                mmproj_path: String::new(),
+                                model_type: arcadia_core::config::llama_cpp::LlamaCppModelType::Generation,
+                                error: None,
+                            });
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        } else if self.ai_context_menu_open {
+            div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("message", "New Chat".into(), text_color, text_color)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
+                            let id = this.ai_next_id;
+                            this.ai_chats.push(AiChat {
+                                id,
+                                title: format!("Chat {id}"),
+                                messages: vec![],
+                                input_draft: String::new(),
+                                is_loading: false,
+                            });
+                            this.active_ai_chat_id = id;
+                            this.ai_next_id += 1;
+                            this.active_page_id = "ai.chat".to_string();
+                            this.ai_context_menu_open = false;
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        } else if let Some((chat_id, chat_pos)) = self.ai_chat_menu {
+            let danger = crate::gui::theme::ui_danger(cx, is_dark);
+            div()
+                .absolute()
+                .left(chat_pos.x)
+                .top(chat_pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("x", "Close Chat".into(), danger, danger).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.ai_chat_menu = None;
+                            this.ai_chats.retain(|c| c.id != chat_id);
+                            if !this.ai_chats.is_empty() {
+                                let last_id = this.ai_chats.last().map(|c| c.id).unwrap_or(0);
+                                if !this.ai_chats.iter().any(|c| c.id == this.active_ai_chat_id) {
+                                    this.active_ai_chat_id = last_id;
+                                }
+                            }
+                            cx.notify();
+                        }),
+                    ),
+                )
+                .into_any_element()
         } else if self.app_menu_open {
             let danger = crate::gui::theme::ui_danger(cx, is_dark);
             div()
@@ -413,8 +805,222 @@ impl ArcadiaRoot {
                     ),
                 )
                 .into_any_element()
+        } else if let Some((tab_idx, tab_pos)) = self.code_editor_tab_menu {
+            let danger = crate::gui::theme::ui_danger(cx, is_dark);
+            div()
+                .absolute()
+                .left(tab_pos.x)
+                .top(tab_pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("x", "Close Editor".into(), danger, danger).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.code_editor_tab_menu = None;
+                            let is_dirty = this
+                                .code_editor_tabs
+                                .get(tab_idx)
+                                .map(|t| t.file_path.is_some() && t.content != t.saved_content)
+                                .unwrap_or(false);
+                            if is_dirty {
+                                this.code_editor_close_confirm = Some(tab_idx);
+                            } else {
+                                if tab_idx < this.code_editor_tabs.len() {
+                                    this.code_editor_tabs.remove(tab_idx);
+                                    if this.code_editor_tabs.is_empty() {
+                                        this.code_editor_show_dashboard = true;
+                                    } else {
+                                        this.active_code_editor_tab = this
+                                            .active_code_editor_tab
+                                            .min(this.code_editor_tabs.len() - 1);
+                                    }
+                                }
+                            }
+                            cx.notify();
+                        }),
+                    ),
+                )
+                .into_any_element()
         } else {
             div().into_any_element()
         }
+    }
+}
+
+impl ArcadiaRoot {
+    pub fn code_editor_close_confirm_modal(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
+        let Some(tab_idx) = self.code_editor_close_confirm else {
+            return div();
+        };
+        let filename = self
+            .code_editor_tabs
+            .get(tab_idx)
+            .map(|t| t.title.clone())
+            .unwrap_or_else(|| "this file".to_string());
+        let has_path = self
+            .code_editor_tabs
+            .get(tab_idx)
+            .and_then(|t| t.file_path.clone())
+            .is_some();
+        let radius = crate::gui::theme::ui_radius(cx);
+
+        div()
+            .absolute()
+            .top_0()
+            .left_0()
+            .right_0()
+            .bottom_0()
+            .child(
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .bg(rgb(0x000000))
+                    .opacity(0.4)
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.code_editor_close_confirm = None;
+                            cx.notify();
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .size_full()
+                    .flex()
+                    .justify_center()
+                    .items_center()
+                    .child(
+                        div()
+                            .w_96()
+                            .p_5()
+                            .rounded(px(radius))
+                            .bg(crate::gui::theme::ui_surface(cx, is_dark))
+                            .border_1()
+                            .border_color(crate::gui::theme::ui_border(cx, is_dark))
+                            .flex()
+                            .flex_col()
+                            .gap_4()
+                            .child(
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(crate::gui::theme::ui_text(cx, is_dark))
+                                    .child("Unsaved Changes"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(crate::gui::theme::ui_text(cx, is_dark))
+                                    .child(format!("\"{filename}\" has unsaved changes.")),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .gap_3()
+                                    .justify_end()
+                                    // Cancel
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1()
+                                            .rounded(px(radius.min(8.0)))
+                                            .border_1()
+                                            .border_color(crate::gui::theme::ui_border(cx, is_dark))
+                                            .text_sm()
+                                            .text_color(crate::gui::theme::ui_text(cx, is_dark))
+                                            .cursor_pointer()
+                                            .child("Cancel")
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.code_editor_close_confirm = None;
+                                                    cx.notify();
+                                                }),
+                                            ),
+                                    )
+                                    // Discard
+                                    .child(
+                                        div()
+                                            .px_3()
+                                            .py_1()
+                                            .rounded(px(radius.min(8.0)))
+                                            .border_1()
+                                            .border_color(crate::gui::theme::ui_danger(cx, is_dark))
+                                            .text_sm()
+                                            .text_color(crate::gui::theme::ui_danger(cx, is_dark))
+                                            .cursor_pointer()
+                                            .child("Discard")
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(move |this, _, _, cx| {
+                                                    this.code_editor_close_confirm = None;
+                                                    if tab_idx < this.code_editor_tabs.len() {
+                                                        this.code_editor_tabs.remove(tab_idx);
+                                                        if this.code_editor_tabs.is_empty() {
+                                                            this.code_editor_show_dashboard = true;
+                                                        } else {
+                                                            this.active_code_editor_tab = this
+                                                                .active_code_editor_tab
+                                                                .min(this.code_editor_tabs.len() - 1);
+                                                        }
+                                                    }
+                                                    cx.notify();
+                                                }),
+                                            ),
+                                    )
+                                    // Save (only when file path exists)
+                                    .when(has_path, |row| {
+                                        row.child(
+                                            div()
+                                                .px_3()
+                                                .py_1()
+                                                .rounded(px(radius.min(8.0)))
+                                                .bg(crate::gui::theme::ui_accent(cx))
+                                                .text_sm()
+                                                .text_color(rgb(0xffffff))
+                                                .cursor_pointer()
+                                                .child("Save")
+                                                .on_mouse_down(
+                                                    MouseButton::Left,
+                                                    cx.listener(move |this, _, _, cx| {
+                                                        this.code_editor_close_confirm = None;
+                                                        if let Some(tab) = this.code_editor_tabs.get_mut(tab_idx) {
+                                                            if let Some(path) = tab.file_path.clone() {
+                                                                let _ = std::fs::write(&path, &tab.content);
+                                                                tab.saved_content = tab.content.clone();
+                                                            }
+                                                        }
+                                                        if tab_idx < this.code_editor_tabs.len() {
+                                                            this.code_editor_tabs.remove(tab_idx);
+                                                            if this.code_editor_tabs.is_empty() {
+                                                                this.code_editor_show_dashboard = true;
+                                                            } else {
+                                                                this.active_code_editor_tab = this
+                                                                    .active_code_editor_tab
+                                                                    .min(this.code_editor_tabs.len() - 1);
+                                                            }
+                                                        }
+                                                        cx.notify();
+                                                    }),
+                                                ),
+                                        )
+                                    }),
+                            ),
+                    ),
+            )
     }
 }

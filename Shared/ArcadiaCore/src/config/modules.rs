@@ -53,6 +53,9 @@ pub const TRAY_MODULE_NAME: &str = "tray";
 pub const CURSOR_MODULE_NAME: &str = "cursor";
 pub const OVERLAY_MODULE_NAME: &str = "overlay";
 pub const WORKSPACE_MODULE_NAME: &str = "workspace";
+pub const CODE_EDITOR_MODULE_NAME: &str = "code-editor";
+pub const AI_MODULE_NAME: &str = "ai";
+pub const AI_LLAMA_CPP_MODULE_NAME: &str = "ai-provider-llama-cpp";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -215,6 +218,33 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
                 default_granted: false,
             },
         ],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: CODE_EDITOR_MODULE_NAME,
+        version: "0.1.0",
+        description: "Code editor with per-file tabs in the sidebar.",
+        required_modules: &[],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_MODULE_NAME,
+        version: "0.1.0",
+        description: "AI chat interface. Requires an AI provider module to be enabled.",
+        required_modules: &[],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_LLAMA_CPP_MODULE_NAME,
+        version: "0.1.0",
+        description: "llama.cpp local inference provider for the AI chat module.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
 ];

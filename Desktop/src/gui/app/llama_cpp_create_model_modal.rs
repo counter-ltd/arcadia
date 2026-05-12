@@ -1,7 +1,6 @@
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use arcadia_core::config::workspace::{WorkspaceEntry, WorkspacesConfig};
+use arcadia_core::config::llama_cpp::{LlamaCppConfig, LlamaCppModel, LlamaCppModelType};
 use arcadia_core::config::ConfigFile;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
@@ -61,13 +60,13 @@ fn text_field(
 }
 
 impl ArcadiaRoot {
-    pub fn workspace_create_modal(
+    pub fn llama_cpp_create_model_modal(
         &mut self,
         window: &Window,
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> AnyElement {
-        if self.workspace_create_draft.is_none() {
+        if self.llama_cpp_create_draft.is_none() {
             return div().into_any_element();
         }
 
@@ -75,41 +74,44 @@ impl ArcadiaRoot {
         let g = theme::glyph_snapshot(cx);
         let radius = g.map(|gg| gg.border_radius).unwrap_or(p.radius_md);
 
-        let label_focused = self.workspace_create_label_focus.is_focused(window);
-        let path_focused = self.workspace_create_path_focus.is_focused(window);
+        let name_focused = self.llama_cpp_create_name_focus.is_focused(window);
+        let path_focused = self.llama_cpp_create_path_focus.is_focused(window);
+        let mmproj_focused = self.llama_cpp_create_mmproj_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
 
-        let label_fh = self.workspace_create_label_focus.clone();
-        let path_fh = self.workspace_create_path_focus.clone();
+        let name_fh = self.llama_cpp_create_name_focus.clone();
+        let path_fh = self.llama_cpp_create_path_focus.clone();
+        let mmproj_fh = self.llama_cpp_create_mmproj_focus.clone();
 
-        let draft = self.workspace_create_draft.clone().unwrap();
+        let draft = self.llama_cpp_create_draft.clone().unwrap();
+        let is_vision = draft.model_type == LlamaCppModelType::Vision;
 
         let modal_surface = g.map(|gg| gg.surface).unwrap_or(p.surface);
         let modal_border = g.map(|gg| gg.border).unwrap_or(p.border);
 
-        let label_field = text_field(
-            &draft.label,
-            "Workspace label…",
-            label_focused,
+        let name_field = text_field(
+            &draft.name,
+            "Model name…",
+            name_focused,
             blink,
-            label_fh,
+            name_fh,
             p,
             radius,
             |this, event, _, cx| {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.workspace_create_draft = None;
+                    this.llama_cpp_create_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.workspace_create_draft {
+                if let Some(ref mut d) = this.llama_cpp_create_draft {
                     if key == "backspace" {
-                        d.label.pop();
+                        d.name.pop();
                         cx.notify();
                     } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
                         if let Some(kc) = &event.keystroke.key_char {
-                            d.label.push_str(kc);
+                            d.name.push_str(kc);
                             cx.notify();
                         }
                     }
@@ -120,7 +122,7 @@ impl ArcadiaRoot {
 
         let path_field = text_field(
             &draft.path,
-            "/path/to/project…",
+            "/path/to/model.gguf…",
             path_focused,
             blink,
             path_fh,
@@ -130,17 +132,48 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.workspace_create_draft = None;
+                    this.llama_cpp_create_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.workspace_create_draft {
+                if let Some(ref mut d) = this.llama_cpp_create_draft {
                     if key == "backspace" {
                         d.path.pop();
                         cx.notify();
                     } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
                         if let Some(kc) = &event.keystroke.key_char {
                             d.path.push_str(kc);
+                            cx.notify();
+                        }
+                    }
+                }
+            },
+            cx,
+        );
+
+        let mmproj_field = text_field(
+            &draft.mmproj_path,
+            "/path/to/mmproj.gguf…",
+            mmproj_focused,
+            blink,
+            mmproj_fh,
+            p,
+            radius,
+            |this, event, _, cx| {
+                let key = event.keystroke.key.as_str();
+                let mods = event.keystroke.modifiers;
+                if key == "escape" {
+                    this.llama_cpp_create_draft = None;
+                    cx.notify();
+                    return;
+                }
+                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                    if key == "backspace" {
+                        d.mmproj_path.pop();
+                        cx.notify();
+                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                        if let Some(kc) = &event.keystroke.key_char {
+                            d.mmproj_path.push_str(kc);
                             cx.notify();
                         }
                     }
@@ -156,6 +189,40 @@ impl ArcadiaRoot {
                 .child(e.clone())
                 .into_any_element()
         });
+
+        // Model type selector row
+        let type_row = {
+            let current_type = draft.model_type.clone();
+            let mut row = div().flex().gap_2();
+            for mt in LlamaCppModelType::all() {
+                let mt_clone = mt.clone();
+                let is_selected = *mt == current_type;
+                let bg = if is_selected { p.accent } else { p.surface_elevated };
+                let fg = if is_selected { p.on_accent } else { p.content_title };
+                let border = if is_selected { p.accent } else { p.border };
+                row = row.child(
+                    div()
+                        .px_3()
+                        .py_1()
+                        .rounded(px(radius.min(8.0)))
+                        .border_1()
+                        .border_color(border)
+                        .bg(bg)
+                        .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(fg)
+                        .cursor_pointer()
+                        .child(mt.label())
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            if let Some(ref mut d) = this.llama_cpp_create_draft {
+                                d.model_type = mt_clone.clone();
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+            row
+        };
 
         div()
             .absolute()
@@ -173,7 +240,7 @@ impl ArcadiaRoot {
                     .bg(rgb(0x000000))
                     .opacity(0.3)
                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                        this.workspace_create_draft = None;
+                        this.llama_cpp_create_draft = None;
                         cx.notify();
                     })),
             )
@@ -197,15 +264,14 @@ impl ArcadiaRoot {
                             .on_mouse_down(MouseButton::Left, cx.listener(|_, _, _, cx| {
                                 cx.stop_propagation();
                             }))
-                            // Title
                             .child(
                                 div()
                                     .text_base()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(p.content_title)
-                                    .child("Add Workspace"),
+                                    .child("Create Model"),
                             )
-                            // Label row
+                            // Name
                             .child(
                                 div()
                                     .flex()
@@ -216,11 +282,11 @@ impl ArcadiaRoot {
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(p.ui_subtext)
-                                            .child("LABEL"),
+                                            .child("NAME"),
                                     )
-                                    .child(label_field),
+                                    .child(name_field),
                             )
-                            // Path row
+                            // Path
                             .child(
                                 div()
                                     .flex()
@@ -231,7 +297,7 @@ impl ArcadiaRoot {
                                             .text_xs()
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(p.ui_subtext)
-                                            .child("PATH"),
+                                            .child("MODEL FILE"),
                                     )
                                     .child(
                                         div()
@@ -254,8 +320,8 @@ impl ArcadiaRoot {
                                                     .child("Browse…")
                                                     .on_mouse_down(MouseButton::Left, cx.listener(|_this, _, window, cx| {
                                                         let receiver = cx.prompt_for_paths(PathPromptOptions {
-                                                            files: false,
-                                                            directories: true,
+                                                            files: true,
+                                                            directories: false,
                                                             multiple: false,
                                                             prompt: None,
                                                         });
@@ -266,7 +332,7 @@ impl ArcadiaRoot {
                                                                     if let Some(path) = paths.into_iter().next() {
                                                                         cx.update(|_, app| {
                                                                             this.update(app, |this, cx| {
-                                                                                if let Some(ref mut d) = this.workspace_create_draft {
+                                                                                if let Some(ref mut d) = this.llama_cpp_create_draft {
                                                                                     d.path = path.to_string_lossy().to_string();
                                                                                     d.error = None;
                                                                                 }
@@ -281,7 +347,82 @@ impl ArcadiaRoot {
                                             ),
                                     ),
                             )
-                            // Error
+                            // Type
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(p.ui_subtext)
+                                            .child("TYPE"),
+                                    )
+                                    .child(type_row),
+                            )
+                            // mmproj path — Vision only
+                            .when(is_vision, |d| d.child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_1()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(p.ui_subtext)
+                                            .child("MMPROJ FILE"),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .gap_2()
+                                            .child(div().flex_1().child(mmproj_field))
+                                            .child(
+                                                div()
+                                                    .px_3()
+                                                    .py_2()
+                                                    .rounded(px(radius.min(8.0)))
+                                                    .bg(p.surface_elevated)
+                                                    .border_1()
+                                                    .border_color(p.border)
+                                                    .text_sm()
+                                                    .font_weight(FontWeight::SEMIBOLD)
+                                                    .text_color(p.content_title)
+                                                    .cursor_pointer()
+                                                    .child("Browse…")
+                                                    .on_mouse_down(MouseButton::Left, cx.listener(|_this, _, window, cx| {
+                                                        let receiver = cx.prompt_for_paths(PathPromptOptions {
+                                                            files: true,
+                                                            directories: false,
+                                                            multiple: false,
+                                                            prompt: None,
+                                                        });
+                                                        cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                                                            let mut cx = cx.clone();
+                                                            async move {
+                                                                if let Ok(Ok(Some(paths))) = receiver.await {
+                                                                    if let Some(path) = paths.into_iter().next() {
+                                                                        cx.update(|_, app| {
+                                                                            this.update(app, |this, cx| {
+                                                                                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                                                                                    d.mmproj_path = path.to_string_lossy().to_string();
+                                                                                    d.error = None;
+                                                                                }
+                                                                                cx.notify();
+                                                                            }).ok();
+                                                                        }).ok();
+                                                                    }
+                                                                }
+                                                            }
+                                                        }).detach();
+                                                    })),
+                                            ),
+                                    ),
+                            ))
                             .when_some(error_el, |d, e| d.child(e))
                             // Footer
                             .child(
@@ -303,7 +444,7 @@ impl ArcadiaRoot {
                                             .cursor_pointer()
                                             .child("Cancel")
                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.workspace_create_draft = None;
+                                                this.llama_cpp_create_draft = None;
                                                 cx.notify();
                                             })),
                                     )
@@ -317,9 +458,9 @@ impl ArcadiaRoot {
                                             .font_weight(FontWeight::SEMIBOLD)
                                             .text_color(p.on_accent)
                                             .cursor_pointer()
-                                            .child("Add")
+                                            .child("Create")
                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.workspace_create_save(cx);
+                                                this.llama_cpp_create_model_save(cx);
                                             })),
                                     ),
                             ),
@@ -328,15 +469,15 @@ impl ArcadiaRoot {
             .into_any_element()
     }
 
-    pub fn workspace_create_save(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.workspace_create_draft.clone() else {
+    pub fn llama_cpp_create_model_save(&mut self, cx: &mut Context<Self>) {
+        let Some(draft) = self.llama_cpp_create_draft.clone() else {
             return;
         };
 
-        let label = draft.label.trim().to_string();
-        if label.is_empty() {
-            if let Some(ref mut d) = self.workspace_create_draft {
-                d.error = Some("Label is required.".to_string());
+        let name = draft.name.trim().to_string();
+        if name.is_empty() {
+            if let Some(ref mut d) = self.llama_cpp_create_draft {
+                d.error = Some("Name is required.".to_string());
             }
             cx.notify();
             return;
@@ -344,59 +485,65 @@ impl ArcadiaRoot {
 
         let path = draft.path.trim().to_string();
         if path.is_empty() {
-            if let Some(ref mut d) = self.workspace_create_draft {
-                d.error = Some("Path is required.".to_string());
+            if let Some(ref mut d) = self.llama_cpp_create_draft {
+                d.error = Some("Model file path is required.".to_string());
             }
             cx.notify();
             return;
         }
 
-        if !Path::new(&path).exists() {
-            if let Some(ref mut d) = self.workspace_create_draft {
-                d.error = Some(format!("Path does not exist: {path}"));
+        let mmproj_path = if draft.model_type == arcadia_core::config::llama_cpp::LlamaCppModelType::Vision {
+            let p = draft.mmproj_path.trim().to_string();
+            if p.is_empty() {
+                if let Some(ref mut d) = self.llama_cpp_create_draft {
+                    d.error = Some("mmproj file path is required for Vision models.".to_string());
+                }
+                cx.notify();
+                return;
             }
-            cx.notify();
-            return;
-        }
+            Some(p)
+        } else {
+            None
+        };
 
-        let Ok(mut cfg) = WorkspacesConfig::load_or_create() else {
-            if let Some(ref mut d) = self.workspace_create_draft {
-                d.error = Some("Could not load workspace.toml".to_string());
+        let Ok(mut cfg) = LlamaCppConfig::load_or_create() else {
+            if let Some(ref mut d) = self.llama_cpp_create_draft {
+                d.error = Some("Could not load llama-cpp.toml".to_string());
             }
             cx.notify();
             return;
         };
 
-        if cfg.workspaces.iter().any(|w| w.path == path) {
-            if let Some(ref mut d) = self.workspace_create_draft {
-                d.error = Some(format!("Workspace already exists for: {path}"));
-            }
-            cx.notify();
-            return;
-        }
-
         let ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_millis())
             .unwrap_or(0);
-        let id = format!("ws_{ms}");
+        let id = format!("m_{ms}");
 
-        cfg.workspaces.push(WorkspaceEntry {
-            id,
-            label,
+        let model = LlamaCppModel {
+            id: id.clone(),
+            name,
+            model_type: draft.model_type,
             path,
-            granted_permissions: vec!["workspace.read".to_string()],
-        });
+            mmproj_path,
+        };
+
+        cfg.models.push(model.clone());
 
         if let Err(e) = cfg.save() {
-            if let Some(ref mut d) = self.workspace_create_draft {
+            if let Some(ref mut d) = self.llama_cpp_create_draft {
                 d.error = Some(format!("Save failed: {e}"));
             }
             cx.notify();
             return;
         }
 
-        self.workspace_create_draft = None;
+        self.llama_cpp_models.push(model);
+        self.active_llama_cpp_model_id = Some(id);
+        self.active_ai_provider_module =
+            arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME.to_string();
+        self.active_page_id = "ai.models".to_string();
+        self.llama_cpp_create_draft = None;
         cx.notify();
     }
 }
