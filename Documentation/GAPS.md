@@ -1,10 +1,10 @@
-# Arcadia — Thin-client / remote-surface status
+# Arcadia — Gap Tracking
 
-This file previously listed **open gaps**. Those items are now either **implemented**, **documented as permanent constraints**, or tracked as **explicit roadmap** in **`REMOTE_AND_IOS_CONSTRAINTS.md`**.
+The canonical gap list lives in **[`ROADMAP.md`](ROADMAP.md)** — P0 through P3, AI system gaps, and security posture. This file covers topics that either don't fit neatly into the priority tiers or need a more narrative form.
 
 ---
 
-## Resolved in tree
+## Thin-client / remote-surface status
 
 | Topic | Where |
 |-------|--------|
@@ -14,10 +14,10 @@ This file previously listed **open gaps**. Those items are now either **implemen
 | **`SurfaceSnapshot.extra` schema** | Documented `schema_version` + keys in `modules/surface.rs` |
 | **Renderer-only nav SKU** | `thin-client.toml` → `navigation_from_host_only` |
 | **iOS constrained shell** | `shell_ios` panel (`shell.execute` / LAN only) |
-| **Stable “unavailable on this surface” strings** | `arcadia_core::capabilities` + shell handlers |
+| **Stable "unavailable on this surface" strings** | `arcadia_core::capabilities` + shell handlers |
 | **CI: iOS cross-check + C ABI header drift** | `stable-build-matrix.yml`, `Shared/Scripts/check-ios-bridge-header.sh` |
 | **Tests** | `parse_surface_revision`, navigation snapshot round-trip, thin-client TOML serde |
-| **Permission catalog + `permissions.toml`** | `config/permissions` + `modules/permissions`; `input.capture` is registered but **not yet enforced** at input injection sites (desktop / `arcadia_ios_inject_touch`) — toggles + CLI work; wire checks when those entrypoints gain a single gate. |
+| **Permission catalog + `permissions.toml`** | `config/permissions` + `modules/permissions`; `input.capture` is registered but **not yet enforced** at input injection sites (desktop / `arcadia_ios_inject_touch`) — toggles + CLI work; see P1.5 in ROADMAP. |
 
 ---
 
@@ -31,4 +31,6 @@ Multi-writer LWW on `modules.toml`, discrete LAN transport, attribution-only `cl
 
 ## Contributing
 
-When extending mirrored host state, keep **`surface.*`** as the protocol surface (`SurfaceSnapshot.extra`, `SurfacePatch`). Follow **`CLAUDE.md`** / **`AGENTS.md`** registry-driven rules.
+When extending mirrored host state, keep **`surface.*`** as the protocol surface (`SurfaceSnapshot.extra`, `SurfacePatch`). Follow **`CLAUDE.md`** registry-driven rules.
+
+For all other gap tracking — code quality, AI features, security, CLI parity — see **[`ROADMAP.md`](ROADMAP.md)**.
