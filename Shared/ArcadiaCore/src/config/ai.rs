@@ -36,4 +36,10 @@ impl ConfigFile for AiConfig {
     fn file_name() -> &'static str {
         FILE_NAME
     }
+
+    fn merge_defaults(&mut self) -> bool {
+        // Add field migrations here following the pattern in config/modules.rs.
+        // Return true if any field was changed so the caller saves the updated config.
+        false
+    }
 }

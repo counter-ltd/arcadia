@@ -237,7 +237,26 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "AI chat interface. Requires an AI provider module to be enabled.",
         required_modules: &[],
         required_permissions: &[],
-        workspace_permissions: &[],
+        workspace_permissions: &[
+            WorkspacePermissionDef {
+                id: "workspace.read",
+                title: "File read (AI)",
+                description: "Allow the AI to read files via @mention and read_file tool.",
+                default_granted: false,
+            },
+            WorkspacePermissionDef {
+                id: "workspace.write",
+                title: "File write (AI)",
+                description: "Allow the AI to create and modify files via write_file tool.",
+                default_granted: false,
+            },
+            WorkspacePermissionDef {
+                id: "workspace.execute",
+                title: "Command execution (AI)",
+                description: "Allow the AI to run allowlisted commands via run_command tool.",
+                default_granted: false,
+            },
+        ],
         supported_platforms: &[],
     },
     ModuleManifest {

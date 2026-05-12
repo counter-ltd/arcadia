@@ -17,6 +17,7 @@ pub struct OllamaModel {
 pub enum OllamaModelKind {
     #[default]
     TextGeneration,
+    ImageGeneration,
     Vision,
     Embedding,
 }
@@ -24,17 +25,19 @@ pub enum OllamaModelKind {
 impl OllamaModelKind {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::TextGeneration => "Text Generation",
-            Self::Vision         => "Vision",
-            Self::Embedding      => "Embedding",
+            Self::TextGeneration  => "Text Generation",
+            Self::ImageGeneration => "Image Generation",
+            Self::Vision          => "Vision",
+            Self::Embedding       => "Embedding",
         }
     }
 
     pub fn as_ai_model_kind(&self) -> AiModelKind {
         match self {
-            Self::TextGeneration => AiModelKind::TextGeneration,
-            Self::Vision         => AiModelKind::Vision,
-            Self::Embedding      => AiModelKind::Embedding,
+            Self::TextGeneration  => AiModelKind::TextGeneration,
+            Self::ImageGeneration => AiModelKind::ImageGeneration,
+            Self::Vision          => AiModelKind::Vision,
+            Self::Embedding       => AiModelKind::Embedding,
         }
     }
 }
@@ -63,5 +66,9 @@ impl Default for OllamaConfig {
 impl ConfigFile for OllamaConfig {
     fn file_name() -> &'static str {
         "ollama.toml"
+    }
+
+    fn merge_defaults(&mut self) -> bool {
+        false
     }
 }

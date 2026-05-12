@@ -1,5 +1,4 @@
 use arcadia_core::config::ollama::OllamaConfig;
-use arcadia_core::config::workspace::WorkspacesConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::config::modules::{
     AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
@@ -197,8 +196,31 @@ impl ArcadiaRoot {
             );
         }
 
-        // Loading dots while streaming
-        if is_loading {
+        // Loading indicator: distinguish model-load phase (empty assistant placeholder)
+        // from token-streaming phase (assistant message has content).
+        let waiting_for_first_token = is_loading && messages.last()
+            .map(|m| m.role == AiMessageRole::Assistant && m.content.is_empty())
+            .unwrap_or(false);
+        if waiting_for_first_token {
+            let dim = p.content_meta;
+            msg_col = msg_col.child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .rounded(px(radius.min(12.0)))
+                            .bg(p.panel_bg)
+                            .border_1()
+                            .border_color(p.panel_border)
+                            .text_sm()
+                            .text_color(dim)
+                            .child("Loading model…"),
+                    ),
+            );
+        } else if is_loading {
             let dim = p.content_meta;
             msg_col = msg_col.child(
                 div()
@@ -351,23 +373,14 @@ impl ArcadiaRoot {
             _ => Err("No AI provider enabled. Enable one in Modules.".to_string()),
         };
 
-        // Resolve workspace context — surface errors rather than silently dropping them.
+        // Resolve workspace context from cached entries (avoids a disk read per message).
         let workspace_context: Option<AiWorkspaceContext> =
             if self.is_module_enabled(WORKSPACE_MODULE_NAME) {
-                match self.ai_chat_workspace_id.as_deref() {
-                    None => None,
-                    Some(ws_id) => {
-                        match WorkspacesConfig::load_or_create() {
-                            Ok(cfg) => cfg.workspaces.into_iter()
-                                .find(|w| w.id == ws_id)
-                                .map(|entry| AiWorkspaceContext::from_workspace_entry(&entry)),
-                            Err(e) => {
-                                eprintln!("workspace config load failed: {e}");
-                                None
-                            }
-                        }
-                    }
-                }
+                self.ai_chat_workspace_id.as_deref().and_then(|ws_id| {
+                    self.workspace_entries.iter()
+                        .find(|w| w.id == ws_id)
+                        .map(AiWorkspaceContext::from_workspace_entry)
+                })
             } else {
                 None
             };

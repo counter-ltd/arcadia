@@ -36,28 +36,38 @@ pub fn execute_tool(
 ) -> AiToolResult {
     let result: Result<String, String> = match call.name.as_str() {
         "read_file" => {
-            let path = call.arguments["path"].as_str().unwrap_or("");
-            let full = resolve_path(path, workspace);
-            ai_sandbox::sandboxed_read(workspace, &full)
+            match call.arguments.get("path").and_then(|v| v.as_str()).filter(|p| !p.is_empty()) {
+                None => Err("Missing or empty 'path' argument".to_string()),
+                Some(path) => {
+                    let full = resolve_path(path, workspace);
+                    ai_sandbox::sandboxed_read(workspace, &full)
+                }
+            }
         }
         "write_file" => {
-            let path = call.arguments["path"].as_str().unwrap_or("");
-            let content = call.arguments["content"].as_str().unwrap_or("");
-            let full = resolve_path(path, workspace);
-            ai_sandbox::sandboxed_write(workspace, &full, content).map(|_| "ok".to_string())
+            let path = call.arguments.get("path").and_then(|v| v.as_str()).filter(|p| !p.is_empty());
+            let content = call.arguments.get("content").and_then(|v| v.as_str());
+            match (path, content) {
+                (None, _) => Err("Missing or empty 'path' argument".to_string()),
+                (_, None) => Err("Missing 'content' argument".to_string()),
+                (Some(path), Some(content)) => {
+                    let full = resolve_path(path, workspace);
+                    ai_sandbox::sandboxed_write(workspace, &full, content).map(|_| "ok".to_string())
+                }
+            }
         }
         "list_files" => {
-            let path = call.arguments["path"].as_str().unwrap_or("");
-            let full = if path.is_empty() {
-                workspace.map(|w| w.workspace_path.as_str()).unwrap_or(".").to_string()
-            } else {
-                resolve_path(path, workspace)
+            let full = match call.arguments.get("path").and_then(|v| v.as_str()).filter(|p| !p.is_empty()) {
+                Some(path) => resolve_path(path, workspace),
+                None => workspace.map(|w| w.workspace_path.as_str()).unwrap_or(".").to_string(),
             };
             ai_sandbox::sandboxed_list(workspace, &full).map(|entries| entries.join("\n"))
         }
         "run_command" => {
-            let cmd = call.arguments["command"].as_str().unwrap_or("");
-            ai_sandbox::sandboxed_exec(workspace, cmd)
+            match call.arguments.get("command").and_then(|v| v.as_str()).filter(|c| !c.is_empty()) {
+                None => Err("Missing or empty 'command' argument".to_string()),
+                Some(cmd) => ai_sandbox::sandboxed_exec(workspace, cmd),
+            }
         }
         name => Err(format!("Unknown tool: {name}")),
     };

@@ -35,7 +35,6 @@ mod ai_chat_panel;
 mod ai_models_panel;
 mod ai_settings_panel;
 mod llama_cpp_create_model_modal;
-pub mod llama_cpp_runtime;
 pub mod ai_runtime;
 mod code_editor_panel;
 mod code_editor_settings;
@@ -193,7 +192,7 @@ pub struct LlamaCppModelCreateDraft {
     pub name: String,
     pub path: String,
     pub mmproj_path: String,
-    pub model_type: arcadia_core::config::llama_cpp::LlamaCppModelType,
+    pub model_kind: arcadia_core::config::llama_cpp::LlamaCppModelKind,
     pub error: Option<String>,
 }
 
@@ -318,10 +317,25 @@ pub struct ArcadiaRoot {
     pub active_ai_provider_module: String,
     /// Models loaded from llama-cpp.toml.
     pub llama_cpp_models: Vec<arcadia_core::config::llama_cpp::LlamaCppModel>,
-    /// Models loaded from ollama.toml.
+    /// Endpoint URL for Ollama (loaded from ollama.toml).
+    pub ollama_endpoint: String,
+    /// Models discovered from the running Ollama instance (merged with ollama.toml on discovery).
     pub ollama_models: Vec<arcadia_core::config::ollama::OllamaModel>,
+    /// True while a background /api/tags discovery call is in flight.
+    pub ollama_discovering: bool,
+    /// OpenAI API key (loaded from openai.toml).
+    pub openai_api_key: String,
+    /// OpenAI base URL (loaded from openai.toml).
+    pub openai_base_url: String,
+    /// Draft values for the OpenAI settings editor fields (Some = editing mode).
+    pub openai_api_key_draft: Option<String>,
+    pub openai_base_url_draft: Option<String>,
+    pub openai_api_key_focus: FocusHandle,
+    pub openai_base_url_focus: FocusHandle,
     /// Models loaded from openai.toml.
     pub openai_models: Vec<arcadia_core::config::openai::OpenAiModel>,
+    /// Workspace entries loaded from workspace.toml — refreshed on module reload.
+    pub workspace_entries: Vec<arcadia_core::config::workspace::WorkspaceEntry>,
     /// ID of the model sub-item selected under llama.cpp in the sidebar.
     pub active_llama_cpp_model_id: Option<String>,
     /// Right-click context menu on the llama.cpp provider sidebar item.

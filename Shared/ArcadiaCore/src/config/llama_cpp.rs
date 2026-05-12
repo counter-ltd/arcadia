@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::ConfigFile;
+use crate::modules::ai_types::AiModelKind;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum LlamaCppModelType {
+pub enum LlamaCppModelKind {
     #[default]
     #[serde(alias = "generation")]
     TextGeneration,
@@ -13,7 +14,7 @@ pub enum LlamaCppModelType {
     Embedding,
 }
 
-impl LlamaCppModelType {
+impl LlamaCppModelKind {
     pub fn label(&self) -> &'static str {
         match self {
             Self::TextGeneration  => "Text Generation",
@@ -23,13 +24,22 @@ impl LlamaCppModelType {
         }
     }
 
-    pub fn all() -> &'static [LlamaCppModelType] {
+    pub fn all() -> &'static [LlamaCppModelKind] {
         &[
-            LlamaCppModelType::TextGeneration,
-            LlamaCppModelType::ImageGeneration,
-            LlamaCppModelType::Vision,
-            LlamaCppModelType::Embedding,
+            LlamaCppModelKind::TextGeneration,
+            LlamaCppModelKind::ImageGeneration,
+            LlamaCppModelKind::Vision,
+            LlamaCppModelKind::Embedding,
         ]
+    }
+
+    pub fn as_ai_model_kind(&self) -> AiModelKind {
+        match self {
+            Self::TextGeneration  => AiModelKind::TextGeneration,
+            Self::ImageGeneration => AiModelKind::ImageGeneration,
+            Self::Vision          => AiModelKind::Vision,
+            Self::Embedding       => AiModelKind::Embedding,
+        }
     }
 }
 
@@ -37,7 +47,9 @@ impl LlamaCppModelType {
 pub struct LlamaCppModel {
     pub id: String,
     pub name: String,
-    pub model_type: LlamaCppModelType,
+    // "model_type" preserved in TOML for backward compat; Rust API uses model_kind.
+    #[serde(rename = "model_type")]
+    pub model_kind: LlamaCppModelKind,
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mmproj_path: Option<String>,
@@ -51,5 +63,9 @@ pub struct LlamaCppConfig {
 impl ConfigFile for LlamaCppConfig {
     fn file_name() -> &'static str {
         "llama-cpp.toml"
+    }
+
+    fn merge_defaults(&mut self) -> bool {
+        false
     }
 }

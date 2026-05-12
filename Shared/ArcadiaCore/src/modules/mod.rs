@@ -5,6 +5,8 @@ pub mod ai_tools;
 pub mod ai_types;
 pub mod animation;
 pub mod llama_cpp;
+pub mod ollama;
+pub mod openai;
 pub mod code_editor;
 pub mod cursor;
 pub mod lan;
@@ -26,9 +28,9 @@ pub mod workspace;
 
 use crate::config::modules::{
     supports_runtime_platform, ModulesConfig, AI_LLAMA_CPP_MODULE_NAME, AI_MODULE_NAME,
-    CODE_EDITOR_MODULE_NAME, CURSOR_MODULE_NAME, LAN_MODULE_NAME, NET_MODULE_NAME,
-    OVERLAY_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME,
-    TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, CURSOR_MODULE_NAME,
+    LAN_MODULE_NAME, NET_MODULE_NAME, OVERLAY_MODULE_NAME, REMOTE_SESSION_MODULE_NAME,
+    TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use crate::config::permissions::{self as perm_cfg, PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
@@ -69,6 +71,8 @@ fn module_commands(module_key: &str) -> Option<&'static [ModuleCommand]> {
         CODE_EDITOR_MODULE_NAME => Some(code_editor::commands()),
         AI_MODULE_NAME => Some(ai::commands()),
         AI_LLAMA_CPP_MODULE_NAME => Some(llama_cpp::commands()),
+        AI_OLLAMA_MODULE_NAME => Some(ollama::commands()),
+        AI_OPENAI_MODULE_NAME => Some(openai::commands()),
         _ => None,
     }
 }

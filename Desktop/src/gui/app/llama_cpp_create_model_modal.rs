@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use arcadia_core::config::llama_cpp::{LlamaCppConfig, LlamaCppModel, LlamaCppModelType};
+use arcadia_core::config::llama_cpp::{LlamaCppConfig, LlamaCppModel, LlamaCppModelKind};
 use arcadia_core::config::ConfigFile;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
@@ -84,7 +84,7 @@ impl ArcadiaRoot {
         let mmproj_fh = self.llama_cpp_create_mmproj_focus.clone();
 
         let draft = self.llama_cpp_create_draft.clone().unwrap();
-        let is_vision = draft.model_type == LlamaCppModelType::Vision;
+        let is_vision = draft.model_kind == LlamaCppModelKind::Vision;
 
         let modal_surface = g.map(|gg| gg.surface).unwrap_or(p.surface);
         let modal_border = g.map(|gg| gg.border).unwrap_or(p.border);
@@ -192,9 +192,9 @@ impl ArcadiaRoot {
 
         // Model type selector row
         let type_row = {
-            let current_type = draft.model_type.clone();
+            let current_type = draft.model_kind.clone();
             let mut row = div().flex().gap_2();
-            for mt in LlamaCppModelType::all() {
+            for mt in LlamaCppModelKind::all() {
                 let mt_clone = mt.clone();
                 let is_selected = *mt == current_type;
                 let bg = if is_selected { p.accent } else { p.surface_elevated };
@@ -215,7 +215,7 @@ impl ArcadiaRoot {
                         .child(mt.label())
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                             if let Some(ref mut d) = this.llama_cpp_create_draft {
-                                d.model_type = mt_clone.clone();
+                                d.model_kind = mt_clone.clone();
                             }
                             cx.notify();
                         })),
@@ -491,12 +491,26 @@ impl ArcadiaRoot {
             cx.notify();
             return;
         }
+        if !std::path::Path::new(&path).exists() {
+            if let Some(ref mut d) = self.llama_cpp_create_draft {
+                d.error = Some("Model file not found at that path.".to_string());
+            }
+            cx.notify();
+            return;
+        }
 
-        let mmproj_path = if draft.model_type == arcadia_core::config::llama_cpp::LlamaCppModelType::Vision {
+        let mmproj_path = if draft.model_kind == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision {
             let p = draft.mmproj_path.trim().to_string();
             if p.is_empty() {
                 if let Some(ref mut d) = self.llama_cpp_create_draft {
                     d.error = Some("mmproj file path is required for Vision models.".to_string());
+                }
+                cx.notify();
+                return;
+            }
+            if !std::path::Path::new(&p).exists() {
+                if let Some(ref mut d) = self.llama_cpp_create_draft {
+                    d.error = Some("mmproj file not found at that path.".to_string());
                 }
                 cx.notify();
                 return;
@@ -523,7 +537,7 @@ impl ArcadiaRoot {
         let model = LlamaCppModel {
             id: id.clone(),
             name,
-            model_type: draft.model_type,
+            model_kind: draft.model_kind,
             path,
             mmproj_path,
         };

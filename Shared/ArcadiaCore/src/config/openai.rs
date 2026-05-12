@@ -6,7 +6,9 @@ use crate::modules::ai_types::AiModelKind;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OpenAiModel {
     pub id: String,
-    pub display_name: String,
+    // "display_name" preserved in TOML for backward compat; Rust API uses name.
+    #[serde(alias = "display_name")]
+    pub name: String,
     pub model_id: String,
     #[serde(default)]
     pub model_kind: OpenAiModelKind,
@@ -41,6 +43,7 @@ impl OpenAiModelKind {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OpenAiConfig {
+    // Stored as plaintext in openai.toml. Future: migrate to OS keychain.
     #[serde(default)]
     pub api_key: String,
     #[serde(default)]
@@ -62,5 +65,9 @@ impl Default for OpenAiConfig {
 impl ConfigFile for OpenAiConfig {
     fn file_name() -> &'static str {
         "openai.toml"
+    }
+
+    fn merge_defaults(&mut self) -> bool {
+        false
     }
 }

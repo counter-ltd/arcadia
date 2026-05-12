@@ -193,7 +193,7 @@ where
 
         // Feed results back as next turn.
         messages.push(("assistant".to_string(), output));
-        messages.push(("tool_result".to_string(), results));
+        messages.push(("user".to_string(), results));
 
         if round == MAX_ROUNDS - 1 {
             let _ = tx.send(RuntimeEvent::Error("Max tool rounds reached".to_string()));
@@ -382,7 +382,13 @@ fn run_llama_cpp(
     // tool_loop handles context injection, tool definition injection, and multi-turn tool use.
     // The closure runs a single generation turn and returns the assembled output string.
     let backend_ref = &*backend;
-    let loaded_ref = &loaded.as_ref().unwrap().1;
+    let loaded_ref = match loaded.as_ref() {
+        Some((_, model)) => model,
+        None => {
+            let _ = tx.send(RuntimeEvent::Error("Model failed to load".to_string()));
+            return;
+        }
+    };
 
     tool_loop(&request, tx, |system, messages, n_predict, tx| {
         let model = loaded_ref;

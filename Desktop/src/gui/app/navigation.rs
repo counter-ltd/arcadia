@@ -268,51 +268,50 @@ impl ArcadiaRoot {
                 .p_2()
                 .child(self.ios_execute_shell_panel(window, cx));
         }
-        if self.active_page_id.as_str() == "global.modules" {
-            return div().w_full().p_6().child(self.modules_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "network.nodes" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.lan_nodes_panel(cx, is_dark));
-        }
-        // TODO: dispatch via page registry; see anti-pattern #3 in AGENTS.md.
-        if self.active_page_id.as_str() == "utility.services" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.services_panel(cx, is_dark));
-        }
+        // Full-height / custom-layout pages — handled before the standard padded dispatcher.
         if self.active_page_id.as_str() == "late.now_playing" {
             return self.render_late_now_playing(window, cx, is_dark);
         }
-        if self.active_page_id.as_str() == "late.settings" {
-            return div().w_full().p_6().child(self.late_settings_panel(window, cx, is_dark));
+        if self.active_page_id.as_str() == "ai.chat" {
+            return div()
+                .flex_1()
+                .h_full()
+                .min_h_0()
+                .child(self.ai_chat_panel(window, cx, is_dark));
         }
-        if self.active_page_id.as_str() == "python.settings" {
-            return div().w_full().p_6().child(self.python_settings_panel(window, cx, is_dark));
-        }
+
+        // Dynamic extension-token settings pages (page IDs aren't in PAGE_DEFINITIONS).
         let active = self.active_page_id.clone();
         if let Some(mid) = navigation::parse_extension_token_settings_page_id(&active) {
             return div().w_full().p_6().child(
                 self.extension_token_settings_panel_for_module(window, cx, is_dark, mid),
             );
         }
-        if self.active_page_id.as_str() == "global.appearance" {
-            return div().w_full().p_6().child(self.appearance_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "global.permissions" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.permissions_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "global.shortcuts" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.shortcuts_panel(window, cx, is_dark));
+
+        // Standard padded panels — add new pages here as new match arms.
+        // All arms share the same div().w_full().p_6() wrapper.
+        {
+            let panel: Option<openframe::AnyElement> = match self.active_page_id.as_str() {
+                "global.modules"    => Some(self.modules_panel(window, cx, is_dark).into_any_element()),
+                "network.nodes"     => Some(self.lan_nodes_panel(cx, is_dark).into_any_element()),
+                "utility.services"  => Some(self.services_panel(cx, is_dark).into_any_element()),
+                "late.settings"     => Some(self.late_settings_panel(window, cx, is_dark).into_any_element()),
+                "python.settings"   => Some(self.python_settings_panel(window, cx, is_dark).into_any_element()),
+                "global.appearance" => Some(self.appearance_panel(window, cx, is_dark).into_any_element()),
+                "global.permissions"=> Some(self.permissions_panel(window, cx, is_dark).into_any_element()),
+                "global.shortcuts"  => Some(self.shortcuts_panel(window, cx, is_dark).into_any_element()),
+                "editor.settings"   => Some(self.code_editor_settings_panel(window, cx, is_dark).into_any_element()),
+                "global.workspaces" => Some(self.workspace_panel(window, cx, is_dark)),
+                "ai.settings"       => Some(self.ai_settings_panel(window, cx, is_dark).into_any_element()),
+                "ai.models"         => Some(self.ai_models_panel(window, cx, is_dark).into_any_element()),
+                navigation::SETTINGS_HUB_ROOT_PAGE_ID => {
+                    Some(self.settings_hub_landing_panel(cx, is_dark).into_any_element())
+                }
+                _ => None,
+            };
+            if let Some(content) = panel {
+                return div().w_full().p_6().child(content);
+            }
         }
         if self.active_page_id.as_str() == "editor.main" {
             let active_idx = self.active_code_editor_tab
@@ -322,11 +321,11 @@ impl ArcadiaRoot {
                 .and_then(|t| t.workspace_path.clone())
                 .unwrap_or_default();
             let show_explorer = self.code_editor_explorer_open && !ws_path.is_empty();
-            let sidebar_bg = if is_dark { openframe::rgb(0x141920) } else { openframe::rgb(0xf3f4f6) };
-            let border_color = if is_dark { openframe::rgb(0x2a3340) } else { openframe::rgb(0xe5e7eb) };
-            let text_color = if is_dark { openframe::rgb(0xd1d5db) } else { openframe::rgb(0x374151) };
-            let dim_color = if is_dark { openframe::rgb(0x6b7280) } else { openframe::rgb(0x9ca3af) };
-            let hover_bg = if is_dark { openframe::rgb(0x1e2530) } else { openframe::rgb(0xe5e7eb) };
+            let sidebar_bg = theme::code_explorer_sidebar_bg(is_dark);
+            let border_color = theme::code_explorer_border(is_dark);
+            let text_color = theme::code_explorer_text(is_dark);
+            let dim_color = theme::code_explorer_dim(is_dark);
+            let hover_bg = theme::code_explorer_hover_bg(is_dark);
             let mut row = div().w_full().h_full().flex().flex_row();
             if show_explorer {
                 // Collect flat entry list with depth via recursive walk
@@ -360,8 +359,8 @@ impl ArcadiaRoot {
                 let active_file_path = self.code_editor_tabs
                     .get(active_idx)
                     .and_then(|t| t.file_path.clone());
-                let active_row_bg = if is_dark { openframe::rgb(0x1a2d45) } else { openframe::rgb(0xdbeafe) };
-                let active_row_text = if is_dark { openframe::rgb(0x93c5fd) } else { openframe::rgb(0x1d4ed8) };
+                let active_row_bg = theme::code_explorer_active_row_bg(is_dark);
+                let active_row_text = theme::code_explorer_active_row_text(is_dark);
 
                 if flat.is_empty() {
                     sidebar = sidebar.child(
@@ -455,40 +454,6 @@ impl ArcadiaRoot {
                     .overflow_hidden()
                     .child(self.code_editor_panel(window, cx, is_dark)),
             );
-        }
-        if self.active_page_id.as_str() == "editor.settings" {
-            return div().w_full().p_6().child(self.code_editor_settings_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "global.workspaces" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.workspace_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "ai.chat" {
-            return div()
-                .flex_1()
-                .h_full()
-                .min_h_0()
-                .child(self.ai_chat_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "ai.settings" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.ai_settings_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == "ai.models" {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.ai_models_panel(window, cx, is_dark));
-        }
-        if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.settings_hub_landing_panel(cx, is_dark));
         }
         {
             let active_page = self

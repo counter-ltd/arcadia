@@ -57,6 +57,12 @@ pub fn sandboxed_list(ctx: Option<&AiWorkspaceContext>, path: &str) -> Result<Ve
 /// the workspace.execute grant. This is a defence-in-depth measure — the GUI
 /// layer should additionally present a per-command confirmation prompt before
 /// calling this function.
+///
+/// SECURITY: This checks only the leading binary name. The full command is passed
+/// to `sh -c`, so allowed binaries can still chain via `&&`, `;`, or pipes. This
+/// is acceptable because the allowlist excludes shells (`sh`, `bash`, `zsh`) and
+/// destructive tools (`rm`, `curl`, `dd`). Do NOT add shells or network tools to
+/// this list without also adding a secondary confirmation gate at the call site.
 const EXEC_ALLOWLIST: &[&str] = &[
     "cargo", "rustc", "rustfmt", "clippy-driver",
     "npm", "npx", "node", "yarn", "pnpm",

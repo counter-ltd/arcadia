@@ -5,7 +5,7 @@ use arcadia_core::config::thin_client::ThinClientConfig;
 #[cfg(feature = "gui")]
 use arcadia_core::modules::lan::connected_approved_session_peers;
 use openframe::{
-    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Render, StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
 use openframe::prelude::FluentBuilder as _;
@@ -96,10 +96,8 @@ impl Render for ArcadiaRoot {
                 .when_some(ui_font_family, |d, f| d.font_family(f))
                 .bg(if let Some(g) = glyph {
                     g.bg
-                } else if is_dark {
-                    rgb(0x0f1115)
                 } else {
-                    rgb(0xffffff)
+                    crate::gui::theme::ui_bg(cx, is_dark)
                 })
                 .flex()
                 .items_center()
@@ -138,10 +136,8 @@ impl Render for ArcadiaRoot {
             .when_some(ui_font_family, |d, f| d.font_family(f))
             .bg(if let Some(g) = glyph {
                 g.bg
-            } else if is_dark {
-                rgb(0x0f1115)
             } else {
-                rgb(0xffffff)
+                crate::gui::theme::ui_bg(cx, is_dark)
             })
             .flex()
             .on_mouse_down(
@@ -325,7 +321,7 @@ impl ArcadiaRoot {
             let all_models: Vec<(String, String, &'static str)> = {
                 let mut v = Vec::new();
                 for model in &self.llama_cpp_models {
-                    v.push((model.id.clone(), model.name.clone(), model.model_type.label()));
+                    v.push((model.id.clone(), model.name.clone(), model.model_kind.label()));
                 }
                 v
             };
@@ -704,7 +700,7 @@ impl ArcadiaRoot {
                                 name: String::new(),
                                 path: String::new(),
                                 mmproj_path: String::new(),
-                                model_type: arcadia_core::config::llama_cpp::LlamaCppModelType::TextGeneration,
+                                model_kind: arcadia_core::config::llama_cpp::LlamaCppModelKind::TextGeneration,
                                 error: None,
                             });
                             cx.notify();
@@ -887,7 +883,7 @@ impl ArcadiaRoot {
                     .left_0()
                     .right_0()
                     .bottom_0()
-                    .bg(rgb(0x000000))
+                    .bg(crate::gui::theme::OVERLAY_MASK_COLOR)
                     .opacity(0.4)
                     .on_mouse_down(
                         MouseButton::Left,
@@ -991,7 +987,7 @@ impl ArcadiaRoot {
                                                 .rounded(px(radius.min(8.0)))
                                                 .bg(crate::gui::theme::ui_accent(cx))
                                                 .text_sm()
-                                                .text_color(rgb(0xffffff))
+                                                .text_color(crate::gui::theme::ui_accent_fg(cx))
                                                 .cursor_pointer()
                                                 .child("Save")
                                                 .on_mouse_down(

@@ -38,6 +38,41 @@ use super::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use super::{ShellMode, TerminalInstance};
 
+/// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
+/// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
+fn fetch_ollama_tags(
+    endpoint: &str,
+) -> Result<Vec<arcadia_core::config::ollama::OllamaModel>, String> {
+    use arcadia_core::config::ollama::{OllamaModel, OllamaModelKind};
+
+    const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+    let url = format!("{}/api/tags", endpoint.trim_end_matches('/'));
+    let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+    let resp = agent
+        .get(&url)
+        .call()
+        .map_err(|e| format!("Ollama /api/tags request failed: {e}"))?;
+    let body: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| format!("Ollama /api/tags parse failed: {e}"))?;
+
+    let models = body["models"]
+        .as_array()
+        .ok_or_else(|| "unexpected Ollama /api/tags response shape".to_string())?
+        .iter()
+        .filter_map(|m| {
+            let name = m["name"].as_str()?;
+            Some(OllamaModel {
+                id: name.to_string(),
+                name: name.to_string(),
+                model_tag: name.to_string(),
+                model_kind: OllamaModelKind::TextGeneration,
+            })
+        })
+        .collect();
+    Ok(models)
+}
+
 #[cfg(feature = "gui")]
 impl TerminalInstance {
     pub(crate) fn new(
@@ -209,12 +244,17 @@ impl ArcadiaRoot {
         let llama_cpp_create_name_focus = cx.focus_handle();
         let llama_cpp_create_path_focus = cx.focus_handle();
         let llama_cpp_create_mmproj_focus = cx.focus_handle();
+        let openai_api_key_focus = cx.focus_handle();
+        let openai_base_url_focus = cx.focus_handle();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
         let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
         let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
         let ollama_cfg = arcadia_core::config::ollama::OllamaConfig::load_or_create().unwrap_or_default();
         let openai_cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
+        let workspace_entries = arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
+            .map(|c| c.workspaces)
+            .unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
@@ -300,8 +340,17 @@ impl ArcadiaRoot {
             ai_poll_task_started: false,
             active_ai_provider_module: String::new(),
             llama_cpp_models: llama_cpp_cfg.models,
+            ollama_endpoint: ollama_cfg.endpoint,
             ollama_models: ollama_cfg.models,
+            ollama_discovering: false,
+            openai_api_key: openai_cfg.api_key,
+            openai_base_url: openai_cfg.base_url,
+            openai_api_key_draft: None,
+            openai_base_url_draft: None,
+            openai_api_key_focus,
+            openai_base_url_focus,
             openai_models: openai_cfg.models,
+            workspace_entries,
             active_llama_cpp_model_id: None,
             llama_cpp_provider_menu: None,
             llama_cpp_create_draft: None,
@@ -665,6 +714,9 @@ impl ArcadiaRoot {
         self.terminal_kill_menu = None;
     }
 
+    // NOTE: ensure_ai_poll_task, ensure_lan_poll_task, and ensure_text_caret_blink_task share
+    // an identical spawn_in → loop → Timer → should_stop pattern. Extracting a generic helper
+    // requires careful GPUI async-closure typing; left as a TODO for a dedicated refactor pass.
     pub fn ensure_ai_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.ai_poll_task_started {
             return;
@@ -761,6 +813,92 @@ impl ArcadiaRoot {
             cx.notify();
         }
         any
+    }
+
+    /// Spawn a background thread to fetch models from the running Ollama instance via /api/tags.
+    /// Updates `self.ollama_models` on completion and clears `self.ollama_discovering`.
+    pub fn discover_ollama_models(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ollama_discovering {
+            return;
+        }
+        self.ollama_discovering = true;
+        cx.notify();
+
+        let endpoint = self.ollama_endpoint.clone();
+        cx.spawn_in(
+            window,
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                let mut cx = cx.clone();
+                async move {
+                    let (tx, rx) = std::sync::mpsc::sync_channel::<
+                        Result<Vec<arcadia_core::config::ollama::OllamaModel>, String>,
+                    >(1);
+                    std::thread::spawn(move || {
+                        let _ = tx.send(fetch_ollama_tags(&endpoint));
+                    });
+                    loop {
+                        Timer::after(Duration::from_millis(200)).await;
+                        match rx.try_recv() {
+                            Ok(result) => {
+                                cx.update(|_, app| {
+                                    view.update(app, |this, cx| {
+                                        this.ollama_discovering = false;
+                                        if let Ok(models) = result {
+                                            this.ollama_models = models;
+                                        }
+                                        cx.notify();
+                                    })
+                                    .ok();
+                                })
+                                .ok();
+                                break;
+                            }
+                            Err(std::sync::mpsc::TryRecvError::Empty) => continue,
+                            Err(_) => {
+                                cx.update(|_, app| {
+                                    view.update(app, |this, cx| {
+                                        this.ollama_discovering = false;
+                                        cx.notify();
+                                    })
+                                    .ok();
+                                })
+                                .ok();
+                                break;
+                            }
+                        }
+                    }
+                }
+            },
+        )
+        .detach();
+    }
+
+    /// Save the OpenAI API key and base URL drafts to openai.toml.
+    pub fn openai_save_settings(&mut self, cx: &mut Context<Self>) {
+        let api_key = self
+            .openai_api_key_draft
+            .take()
+            .unwrap_or_else(|| self.openai_api_key.clone());
+        let base_url = self
+            .openai_base_url_draft
+            .take()
+            .unwrap_or_else(|| self.openai_base_url.clone());
+
+        let mut cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create()
+            .unwrap_or_default();
+        cfg.api_key = api_key.clone();
+        cfg.base_url = base_url.clone();
+
+        match cfg.save() {
+            Ok(()) => {
+                self.openai_api_key = api_key;
+                self.openai_base_url = base_url;
+            }
+            Err(e) => {
+                eprintln!("openai config save failed: {e}");
+            }
+        }
+        cx.notify();
     }
 
     pub fn ensure_lan_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
