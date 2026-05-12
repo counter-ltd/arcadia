@@ -1,4 +1,8 @@
 pub mod ai;
+pub mod ai_context;
+pub mod ai_sandbox;
+pub mod ai_tools;
+pub mod ai_types;
 pub mod animation;
 pub mod llama_cpp;
 pub mod code_editor;

@@ -56,6 +56,8 @@ pub const WORKSPACE_MODULE_NAME: &str = "workspace";
 pub const CODE_EDITOR_MODULE_NAME: &str = "code-editor";
 pub const AI_MODULE_NAME: &str = "ai";
 pub const AI_LLAMA_CPP_MODULE_NAME: &str = "ai-provider-llama-cpp";
+pub const AI_OLLAMA_MODULE_NAME: &str = "ai-provider-ollama";
+pub const AI_OPENAI_MODULE_NAME: &str = "ai-provider-openai";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -242,6 +244,24 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         name: AI_LLAMA_CPP_MODULE_NAME,
         version: "0.1.0",
         description: "llama.cpp local inference provider for the AI chat module.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_OLLAMA_MODULE_NAME,
+        version: "0.1.0",
+        description: "Ollama local inference provider for the AI chat module.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_OPENAI_MODULE_NAME,
+        version: "0.1.0",
+        description: "OpenAI API provider for the AI chat module.",
         required_modules: &[AI_MODULE_NAME],
         required_permissions: &[],
         workspace_permissions: &[],

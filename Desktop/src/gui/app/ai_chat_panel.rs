@@ -1,11 +1,18 @@
+use arcadia_core::config::ollama::OllamaConfig;
+use arcadia_core::config::workspace::WorkspacesConfig;
+use arcadia_core::config::ConfigFile;
+use arcadia_core::config::modules::{
+    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
+};
 use arcadia_core::modules::ai::is_ai_provider_available;
+use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::{
-    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, StatefulInteractiveElement, Styled, Window,
 };
 use openframe::prelude::FluentBuilder as _;
 
-use crate::gui::app::llama_cpp_runtime::{build_chat_prompt, LlamaCppRuntime, RuntimeRequest};
+use crate::gui::app::ai_runtime::{AiRuntimeHandle, AiRuntimeRequest, ProviderRouting};
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::{AiChat, AiMessage, AiMessageRole, ArcadiaRoot};
 use crate::gui::theme;
@@ -103,7 +110,7 @@ impl ArcadiaRoot {
                             .bg(theme::ui_accent(cx))
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(rgb(0xffffff))
+                            .text_color(theme::ui_accent_fg(cx))
                             .cursor_pointer()
                             .child("Open Modules")
                             .on_mouse_down(
@@ -165,7 +172,7 @@ impl ArcadiaRoot {
             } else {
                 p.panel_bg
             };
-            let text_col = if is_user { rgb(0xffffff) } else { p.content_body };
+            let text_col = if is_user { theme::ui_accent_fg(cx) } else { p.content_body };
             let content = msg.content.clone();
 
             let bubble = div()
@@ -192,7 +199,7 @@ impl ArcadiaRoot {
 
         // Loading dots while streaming
         if is_loading {
-            let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+            let dim = p.content_meta;
             msg_col = msg_col.child(
                 div()
                     .flex()
@@ -307,19 +314,65 @@ impl ArcadiaRoot {
             return;
         }
 
-        // If already inferring on this chat, ignore
-        if self.llama_cpp_stream_chat_id == Some(active_id) {
+        // If already inferring on this chat, ignore.
+        if self.ai_stream_chat_id == Some(active_id) {
             return;
         }
 
-        // Resolve model path
-        let model_path = self
-            .ai_chat_model_id
-            .as_deref()
-            .and_then(|id| self.llama_cpp_models.iter().find(|m| m.id == id))
-            .map(|m| m.path.clone());
+        // Build provider routing from active provider + selected model.
+        let provider = self.active_ai_provider_module.clone();
+        let model_id = self.ai_chat_model_id.clone();
+        let routing_result: Result<ProviderRouting, String> = match provider.as_str() {
+            AI_LLAMA_CPP_MODULE_NAME => {
+                match model_id.as_deref() {
+                    None => Err("No model selected. Choose a model from the top bar.".to_string()),
+                    Some(id) => self.llama_cpp_models.iter().find(|m| m.id == id)
+                        .map(|m| ProviderRouting::LlamaCpp { model_path: m.path.clone() })
+                        .ok_or_else(|| format!("Model '{id}' not found. It may have been moved or deleted.")),
+                }
+            }
+            AI_OLLAMA_MODULE_NAME => {
+                let cfg = OllamaConfig::load_or_create().unwrap_or_default();
+                match model_id.as_deref() {
+                    None => Err("No model selected. Choose a model from the top bar.".to_string()),
+                    Some(id) => self.ollama_models.iter().find(|m| m.id == id)
+                        .map(|m| ProviderRouting::Ollama { endpoint: cfg.endpoint.clone(), model_name: m.model_tag.clone() })
+                        .ok_or_else(|| format!("Model '{id}' not found in Ollama model list.")),
+                }
+            }
+            AI_OPENAI_MODULE_NAME => {
+                match model_id.as_deref() {
+                    None => Err("No model selected. Choose a model from the top bar.".to_string()),
+                    Some(id) => self.openai_models.iter().find(|m| m.id == id)
+                        .map(|m| ProviderRouting::OpenAi { model_id: m.model_id.clone() })
+                        .ok_or_else(|| format!("Model '{id}' not found.")),
+                }
+            }
+            _ => Err("No AI provider enabled. Enable one in Modules.".to_string()),
+        };
 
-        // Push user message + clear draft
+        // Resolve workspace context — surface errors rather than silently dropping them.
+        let workspace_context: Option<AiWorkspaceContext> =
+            if self.is_module_enabled(WORKSPACE_MODULE_NAME) {
+                match self.ai_chat_workspace_id.as_deref() {
+                    None => None,
+                    Some(ws_id) => {
+                        match WorkspacesConfig::load_or_create() {
+                            Ok(cfg) => cfg.workspaces.into_iter()
+                                .find(|w| w.id == ws_id)
+                                .map(|entry| AiWorkspaceContext::from_workspace_entry(&entry)),
+                            Err(e) => {
+                                eprintln!("workspace config load failed: {e}");
+                                None
+                            }
+                        }
+                    }
+                }
+            } else {
+                None
+            };
+
+        // Push user message + clear draft.
         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
             chat.messages.push(AiMessage {
                 role: AiMessageRole::User,
@@ -328,67 +381,65 @@ impl ArcadiaRoot {
             chat.input_draft.clear();
         }
 
-        let Some(model_path) = model_path else {
-            // No model — reply inline
-            if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
-                chat.messages.push(AiMessage {
-                    role: AiMessageRole::Assistant,
-                    content: "No model selected. Choose one from the top bar.".to_string(),
-                });
+        let routing = match routing_result {
+            Ok(r) => r,
+            Err(msg) => {
+                if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
+                    chat.messages.push(AiMessage {
+                        role: AiMessageRole::Assistant,
+                        content: msg,
+                    });
+                }
+                cx.notify();
+                return;
             }
-            cx.notify();
-            return;
         };
 
-        // Build prompt from full history (pre-push state already includes user message)
+        // Build full message history.
         let system = self.ai_default_system_prompt.clone();
         let history: Vec<(String, String)> = self
             .ai_chats
             .iter()
             .find(|c| c.id == active_id)
             .map(|c| {
-                c.messages
-                    .iter()
-                    .map(|m| {
-                        let role = match m.role {
-                            AiMessageRole::User => "user".to_string(),
-                            AiMessageRole::Assistant => "assistant".to_string(),
-                        };
-                        (role, m.content.clone())
-                    })
-                    .collect()
+                c.messages.iter().map(|m| {
+                    let role = match m.role {
+                        AiMessageRole::User => "user".to_string(),
+                        AiMessageRole::Assistant => "assistant".to_string(),
+                    };
+                    (role, m.content.clone())
+                }).collect()
             })
             .unwrap_or_default();
 
-        let prompt = build_chat_prompt(&system, &history);
-
-        // Placeholder assistant message (tokens will stream into it)
+        // Placeholder assistant message (tokens stream into it).
         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
-            chat.messages.push(AiMessage {
-                role: AiMessageRole::Assistant,
-                content: String::new(),
-            });
+            chat.messages.push(AiMessage { role: AiMessageRole::Assistant, content: String::new() });
             chat.is_loading = true;
         }
 
-        self.llama_cpp_stream_chat_id = Some(active_id);
+        self.ai_stream_chat_id = Some(active_id);
 
-        // Start runtime lazily
-        let runtime = self
-            .llama_cpp_runtime
-            .get_or_insert_with(LlamaCppRuntime::start);
+        let tools = if workspace_context.is_some() {
+            arcadia_core::modules::ai_tools::WORKSPACE_TOOLS.to_vec()
+        } else {
+            vec![]
+        };
 
-        let _ = runtime.request_tx.try_send(RuntimeRequest::Infer {
-            model_path,
-            prompt,
-            n_predict: 512,
+        let runtime = self.ai_runtime.get_or_insert_with(AiRuntimeHandle::start);
+        let _ = runtime.request_tx.try_send(AiRuntimeRequest::Generate {
+            routing,
+            request: TextGenerationRequest {
+                system,
+                messages: history,
+                max_tokens: 512,
+                workspace_context,
+                tools,
+            },
         });
 
-        self.ensure_llama_cpp_poll_task(window, cx);
+        self.ensure_ai_poll_task(window, cx);
         cx.notify();
     }
 }
 
-impl AiChat {
-    pub fn _placeholder() {}
-}

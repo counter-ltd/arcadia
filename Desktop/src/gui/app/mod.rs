@@ -36,6 +36,7 @@ mod ai_models_panel;
 mod ai_settings_panel;
 mod llama_cpp_create_model_modal;
 pub mod llama_cpp_runtime;
+pub mod ai_runtime;
 mod code_editor_panel;
 mod code_editor_settings;
 mod workspace_create_modal;
@@ -307,16 +308,20 @@ pub struct ArcadiaRoot {
     pub ai_chat_workspace_id: Option<String>,
     /// Whether the workspace picker dropdown is open.
     pub ai_chat_workspace_picker_open: bool,
-    /// Background inference runtime (lazy-started on first send).
-    pub llama_cpp_runtime: Option<llama_cpp_runtime::LlamaCppRuntime>,
+    /// Unified AI inference runtime (lazy-started on first send, shared across providers).
+    pub ai_runtime: Option<ai_runtime::AiRuntimeHandle>,
     /// Which chat ID is currently receiving streamed tokens.
-    pub llama_cpp_stream_chat_id: Option<usize>,
+    pub ai_stream_chat_id: Option<usize>,
     /// Whether the 50ms inference poll task is running.
-    pub llama_cpp_poll_task_started: bool,
+    pub ai_poll_task_started: bool,
     /// Module name of the provider selected in the Models sidebar (e.g. `"ai-provider-llama-cpp"`).
     pub active_ai_provider_module: String,
     /// Models loaded from llama-cpp.toml.
     pub llama_cpp_models: Vec<arcadia_core::config::llama_cpp::LlamaCppModel>,
+    /// Models loaded from ollama.toml.
+    pub ollama_models: Vec<arcadia_core::config::ollama::OllamaModel>,
+    /// Models loaded from openai.toml.
+    pub openai_models: Vec<arcadia_core::config::openai::OpenAiModel>,
     /// ID of the model sub-item selected under llama.cpp in the sidebar.
     pub active_llama_cpp_model_id: Option<String>,
     /// Right-click context menu on the llama.cpp provider sidebar item.

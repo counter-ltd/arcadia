@@ -21,6 +21,8 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 | `Desktop/src/gui/app/entry_ios.rs` | iOS Metal-layer bootstrap | Wire `arcadia_ios_start` to OpenFrame on the supplied `CAMetalLayer` |
 | `Desktop/src/gui/app/workspace_panel.rs` | Workspaces page | List + search; loads `WorkspacesConfig`; renders `workspace_row` per entry |
 | `Desktop/src/gui/app/workspace_row.rs` | Per-workspace row | Iterates enabled modules for `workspace_permissions`; grant/revoke toggles |
+| `Shared/ArcadiaCore/src/modules/ai_sandbox.rs` | AI filesystem + exec sandbox | Only entry point for AI file/exec ops; `EXEC_ALLOWLIST` lives here; path canonicalization enforced here |
+| `Shared/ArcadiaCore/src/modules/ai_types.rs` | AI type definitions + workspace scope | `AiWorkspaceContext.is_path_in_scope` uses `fs::canonicalize` — do not weaken to string comparison |
 | `Desktop/src/gui/app/workspace_create_modal.rs` | Create-workspace modal | Label + path fields; calls `workspace.add` on confirm |
 | `Desktop/src/gui/theme/icons.rs` | Icon path helper | `icon_path(glyph_key)` — all SVG lookups; never inline asset paths in views |
 | `Desktop/src/gui/theme/mod.rs` | Color + accent helpers | All color constants; never inline `rgb(0x...)` in views |
@@ -43,6 +45,12 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 7. **Am I renaming a module?** → Add a `merge_defaults()` migration.
 8. **Am I creating a `remote-session.*` command for UI state?** → Use `surface.snapshot` / `surface.patch`.
 9. **Am I reintroducing UniFFI / `Generated/` / `ArcadiaCore.xcframework`?** → No. Dead by design.
+10. **Am I passing credentials (API keys, tokens, secrets) through a channel or struct field?** → Load them at the point of use (in the inference thread, in the config read). Never put secrets in `enum` variants or message payloads.
+11. **Am I checking whether a path is inside a workspace scope?** → Use `std::fs::canonicalize` on both paths before comparing. `starts_with()` on raw strings is bypassed by `..` traversal.
+12. **Am I calling `sh -c` or any shell with user-supplied or model-supplied input?** → Check the binary against `EXEC_ALLOWLIST` in `ai_sandbox.rs`. If the binary isn't on the list, reject it.
+13. **Am I making an outbound HTTP call (Ollama, OpenAI, any provider)?** → Use `ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build()`. Never call `ureq::post()` directly — no timeout means the UI can hang forever.
+14. **Is my file over 400 lines?** → Plan a split into submodules before the PR. Files over 600 lines are blocked. (Exception: generated or test files.)
+15. **Am I returning `None` or a fallback when a user-visible operation fails?** → Return `Err(String)` with a specific message instead. The UI layer must show the error, not silently degrade.
 
 ---
 
@@ -57,3 +65,10 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 - [ ] Module rename includes `merge_defaults()` migration
 - [ ] New mirrored state uses `surface.*` protocol, not ad-hoc verbs
 - [ ] `cargo test -p arcadia-core --manifest-path Shared/Cargo.toml` passes
+- [ ] No secrets (API keys, tokens) in enum variants, channel payloads, or struct fields that cross thread boundaries — load at point of use
+- [ ] All workspace path checks use `fs::canonicalize` on both sides — no raw `starts_with()` comparisons
+- [ ] All outbound HTTP calls go through an `AgentBuilder` with `HTTP_TIMEOUT` — no bare `ureq::post()`
+- [ ] All `sandboxed_exec` calls route through the binary allowlist in `ai_sandbox.rs`
+- [ ] No `expect()` or `unwrap()` in production paths (outside `#[cfg(test)]`) — use `Result` / `Option` with user-visible error messages
+- [ ] No file in `Shared/ArcadiaCore/src/modules/` or `Desktop/src/gui/app/` exceeds 600 lines without a documented split plan
+- [ ] New AI provider routes do not carry credentials in `ProviderRouting` — the inference thread loads config directly

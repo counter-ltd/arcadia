@@ -213,6 +213,8 @@ impl ArcadiaRoot {
         let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
         let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
         let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
+        let ollama_cfg = arcadia_core::config::ollama::OllamaConfig::load_or_create().unwrap_or_default();
+        let openai_cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
@@ -293,11 +295,13 @@ impl ArcadiaRoot {
             ai_chat_model_picker_open: false,
             ai_chat_workspace_id: None,
             ai_chat_workspace_picker_open: false,
-            llama_cpp_runtime: None,
-            llama_cpp_stream_chat_id: None,
-            llama_cpp_poll_task_started: false,
+            ai_runtime: None,
+            ai_stream_chat_id: None,
+            ai_poll_task_started: false,
             active_ai_provider_module: String::new(),
             llama_cpp_models: llama_cpp_cfg.models,
+            ollama_models: ollama_cfg.models,
+            openai_models: openai_cfg.models,
             active_llama_cpp_model_id: None,
             llama_cpp_provider_menu: None,
             llama_cpp_create_draft: None,
@@ -661,11 +665,11 @@ impl ArcadiaRoot {
         self.terminal_kill_menu = None;
     }
 
-    pub fn ensure_llama_cpp_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.llama_cpp_poll_task_started {
+    pub fn ensure_ai_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ai_poll_task_started {
             return;
         }
-        self.llama_cpp_poll_task_started = true;
+        self.ai_poll_task_started = true;
         cx.spawn_in(
             window,
             move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
@@ -676,13 +680,11 @@ impl ArcadiaRoot {
                         let should_stop = cx
                             .update(|_, app| {
                                 view.update(app, |this, cx| {
-                                    let had_event = this.poll_llama_cpp_events(cx);
-                                    // Keep running while inference is active or runtime exists.
-                                    if had_event || this.llama_cpp_stream_chat_id.is_some() {
+                                    let had_event = this.poll_ai_events(cx);
+                                    if had_event || this.ai_stream_chat_id.is_some() {
                                         false
                                     } else {
-                                        // Idle — stop task so it restarts on next send.
-                                        this.llama_cpp_poll_task_started = false;
+                                        this.ai_poll_task_started = false;
                                         true
                                     }
                                 })
@@ -700,11 +702,11 @@ impl ArcadiaRoot {
     }
 
     /// Drain the inference event channel. Returns `true` if any event was processed.
-    pub fn poll_llama_cpp_events(&mut self, cx: &mut Context<Self>) -> bool {
-        use crate::gui::app::llama_cpp_runtime::RuntimeEvent;
+    pub fn poll_ai_events(&mut self, cx: &mut Context<Self>) -> bool {
+        use crate::gui::app::ai_runtime::RuntimeEvent;
         use crate::gui::app::{AiMessage, AiMessageRole};
 
-        let Some(ref runtime) = self.llama_cpp_runtime else {
+        let Some(ref runtime) = self.ai_runtime else {
             return false;
         };
 
@@ -713,7 +715,7 @@ impl ArcadiaRoot {
             match runtime.event_rx.try_recv() {
                 Ok(RuntimeEvent::Token(s)) => {
                     any = true;
-                    if let Some(chat_id) = self.llama_cpp_stream_chat_id {
+                    if let Some(chat_id) = self.ai_stream_chat_id {
                         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
                             if let Some(last) = chat.messages.last_mut() {
                                 if last.role == AiMessageRole::Assistant {
@@ -725,16 +727,16 @@ impl ArcadiaRoot {
                 }
                 Ok(RuntimeEvent::Done) => {
                     any = true;
-                    if let Some(chat_id) = self.llama_cpp_stream_chat_id {
+                    if let Some(chat_id) = self.ai_stream_chat_id {
                         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
                             chat.is_loading = false;
                         }
                     }
-                    self.llama_cpp_stream_chat_id = None;
+                    self.ai_stream_chat_id = None;
                 }
                 Ok(RuntimeEvent::Error(e)) => {
                     any = true;
-                    if let Some(chat_id) = self.llama_cpp_stream_chat_id {
+                    if let Some(chat_id) = self.ai_stream_chat_id {
                         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
                             chat.is_loading = false;
                             if let Some(last) = chat.messages.last_mut() {
@@ -749,7 +751,7 @@ impl ArcadiaRoot {
                             }
                         }
                     }
-                    self.llama_cpp_stream_chat_id = None;
+                    self.ai_stream_chat_id = None;
                 }
                 Err(_) => break,
             }

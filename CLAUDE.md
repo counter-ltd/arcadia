@@ -284,6 +284,140 @@ Do not create `remote-session.foo` commands for UI mirroring. Extend `surface.sn
 
 Renaming a module name constant without a migration in `ModulesConfig::merge_defaults()` will silently strand user settings.
 
+### Secrets in channel payloads or enum variants
+
+```rust
+// BAD — API key travels through mpsc channel, lives on heap unencrypted,
+// appears in core dumps and channel debug output
+enum ProviderRouting {
+    OpenAi { api_key: String, model_id: String },
+}
+
+// GOOD — routing carries only non-secret routing metadata;
+// the inference thread loads the key directly at point of use
+enum ProviderRouting {
+    OpenAi { model_id: String },  // key loaded in inference thread via OpenAiConfig::load_or_create()
+}
+```
+
+**Rule:** No credential (API key, token, password) in any `enum` variant, struct field that crosses a thread boundary, or message payload. Load secrets at the point of use.
+
+### Path scope checks using string prefix matching
+
+```rust
+// BAD — @/workspace/../../../etc/passwd bypasses this check
+pub fn is_path_in_scope(&self, path: &str) -> bool {
+    path.starts_with(&self.workspace_path)
+}
+
+// GOOD — canonicalize resolves symlinks and .. before comparing
+pub fn is_path_in_scope(&self, path: &str) -> bool {
+    let Ok(canon_ws) = std::fs::canonicalize(&self.workspace_path) else { return false; };
+    let canon = if let Ok(c) = std::fs::canonicalize(path) { c } else {
+        let p = std::path::Path::new(path);
+        let Ok(cp) = std::fs::canonicalize(p.parent().unwrap_or(p)) else { return false; };
+        cp.join(p.file_name().unwrap_or_default())
+    };
+    canon.starts_with(&canon_ws)
+}
+```
+
+**Rule:** Never use `starts_with()` on raw path strings for security decisions. Always canonicalize first.
+
+### Unrestricted `sh -c` execution
+
+```rust
+// BAD — grants AI ability to run rm -rf, curl | sh, sudo, etc.
+Command::new("sh").arg("-c").arg(model_supplied_cmd).output()
+
+// GOOD — allowlist enforced in ai_sandbox::sandboxed_exec before sh -c
+// EXEC_ALLOWLIST in ai_sandbox.rs defines permitted binary names
+```
+
+**Rule:** Any execution of user- or model-supplied shell commands must go through `sandboxed_exec()` in `ai_sandbox.rs`. The allowlist there is the single gate. Do not bypass it.
+
+### HTTP calls without timeouts
+
+```rust
+// BAD — server hang = UI hangs forever; inference thread blocks indefinitely
+ureq::post(&url).set("Content-Type", "application/json").send_json(&body)
+
+// GOOD — 120s ceiling; thread unblocks, error propagates to UI
+const HTTP_TIMEOUT: Duration = Duration::from_secs(120);
+let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+agent.post(&url).set("Content-Type", "application/json").send_json(&body)
+```
+
+**Rule:** Every outbound HTTP call (AI providers, LAN APIs, webhooks) must use an `AgentBuilder` with an explicit timeout. `ureq::post()` with no agent is banned in production paths.
+
+### `expect()` / `unwrap()` in production code paths
+
+```rust
+// BAD — panics on thread creation failure, crashes the whole process
+std::thread::spawn(move || work()).expect("failed to spawn thread")
+
+// GOOD — degrade gracefully; surface error to user if appropriate
+match std::thread::Builder::new().spawn(move || work()) {
+    Ok(_) => { /* started */ }
+    Err(e) => { eprintln!("thread spawn failed: {e}"); /* show error in UI */ }
+}
+```
+
+**Rule:** `expect()` and `unwrap()` are only permitted inside `#[cfg(test)]` blocks and in static initializers that provably cannot fail. Everywhere else: propagate `Result`/`Option` or degrade gracefully with a user-visible error.
+
+### Silent error swallowing with `.ok()`
+
+```rust
+// BAD — config corruption silently disables tools with no feedback to user
+WorkspacesConfig::load_or_create().ok()
+    .and_then(|cfg| cfg.workspaces.into_iter().find(...))
+
+// GOOD — surface the error; log it, show a banner, or push an error message
+match WorkspacesConfig::load_or_create() {
+    Ok(cfg) => cfg.workspaces.into_iter().find(...),
+    Err(e) => { eprintln!("config load failed: {e}"); None }
+}
+```
+
+**Rule:** `.ok()` on a `Result` that represents a user-visible operation is not acceptable. Either propagate the error or log it explicitly.
+
+### Monolith files over 400 lines
+
+Files over 400 lines in `Shared/ArcadiaCore/src/modules/` or `Desktop/src/gui/app/` are a split candidate. Files over 600 lines are blocked without a documented split plan. The current known violations are tracked in `Documentation/ROADMAP.md`.
+
+---
+
+## AI Module Patterns
+
+### Adding a new AI provider
+
+1. Add provider module to `MODULE_REGISTRY` with `AI_MODULE_NAME` as a dependency.
+2. Add a `ProviderRouting` variant with only non-secret routing metadata (endpoint, model ID). **No API keys.**
+3. Load credentials in the inference thread via `ProviderConfig::load_or_create()` at call time.
+4. Add the binary names your provider uses to `EXEC_ALLOWLIST` in `ai_sandbox.rs` if needed.
+5. Use `ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build()` for all HTTP calls.
+6. Route all file/exec operations through `sandboxed_read` / `sandboxed_write` / `sandboxed_exec` in `ai_sandbox.rs` — never directly call `std::fs` or `Command` from the provider.
+
+### AI sandbox architecture
+
+```
+ai_chat_panel.rs        — builds TextGenerationRequest, resolves workspace context
+ai_runtime.rs           — inference thread; dispatches to provider fns
+  └── run_ollama()      — HTTP, 120s timeout, no credentials in routing
+  └── run_openai()      — loads API key from config; HTTP, 120s timeout
+  └── run_llama_cpp()   — local model; lazy-loads via LlamaCppConfig path
+ai_sandbox.rs           — SINGLE gate for all file/exec ops from AI
+  └── sandboxed_read()  — checks scope + workspace.read permission
+  └── sandboxed_write() — checks scope + workspace.write permission
+  └── sandboxed_exec()  — checks EXEC_ALLOWLIST + workspace.execute permission
+  └── EXEC_ALLOWLIST    — permitted binary names (cargo, npm, python, git, …)
+ai_context.rs           — @mention parsing, file context injection
+ai_types.rs             — AiWorkspaceContext (is_path_in_scope uses canonicalize)
+ai_tools.rs             — tool definitions and execution dispatch
+```
+
+**Never** call `std::fs::read_to_string` or `Command::new` directly from a provider or tool handler. Always go through `ai_sandbox`.
+
 ---
 
 ## LAN / Thin-Client Patterns

@@ -704,7 +704,7 @@ impl ArcadiaRoot {
                                 name: String::new(),
                                 path: String::new(),
                                 mmproj_path: String::new(),
-                                model_type: arcadia_core::config::llama_cpp::LlamaCppModelType::Generation,
+                                model_type: arcadia_core::config::llama_cpp::LlamaCppModelType::TextGeneration,
                                 error: None,
                             });
                             cx.notify();

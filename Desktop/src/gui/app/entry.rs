@@ -3,6 +3,9 @@ use openframe::{
     WindowOptions, WindowStacking,
 };
 
+static QUIT_REQUESTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 use super::super::assets::EmbeddedAssets;
 use super::super::overlay_hud::OverlayHudRoot;
 use super::ArcadiaRoot;
@@ -12,13 +15,15 @@ use crate::gui::{cursor_backend, overlay_backend, tray_backend};
 use arcadia_core::scheduling;
 
 pub fn run() {
-    use std::process;
+    use std::sync::atomic::Ordering;
     use std::thread;
 
     cli::print_startup("gui");
 
     thread::spawn(|| {
-        cli::start_loop(|| process::exit(0));
+        cli::start_loop(|| {
+            QUIT_REQUESTED.store(true, Ordering::Release);
+        });
     });
 
     // Mark that we will drain the main-thread queue; subsystems may now route work via
@@ -66,11 +71,16 @@ pub fn run() {
 
 fn spawn_main_thread_pump(app: &mut openframe::App) {
     use openframe::Timer;
+    use std::sync::atomic::Ordering;
     use std::time::Duration;
 
     app.spawn(async |cx| {
         loop {
             Timer::after(Duration::from_millis(16)).await;
+            if QUIT_REQUESTED.load(Ordering::Acquire) {
+                cx.update(|app| app.quit()).ok();
+                return;
+            }
             scheduling::drain_main_queue();
             tray_backend::poll_menu_events();
             overlay_backend::poll_overlay(cx);

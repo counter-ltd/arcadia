@@ -98,6 +98,7 @@ dependencies = [
  "rustyline",
  "serde_json",
  "tray-icon",
+ "ureq",
  "vt100",
 ]
 

@@ -1,11 +1,13 @@
 use std::sync::mpsc::{Receiver, SyncSender};
 
+use arcadia_core::modules::ai_types::TextGenerationRequest;
+
 pub enum RuntimeRequest {
     Infer {
         model_path: String,
-        prompt: String,
-        n_predict: i32,
+        request: TextGenerationRequest,
     },
+    Shutdown,
 }
 
 pub enum RuntimeEvent {
@@ -17,6 +19,7 @@ pub enum RuntimeEvent {
 pub struct LlamaCppRuntime {
     pub request_tx: SyncSender<RuntimeRequest>,
     pub event_rx: Receiver<RuntimeEvent>,
+    join_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl LlamaCppRuntime {
@@ -24,7 +27,7 @@ impl LlamaCppRuntime {
         let (request_tx, request_rx) = std::sync::mpsc::sync_channel::<RuntimeRequest>(4);
         let (event_tx, event_rx) = std::sync::mpsc::sync_channel::<RuntimeEvent>(512);
 
-        std::thread::Builder::new()
+        let join_handle = std::thread::Builder::new()
             .name("llama-inference".to_string())
             .spawn(move || {
                 #[cfg(feature = "llama-cpp")]
@@ -39,13 +42,23 @@ impl LlamaCppRuntime {
                                     "llama.cpp not compiled into this build.".to_string(),
                                 ));
                             }
+                            RuntimeRequest::Shutdown => break,
                         }
                     }
                 }
             })
             .expect("failed to spawn inference thread");
 
-        LlamaCppRuntime { request_tx, event_rx }
+        LlamaCppRuntime { request_tx, event_rx, join_handle: Some(join_handle) }
+    }
+}
+
+impl Drop for LlamaCppRuntime {
+    fn drop(&mut self) {
+        let _ = self.request_tx.send(RuntimeRequest::Shutdown);
+        if let Some(h) = self.join_handle.take() {
+            let _ = h.join();
+        }
     }
 }
 
@@ -58,7 +71,7 @@ fn inference_thread_impl(
         context::params::LlamaContextParams,
         llama_backend::LlamaBackend,
         llama_batch::LlamaBatch,
-        model::{params::LlamaModelParams, AddBos, LlamaModel, Special},
+        model::{params::LlamaModelParams, AddBos, LlamaChatMessage, LlamaChatTemplate, LlamaModel, Special},
         sampling::LlamaSampler,
     };
 
@@ -74,7 +87,11 @@ fn inference_thread_impl(
 
     while let Ok(req) = request_rx.recv() {
         match req {
-            RuntimeRequest::Infer { model_path, prompt, n_predict } => {
+            RuntimeRequest::Shutdown => break,
+            RuntimeRequest::Infer { model_path, request } => {
+                let system = request.system;
+                let messages = request.messages;
+                let n_predict = request.max_tokens;
                 // Reload model only when path changes.
                 let needs_load = loaded
                     .as_ref()
@@ -95,7 +112,52 @@ fn inference_thread_impl(
 
                 let (_, model) = loaded.as_ref().unwrap();
 
-                let tokens = match model.str_to_token(&prompt, AddBos::Always) {
+                // Build chat messages and apply the model's embedded chat template.
+                let mut chat_messages: Vec<LlamaChatMessage> = Vec::new();
+                if !system.trim().is_empty() {
+                    match LlamaChatMessage::new("system".into(), system.trim().into()) {
+                        Ok(m) => chat_messages.push(m),
+                        Err(e) => {
+                            let _ = event_tx
+                                .send(RuntimeEvent::Error(format!("Chat message: {e}")));
+                            continue;
+                        }
+                    }
+                }
+                let mut msg_err = false;
+                for (role, content) in &messages {
+                    match LlamaChatMessage::new(role.clone(), content.trim().into()) {
+                        Ok(m) => chat_messages.push(m),
+                        Err(e) => {
+                            let _ = event_tx
+                                .send(RuntimeEvent::Error(format!("Chat message: {e}")));
+                            msg_err = true;
+                            break;
+                        }
+                    }
+                }
+                if msg_err {
+                    continue;
+                }
+
+                let tmpl = match model.chat_template(None) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        let _ = event_tx
+                            .send(RuntimeEvent::Error(format!("Chat template: {e}")));
+                        continue;
+                    }
+                };
+                let prompt = match model.apply_chat_template(&tmpl, &chat_messages, true) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        let _ = event_tx
+                            .send(RuntimeEvent::Error(format!("Chat template: {e}")));
+                        continue;
+                    }
+                };
+
+                let tokens = match model.str_to_token(&prompt, AddBos::Never) {
                     Ok(t) => t,
                     Err(e) => {
                         let _ = event_tx
@@ -136,7 +198,6 @@ fn inference_thread_impl(
                     continue;
                 }
 
-                let eos = model.token_eos();
                 let mut n_cur = batch.n_tokens();
                 let mut sampler = LlamaSampler::greedy();
 
@@ -145,13 +206,13 @@ fn inference_thread_impl(
                     let token = sampler.sample(&ctx, idx);
                     sampler.accept(token);
 
-                    if token == eos {
+                    if model.is_eog_token(token) {
                         break;
                     }
 
                     #[allow(deprecated)]
-                    if let Ok(s) = model.token_to_str(token, Special::Tokenize) {
-                        if event_tx.send(RuntimeEvent::Token(s)).is_err() {
+                    if let Ok(s) = model.token_to_str(token, Special::Plaintext) {
+                        if !s.is_empty() && event_tx.send(RuntimeEvent::Token(s)).is_err() {
                             break 'gen;
                         }
                     }
@@ -170,30 +231,9 @@ fn inference_thread_impl(
             }
         }
     }
-}
-
-/// Build a simple instruct-format prompt from message history.
-/// Works with most instruction-tuned GGUF models.
-pub fn build_chat_prompt(
-    system_prompt: &str,
-    messages: &[(String, String)], // (role, content)
-) -> String {
-    let mut out = String::new();
-    if !system_prompt.trim().is_empty() {
-        out.push_str(system_prompt.trim());
-        out.push_str("\n\n");
-    }
-    for (role, content) in messages {
-        if role == "user" {
-            out.push_str("User: ");
-            out.push_str(content.trim());
-            out.push_str("\n\n");
-        } else if role == "assistant" {
-            out.push_str("Assistant: ");
-            out.push_str(content.trim());
-            out.push_str("\n\n");
-        }
-    }
-    out.push_str("Assistant:");
-    out
+    // Explicit drop ensures LlamaModel and LlamaBackend release their Metal resources
+    // before this thread exits, so the GGML Metal device atexit destructor sees no live
+    // resource sets.
+    drop(loaded);
+    drop(backend);
 }

@@ -1,6 +1,8 @@
 pub mod ai;
 pub mod appearance;
 pub mod llama_cpp;
+pub mod ollama;
+pub mod openai;
 pub mod code_editor;
 pub mod commandline;
 pub mod extension_tokens;

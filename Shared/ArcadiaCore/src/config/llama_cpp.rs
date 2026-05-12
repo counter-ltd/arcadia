@@ -6,7 +6,9 @@ use crate::config::ConfigFile;
 #[serde(rename_all = "snake_case")]
 pub enum LlamaCppModelType {
     #[default]
-    Generation,
+    #[serde(alias = "generation")]
+    TextGeneration,
+    ImageGeneration,
     Vision,
     Embedding,
 }
@@ -14,15 +16,17 @@ pub enum LlamaCppModelType {
 impl LlamaCppModelType {
     pub fn label(&self) -> &'static str {
         match self {
-            LlamaCppModelType::Generation => "Generation",
-            LlamaCppModelType::Vision => "Vision",
-            LlamaCppModelType::Embedding => "Embedding",
+            Self::TextGeneration  => "Text Generation",
+            Self::ImageGeneration => "Image Generation",
+            Self::Vision          => "Vision",
+            Self::Embedding       => "Embedding",
         }
     }
 
     pub fn all() -> &'static [LlamaCppModelType] {
         &[
-            LlamaCppModelType::Generation,
+            LlamaCppModelType::TextGeneration,
+            LlamaCppModelType::ImageGeneration,
             LlamaCppModelType::Vision,
             LlamaCppModelType::Embedding,
         ]

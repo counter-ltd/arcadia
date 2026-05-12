@@ -5,9 +5,22 @@ Read `AGENTS.md` — it has the registry-discipline rules and the full list of a
 1. **Registry entry before surface code.** New module? `MODULE_REGISTRY` first. New page? `PAGE_DEFINITIONS` first.
 2. **No per-module booleans in surface state.** One generic `is_module_enabled(name)` query.
 3. **No hardcoded page ID match arms in visibility logic.** Derive from `required_module` in `PageDefinition`.
-4. **No inline colors.** Theme layer only.
+4. **No inline colors.** Theme layer only — `theme::ui_accent(cx)`, `p.content_title`, etc. No `rgb(0x...)` in view files.
 5. **Cross-platform logic belongs in core.** Desktop and iOS share the same Rust UI — if you're writing the same thing in `Desktop/src/main.rs` and `Mobile/iOS/ArcadiaApp/`, it almost certainly belongs in `arcadia-core` or `gui/app/`.
 6. **iOS C ABI changes:** edit `Desktop/src/ios_lib.rs` and mirror in `Mobile/iOS/ArcadiaApp/ArcadiaBridge.h`. Commit both.
+
+### Security rules (mandatory — not optional style)
+
+7. **No secrets in channel payloads or enum variants.** API keys, tokens, and passwords must be loaded at the point of use inside the consuming thread. Do not put them in `enum` variants, struct fields that cross thread boundaries, or mpsc messages.
+8. **Canonicalize paths before scope checks.** `is_path_in_scope` must call `std::fs::canonicalize` on both paths. Raw `starts_with()` comparisons on path strings are vulnerable to `..` traversal attacks and are banned for security decisions.
+9. **All model/user-supplied shell commands go through `sandboxed_exec`.** Never call `Command::new("sh")` with model-supplied input directly. `ai_sandbox::sandboxed_exec` enforces the `EXEC_ALLOWLIST`; bypass it and the PR is rejected.
+10. **All outbound HTTP calls use a timeout.** Use `ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build()`. Bare `ureq::post()` is not allowed in production paths — a hanging server will hang the inference thread permanently.
+
+### Code health rules (mandatory)
+
+11. **No `expect()` or `unwrap()` outside `#[cfg(test)]`.** Return `Result`/`Option` and propagate or show the error. Panicking production code is a crash, not error handling.
+12. **No silent error swallowing.** `.ok()` on a user-visible operation discards the error silently. Either propagate with `?` or log + show to user. `.ok()` is only acceptable when a missing value is genuinely expected (e.g., optional config keys).
+13. **File size limit: 600 lines.** Files over 400 lines need a note; files over 600 lines in `modules/` or `gui/app/` are blocked without a split plan attached to the PR.
 
 If something's missing: open a PR, draft a module, or file an issue with a concrete repro.
 

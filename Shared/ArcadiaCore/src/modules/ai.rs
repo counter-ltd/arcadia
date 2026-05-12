@@ -12,11 +12,23 @@ pub struct AiProviderManifest {
     pub description: &'static str,
 }
 
-pub const AI_PROVIDER_REGISTRY: &[AiProviderManifest] = &[AiProviderManifest {
-    module_name: "ai-provider-llama-cpp",
-    display_name: "llama.cpp",
-    description: "Local inference via llama.cpp. Runs models directly on this machine.",
-}];
+pub const AI_PROVIDER_REGISTRY: &[AiProviderManifest] = &[
+    AiProviderManifest {
+        module_name: "ai-provider-llama-cpp",
+        display_name: "llama.cpp",
+        description: "Local inference via llama.cpp. Runs models directly on this machine.",
+    },
+    AiProviderManifest {
+        module_name: "ai-provider-ollama",
+        display_name: "Ollama",
+        description: "Local inference via Ollama HTTP API.",
+    },
+    AiProviderManifest {
+        module_name: "ai-provider-openai",
+        display_name: "OpenAI",
+        description: "Cloud inference via OpenAI API.",
+    },
+];
 
 pub fn enabled_ai_providers(module_rows: &[(String, bool)]) -> Vec<&'static AiProviderManifest> {
     AI_PROVIDER_REGISTRY
