@@ -15,6 +15,7 @@ pub(crate) enum ListPanelSearchKind {
     Extensions,
     Permissions,
     Shortcuts,
+    Workspaces,
 }
 
 pub(crate) fn list_panel_row_matches(q_lower: &str, primary: &str, extras: &[&str]) -> bool {
@@ -48,12 +49,16 @@ impl ArcadiaRoot {
             ListPanelSearchKind::Shortcuts => {
                 (&self.shortcuts_search_query, &self.shortcuts_search_focus)
             }
+            ListPanelSearchKind::Workspaces => {
+                (&self.workspace_search_query, &self.workspace_search_focus)
+            }
         };
         let placeholder = match kind {
             ListPanelSearchKind::Modules => "Search modules…",
             ListPanelSearchKind::Extensions => "Search extensions…",
             ListPanelSearchKind::Permissions => "Search permissions…",
             ListPanelSearchKind::Shortcuts => "Search shortcuts…",
+            ListPanelSearchKind::Workspaces => "Search workspaces…",
         };
 
         let input_bg = theme::glyph_snapshot(cx)
@@ -103,6 +108,7 @@ impl ArcadiaRoot {
                     ListPanelSearchKind::Extensions => &mut this.extensions_search_query,
                     ListPanelSearchKind::Permissions => &mut this.permissions_search_query,
                     ListPanelSearchKind::Shortcuts => &mut this.shortcuts_search_query,
+                    ListPanelSearchKind::Workspaces => &mut this.workspace_search_query,
                 };
                 if key == "backspace" {
                     buf.pop();

@@ -14,27 +14,29 @@ Multi-platform runtime and shell: one Rust core (`Shared/ArcadiaCore`) consumed 
 Shared/ArcadiaCore/src/
   lib.rs              module declarations (config, modules, navigation, platform, services)
   navigation.rs       PAGE_DEFINITIONS, GROUP_DEFINITIONS, NavigationRegistryOwned
-  services.rs         high-level service registry helpers
+  services.rs         SERVICE_DEFINITIONS, service-host helpers
   config/
     mod.rs            ConfigFile trait, CONFIG_ROOT_OVERRIDE (iOS sets this)
     modules.rs        MODULE_REGISTRY, ModulesConfig, merge_defaults() migrations
+    workspace.rs      WorkspacesConfig, WorkspaceEntry, WorkspacePermissionDef → workspace.toml
     appearance.rs     appearance.toml (theme tokens)
     commandline.rs    CLI preferences
     extension_tokens.rs  extension theme/glyph token resolution
     late.rs           late.toml (WS chat config)
-    thin_client.rs    thin-client.toml (preferred_remote_route, surface_client_id)
+    thin_client.rs    thin-client.toml (preferred_remote_route, surface_client_id, navigation_from_host_only)
   modules/
     mod.rs            execute_command dispatcher, module_commands() lookup
     shell.rs          shell.execute + shell.internal
-    shell_motd.rs     MOTD banner
+    shell_motd.rs     MOTD banner (terminal-motd module)
     surface.rs        surface.snapshot / surface.patch / revision counter
-    remote_session.rs routing manifest only
+    remote_session.rs routing manifest only (no standalone commands)
     remote_mirror.rs  host transcript queue + drain (for surface mirroring)
     net.rs            networking foundation
     lan/              LAN subsystem (discovery, peers, protocol, handlers)
     late.rs           WebSocket chat / now-playing / votes module
     python_host.rs    Python extension host
     python_registry.rs Python extension manifest registry
+    workspace.rs      workspace.list/add/remove/grant/revoke/check commands
   platform/
     mod.rs, macos.rs, ios.rs, linux.rs, windows.rs, unknown.rs
 
@@ -57,6 +59,9 @@ Desktop/
         entry_ios.rs  iOS entrypoint — boots OpenFrame on supplied CAMetalLayer
         lifecycle.rs  focus, resize, module state reload
         navigation.rs nav state, page routing
+        workspace_panel.rs    Workspaces page — list + search
+        workspace_row.rs      per-workspace row with permission toggles
+        workspace_create_modal.rs  create-workspace modal (label + path fields)
         root/, sidebar/, shell/, modules_page/, lan_nodes/, splash/,
         appearance/, late/, python_settings/, services/, list_panel_search.rs,
         text_input_caret.rs
@@ -71,13 +76,69 @@ Mobile/iOS/
     MetalHostView.swift CAMetalLayer host view, forwards UITouch → arcadia_ios_inject_touch
     ArcadiaBridge.h     C ABI declarations matching ios_lib.rs
 
-Configuration/  (under $HOME/Arcadia/Configuration on desktop, app Documents on iOS)
+Configuration/  (runtime root: $HOME/Arcadia/Configuration on Desktop, app Documents on iOS)
   modules.toml        module enable/disable state
   commandline.toml    CLI settings
-  thin-client.toml    preferred_remote_route, surface_client_id (UUID)
+  thin-client.toml    preferred_remote_route, surface_client_id (UUID), navigation_from_host_only
   appearance.toml     theme tokens
   late.toml           late module state
+  workspace.toml      registered workspace directories + per-workspace permission grants
 ```
+
+---
+
+## Module Quick Reference
+
+All modules live in `MODULE_REGISTRY` (`config/modules.rs`). Commands follow `module.verb` format.
+
+| Module | Constant | Requires | Commands / Purpose |
+|--------|----------|----------|--------------------|
+| `animation` | `ANIMATION_MODULE_NAME` | — | Shared tween engine; 16 ms driver loop |
+| `net` | `NET_MODULE_NAME` | — | Networking foundation |
+| `lan` | `LAN_MODULE_NAME` | `net` | `lan.scan`, `lan.node`, `lan.session_targets` — LAN discovery + pairing |
+| `surface` | `SURFACE_MODULE_NAME` | — | `surface.snapshot`, `surface.patch`, `surface.revision` |
+| `remote-session` | `REMOTE_SESSION_MODULE_NAME` | `net`, `lan` | Routing gate for `net_as` forwarding; no standalone commands |
+| `terminal` | `TERMINAL_MODULE_NAME` | — | `shell.execute` (routable), `shell.internal` (REPL), PTY/TUI on Desktop |
+| `terminal-motd` | `TERMINAL_MOTD_MODULE_NAME` | `terminal` | Fastfetch-style banner on terminal open |
+| `late` | `LATE_MODULE_NAME` | — | `late.*` — chat rooms, music stream, reactions |
+| `python-host` | `PYTHON_HOST_MODULE_NAME` | — | Python extension loader; scans `~/Arcadia/Extensions/` |
+| `permissions` | `PERMISSIONS_MODULE_NAME` | — | Permission catalog, grants, `permit`/`list` commands |
+| `tray` | `TRAY_MODULE_NAME` | — | Menu-bar (macOS) / system-tray (Windows/Linux) |
+| `cursor` | `CURSOR_MODULE_NAME` | — | OS-global cursor position + display size (desktop only) |
+| `overlay` | `OVERLAY_MODULE_NAME` | — | Always-on-top transparent HUD (desktop only) |
+| `workspace` | `WORKSPACE_MODULE_NAME` | — | `workspace.add/remove/list/grant/revoke/check` — directory registry + permissions |
+
+---
+
+## Navigation Quick Reference
+
+All pages in `PAGE_DEFINITIONS` (`navigation.rs`). Visibility from `required_module` — never hardcode.
+
+| Page ID | Title | Placement | Required Module |
+|---------|-------|-----------|-----------------|
+| `utility.shell` | Terminal | `utilities` group | `terminal` |
+| `utility.services` | Services | `utilities` group | _service-driven_ |
+| `global.dashboard` | Dashboard | sidebar global | — |
+| `global.settings` | Settings | sidebar global + hub root | — |
+| `global.logs` | Logs | app-title context menu | — |
+| `global.modules` | Modules | top bar | — |
+| `global.appearance` | Appearance | settings hub | — |
+| `global.permissions` | Permissions | settings hub | — |
+| `global.shortcuts` | Shortcuts | settings hub | — |
+| `global.workspaces` | Workspaces | settings hub | `workspace` |
+| `network.nodes` | Nodes | `network` group | `lan` |
+| `late.now_playing` | Late.sh | `social` group | `late` |
+| `late.experimental` | Experimental | `social` group | `late` |
+| `late.settings` | Late.sh settings | settings hub | `late` |
+| `python.settings` | Extensions | top bar | `python-host` |
+
+**Groups:** `utilities` (shell, services) · `network` (nodes) · `social` (late pages)
+
+**Special lists:**
+- `GLOBAL_PAGE_IDS` → sidebar global: `global.dashboard`, `global.settings`
+- `TOP_BAR_PAGE_IDS` → top bar: `python.settings`, `global.modules`
+- `SETTINGS_HUB_ROOT_PAGE_ID` → `global.settings`
+- `SETTINGS_HUB_PAGE_IDS` → `global.permissions`, `global.shortcuts`, `global.appearance`, `global.workspaces`, `late.settings`
 
 ---
 
@@ -93,6 +154,7 @@ Configuration/  (under $HOME/Arcadia/Configuration on desktop, app Documents on 
 | Theme tokens | `Desktop/src/gui/theme/` | every render path |
 | Config schema | `ModulesConfig` in `config/modules.rs` | CLI, GUI |
 | Config migrations | `ModulesConfig::merge_defaults()` | every load path |
+| Workspace registry | `config/workspace.rs` `WorkspacesConfig` | workspace module + GUI panel |
 
 ### Thin surfaces, fat core, single UI layer
 
@@ -103,7 +165,7 @@ Configuration/  (under $HOME/Arcadia/Configuration on desktop, app Documents on 
 Surface entrypoints must NOT:
 - Re-implement business logic that belongs in `arcadia_core`.
 - Hard-code module names, page IDs, or feature flags.
-- Add per-module booleans (`shell_enabled`, `net_enabled`) — query the config dynamically via `is_module_enabled(name)`.
+- Add per-module booleans (`shell_enabled`, `net_enabled`) — query dynamically via `is_module_enabled(name)`.
 - Duplicate navigation structure that already exists in `navigation.rs`.
 
 ---
@@ -113,22 +175,22 @@ Surface entrypoints must NOT:
 ### New module
 
 1. Add `pub const X_MODULE_NAME: &str = "x";` to `Shared/ArcadiaCore/src/config/modules.rs`.
-2. Add a `ModuleManifest` entry to `MODULE_REGISTRY` in the same file.
-3. Create `Shared/ArcadiaCore/src/modules/x.rs` with a `commands()` fn returning `&[ModuleCommand]` and a `pub const NAME: &str`.
-4. Register the module in `Shared/ArcadiaCore/src/modules/mod.rs` (`pub mod x;` and add to `module_commands()` match).
+2. Add a `ModuleManifest` entry to `MODULE_REGISTRY` in the same file (all 6 fields — see struct below).
+3. Create `Shared/ArcadiaCore/src/modules/x.rs` with a `commands()` fn returning `&[ModuleCommand]`.
+4. Register in `Shared/ArcadiaCore/src/modules/mod.rs`: `pub mod x;` + add to `module_commands()` match.
 5. Done — GUI and CLI pick it up from the registry automatically. No surface edits required.
 
 ### New navigation page
 
 1. Add a `NavigationPageDefinition` entry to `PAGE_DEFINITIONS` in `navigation.rs`. Set `required_module` if the page depends on a module.
-2. Add the page ID to the relevant `NavigationGroupDefinition.pages` slice, or create a new group.
+2. Add the page ID to the relevant `NavigationGroupDefinition.pages` slice, or add to `SETTINGS_HUB_PAGE_IDS`, `GLOBAL_PAGE_IDS`, or `TOP_BAR_PAGE_IDS` as appropriate.
 3. Implement the page panel under `Desktop/src/gui/app/` (single implementation — renders on desktop and iOS).
 4. Route in the surface content switch — derive visibility from `required_module`, **never** add a hardcoded match arm.
 
 ### New icon/glyph
 
 1. Add SVG to `Desktop/assets/icons/`.
-2. Add a match arm to `icon_path()` in `Desktop/src/gui/theme/mod.rs`.
+2. Add a match arm to `icon_path()` in `Desktop/src/gui/theme/icons.rs`.
 3. Use the key in `NavigationPageDefinition.glyph` or `NavigationGroupDefinition.glyph`.
 
 ### New theme color
@@ -167,7 +229,7 @@ fn is_module_enabled(&self, name: &str) -> bool {
         .map(|(_, enabled)| *enabled)
         .unwrap_or(false)
 }
-// call as: self.is_module_enabled(SHELL_MODULE_NAME)
+// call as: self.is_module_enabled(TERMINAL_MODULE_NAME)
 ```
 
 ### Hardcoded page ID match arms in visibility logic
@@ -243,7 +305,7 @@ execute_command("shell.execute", "ls -la", ExecutionContext {
 
 ```
 Client calls: execute_command("surface.snapshot", "", context_pointing_at_host)
-Host returns: { modules: [...], revision: N, extra: { navigation_registry: "..." } }
+Host returns: { modules: [...], revision: N, extra: { schema_version: 1, navigation_registry: "..." } }
 
 Client calls: execute_command("surface.patch", json_ops, context_pointing_at_host)
 Host applies: module toggle ops, bumps revision
@@ -261,12 +323,17 @@ The desktop GUI polls `remote_mirror::drain_*` on a timer when acting as a clien
 
 ```rust
 pub struct ModuleManifest {
-    pub name: &'static str,                       // unique key
+    pub name: &'static str,                                    // unique key, e.g. "terminal"
     pub version: &'static str,
     pub description: &'static str,
-    pub required_modules: &'static [&'static str], // transitive deps enforced on enable
+    pub required_modules: &'static [&'static str],             // transitive deps enforced on enable
+    pub required_permissions: &'static [&'static str],         // global permissions needed
+    pub workspace_permissions: &'static [WorkspacePermissionDef], // per-workspace grant toggles
+    pub supported_platforms: &'static [&'static str],          // empty = all platforms
 }
 ```
+
+`workspace_permissions` advertises per-directory grants this module needs. The workspace panel iterates all enabled modules and renders their entries as per-workspace toggle rows.
 
 ### ModulesConfig key methods
 
@@ -303,9 +370,10 @@ pub struct NavigationPageDefinition {
     pub id: &'static str,                       // "group.name" format
     pub title: &'static str,
     pub description: &'static str,
-    pub glyph: &'static str,                    // key into icon_path()
+    pub glyph: &'static str,                    // key into icon_path() in theme/icons.rs
+    pub system_image: &'static str,             // SF Symbol name for iOS native contexts
     pub accent: &'static str,                   // accent palette key
-    pub required_module: Option<&'static str>,  // drives visibility
+    pub required_module: Option<&'static str>,  // drives visibility; None = always visible
 }
 ```
 
@@ -314,7 +382,7 @@ pub struct NavigationPageDefinition {
 ```rust
 page_by_id(id: &str) -> Option<&'static NavigationPageDefinition>
 group_by_id(id: &str) -> Option<&'static NavigationGroupDefinition>
-default_navigation_registry_json() -> String  // emitted via surface.snapshot
+default_navigation_registry_json() -> String  // emitted via surface.snapshot.extra
 ```
 
 ---
@@ -380,8 +448,11 @@ Cargo output is unified at `Builds/workspace/` via `/.cargo/config.toml`. Overri
 
 ## Known Gotchas
 
-- `surface.revision` only advances on `surface.patch` — CLI writes bypass it. Do not rely on the revision as a freshness signal for all write paths.
+- `surface.revision` advances on every `ModulesConfig::save` — all write paths bump it, including CLI. GUI polls `surface.revision` on a timer when a remote route is active and shows a stale banner + Reload when it diverges.
 - Multiple concurrent GUIs on the same host = last-write-wins on `modules.toml`. No merge semantics.
 - LAN forwarding requires `remote-session`, `lan`, and `net` enabled locally. The peer checks its own module rules for the forwarded token.
 - `ARCADIA_NET_AS` env var overrides `thin-client.toml` `preferred_remote_route` on startup.
+- `thin-client.toml` flag `navigation_from_host_only = true`: when set and a LAN route is active, the GUI uses only host `surface.snapshot` navigation — no fallback to compiled-in nav until the snapshot supplies `navigation_registry`.
 - iOS surface is OpenFrame rendered into a `CAMetalLayer`, not SwiftUI. The Swift host is a ~50-line UIKit shell (`ArcadiaApp.swift` + `MetalHostView.swift`) whose only job is to provide a Metal layer and forward `UITouch` events. All UI logic lives in `Desktop/src/gui/app/` (via OpenFrame on iOS).
+- `surface.patch` `client_id` is attribution only — not authentication or authorization. Do not build access control on it.
+- The UniFFI / `Generated/` / `ArcadiaCore.xcframework` path is dead. iOS uses `libarcadia_ios.a` via a 2-function C ABI in `ios_lib.rs`. Do not reintroduce it.

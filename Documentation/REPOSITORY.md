@@ -17,6 +17,7 @@ Shared/
         extension_tokens.rs           # extension theme/glyph token resolution
         late.rs                       # late.toml (WS chat config)
         thin_client.rs                # ThinClientConfig → thin-client.toml
+        workspace.rs                  # WorkspacesConfig, WorkspaceEntry, WorkspacePermissionDef → workspace.toml
       modules/
         mod.rs                        # execute_command dispatcher, module_commands() lookup
         shell.rs                      # shell.execute, shell.internal
@@ -28,6 +29,7 @@ Shared/
         late.rs                       # WebSocket chat / now-playing / votes
         python_host.rs                # Python extension host
         python_registry.rs            # Python extension manifest registry
+        workspace.rs                  # workspace.list/add/remove/grant/revoke/check commands
         lan/                          # LAN subsystem
           mod.rs, discovery.rs, handlers.rs, config.rs, peers.rs, protocol.rs
       platform/
@@ -63,6 +65,9 @@ Desktop/
         entry_ios.rs                  # iOS OpenFrame bootstrap (called from arcadia_ios_start)
         lifecycle.rs                  # focus, resize, module reload
         navigation.rs                 # nav state and page routing
+        workspace_panel.rs            # Workspaces page — list + search
+        workspace_row.rs              # Per-workspace row with permission toggles
+        workspace_create_modal.rs     # Create-workspace modal (label + path fields)
         root/, sidebar/, shell/, modules_page/, lan_nodes/, splash/,
         appearance/, late/, python_settings/, services/, list_panel_search.rs,
         text_input_caret.rs

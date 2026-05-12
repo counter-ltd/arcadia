@@ -52,12 +52,17 @@ Modules are entries in `MODULE_REGISTRY` (`config/modules.rs`). Each entry is a 
 
 ```rust
 pub struct ModuleManifest {
-    pub name: &'static str,          // unique key, e.g. "shell"
+    pub name: &'static str,                           // unique key, e.g. "terminal"
     pub version: &'static str,
     pub description: &'static str,
-    pub required_modules: &'static [&'static str], // dependency enforcement
+    pub required_modules: &'static [&'static str],    // dependency enforcement
+    pub required_permissions: &'static [&'static str],
+    pub workspace_permissions: &'static [WorkspacePermissionDef], // per-workspace grant toggles in workspace panel
+    pub supported_platforms: &'static [&'static str], // empty = all platforms
 }
 ```
+
+`workspace_permissions` lets a module advertise the per-directory grants it needs. The workspace panel iterates all enabled modules and renders their `workspace_permissions` as toggle rows for each workspace entry. See `config/workspace.rs` and `config/modules.rs` for types.
 
 `ModulesConfig` (TOML-backed) maps module names to enabled state. Key behaviors:
 
@@ -74,17 +79,24 @@ Every surface calls `list_modules()` → `Vec<ModuleStatus>` and renders whateve
 
 Navigation structure lives entirely in `navigation.rs` as two static slices:
 
-**`PAGE_DEFINITIONS`** — pages:
+**`PAGE_DEFINITIONS`** — pages (full list in [`REFERENCE.md`](REFERENCE.md)):
 
 | ID | Title | Required Module |
 |----|-------|-----------------|
 | `utility.shell` | Terminal | `terminal` |
-| `utility.services` | Services | _service-driven (any service active)_ |
+| `utility.services` | Services | _service-driven_ |
 | `global.dashboard` | Dashboard | — |
-| `global.logs` | Logs | — |
 | `global.settings` | Settings | — |
+| `global.logs` | Logs | — |
 | `global.modules` | Modules | — |
+| `global.appearance` | Appearance | — |
+| `global.permissions` | Permissions | — |
+| `global.shortcuts` | Shortcuts | — |
+| `global.workspaces` | Workspaces | `workspace` |
 | `network.nodes` | Nodes | `lan` |
+| `late.now_playing` | Late.sh | `late` |
+| `late.settings` | Late.sh settings | `late` |
+| `python.settings` | Extensions | `python-host` |
 
 **`GROUP_DEFINITIONS`** — groups:
 
@@ -100,9 +112,11 @@ Navigation structure lives entirely in `navigation.rs` as two static slices:
 |---------|------|-----------------|----------|
 | `lan.discovery` | `utility.services` | `lan` | start, stop, status_detail |
 
-**`GLOBAL_PAGE_IDS`** — pages rendered in the sidebar global section: `global.dashboard`, `global.settings`.
+**`GLOBAL_PAGE_IDS`** — sidebar global section: `global.dashboard`, `global.settings`.
 
-**`TOP_BAR_PAGE_IDS`** — pages rendered as compact controls in the surface top bar: `global.logs`, `global.modules`. Each surface chooses how to render them (Desktop pill, iOS toolbar item) — registry stays the source of truth.
+**`TOP_BAR_PAGE_IDS`** — compact top-bar controls: `python.settings`, `global.modules`.
+
+**`SETTINGS_HUB_PAGE_IDS`** — nested rows under `global.settings` (the settings hub root): `global.permissions`, `global.shortcuts`, `global.appearance`, `global.workspaces`, `late.settings`.
 
 `NavigationPageDefinition.required_module` drives visibility for non-service-host pages — surfaces query `is_module_enabled(page.required_module)`, never hardcode per-page logic. Service-host pages (any page that has at least one entry in `SERVICE_DEFINITIONS` targeting it) are visible iff one of their services' `required_module` is enabled; surfaces use the central helper `arcadia_core::navigation::is_page_visible_with` (or `is_page_visible_in_owned` for thin clients consuming a remote registry) so the rule stays in one place. The full registry serializes to JSON via `default_navigation_registry_json()` for the thin-client snapshot path — it is embedded in `surface.snapshot.extra` so remote clients get the host's nav without a local copy.
 

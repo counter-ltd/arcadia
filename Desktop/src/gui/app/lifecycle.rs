@@ -197,6 +197,9 @@ impl ArcadiaRoot {
         let shortcut_create_label_focus = cx.focus_handle();
         let shortcut_create_token_focus = cx.focus_handle();
         let shortcut_create_args_focus = cx.focus_handle();
+        let workspace_search_focus = cx.focus_handle();
+        let workspace_create_label_focus = cx.focus_handle();
+        let workspace_create_path_focus = cx.focus_handle();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
@@ -231,10 +234,12 @@ impl ArcadiaRoot {
             extensions_search_query: String::new(),
             permissions_search_query: String::new(),
             shortcuts_search_query: String::new(),
+            workspace_search_query: String::new(),
             modules_search_focus,
             extensions_search_focus,
             permissions_search_focus,
             shortcuts_search_focus,
+            workspace_search_focus,
             shortcut_listening_id: None,
             shortcut_listening_sequence: None,
             shortcut_listen_focus,
@@ -244,6 +249,9 @@ impl ArcadiaRoot {
             shortcut_create_label_focus,
             shortcut_create_token_focus,
             shortcut_create_args_focus,
+            workspace_create_draft: None,
+            workspace_create_label_focus,
+            workspace_create_path_focus,
             module_rows,
             python_extension_rows: Vec::new(),
             active_style,

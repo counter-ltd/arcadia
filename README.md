@@ -39,12 +39,13 @@ In short: the software is meant for **people** — personal, educational, resear
 | Capability | How |
 |------------|-----|
 | Native shell / PTY terminal | `shell.execute` (routable), `shell.internal` (REPL), full PTY/TUI on Desktop |
-| Shell welcome banner | `shell-motd` module — fastfetch-style on shell open |
+| Shell welcome banner | `terminal-motd` module — fastfetch-style on terminal open |
 | Manage modules | CLI (`module enable/disable`) or GUI toggle; same `modules.toml` |
 | Discover LAN peers | `lan.scan`, `lan.node`, LAN nodes UI on Desktop and iOS |
 | Route commands to another machine | `ExecutionContext.net_as = "lan:IP"`, session chip on Desktop, route picker on iOS |
 | Mirror host UI state to clients | `surface.snapshot` — modules + nav registry + revision |
 | Push module changes from client to host | `surface.patch` with `modules_set` op |
+| Register workspace directories | `workspace` module — `workspace.add`, per-workspace `read`/`write`/`execute` grants; GUI panel in Settings |
 | Run headless as a host | `cargo run` (default `headless` feature) |
 | Build the iOS app | Open `Mobile/iOS/ArcadiaApp.xcodeproj` and build — the project's "Build Rust (cargo)" phase produces `libarcadia_ios.a` automatically |
 | Install global CLI wrappers | `bash Shared/Scripts/Installers/install-global-commands-macos.sh` |

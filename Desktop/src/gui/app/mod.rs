@@ -31,6 +31,9 @@ mod shortcuts;
 mod shortcuts_create_modal;
 mod shortcuts_panel;
 mod shortcuts_row;
+mod workspace_create_modal;
+mod workspace_panel;
+mod workspace_row;
 
 #[cfg(feature = "gui")]
 pub use entry::run;
@@ -133,6 +136,13 @@ pub struct ShortcutCreateDraft {
 }
 
 #[derive(Clone)]
+pub struct WorkspaceCreateDraft {
+    pub label: String,
+    pub path: String,
+    pub error: Option<String>,
+}
+
+#[derive(Clone)]
 pub enum PendingPermissionGrant {
     NativeModule {
         module: String,
@@ -181,10 +191,13 @@ pub struct ArcadiaRoot {
     pub permissions_search_query: String,
     /// Filters rows on global.shortcuts (UI-only).
     pub shortcuts_search_query: String,
+    /// Filters rows on global.workspaces (UI-only).
+    pub workspace_search_query: String,
     pub modules_search_focus: FocusHandle,
     pub extensions_search_focus: FocusHandle,
     pub permissions_search_focus: FocusHandle,
     pub shortcuts_search_focus: FocusHandle,
+    pub workspace_search_focus: FocusHandle,
     /// When `Some(id)`, shortcuts panel captures the next keystroke as a new chord override for that shortcut.
     pub shortcut_listening_id: Option<String>,
     /// When `Some((id, captured_steps, total_steps))`, captures successive keystrokes into a sequence override.
@@ -200,6 +213,9 @@ pub struct ArcadiaRoot {
     pub shortcut_create_label_focus: FocusHandle,
     pub shortcut_create_token_focus: FocusHandle,
     pub shortcut_create_args_focus: FocusHandle,
+    pub workspace_create_draft: Option<WorkspaceCreateDraft>,
+    pub workspace_create_label_focus: FocusHandle,
+    pub workspace_create_path_focus: FocusHandle,
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
     pub python_extension_rows: Vec<(String, String, String, bool, Vec<String>, Vec<String>)>,

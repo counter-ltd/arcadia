@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io;
 
+use crate::config::workspace::WorkspacePermissionDef;
 use crate::config::{write_config_toml, ConfigFile};
 use crate::platform::PlatformInfo;
 
@@ -51,6 +52,7 @@ pub const TERMINAL_MOTD_MODULE_NAME: &str = "terminal-motd";
 pub const TRAY_MODULE_NAME: &str = "tray";
 pub const CURSOR_MODULE_NAME: &str = "cursor";
 pub const OVERLAY_MODULE_NAME: &str = "overlay";
+pub const WORKSPACE_MODULE_NAME: &str = "workspace";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -61,6 +63,9 @@ pub struct ModuleManifest {
     pub required_modules: &'static [&'static str],
     /// Permissions that must be globally and per-subject granted for full use (first-enable flow).
     pub required_permissions: &'static [&'static str],
+    /// Workspace-scoped permissions this module contributes. The workspace panel iterates all
+    /// enabled modules and shows these as per-workspace grant toggles.
+    pub workspace_permissions: &'static [WorkspacePermissionDef],
     /// Empty = all platforms. Otherwise whitelist of [`runtime_platform_id`] values.
     pub supported_platforms: &'static [&'static str],
 }
@@ -73,6 +78,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Shared tween engine for modules and extensions. One 16 ms driver loop services all running animations.",
         required_modules: &[],
         required_permissions: &[],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -81,6 +87,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Local network discovery and peer communication.",
         required_modules: &[NET_MODULE_NAME],
         required_permissions: &["network.lan"],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -89,6 +96,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Shared networking foundation for routed module commands.",
         required_modules: &[],
         required_permissions: &[],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -97,6 +105,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Generic UI snapshot (surface.snapshot) and patches (surface.patch); extend patches for new surfaces.",
         required_modules: &[],
         required_permissions: &["surface.read", "surface.control"],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -105,6 +114,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Permission to route execute_command over LAN (net_as: lan:…); transcript/mirror are automatic on hosts.",
         required_modules: &[NET_MODULE_NAME, LAN_MODULE_NAME],
         required_permissions: &["session.remote_route"],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -113,6 +123,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Interactive terminal command execution for Arcadia surfaces.",
         required_modules: &[],
         required_permissions: &["shell.run", "shell.bridge"],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -121,6 +132,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Fastfetch-style banner when opening the Arcadia terminal (requires terminal).",
         required_modules: &[TERMINAL_MODULE_NAME],
         required_permissions: &[],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -129,6 +141,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Native late.sh client — chat rooms, music stream, reactions, and bonsai.",
         required_modules: &[],
         required_permissions: &["late.outbound"],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -137,6 +150,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Python extension loader. Scans ~/Arcadia/Extensions/ for .py files and registers their commands.",
         required_modules: &[],
         required_permissions: &["python.host", "python.extension_toggle"],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -145,6 +159,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Permission catalog, grants, and headless permit/list commands.",
         required_modules: &[],
         required_permissions: &[],
+        workspace_permissions: &[],
         supported_platforms: &[],
     },
     ModuleManifest {
@@ -153,6 +168,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Menu-bar (macOS) and system-tray (Windows/Linux) icons with dynamic images and menus.",
         required_modules: &[],
         required_permissions: &["tray.create"],
+        workspace_permissions: &[],
         supported_platforms: &["macos", "windows", "linux"],
     },
     ModuleManifest {
@@ -161,6 +177,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "OS-global cursor position and primary display size for extensions that track input.",
         required_modules: &[],
         required_permissions: &["cursor.global_position"],
+        workspace_permissions: &[],
         supported_platforms: &["macos", "windows", "linux"],
     },
     ModuleManifest {
@@ -169,7 +186,36 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         description: "Single always-on-top transparent HUD window for overlays (pointer pass-through v1).",
         required_modules: &[],
         required_permissions: &["overlay.hud"],
+        workspace_permissions: &[],
         supported_platforms: &["macos", "windows", "linux"],
+    },
+    ModuleManifest {
+        name: WORKSPACE_MODULE_NAME,
+        version: "0.1.0",
+        description: "Workspace directory registry with scoped file and execution permissions.",
+        required_modules: &[],
+        required_permissions: &[],
+        workspace_permissions: &[
+            WorkspacePermissionDef {
+                id: "workspace.read",
+                title: "File read",
+                description: "Read files within this workspace.",
+                default_granted: true,
+            },
+            WorkspacePermissionDef {
+                id: "workspace.write",
+                title: "File write",
+                description: "Create, modify, and delete files.",
+                default_granted: false,
+            },
+            WorkspacePermissionDef {
+                id: "workspace.execute",
+                title: "Command execution",
+                description: "Run commands scoped to this workspace.",
+                default_granted: false,
+            },
+        ],
+        supported_platforms: &[],
     },
 ];
 

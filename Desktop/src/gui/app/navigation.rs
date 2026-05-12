@@ -311,6 +311,12 @@ impl ArcadiaRoot {
                 .p_6()
                 .child(self.shortcuts_panel(window, cx, is_dark));
         }
+        if self.active_page_id.as_str() == "global.workspaces" {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.workspace_panel(window, cx, is_dark));
+        }
         if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
             return div()
                 .w_full()

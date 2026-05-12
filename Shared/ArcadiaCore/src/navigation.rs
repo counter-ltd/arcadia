@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::modules::{
     LAN_MODULE_NAME, LATE_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
+    WORKSPACE_MODULE_NAME,
 };
 use crate::modules::python_registry;
 use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
@@ -258,6 +259,15 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         required_module: None,
     },
     NavigationPageDefinition {
+        id: "global.workspaces",
+        title: "Workspaces",
+        description: "Register project directories and grant scoped file and execution permissions.",
+        glyph: "folder",
+        system_image: "folder",
+        accent: "emerald",
+        required_module: Some(WORKSPACE_MODULE_NAME),
+    },
+    NavigationPageDefinition {
         id: "network.nodes",
         title: "Nodes",
         description: "Discover LAN peers and manage pairing with lan.scan / lan.node.",
@@ -342,6 +352,7 @@ pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
     "global.permissions",
     "global.shortcuts",
     "global.appearance",
+    "global.workspaces",
     "late.settings",
 ];
 pub const DEFAULT_GROUP_ID: &str = "utilities";

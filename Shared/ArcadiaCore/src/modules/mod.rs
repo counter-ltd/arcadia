@@ -15,11 +15,12 @@ pub mod shell;
 pub mod shell_motd;
 pub mod surface;
 pub mod tray;
+pub mod workspace;
 
 use crate::config::modules::{
     supports_runtime_platform, ModulesConfig, CURSOR_MODULE_NAME, LAN_MODULE_NAME, NET_MODULE_NAME,
     OVERLAY_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME,
-    TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME,
+    TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use crate::config::permissions::{self as perm_cfg, PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
@@ -56,6 +57,7 @@ fn module_commands(module_key: &str) -> Option<&'static [ModuleCommand]> {
         surface::NAME => Some(surface::commands()),
         TRAY_MODULE_NAME => Some(tray::commands()),
         OVERLAY_MODULE_NAME => Some(overlay::commands()),
+        WORKSPACE_MODULE_NAME => Some(workspace::commands()),
         _ => None,
     }
 }

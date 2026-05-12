@@ -6,6 +6,7 @@ pub mod modules;
 pub mod permissions;
 pub mod shortcuts;
 pub mod thin_client;
+pub mod workspace;
 
 use std::env;
 use std::fs;

@@ -20,6 +20,7 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "music" => "icons/music.svg",
         "flask" => "icons/flask.svg",
         "coffee" => "icons/coffee.svg",
+        "folder" => "icons/folder.svg",
         _ => "icons/terminal.svg",
     }
 }

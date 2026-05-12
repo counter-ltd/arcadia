@@ -8,9 +8,10 @@ Runtime config root: `~/Arcadia/Configuration/` on Desktop. On iOS, `arcadia_ios
 |------|--------|---------|
 | `modules.toml` | `ModulesConfig` | Per-module on/off state |
 | `commandline.toml` | `CommandlineConfig` | CLI preferences (scaffold) |
-| `thin-client.toml` | `ThinClientConfig` | `preferred_remote_route`, `surface_client_id` |
+| `thin-client.toml` | `ThinClientConfig` | `preferred_remote_route`, `surface_client_id`, `navigation_from_host_only` |
 | `appearance.toml` | `AppearanceConfig` | Theme tokens |
 | `late.toml` | `LateConfig` | Late module state |
+| `workspace.toml` | `WorkspacesConfig` | Registered workspace directories and their per-workspace permission grants |
 
 Config migrations live in `ModulesConfig::merge_defaults()`. When renaming a module, add a migration entry there — do not do ad-hoc renames at call sites.
 
