@@ -404,7 +404,14 @@ fn build_extension_token_settings_page_owned(module_id: &str) -> NavigationPageO
         id: extension_token_settings_page_id(module_id),
         title,
         description,
-        glyph: "extensions".to_string(),
+        glyph: {
+            let icon_path = python_registry::resolve_extension_asset_path(module_id, "icon.svg");
+            if icon_path.map(|p| p.exists()).unwrap_or(false) {
+                format!("extension-icon/{module_id}")
+            } else {
+                "extensions".to_string()
+            }
+        },
         system_image: "slider.horizontal.3".to_string(),
         accent: extension_token_settings_page_accent(module_id).to_string(),
         required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),

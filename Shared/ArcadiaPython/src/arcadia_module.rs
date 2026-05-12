@@ -601,7 +601,7 @@ fn overlay_display_size(extension_id: String) -> PyResult<Option<(u32, u32)>> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (extension_id, rgba, width, height, pad_right=None, pad_bottom=None))]
+#[pyo3(signature = (extension_id, rgba, width, height, pad_right=None, pad_bottom=None, display_width=None, display_height=None))]
 fn overlay_hud_set_sprite(
     extension_id: String,
     rgba: &Bound<'_, PyBytes>,
@@ -609,6 +609,8 @@ fn overlay_hud_set_sprite(
     height: u32,
     pad_right: Option<f32>,
     pad_bottom: Option<f32>,
+    display_width: Option<f32>,
+    display_height: Option<f32>,
 ) -> PyResult<()> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
     let payload = overlay_hud_sprite::OverlayHudSpritePayload {
@@ -617,6 +619,8 @@ fn overlay_hud_set_sprite(
         height,
         pad_right: pad_right.unwrap_or(24.),
         pad_bottom: pad_bottom.unwrap_or(24.),
+        display_width,
+        display_height,
     };
     overlay_hud_sprite::set_sprite(payload).map_err(|e| {
         PyErr::new::<pyo3::exceptions::PyValueError, _>(e)

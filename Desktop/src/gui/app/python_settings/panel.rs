@@ -9,7 +9,7 @@ use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
+use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
     pub fn python_settings_panel(
@@ -191,6 +191,17 @@ impl ArcadiaRoot {
             .child(
                 div()
                     .flex()
+                    .items_start()
+                    .gap_3()
+                    .child(
+                        render_icon(&format!("extension-icon/{name}"))
+                            .size_8()
+                            .flex_shrink_0()
+                            .text_color(p.content_title),
+                    )
+                    .child(
+                div()
+                    .flex()
                     .flex_col()
                     .gap_2()
                     .child(
@@ -239,6 +250,7 @@ impl ArcadiaRoot {
                                 .child("Platform Not Supported"),
                         )
                     }),
+                    )
             )
             .child(
                 div()

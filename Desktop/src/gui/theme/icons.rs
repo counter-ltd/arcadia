@@ -25,5 +25,9 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
 }
 
 pub fn render_icon(glyph_key: &str) -> Svg {
-    svg().path(icon_path(glyph_key))
+    if glyph_key.starts_with("extension-icon/") {
+        svg().path(openframe::SharedString::from(glyph_key.to_string()))
+    } else {
+        svg().path(icon_path(glyph_key))
+    }
 }

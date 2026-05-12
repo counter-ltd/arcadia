@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use arcadia_core::modules::python_registry;
 use openframe::{AssetSource, Result, SharedString};
 
 pub struct EmbeddedAssets;
@@ -70,6 +71,16 @@ impl AssetSource for EmbeddedAssets {
             "icons/app-icon-tui.svg" => Ok(Some(Cow::Borrowed(include_bytes!(
                 "../../assets/icons/app-icon-tui.svg"
             )))),
+            path if path.starts_with("extension-icon/") => {
+                let ext_id = &path["extension-icon/".len()..];
+                match python_registry::resolve_extension_asset_path(ext_id, "icon.svg") {
+                    Ok(p) => match std::fs::read(&p) {
+                        Ok(bytes) => Ok(Some(Cow::Owned(bytes))),
+                        Err(_) => Ok(None),
+                    },
+                    Err(_) => Ok(None),
+                }
+            }
             _ => Ok(None),
         }
     }

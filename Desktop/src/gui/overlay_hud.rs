@@ -17,6 +17,8 @@ pub struct OverlayHudRoot {
     sprite: Option<Arc<RenderImage>>,
     pad_right: f32,
     pad_bottom: f32,
+    display_width: Option<f32>,
+    display_height: Option<f32>,
 }
 
 impl OverlayHudRoot {
@@ -26,6 +28,8 @@ impl OverlayHudRoot {
             sprite: None,
             pad_right: 24.,
             pad_bottom: 24.,
+            display_width: None,
+            display_height: None,
         }
     }
 
@@ -39,6 +43,8 @@ impl OverlayHudRoot {
             Some(p) => {
                 self.pad_right = p.pad_right;
                 self.pad_bottom = p.pad_bottom;
+                self.display_width = p.display_width;
+                self.display_height = p.display_height;
                 self.sprite = render_image_from_rgba(p.rgba, p.width, p.height);
             }
             None => {
@@ -63,6 +69,8 @@ impl Render for OverlayHudRoot {
 
         let pad_r = self.pad_right;
         let pad_b = self.pad_bottom;
+        let display_width = self.display_width;
+        let display_height = self.display_height;
         let inner = if let Some(sprite) = self.sprite.clone() {
             let (iw, ih) = {
                 let s = sprite.size(0);
@@ -70,8 +78,8 @@ impl Render for OverlayHudRoot {
             };
             div().flex_none().child(
                 img(sprite)
-                    .w(px(iw))
-                    .h(px(ih)),
+                    .w(px(display_width.unwrap_or(iw)))
+                    .h(px(display_height.unwrap_or(ih))),
             )
         } else {
             div().flex_none()

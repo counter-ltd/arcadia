@@ -11,6 +11,8 @@ pub struct OverlayHudSpritePayload {
     pub height: u32,
     pub pad_right: f32,
     pub pad_bottom: f32,
+    pub display_width: Option<f32>,
+    pub display_height: Option<f32>,
 }
 
 struct Inner {
