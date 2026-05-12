@@ -38,6 +38,7 @@ const LEGACY_TERMINAL_MOTD_MODULE_NAME: &str = "shell-motd";
 /// silently resetting the extension to disabled.
 const LEGACY_TERMINAL_THEME_EXTENSION_IDS: &[&str] = &["tui-style", "shell-theme", "flux-theme"];
 const TERMINAL_THEME_EXTENSION_ID: &str = "terminal-theme";
+pub const ANIMATION_MODULE_NAME: &str = "animation";
 pub const LAN_MODULE_NAME: &str = "lan";
 pub const LATE_MODULE_NAME: &str = "late";
 pub const NET_MODULE_NAME: &str = "net";
@@ -66,6 +67,14 @@ pub struct ModuleManifest {
 
 // Single source of truth for modules and their metadata.
 pub static MODULE_REGISTRY: &[ModuleManifest] = &[
+    ModuleManifest {
+        name: ANIMATION_MODULE_NAME,
+        version: "0.1.0",
+        description: "Shared tween engine for modules and extensions. One 16 ms driver loop services all running animations.",
+        required_modules: &[],
+        required_permissions: &[],
+        supported_platforms: &[],
+    },
     ModuleManifest {
         name: LAN_MODULE_NAME,
         version: "1.0.0",
@@ -196,7 +205,8 @@ impl Default for ModulesConfig {
             .iter()
             .map(|manifest| {
                 let enabled = manifest.name == SURFACE_MODULE_NAME
-                    || manifest.name == PERMISSIONS_MODULE_NAME;
+                    || manifest.name == PERMISSIONS_MODULE_NAME
+                    || manifest.name == ANIMATION_MODULE_NAME;
                 (manifest.name.to_string(), enabled)
             })
             .collect();

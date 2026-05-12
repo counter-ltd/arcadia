@@ -1,3 +1,4 @@
+pub mod animation;
 pub mod cursor;
 pub mod lan;
 pub mod late;
@@ -17,8 +18,8 @@ pub mod tray;
 
 use crate::config::modules::{
     supports_runtime_platform, ModulesConfig, CURSOR_MODULE_NAME, LAN_MODULE_NAME, NET_MODULE_NAME,
-    OVERLAY_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME,
-    TRAY_MODULE_NAME,
+    OVERLAY_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME,
+    TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME,
 };
 use crate::config::permissions::{self as perm_cfg, PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
@@ -42,6 +43,7 @@ pub struct ModuleCommand {
 
 fn module_commands(module_key: &str) -> Option<&'static [ModuleCommand]> {
     match module_key {
+        animation::NAME => Some(animation::commands()),
         TERMINAL_MODULE_NAME | shell::NAME => Some(shell::commands()),
         TERMINAL_MOTD_MODULE_NAME | shell_motd::NAME => Some(shell_motd::commands()),
         CURSOR_MODULE_NAME => Some(cursor::commands()),
@@ -332,6 +334,7 @@ pub fn all_command_entries() -> Vec<(String, String)> {
 
 pub fn load_all() {
     let _known_modules = [
+        animation::NAME,
         cursor::NAME,
         lan::NAME,
         late::NAME,

@@ -2,7 +2,7 @@ use super::python_registry;
 use crate::config::modules::{ModulesConfig, OVERLAY_MODULE_NAME};
 use crate::config::permissions::{PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
-use crate::modules::{tray, ExecutionContext, ModuleCommand};
+use crate::modules::{animation, tray, ExecutionContext, ModuleCommand};
 
 pub const NAME: &str = "python-host";
 
@@ -155,10 +155,11 @@ fn extension_disable(args: &[&str], _context: &ExecutionContext) -> String {
     }
     python_registry::set_extension_enabled(name, false);
 
-    // Tear down handlers, tokens, styles, shortcuts, and tray icons owned by this extension
-    // so disabling has an immediate visible effect instead of waiting for the next restart.
+    // Tear down handlers, tokens, styles, shortcuts, tray icons, and animation tweens owned
+    // by this extension so disabling has an immediate visible effect.
     python_registry::unregister_extension_contributions(name);
     let _ = tray::remove_items_for_owner(&format!("python:{name}"));
+    animation::cancel_all_for_extension(name);
 
     format!("Extension '{name}' disabled.")
 }
