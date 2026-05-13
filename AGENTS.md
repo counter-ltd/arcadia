@@ -26,6 +26,7 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 | `Desktop/src/gui/app/workspace_create_modal.rs` | Create-workspace modal | Label + path fields; calls `workspace.add` on confirm |
 | `Desktop/src/gui/theme/icons.rs` | Icon path helper | `icon_path(glyph_key)` — all SVG lookups; never inline asset paths in views |
 | `Desktop/src/gui/theme/mod.rs` | Color + accent helpers | All color constants; never inline `rgb(0x...)` in views |
+| `Documentation/Features/*.md` | In-depth feature docs | Update the relevant file(s) when the feature's source changes — see doc maintenance rules in `CLAUDE.md` |
 | `Desktop/src/gui/tui/` | PTY/TUI terminal emulator | Desktop-feature only |
 | `Mobile/iOS/ArcadiaApp/ArcadiaApp.swift` | UIKit @main | Only: configure Metal layer, call `arcadia_ios_start` with config root |
 | `Mobile/iOS/ArcadiaApp/MetalHostView.swift` | `CAMetalLayer` host view | Only: forward `UITouch` via `arcadia_ios_inject_touch` |
@@ -51,6 +52,7 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 13. **Am I making an outbound HTTP call (Ollama, OpenAI, any provider)?** → Use `ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build()`. Never call `ureq::post()` directly — no timeout means the UI can hang forever.
 14. **Is my file over 400 lines?** → Plan a split into submodules before the PR. Files over 600 lines are blocked. (Exception: generated or test files.)
 15. **Am I returning `None` or a fallback when a user-visible operation fails?** → Return `Err(String)` with a specific message instead. The UI layer must show the error, not silently degrade.
+16. **Did I add, rename, or change a feature (module, page, command, type, config field)?** → Update the corresponding `Documentation/Features/*.md` file. The mapping is in `CLAUDE.md` under "Documentation Maintenance".
 
 ---
 
@@ -72,3 +74,4 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 - [ ] No `expect()` or `unwrap()` in production paths (outside `#[cfg(test)]`) — use `Result` / `Option` with user-visible error messages
 - [ ] No file in `Shared/ArcadiaCore/src/modules/` or `Desktop/src/gui/app/` exceeds 600 lines without a documented split plan
 - [ ] New AI provider routes do not carry credentials in `ProviderRouting` — the inference thread loads config directly
+- [ ] `Documentation/Features/*.md` updated for any changed module, page, command, config field, or type (see mapping in `CLAUDE.md` § Documentation Maintenance)

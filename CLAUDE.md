@@ -83,7 +83,47 @@ Configuration/  (runtime root: $HOME/Arcadia/Configuration on Desktop, app Docum
   appearance.toml     theme tokens
   late.toml           late module state
   workspace.toml      registered workspace directories + per-workspace permission grants
+
+Documentation/Features/   in-depth feature docs — keep in sync with code changes
+  README.md           index table
+  AI.md               AI providers, tools, sandbox, allowlist
+  Appearance.md       token system, accent palettes, extension style tokens
+  CodeEditor.md       syntax highlight + decoration providers
+  Extensions.md       Python host lifecycle, style tokens, overlay companion
+  LAN_and_Remote.md   UDP protocol, routing, surface snapshot/patch, thin client
+  Late.md             domain types, LateState, GUI panels
+  Modules.md          full module table, manifest fields, dep enforcement, migrations
+  Navigation.md       all pages/groups, special lists, visibility rule
+  Overlay_and_Cursor.md  stacking tokens, cursor backend
+  Permissions.md      subject model, grants, global vs workspace permissions
+  Services.md         ServiceDefinition, controls, port collision
+  Shortcuts.md        trigger types, overrides, custom, OS-global consent
+  Terminal.md         PTY vs shell.execute, mirror mode, platform matrix
+  Workspaces.md       entry schema, commands, AI context, scope check
 ```
+
+---
+
+## Documentation Maintenance
+
+`Documentation/Features/` contains in-depth feature docs derived from the source. **Update the relevant file(s) whenever you:**
+
+- Add, rename, or remove a module — update `Modules.md` module table.
+- Add or change a navigation page or group — update `Navigation.md`.
+- Add a new AI provider or change the sandbox/allowlist — update `AI.md`.
+- Change workspace permission model or commands — update `Workspaces.md`.
+- Change LAN protocol, surface snapshot schema, or thin-client config — update `LAN_and_Remote.md`.
+- Add or change extension capabilities (style tokens, overlay, highlight) — update `Extensions.md`.
+- Change Late.sh domain types or state shape — update `Late.md`.
+- Change shortcut types, actions, or OS-global flow — update `Shortcuts.md`.
+- Add a service to `SERVICE_DEFINITIONS` — update `Services.md`.
+- Change overlay stacking tokens or cursor backend — update `Overlay_and_Cursor.md`.
+- Change appearance config or accent palettes — update `Appearance.md`.
+- Change permissions model or subject types — update `Permissions.md`.
+- Change terminal PTY or shell execution — update `Terminal.md`.
+- Change code editor extension APIs — update `CodeEditor.md`.
+
+The docs are written from the source. If source and doc disagree, **the source is authoritative** — fix the doc.
 
 ---
 
