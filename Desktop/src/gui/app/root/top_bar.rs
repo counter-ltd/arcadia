@@ -1,5 +1,6 @@
 use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 use openframe::prelude::FluentBuilder as _;
+use arcadia_core::config::ConfigFile as _;
 
 use arcadia_core::modules;
 
@@ -56,6 +57,82 @@ impl ArcadiaRoot {
                                     .text_color(title_color)
                                     .child(active_page_title),
                             )
+                            .child({
+                                if self.active_page_id.as_str() == "ai.chat" {
+                                    let label = self.ai_chat_model_id
+                                        .as_deref()
+                                        .and_then(|id| {
+                                            self.llama_cpp_models
+                                                .iter()
+                                                .find(|m| m.id == id)
+                                                .map(|m| m.name.clone())
+                                        })
+                                        .unwrap_or_else(|| "No Model".to_string());
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded(px(radius))
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .bg(action_pill_bg)
+                                        .text_color(action_pill_tc)
+                                        .hover(move |style| style.bg(action_pill_hover))
+                                        .child(label)
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
+                                                this.ai_chat_model_picker_open = !this.ai_chat_model_picker_open;
+                                                #[cfg(feature = "gui")]
+                                                { this.context_menu_position = event.position; }
+                                                #[cfg(not(feature = "gui"))]
+                                                let _ = event;
+                                                cx.stop_propagation();
+                                                cx.notify();
+                                            }),
+                                        )
+                                } else {
+                                    div()
+                                }
+                            })
+                            .child({
+                                if self.active_page_id.as_str() == "ai.chat"
+                                    && self.is_module_enabled(arcadia_core::config::modules::WORKSPACE_MODULE_NAME)
+                                {
+                                    let ws_label = self.ai_chat_workspace_id
+                                        .as_deref()
+                                        .and_then(|id| {
+                                            arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok()
+                                                .and_then(|cfg| cfg.workspaces.into_iter().find(|w| w.id == id))
+                                                .map(|w| w.label)
+                                        })
+                                        .unwrap_or_else(|| "No Workspace".to_string());
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded(px(radius))
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .bg(action_pill_bg)
+                                        .text_color(action_pill_tc)
+                                        .hover(move |style| style.bg(action_pill_hover))
+                                        .child(ws_label)
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
+                                                this.ai_chat_workspace_picker_open = !this.ai_chat_workspace_picker_open;
+                                                this.ai_chat_model_picker_open = false;
+                                                #[cfg(feature = "gui")]
+                                                { this.context_menu_position = event.position; }
+                                                #[cfg(not(feature = "gui"))]
+                                                let _ = event;
+                                                cx.stop_propagation();
+                                                cx.notify();
+                                            }),
+                                        )
+                                } else {
+                                    div()
+                                }
+                            })
                             .child({
                                 if self.active_page_id.as_str() == "python.settings" {
                                     div()
@@ -131,6 +208,247 @@ impl ArcadiaRoot {
                                     }))
                             } else {
                                 div()
+                            })
+                            .child({
+                                #[cfg(feature = "gui")]
+                                {
+                                    if self.active_page_id.as_str() == "editor.main"
+                                        && !self.code_editor_tabs.is_empty()
+                                    {
+                                        let active_idx = self.active_code_editor_tab
+                                            .min(self.code_editor_tabs.len().saturating_sub(1));
+                                        let ws_label = self.code_editor_tabs
+                                            .get(active_idx)
+                                            .and_then(|t| t.workspace_path.as_deref())
+                                            .map(|p| {
+                                                arcadia_core::config::workspace::list_workspaces()
+                                                    .into_iter()
+                                                    .find(|w| w.path == p)
+                                                    .map(|w| if w.label.is_empty() {
+                                                        p.rsplit('/').next().unwrap_or(p).to_string()
+                                                    } else {
+                                                        w.label.clone()
+                                                    })
+                                                    .unwrap_or_else(|| {
+                                                        p.rsplit('/').next().unwrap_or(p).to_string()
+                                                    })
+                                            });
+                                        let has_file = self.code_editor_tabs
+                                            .get(active_idx)
+                                            .map(|t| t.file_path.is_some())
+                                            .unwrap_or(false);
+                                        let is_dirty = self.code_editor_tabs
+                                            .get(active_idx)
+                                            .map(|t| t.file_path.is_some() && t.content != t.saved_content)
+                                            .unwrap_or(false);
+                                        let has_explorer = self.code_editor_tabs
+                                            .get(active_idx)
+                                            .and_then(|t| t.workspace_path.as_deref())
+                                            .map(|p| arcadia_core::config::workspace::any_workspace_grants(p, "workspace.read"))
+                                            .unwrap_or(false);
+                                        let make_pill = |label: &'static str| {
+                                            div()
+                                                .px_2()
+                                                .py_0p5()
+                                                .rounded(px(radius))
+                                                .cursor_pointer()
+                                                .text_xs()
+                                                .bg(action_pill_bg)
+                                                .text_color(action_pill_tc)
+                                                .hover(move |style| style.bg(action_pill_hover))
+                                                .child(label)
+                                        };
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .gap_1()
+                                            // Workspace picker
+                                            .child(
+                                                div()
+                                                    .px_2()
+                                                    .py_0p5()
+                                                    .rounded(px(radius))
+                                                    .cursor_pointer()
+                                                    .text_xs()
+                                                    .bg(action_pill_bg)
+                                                    .text_color(action_pill_tc)
+                                                    .hover(move |style| style.bg(action_pill_hover))
+                                                    .child(ws_label.unwrap_or_else(|| "Open Workspace".to_string()))
+                                                    .on_mouse_down(
+                                                        openframe::MouseButton::Left,
+                                                        cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
+                                                            this.code_editor_workspace_picker_open =
+                                                                !this.code_editor_workspace_picker_open;
+                                                            this.context_menu_position = event.position;
+                                                            cx.stop_propagation();
+                                                            cx.notify();
+                                                        }),
+                                                    )
+                                            )
+                                            // Explorer (workspace.read required)
+                                            .when(has_explorer, |row| {
+                                                row.child(
+                                                    make_pill("Explorer")
+                                                        .on_mouse_down(
+                                                            openframe::MouseButton::Left,
+                                                            cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
+                                                                this.code_editor_explorer_open =
+                                                                    !this.code_editor_explorer_open;
+                                                                this.context_menu_position = event.position;
+                                                                cx.stop_propagation();
+                                                                cx.notify();
+                                                            }),
+                                                        )
+                                                )
+                                            })
+                                            // Open
+                                            .child(
+                                                make_pill("Open")
+                                                    .on_mouse_down(
+                                                        openframe::MouseButton::Left,
+                                                        cx.listener(|_this, _, window, cx| {
+                                                            let receiver = cx.prompt_for_paths(openframe::PathPromptOptions {
+                                                                files: true,
+                                                                directories: false,
+                                                                multiple: false,
+                                                                prompt: None,
+                                                            });
+                                                            cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                                                                let mut cx = cx.clone();
+                                                                async move {
+                                                                    if let Ok(Ok(Some(paths))) = receiver.await {
+                                                                        if let Some(path) = paths.into_iter().next() {
+                                                                            if let Ok(text) = std::fs::read_to_string(&path) {
+                                                                                let path_str = path.to_string_lossy().to_string();
+                                                                                let title = path
+                                                                                    .file_name()
+                                                                                    .map(|n| n.to_string_lossy().to_string())
+                                                                                    .unwrap_or_else(|| path_str.clone());
+                                                                                let lang = crate::gui::app::code_editor_panel::detect_language(&title);
+                                                                                cx.update(|_, app| {
+                                                                                    this.update(app, |this, cx| {
+                                                                                        let idx = this.active_code_editor_tab
+                                                                                            .min(this.code_editor_tabs.len().saturating_sub(1));
+                                                                                        if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                                            tab.saved_content = text.clone();
+                                                                                            tab.content = text;
+                                                                                            tab.file_path = Some(path_str);
+                                                                                            tab.title = title;
+                                                                                            tab.language = lang;
+                                                                                            tab.cursor = 0;
+                                                                                            tab.selection_anchor = None;
+                                                                                            tab.highlight_dirty = true;
+                                                                                        }
+                                                                                        cx.notify();
+                                                                                    }).ok();
+                                                                                }).ok();
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }).detach();
+                                                        }),
+                                                    )
+                                            )
+                                            // Save (only when a file is open)
+                                            .when(has_file, |row| {
+                                                row.child(
+                                                    make_pill("Save")
+                                                        .on_mouse_down(
+                                                            openframe::MouseButton::Left,
+                                                            cx.listener(|this, _, _, cx| {
+                                                                let idx = this.active_code_editor_tab
+                                                                    .min(this.code_editor_tabs.len().saturating_sub(1));
+                                                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                    if let Some(path) = tab.file_path.clone() {
+                                                                        let _ = std::fs::write(&path, &tab.content);
+                                                                        tab.saved_content = tab.content.clone();
+                                                                        cx.notify();
+                                                                    }
+                                                                }
+                                                            }),
+                                                        )
+                                                )
+                                            })
+                                            // Save As
+                                            .child(
+                                                make_pill("Save As")
+                                                    .on_mouse_down(
+                                                        openframe::MouseButton::Left,
+                                                        cx.listener(|this, _, window, cx| {
+                                                            let idx = this.active_code_editor_tab
+                                                                .min(this.code_editor_tabs.len().saturating_sub(1));
+                                                            let (content, suggested) = this.code_editor_tabs
+                                                                .get(idx)
+                                                                .map(|t| (t.content.clone(), t.title.clone()))
+                                                                .unwrap_or_default();
+                                                            let init_dir = this.code_editor_tabs
+                                                                .get(idx)
+                                                                .and_then(|t| t.file_path.as_deref())
+                                                                .and_then(|p| std::path::Path::new(p).parent())
+                                                                .map(|p| p.to_path_buf())
+                                                                .unwrap_or_default();
+                                                            let receiver = cx.prompt_for_new_path(
+                                                                &init_dir,
+                                                                if suggested.is_empty() { None } else { Some(suggested.as_str()) },
+                                                            );
+                                                            cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                                                                let mut cx = cx.clone();
+                                                                async move {
+                                                                    if let Ok(Ok(Some(path))) = receiver.await {
+                                                                        let _ = std::fs::write(&path, &content);
+                                                                        let path_str = path.to_string_lossy().to_string();
+                                                                        let title = path
+                                                                            .file_name()
+                                                                            .map(|n| n.to_string_lossy().to_string())
+                                                                            .unwrap_or_else(|| path_str.clone());
+                                                                        let lang = crate::gui::app::code_editor_panel::detect_language(&title);
+                                                                        cx.update(|_, app| {
+                                                                            this.update(app, |this, cx| {
+                                                                                let idx = this.active_code_editor_tab
+                                                                                    .min(this.code_editor_tabs.len().saturating_sub(1));
+                                                                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                                    tab.file_path = Some(path_str);
+                                                                                    tab.title = title;
+                                                                                    tab.saved_content = tab.content.clone();
+                                                                                    tab.language = lang;
+                                                                                    tab.highlight_dirty = true;
+                                                                                }
+                                                                                cx.notify();
+                                                                            }).ok();
+                                                                        }).ok();
+                                                                    }
+                                                                }
+                                                            }).detach();
+                                                        }),
+                                                    )
+                                            )
+                                            // Restore (only when file open and dirty)
+                                            .when(is_dirty, |row| {
+                                                row.child(
+                                                    make_pill("Restore")
+                                                        .on_mouse_down(
+                                                            openframe::MouseButton::Left,
+                                                            cx.listener(|this, _, _, cx| {
+                                                                let idx = this.active_code_editor_tab
+                                                                    .min(this.code_editor_tabs.len().saturating_sub(1));
+                                                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                    tab.content = tab.saved_content.clone();
+                                                                    tab.cursor = 0;
+                                                                    tab.selection_anchor = None;
+                                                                    tab.highlight_dirty = true;
+                                                                    cx.notify();
+                                                                }
+                                                            }),
+                                                        )
+                                                )
+                                            })
+                                    } else {
+                                        div().flex().flex_row()
+                                    }
+                                }
+                                #[cfg(not(feature = "gui"))]
+                                { div().flex().flex_row() }
                             })
                             .child({
                                 #[cfg(feature = "gui")]

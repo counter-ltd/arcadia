@@ -2,16 +2,18 @@ use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use openframe::{
-    div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    Window, div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, Styled,
 };
 
+use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
 impl ArcadiaRoot {
     pub(crate) fn late_settings_panel(
         &self,
+        window: &Window,
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
@@ -88,50 +90,65 @@ impl ArcadiaRoot {
                             )
                             .child({
                                 let url_val = server_url.clone();
-                                div()
-                                    .id("late-settings-url")
-                                    .px_3()
-                                    .py_2()
-                                    .rounded(px(settings_radius))
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(input_border)
-                                    .text_sm()
-                                    .text_color(text_c)
-                                    .track_focus(&self.late_settings_server_url_focus)
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(|this, _, window, _| {
-                                            this.late_settings_server_url_focus.focus(window);
-                                        }),
-                                    )
-                                    .child(if url_val.is_empty() {
-                                        div()
-                                            .text_color(subtext_c)
-                                            .child("https://late.sh")
-                                    } else {
-                                        div().child(url_val)
-                                    })
-                                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                                        let key = event.keystroke.key.as_str();
-                                        let mods = event.keystroke.modifiers;
-                                        if key == "backspace" {
-                                            this.late_settings_server_url.pop();
-                                            cx.notify();
-                                        } else if key == "space" {
-                                            this.late_settings_server_url.push(' ');
-                                            cx.notify();
-                                        } else if !mods.control
-                                            && !mods.alt
-                                            && !mods.platform
-                                            && !mods.function
-                                        {
-                                            if let Some(ch) = &event.keystroke.key_char {
-                                                this.late_settings_server_url.push_str(ch);
-                                                cx.notify();
+                                {
+                                    let url_focused =
+                                        self.late_settings_server_url_focus.is_focused(window);
+                                    let blink = self.text_caret_blink_visible;
+                                    div()
+                                        .id("late-settings-url")
+                                        .px_3()
+                                        .py_2()
+                                        .rounded(px(settings_radius))
+                                        .bg(input_bg)
+                                        .border_1()
+                                        .border_color(input_border)
+                                        .text_sm()
+                                        .text_color(text_c)
+                                        .track_focus(&self.late_settings_server_url_focus)
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(|this, _, window, _| {
+                                                this.late_settings_server_url_focus.focus(window);
+                                            }),
+                                        )
+                                        .child(if url_val.is_empty() {
+                                            if url_focused && blink {
+                                                div()
+                                                    .text_color(text_c)
+                                                    .child(TEXT_INPUT_CARET_CHAR.to_string())
+                                            } else {
+                                                div()
+                                                    .text_color(subtext_c)
+                                                    .child("https://late.sh")
                                             }
-                                        }
-                                    }))
+                                        } else {
+                                            div().child(text_with_trailing_caret(
+                                                url_val.as_str(),
+                                                url_focused,
+                                                blink,
+                                            ))
+                                        })
+                                        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                                            let key = event.keystroke.key.as_str();
+                                            let mods = event.keystroke.modifiers;
+                                            if key == "backspace" {
+                                                this.late_settings_server_url.pop();
+                                                cx.notify();
+                                            } else if key == "space" {
+                                                this.late_settings_server_url.push(' ');
+                                                cx.notify();
+                                            } else if !mods.control
+                                                && !mods.alt
+                                                && !mods.platform
+                                                && !mods.function
+                                            {
+                                                if let Some(ch) = &event.keystroke.key_char {
+                                                    this.late_settings_server_url.push_str(ch);
+                                                    cx.notify();
+                                                }
+                                            }
+                                        }))
+                                }
                             }),
                     )
                     // Username
@@ -149,6 +166,9 @@ impl ArcadiaRoot {
                             )
                             .child({
                                 let uname_val = username.clone();
+                                let uname_focused =
+                                    self.late_settings_username_focus.is_focused(window);
+                                let blink = self.text_caret_blink_visible;
                                 div()
                                     .id("late-settings-username")
                                     .px_3()
@@ -167,11 +187,21 @@ impl ArcadiaRoot {
                                         }),
                                     )
                                     .child(if uname_val.is_empty() {
-                                        div()
-                                            .text_color(subtext_c)
-                                            .child("your-username")
+                                        if uname_focused && blink {
+                                            div()
+                                                .text_color(text_c)
+                                                .child(TEXT_INPUT_CARET_CHAR.to_string())
+                                        } else {
+                                            div()
+                                                .text_color(subtext_c)
+                                                .child("your-username")
+                                        }
                                     } else {
-                                        div().child(uname_val)
+                                        div().child(text_with_trailing_caret(
+                                            uname_val.as_str(),
+                                            uname_focused,
+                                            blink,
+                                        ))
                                     })
                                     .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                                         let key = event.keystroke.key.as_str();
@@ -210,6 +240,9 @@ impl ArcadiaRoot {
                             )
                             .child({
                                 let room_val = default_room.clone();
+                                let room_focused =
+                                    self.late_settings_default_room_focus.is_focused(window);
+                                let blink = self.text_caret_blink_visible;
                                 div()
                                     .id("late-settings-room")
                                     .px_3()
@@ -228,11 +261,19 @@ impl ArcadiaRoot {
                                         }),
                                     )
                                     .child(if room_val.is_empty() {
-                                        div()
-                                            .text_color(subtext_c)
-                                            .child("1")
+                                        if room_focused && blink {
+                                            div()
+                                                .text_color(text_c)
+                                                .child(TEXT_INPUT_CARET_CHAR.to_string())
+                                        } else {
+                                            div().text_color(subtext_c).child("1")
+                                        }
                                     } else {
-                                        div().child(room_val)
+                                        div().child(text_with_trailing_caret(
+                                            room_val.as_str(),
+                                            room_focused,
+                                            blink,
+                                        ))
                                     })
                                     .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                                         let key = event.keystroke.key.as_str();

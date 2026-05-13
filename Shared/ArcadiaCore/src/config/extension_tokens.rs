@@ -64,9 +64,12 @@ pub fn load_module_tokens(module: &str) -> io::Result<HashMap<String, Value>> {
     if path.exists() {
         return load_tokens_file(&path);
     }
-    // Legacy token files before `shell-theme` (`flux-theme`, `terminal-theme`).
-    if module == "shell-theme" {
-        for legacy in ["flux-theme", "terminal-theme"] {
+    // Legacy token files from previous names of the same Python extension. The canonical
+    // name was `terminal-theme` → `flux-theme` → `shell-theme` → `terminal-theme` (back to
+    // the original to match the native `terminal` module). Read from any older name's
+    // token file when the new one doesn't exist yet.
+    if module == "terminal-theme" {
+        for legacy in ["shell-theme", "flux-theme", "tui-style"] {
             let p = tokens_file_for_module(legacy)?;
             if p.exists() {
                 return load_tokens_file(&p);
@@ -87,11 +90,7 @@ pub fn save_module_tokens(module: &str, tokens: &HashMap<String, Value>) -> io::
     fs::write(path, body)
 }
 
-pub fn merged_display_for_key(
-    key: &str,
-    default: &str,
-    file: &HashMap<String, Value>,
-) -> String {
+pub fn merged_display_for_key(key: &str, default: &str, file: &HashMap<String, Value>) -> String {
     if let Some(v) = file.get(key) {
         value_to_display_string(v)
     } else {
@@ -233,7 +232,11 @@ fn apply_glyph_token_key(g: &mut GlyphParams, key: &str, v: &Value) {
 ///
 /// Any `*_dark` / `*_light` token variants are mode-specific overrides applied after their
 /// base token (when present), so each color scheme can have independent values per key.
-pub fn apply_file_tokens_to_glyph(g: &mut GlyphParams, file: &HashMap<String, Value>, is_dark: bool) {
+pub fn apply_file_tokens_to_glyph(
+    g: &mut GlyphParams,
+    file: &HashMap<String, Value>,
+    is_dark: bool,
+) {
     for (k, v) in file {
         if k.ends_with("_dark") || k.ends_with("_light") {
             continue;

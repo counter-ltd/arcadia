@@ -3,7 +3,10 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use arcadia_core::config::ai::AiConfig;
+use arcadia_core::config::llama_cpp::LlamaCppConfig;
 use arcadia_core::config::appearance::AppearanceConfig;
+use arcadia_core::config::code_editor::CodeEditorConfig;
 use arcadia_core::config::extension_tokens;
 use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::modules::{
@@ -16,12 +19,14 @@ use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
-use arcadia_core::modules::python_registry::StyleInfo;
+use arcadia_core::modules::python_registry::{clamp_numeric_display_for_spec, StyleInfo, StyleTokenKind};
 #[cfg(feature = "gui")]
 use arcadia_core::modules::shell_motd;
-use arcadia_core::modules::surface::parse_surface_snapshot;
+use arcadia_core::modules::surface::{parse_surface_revision, parse_surface_snapshot};
 use arcadia_core::navigation;
 use openframe::{Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
+#[cfg(feature = "ios-gui")]
+use openframe::ScrollHandle;
 use crate::gui::theme::{
     ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
     ActiveGlyphUiFontFamily, GlyphBorderTypography, GlyphStyleConfig,
@@ -32,6 +37,41 @@ use super::super::tui;
 use super::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use super::{ShellMode, TerminalInstance};
+
+/// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
+/// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
+fn fetch_ollama_tags(
+    endpoint: &str,
+) -> Result<Vec<arcadia_core::config::ollama::OllamaModel>, String> {
+    use arcadia_core::config::ollama::{OllamaModel, OllamaModelKind};
+
+    const HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+    let url = format!("{}/api/tags", endpoint.trim_end_matches('/'));
+    let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+    let resp = agent
+        .get(&url)
+        .call()
+        .map_err(|e| format!("Ollama /api/tags request failed: {e}"))?;
+    let body: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| format!("Ollama /api/tags parse failed: {e}"))?;
+
+    let models = body["models"]
+        .as_array()
+        .ok_or_else(|| "unexpected Ollama /api/tags response shape".to_string())?
+        .iter()
+        .filter_map(|m| {
+            let name = m["name"].as_str()?;
+            Some(OllamaModel {
+                id: name.to_string(),
+                name: name.to_string(),
+                model_tag: name.to_string(),
+                model_kind: OllamaModelKind::TextGeneration,
+            })
+        })
+        .collect();
+    Ok(models)
+}
 
 #[cfg(feature = "gui")]
 impl TerminalInstance {
@@ -180,12 +220,42 @@ impl ArcadiaRoot {
     pub fn new(cx: &mut openframe::Context<Self>) -> Self {
         #[cfg(feature = "gui")]
         let shell_focus = cx.focus_handle();
+        #[cfg(feature = "ios-gui")]
+        let ios_shell_focus = cx.focus_handle();
         let late_compose_focus = cx.focus_handle();
         let late_settings_server_url_focus = cx.focus_handle();
         let late_settings_username_focus = cx.focus_handle();
         let late_settings_default_room_focus = cx.focus_handle();
         let extension_token_focus = cx.focus_handle();
+        let modules_search_focus = cx.focus_handle();
+        let extensions_search_focus = cx.focus_handle();
+        let permissions_search_focus = cx.focus_handle();
+        let shortcuts_search_focus = cx.focus_handle();
+        let shortcut_listen_focus = cx.focus_handle();
+        let shortcut_create_label_focus = cx.focus_handle();
+        let shortcut_create_token_focus = cx.focus_handle();
+        let shortcut_create_args_focus = cx.focus_handle();
+        let workspace_search_focus = cx.focus_handle();
+        let workspace_create_label_focus = cx.focus_handle();
+        let workspace_create_path_focus = cx.focus_handle();
+        let code_editor_focus = cx.focus_handle();
+        let code_editor_char_width_focus = cx.focus_handle();
+        let ai_input_focus = cx.focus_handle();
+        let llama_cpp_create_name_focus = cx.focus_handle();
+        let llama_cpp_create_path_focus = cx.focus_handle();
+        let llama_cpp_create_mmproj_focus = cx.focus_handle();
+        let openai_api_key_focus = cx.focus_handle();
+        let openai_base_url_focus = cx.focus_handle();
+        let ui_prefs_cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
+        let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
+        let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
+        let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
+        let ollama_cfg = arcadia_core::config::ollama::OllamaConfig::load_or_create().unwrap_or_default();
+        let openai_cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
+        let workspace_entries = arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
+            .map(|c| c.workspaces)
+            .unwrap_or_default();
         let module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
@@ -215,11 +285,89 @@ impl ArcadiaRoot {
             title: openframe::SharedString::new_static("Arcadia"),
             active_page_id: navigation::DEFAULT_PAGE_ID.to_string(),
             active_group_id: navigation::DEFAULT_GROUP_ID.to_string(),
+            modules_search_query: String::new(),
+            extensions_search_query: String::new(),
+            permissions_search_query: String::new(),
+            shortcuts_search_query: String::new(),
+            workspace_search_query: String::new(),
+            modules_search_focus,
+            extensions_search_focus,
+            permissions_search_focus,
+            shortcuts_search_focus,
+            workspace_search_focus,
+            shortcut_listening_id: None,
+            shortcut_listening_sequence: None,
+            shortcut_listen_focus,
+            shortcut_create_draft: None,
+            shortcut_draft_recording_chord: false,
+            shortcut_draft_recording_seq: false,
+            shortcut_create_label_focus,
+            shortcut_create_token_focus,
+            shortcut_create_args_focus,
+            code_editor_show_indentation_marks: code_editor_cfg.show_indentation_marks,
+            code_editor_char_width_override: code_editor_cfg.char_width_override,
+            code_editor_char_width_draft: code_editor_cfg
+                .char_width_override
+                .map(|v| format!("{:.2}", v))
+                .unwrap_or_default(),
+            code_editor_char_width_editing: false,
+            code_editor_tabs: vec![],
+            active_code_editor_tab: 0,
+            code_editor_next_id: 1,
+            code_editor_focus,
+            code_editor_char_width_focus,
+            code_editor_workspace_picker_open: false,
+            code_editor_explorer_open: false,
+            code_editor_explorer_expanded: std::collections::HashSet::new(),
+            code_editor_context_menu_open: false,
+            code_editor_show_dashboard: false,
+            code_editor_tab_menu: None,
+            code_editor_close_confirm: None,
+            code_editor_line_bounds: std::rc::Rc::new(std::cell::RefCell::new(vec![])),
+            code_editor_is_dragging: false,
+            ai_chats: vec![],
+            active_ai_chat_id: 0,
+            ai_next_id: 1,
+            ai_context_menu_open: false,
+            ai_chat_menu: None,
+            ai_input_focus,
+            ai_default_system_prompt: ai_cfg.default_system_prompt,
+            ai_chat_model_id: None,
+            ai_chat_model_picker_open: false,
+            ai_chat_workspace_id: None,
+            ai_chat_workspace_picker_open: false,
+            ai_runtime: None,
+            ai_stream_chat_id: None,
+            ai_poll_task_started: false,
+            active_ai_provider_module: String::new(),
+            llama_cpp_models: llama_cpp_cfg.models,
+            ollama_endpoint: ollama_cfg.endpoint,
+            ollama_models: ollama_cfg.models,
+            ollama_discovering: false,
+            openai_api_key: openai_cfg.api_key,
+            openai_base_url: openai_cfg.base_url,
+            openai_api_key_draft: None,
+            openai_base_url_draft: None,
+            openai_api_key_focus,
+            openai_base_url_focus,
+            openai_models: openai_cfg.models,
+            workspace_entries,
+            active_llama_cpp_model_id: None,
+            llama_cpp_provider_menu: None,
+            llama_cpp_create_draft: None,
+            llama_cpp_create_name_focus,
+            llama_cpp_create_path_focus,
+            llama_cpp_create_mmproj_focus,
+            workspace_create_draft: None,
+            workspace_create_label_focus,
+            workspace_create_path_focus,
             module_rows,
             python_extension_rows: Vec::new(),
             active_style,
             available_styles,
             pending_module_enable: None,
+            pending_permission_grant: None,
+            python_extension_action_error: None,
             #[cfg(feature = "gui")]
             terminals: vec![first_terminal],
             #[cfg(feature = "gui")]
@@ -237,10 +385,8 @@ impl ArcadiaRoot {
             #[cfg(feature = "gui")]
             shell_focus,
             late_compose_focus,
-            #[cfg(feature = "gui")]
-            shell_caret_visible: true,
-            #[cfg(feature = "gui")]
-            shell_caret_task_started: false,
+            text_caret_blink_visible: true,
+            text_caret_blink_task_started: false,
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
             sidebar_visible: true,
@@ -249,8 +395,12 @@ impl ArcadiaRoot {
             session_route_menu_open: false,
             remote_route: None,
             remote_nav: None,
+            local_navigation_registry: navigation::NavigationRegistryOwned::from_static_registry(),
             surface_client_id: ThinClientConfig::load_surface_client_id(),
             last_surface_revision: None,
+            navigation_from_host_only: false,
+            remote_surface_stale: false,
+            remote_revision_poll_started: false,
             lan_discovered_peers: Vec::new(),
             lan_command_feedback: String::new(),
             lan_service_feedback: String::new(),
@@ -274,7 +424,35 @@ impl ArcadiaRoot {
             last_color_scheme_dark: None,
             #[cfg(feature = "gui")]
             shell_motd_prefix_lines: initial_motd_n,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_history: Vec::new(),
+            #[cfg(feature = "ios-gui")]
+            ios_shell_input: String::new(),
+            #[cfg(feature = "ios-gui")]
+            ios_shell_cursor: 0,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_command_history: Vec::new(),
+            #[cfg(feature = "ios-gui")]
+            ios_shell_history_index: None,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_focus,
+            #[cfg(feature = "ios-gui")]
+            ios_shell_scroll: ScrollHandle::new(),
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_sequence_pending: None,
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_sequence_deadline: None,
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_edge_drag_start: None,
+            #[cfg(any(feature = "gui", feature = "ios-gui"))]
+            shortcut_hot_corner_dwell: std::collections::HashMap::new(),
+            pinned_settings_pages: ui_prefs_cfg.pinned_settings_pages,
+            settings_pin_context_menu: None,
         };
+
+        if let Ok(tc) = ThinClientConfig::load_or_create() {
+            root.navigation_from_host_only = tc.navigation_from_host_only;
+        }
 
         // Thin client bootstrap: ARCADIA_NET_AS overrides persisted thin-client.toml route.
         let mut picked_route: Option<String> = None;
@@ -306,19 +484,30 @@ impl ArcadiaRoot {
             if let Err(e) = arcadia_python::PythonExtensionHost::start(ext_dir) {
                 eprintln!("python-host: {e}");
             }
+            // Startup may co-enable native modules (e.g. `overlay` for HUD extensions).
+            root.reload_modules();
             root.python_extension_rows =
                 arcadia_core::modules::python_registry::list_modules();
             // Merge styles from Python extensions into available_styles.
             root.available_styles = merged_available_styles();
         }
 
+        root.refresh_local_navigation_registry();
         root.refresh_extension_token_cache();
 
         // Apply persisted style (may activate a glyph config from an extension).
         let active = root.active_style.clone();
         root.apply_style(active, true, cx);
 
+        #[cfg(all(feature = "gui", not(target_os = "ios")))]
+        super::shortcuts::sync_os_global_hotkeys();
+
         root
+    }
+
+    pub(crate) fn refresh_local_navigation_registry(&mut self) {
+        self.local_navigation_registry =
+            navigation::NavigationRegistryOwned::with_extension_token_settings_merged();
     }
 
     pub(super) fn refresh_extension_token_cache(&mut self) {
@@ -338,20 +527,24 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn flush_extension_token_edit(&mut self, module: String, key: String, cx: &mut Context<Self>) {
-        let kind = arcadia_core::modules::python_registry::list_style_tokens()
+        let spec = arcadia_core::modules::python_registry::list_style_tokens()
             .into_iter()
             .find(|(m, _)| m == &module)
-            .and_then(|(_, specs)| specs.into_iter().find(|s| s.key == key))
-            .map(|s| s.kind);
-        let Some(kind) = kind else {
+            .and_then(|(_, specs)| specs.into_iter().find(|s| s.key == key));
+        let Some(spec) = spec else {
             return;
         };
         let pair = (module.clone(), key.clone());
         let Some(raw) = self.extension_token_values.get(&pair).cloned() else {
             return;
         };
+        let text_in = if matches!(spec.kind, StyleTokenKind::Int | StyleTokenKind::Float) {
+            clamp_numeric_display_for_spec(&spec, raw.trim()).unwrap_or(raw)
+        } else {
+            raw
+        };
         let mut file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
-        match extension_tokens::parse_input_to_value(kind, &raw) {
+        match extension_tokens::parse_input_to_value(spec.kind, &text_in) {
             Ok(val) => {
                 file.insert(key.clone(), val.clone());
                 if extension_tokens::save_module_tokens(&module, &file).is_ok() {
@@ -378,6 +571,7 @@ impl ArcadiaRoot {
         };
         self.available_styles = styles;
         self.refresh_extension_token_cache();
+        self.refresh_local_navigation_registry();
         self.apply_style(active, self.current_color_scheme_dark(), cx);
     }
 
@@ -455,6 +649,7 @@ impl ArcadiaRoot {
             let ctx = modules::ExecutionContext {
                 net_as: Some(route.clone()),
                 net_timeout_ms: None,
+                ..Default::default()
             };
             match modules::execute_command("surface.snapshot", &[], &ctx) {
                 Ok(Some(json)) => {
@@ -462,21 +657,30 @@ impl ArcadiaRoot {
                     self.module_rows = parsed.modules;
                     self.remote_nav = parsed.navigation_registry;
                     self.last_surface_revision = Some(parsed.revision);
+                    self.remote_surface_stale = false;
                 }
                 _ => {
                     self.module_rows = Vec::new();
                     self.remote_nav = None;
                     self.last_surface_revision = None;
+                    self.remote_surface_stale = false;
                 }
             }
         } else {
             self.remote_nav = None;
             self.last_surface_revision = None;
+            self.remote_surface_stale = false;
             self.module_rows = ModulesConfig::load_or_create()
                 .map(|cfg| cfg.modules.into_iter().collect())
                 .unwrap_or_default();
         }
+        self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();
+        for tab in &mut self.code_editor_tabs {
+            tab.highlight_dirty = true;
+        }
+        #[cfg(all(feature = "gui", not(target_os = "ios")))]
+        super::shortcuts::sync_os_global_hotkeys();
     }
 
     #[cfg(feature = "gui")]
@@ -511,6 +715,193 @@ impl ArcadiaRoot {
             self.active_terminal_id -= 1;
         }
         self.terminal_kill_menu = None;
+    }
+
+    // NOTE: ensure_ai_poll_task, ensure_lan_poll_task, and ensure_text_caret_blink_task share
+    // an identical spawn_in → loop → Timer → should_stop pattern. Extracting a generic helper
+    // requires careful GPUI async-closure typing; left as a TODO for a dedicated refactor pass.
+    pub fn ensure_ai_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ai_poll_task_started {
+            return;
+        }
+        self.ai_poll_task_started = true;
+        cx.spawn_in(
+            window,
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                let mut cx = cx.clone();
+                async move {
+                    loop {
+                        Timer::after(Duration::from_millis(50)).await;
+                        let should_stop = cx
+                            .update(|_, app| {
+                                view.update(app, |this, cx| {
+                                    let had_event = this.poll_ai_events(cx);
+                                    if had_event || this.ai_stream_chat_id.is_some() {
+                                        false
+                                    } else {
+                                        this.ai_poll_task_started = false;
+                                        true
+                                    }
+                                })
+                                .unwrap_or(true)
+                            })
+                            .unwrap_or(true);
+                        if should_stop {
+                            break;
+                        }
+                    }
+                }
+            },
+        )
+        .detach();
+    }
+
+    /// Drain the inference event channel. Returns `true` if any event was processed.
+    pub fn poll_ai_events(&mut self, cx: &mut Context<Self>) -> bool {
+        use crate::gui::app::ai_runtime::RuntimeEvent;
+        use crate::gui::app::{AiMessage, AiMessageRole};
+
+        let Some(ref runtime) = self.ai_runtime else {
+            return false;
+        };
+
+        let mut any = false;
+        loop {
+            match runtime.event_rx.try_recv() {
+                Ok(RuntimeEvent::Token(s)) => {
+                    any = true;
+                    if let Some(chat_id) = self.ai_stream_chat_id {
+                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                            if let Some(last) = chat.messages.last_mut() {
+                                if last.role == AiMessageRole::Assistant {
+                                    last.content.push_str(&s);
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(RuntimeEvent::Done) => {
+                    any = true;
+                    if let Some(chat_id) = self.ai_stream_chat_id {
+                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                            chat.is_loading = false;
+                        }
+                    }
+                    self.ai_stream_chat_id = None;
+                }
+                Ok(RuntimeEvent::Error(e)) => {
+                    any = true;
+                    if let Some(chat_id) = self.ai_stream_chat_id {
+                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                            chat.is_loading = false;
+                            if let Some(last) = chat.messages.last_mut() {
+                                if last.role == AiMessageRole::Assistant && last.content.is_empty() {
+                                    last.content = format!("Error: {e}");
+                                } else {
+                                    chat.messages.push(AiMessage {
+                                        role: AiMessageRole::Assistant,
+                                        content: format!("Error: {e}"),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    self.ai_stream_chat_id = None;
+                }
+                Err(_) => break,
+            }
+        }
+
+        if any {
+            cx.notify();
+        }
+        any
+    }
+
+    /// Spawn a background thread to fetch models from the running Ollama instance via /api/tags.
+    /// Updates `self.ollama_models` on completion and clears `self.ollama_discovering`.
+    pub fn discover_ollama_models(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ollama_discovering {
+            return;
+        }
+        self.ollama_discovering = true;
+        cx.notify();
+
+        let endpoint = self.ollama_endpoint.clone();
+        cx.spawn_in(
+            window,
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                let mut cx = cx.clone();
+                async move {
+                    let (tx, rx) = std::sync::mpsc::sync_channel::<
+                        Result<Vec<arcadia_core::config::ollama::OllamaModel>, String>,
+                    >(1);
+                    std::thread::spawn(move || {
+                        let _ = tx.send(fetch_ollama_tags(&endpoint));
+                    });
+                    loop {
+                        Timer::after(Duration::from_millis(200)).await;
+                        match rx.try_recv() {
+                            Ok(result) => {
+                                cx.update(|_, app| {
+                                    view.update(app, |this, cx| {
+                                        this.ollama_discovering = false;
+                                        if let Ok(models) = result {
+                                            this.ollama_models = models;
+                                        }
+                                        cx.notify();
+                                    })
+                                    .ok();
+                                })
+                                .ok();
+                                break;
+                            }
+                            Err(std::sync::mpsc::TryRecvError::Empty) => continue,
+                            Err(_) => {
+                                cx.update(|_, app| {
+                                    view.update(app, |this, cx| {
+                                        this.ollama_discovering = false;
+                                        cx.notify();
+                                    })
+                                    .ok();
+                                })
+                                .ok();
+                                break;
+                            }
+                        }
+                    }
+                }
+            },
+        )
+        .detach();
+    }
+
+    /// Save the OpenAI API key and base URL drafts to openai.toml.
+    pub fn openai_save_settings(&mut self, cx: &mut Context<Self>) {
+        let api_key = self
+            .openai_api_key_draft
+            .take()
+            .unwrap_or_else(|| self.openai_api_key.clone());
+        let base_url = self
+            .openai_base_url_draft
+            .take()
+            .unwrap_or_else(|| self.openai_base_url.clone());
+
+        let mut cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create()
+            .unwrap_or_default();
+        cfg.api_key = api_key.clone();
+        cfg.base_url = base_url.clone();
+
+        match cfg.save() {
+            Ok(()) => {
+                self.openai_api_key = api_key;
+                self.openai_base_url = base_url;
+            }
+            Err(e) => {
+                eprintln!("openai config save failed: {e}");
+            }
+        }
+        cx.notify();
     }
 
     pub fn ensure_lan_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -551,12 +942,12 @@ impl ArcadiaRoot {
         .detach();
     }
 
-    #[cfg(feature = "gui")]
-    pub fn ensure_shell_caret_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.shell_caret_task_started {
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub fn ensure_text_caret_blink_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.text_caret_blink_task_started {
             return;
         }
-        self.shell_caret_task_started = true;
+        self.text_caret_blink_task_started = true;
         cx.spawn_in(
             window,
             move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
@@ -567,11 +958,7 @@ impl ArcadiaRoot {
                         let should_stop = cx
                             .update(|_, app| {
                                 view.update(app, |this, cx| {
-                                    if !this.is_module_enabled(TERMINAL_MODULE_NAME) {
-                                        this.shell_caret_task_started = false;
-                                        return true;
-                                    }
-                                    this.shell_caret_visible = !this.shell_caret_visible;
+                                    this.text_caret_blink_visible = !this.text_caret_blink_visible;
                                     cx.notify();
                                     false
                                 })
@@ -586,6 +973,82 @@ impl ArcadiaRoot {
             },
         )
         .detach();
+    }
+
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub fn ensure_remote_revision_poll_task(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.remote_revision_poll_started {
+            return;
+        }
+        if self.remote_route.is_none() {
+            return;
+        }
+        self.remote_revision_poll_started = true;
+        cx.spawn_in(
+            window,
+            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+                let mut cx = cx.clone();
+                async move {
+                    loop {
+                        Timer::after(Duration::from_secs(12)).await;
+                        let stop = cx
+                            .update(|_, app| {
+                                view.update(app, |this, cx| {
+                                    if this.remote_route.is_none() {
+                                        this.remote_revision_poll_started = false;
+                                        return true;
+                                    }
+                                    let Some(route) = this.remote_route.clone() else {
+                                        this.remote_revision_poll_started = false;
+                                        return true;
+                                    };
+                                    let ctx = modules::ExecutionContext {
+                                        net_as: Some(route),
+                                        net_timeout_ms: Some(8000),
+                                        ..Default::default()
+                                    };
+                                    if let Ok(Some(json)) =
+                                        modules::execute_command("surface.revision", &[], &ctx)
+                                    {
+                                        if let Some(rev) = parse_surface_revision(&json) {
+                                            if let Some(last) = this.last_surface_revision {
+                                                if rev != last {
+                                                    this.remote_surface_stale = true;
+                                                    cx.notify();
+                                                }
+                                            }
+                                        }
+                                    }
+                                    false
+                                })
+                                .unwrap_or(true)
+                            })
+                            .unwrap_or(true);
+                        if stop {
+                            break;
+                        }
+                    }
+                }
+            },
+        )
+        .detach();
+    }
+
+    pub fn toggle_settings_pin(&mut self, page_id: &str) {
+        if let Some(i) = self.pinned_settings_pages.iter().position(|p| p == page_id) {
+            self.pinned_settings_pages.remove(i);
+        } else {
+            self.pinned_settings_pages.push(page_id.to_string());
+        }
+        let mut cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
+        cfg.pinned_settings_pages = self.pinned_settings_pages.clone();
+        if let Err(e) = cfg.save() {
+            eprintln!("ui-prefs save failed: {e}");
+        }
     }
 }
 

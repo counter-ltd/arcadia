@@ -28,6 +28,11 @@ pub const COMMAND_SPECS: &[CommandSpec] = &[
         subcommands: &["enable", "disable"],
     },
     CommandSpec {
+        name: "permit",
+        aliases: &[],
+        subcommands: &[],
+    },
+    CommandSpec {
         name: "quit",
         aliases: &[],
         subcommands: &[],
@@ -89,6 +94,7 @@ pub fn parse_execution_context(
         modules::ExecutionContext {
             net_as,
             net_timeout_ms,
+            ..Default::default()
         },
     ))
 }

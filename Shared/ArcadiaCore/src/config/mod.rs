@@ -1,9 +1,18 @@
+pub mod ai;
 pub mod appearance;
+pub mod ui_prefs;
+pub mod llama_cpp;
+pub mod ollama;
+pub mod openai;
+pub mod code_editor;
 pub mod commandline;
 pub mod extension_tokens;
 pub mod late;
 pub mod modules;
+pub mod permissions;
+pub mod shortcuts;
 pub mod thin_client;
+pub mod workspace;
 
 use std::env;
 use std::fs;
@@ -80,10 +89,14 @@ pub trait ConfigFile: Default + Serialize + for<'de> Deserialize<'de> + Sized {
     }
 
     fn save(&self) -> io::Result<()> {
-        let root = config_root_dir()?;
-        fs::create_dir_all(&root)?;
-        let path = Self::file_path()?;
-        let content = toml::to_string_pretty(self).map_err(io::Error::other)?;
-        fs::write(path, content)
+        write_config_toml(Self::file_name(), self)
     }
+}
+
+pub(crate) fn write_config_toml<T: Serialize>(file_name: &str, value: &T) -> io::Result<()> {
+    let root = config_root_dir()?;
+    fs::create_dir_all(&root)?;
+    let path = config_file_path(file_name)?;
+    let content = toml::to_string_pretty(value).map_err(io::Error::other)?;
+    fs::write(path, content)
 }

@@ -11,7 +11,7 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "appearance" => "icons/appearance.svg",
         "extensions" => "icons/python.svg",
         "python" => "icons/python.svg",
-        "modules" => "icons/modules.svg",
+        "permissions" => "icons/permissions.svg",
         "nodes" => "icons/nodes.svg",
         "tools" => "icons/tools.svg",
         "services" => "icons/services.svg",
@@ -20,10 +20,25 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "music" => "icons/music.svg",
         "flask" => "icons/flask.svg",
         "coffee" => "icons/coffee.svg",
+        "folder" => "icons/folder.svg",
+        "folder-open" => "icons/folder-open.svg",
+        "file" => "icons/file.svg",
+        "file-code" => "icons/file-code.svg",
+        "file-text" => "icons/file-text.svg",
+        "chevron-right" => "icons/chevron-right.svg",
+        "chevron-down" => "icons/chevron-down.svg",
+        "pin" => "icons/pin.svg",
+        "pin-fill" => "icons/pin-fill.svg",
+        "code" => "icons/modules.svg",
+        "message" => "icons/message.svg",
         _ => "icons/terminal.svg",
     }
 }
 
 pub fn render_icon(glyph_key: &str) -> Svg {
-    svg().path(icon_path(glyph_key))
+    if glyph_key.starts_with("extension-icon/") {
+        svg().path(openframe::SharedString::from(glyph_key.to_string()))
+    } else {
+        svg().path(icon_path(glyph_key))
+    }
 }

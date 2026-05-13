@@ -27,7 +27,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: Shared -> Builds/workspace
+          workspaces: Shared -> ../Builds/workspace
 
       - name: Run core tests
         run: cargo test -p arcadia-core --manifest-path Shared/Cargo.toml

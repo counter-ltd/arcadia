@@ -2,9 +2,9 @@
 
 ## What Arcadia Is
 
-Multi-platform runtime and shell: one Rust core (`Shared/ArcadiaCore`) consumed by two thin surface shells — a GPUI desktop app (`Desktop/`) and a SwiftUI iOS app (`Mobile/iOS/`) — plus a headless CLI. The core owns all logic; surfaces only render and dispatch.
+Multi-platform runtime and shell: one Rust core (`Shared/ArcadiaCore`) consumed by a single GPUI-style UI layer (`Libraries/OpenFrame`) rendered on three surfaces — desktop (`Desktop/` GUI feature), iOS (Metal-hosted OpenFrame via `--features ios-gui`), and a headless CLI. The core owns all logic; the UI layer renders; the surfaces only initialize and dispatch input.
 
-**Key invariant:** if you find yourself writing the same logic in both `Desktop/src/gui/app/` and `Mobile/iOS/ArcadiaApp/`, it belongs in `arcadia-core` instead.
+**Key invariant:** if you find yourself writing the same logic in more than one place, it belongs in `arcadia-core` (logic) or `gui/app/` (presentation) — not in surface entrypoints.
 
 ---
 
@@ -12,87 +12,133 @@ Multi-platform runtime and shell: one Rust core (`Shared/ArcadiaCore`) consumed 
 
 ```
 Shared/ArcadiaCore/src/
-  lib.rs              root module, exports, UniFFI scaffolding
-  ffi.rs              UniFFI bridge — Rust → Swift (all iOS calls go through here)
-  navigation.rs       PAGE_DEFINITIONS, GROUP_DEFINITIONS, registry JSON serialization
+  lib.rs              module declarations (config, modules, navigation, platform, services)
+  navigation.rs       PAGE_DEFINITIONS, GROUP_DEFINITIONS, NavigationRegistryOwned
+  services.rs         SERVICE_DEFINITIONS, service-host helpers
   config/
-    mod.rs            ConfigFile trait, config root path (~/ vs iOS sandbox)
-    modules.rs        MODULE_REGISTRY, ModulesConfig, config migrations
-    commandline.rs    CLI preferences scaffold
-    thin_client.rs    ThinClientConfig → thin-client.toml
+    mod.rs            ConfigFile trait, CONFIG_ROOT_OVERRIDE (iOS sets this)
+    modules.rs        MODULE_REGISTRY, ModulesConfig, merge_defaults() migrations
+    workspace.rs      WorkspacesConfig, WorkspaceEntry, WorkspacePermissionDef → workspace.toml
+    appearance.rs     appearance.toml (theme tokens)
+    commandline.rs    CLI preferences
+    extension_tokens.rs  extension theme/glyph token resolution
+    late.rs           late.toml (WS chat config)
+    thin_client.rs    thin-client.toml (preferred_remote_route, surface_client_id, navigation_from_host_only)
   modules/
-    mod.rs            execute_command dispatcher, module lifecycle (load_all, shutdown_all)
-    shell.rs          shell.execute + shell.internal; PTY integration
-    shell_motd.rs     fastfetch-style MOTD banner (requires shell)
+    mod.rs            execute_command dispatcher, module_commands() lookup
+    shell.rs          shell.execute + shell.internal
+    shell_motd.rs     MOTD banner (terminal-motd module)
     surface.rs        surface.snapshot / surface.patch / revision counter
-    remote_session.rs routing manifest only — no standalone commands
-    remote_mirror.rs  host transcript queue + FFI drain (RemoteMirrorDrain)
+    remote_session.rs routing manifest only (no standalone commands)
+    remote_mirror.rs  host transcript queue + drain (for surface mirroring)
     net.rs            networking foundation
-    lan/              LAN subsystem — see module reference
-      mod.rs, discovery.rs, handlers.rs, config.rs, peers.rs, protocol.rs
+    lan/              LAN subsystem (discovery, peers, protocol, handlers)
+    late.rs           WebSocket chat / now-playing / votes module
+    python_host.rs    Python extension host
+    python_registry.rs Python extension manifest registry
+    workspace.rs      workspace.list/add/remove/grant/revoke/check commands
   platform/
     mod.rs, macos.rs, ios.rs, linux.rs, windows.rs, unknown.rs
 
-Desktop/src/
-  main.rs             binary entry — feature-gated gui vs headless
-  cli/
-    mod.rs            REPL loop, command dispatch, startup messages
-    args.rs           CLI argument parsing
-    completion.rs     shell completion helpers
-    config_cmds.rs    module/config CLI commands
-    module_cmds.rs    module shortcut commands
-  gui/
-    mod.rs
-    assets.rs         embedded SVG asset loading
-    app/
-      mod.rs          ArcadiaRoot state struct, ShellMode enum
-      entry.rs        GPUI initialization + window setup
-      lifecycle.rs    focus, resize, module state reload
-      navigation.rs   nav state, page routing, sidebar group logic
-      root/           mod.rs, render.rs, top_bar.rs
-      sidebar/        mod.rs, layout.rs, nav_items.rs
-      shell/          mod.rs, panel.rs, execute.rs, keys.rs, tui_screen.rs, mirror.rs
-      modules_page/   mod.rs, panel.rs, row.rs, requirements_modal.rs
-      lan_nodes/      mod.rs, panel.rs
-      splash/         mod.rs, view.rs, draw_*.rs, math.rs
-    theme/
-      mod.rs          icon_path(), color constants and helpers
-      chrome.rs       window chrome styles
-      icons.rs        icon metadata
-      splash_colors.rs
-      modules/        component tokens: buttons, panel, row_surface, toggle_states, typography
-      nav_accents/    per-accent palettes (9 accents: amber, cyan, emerald, fuchsia, indigo, orange, sky, teal, violet)
-    tui/
-      mod.rs, session.rs   PTY session state + lifecycle
-      ansi_line.rs         ANSI escape sequence parsing
-      colors.rs            terminal color palette
-      cd_builtin.rs        cd builtin (updates shell_working_dir)
-      cwd.rs, env.rs       CWD tracking, env vars
-      keys.rs              PTY keyboard events
-      vt_history.rs        VT100 history buffer
+Libraries/OpenFrame/        Rust GPU UI framework (forked from Zed GPUI; multi-platform incl. iOS)
 
-Mobile/iOS/ArcadiaApp/
-  ArcadiaApp.swift              @main, set_config_root_path early
-  ContentView.swift             top-level coordinator
-  ContentView+Actions.swift     action methods
-  ContentView+Layout.swift      layout + composition
-  ContentView+NavigationState.swift  navigation state helpers
-  ContentView+Registry.swift    NavigationRegistry loading + JSON deserialization
-  NavigationModels.swift        Swift structs mirroring NavigationRegistry
-  AppTheme.swift                all iOS colors as computed properties
-  SidebarView.swift             sidebar + remote session picker
-  SplashView.swift              animated splash
-  ShellView.swift               shell input + history
-  ModulesView.swift             module toggle list
-  LanNodesView.swift            LAN peer discovery + pairing
-  ModuleNames.swift             string constants mirroring MODULE_REGISTRY
-  GlassComponents.swift         reusable glassmorphism components
+Desktop/
+  Cargo.toml          package `arcadia`:
+                        [[bin]] arcadia (src/main.rs)            — desktop binary
+                        [lib]   arcadia_ios (src/ios_lib.rs)     — staticlib for iOS host
+                      features: headless (default), gui, ios-gui, python-extensions
+  src/
+    main.rs           binary entry — feature-gated gui vs headless
+    ios_lib.rs        iOS C ABI entrypoints (arcadia_ios_start, arcadia_ios_inject_touch)
+    cli/              REPL, args, completion, config + module commands
+    gui/
+      mod.rs, assets.rs
+      app/
+        mod.rs        ArcadiaRoot state struct
+        entry.rs      desktop GPUI initialization + window setup
+        entry_ios.rs  iOS entrypoint — boots OpenFrame on supplied CAMetalLayer
+        lifecycle.rs  focus, resize, module state reload
+        navigation.rs nav state, page routing
+        workspace_panel.rs    Workspaces page — list + search
+        workspace_row.rs      per-workspace row with permission toggles
+        workspace_create_modal.rs  create-workspace modal (label + path fields)
+        root/, sidebar/, shell/, modules_page/, lan_nodes/, splash/,
+        appearance/, late/, python_settings/, services/, list_panel_search.rs,
+        text_input_caret.rs
+      theme/          icon_path(), color tokens, accent palettes, component tokens
+      tui/            PTY/TUI terminal emulator (desktop only)
 
-Configuration/
+Mobile/iOS/
+  ArcadiaApp.xcodeproj  Xcode project — "Build Rust (cargo)" phase shells out to cargo
+                        and copies libarcadia_ios.a into BUILT_PRODUCTS_DIR
+  ArcadiaApp/
+    ArcadiaApp.swift    UIKit @main; bootstraps Metal layer, calls arcadia_ios_start
+    MetalHostView.swift CAMetalLayer host view, forwards UITouch → arcadia_ios_inject_touch
+    ArcadiaBridge.h     C ABI declarations matching ios_lib.rs
+
+Configuration/  (runtime root: $HOME/Arcadia/Configuration on Desktop, app Documents on iOS)
   modules.toml        module enable/disable state
   commandline.toml    CLI settings
-  thin-client.toml    preferred_remote_route, surface_client_id (UUID)
+  thin-client.toml    preferred_remote_route, surface_client_id (UUID), navigation_from_host_only
+  appearance.toml     theme tokens
+  late.toml           late module state
+  workspace.toml      registered workspace directories + per-workspace permission grants
 ```
+
+---
+
+## Module Quick Reference
+
+All modules live in `MODULE_REGISTRY` (`config/modules.rs`). Commands follow `module.verb` format.
+
+| Module | Constant | Requires | Commands / Purpose |
+|--------|----------|----------|--------------------|
+| `animation` | `ANIMATION_MODULE_NAME` | — | Shared tween engine; 16 ms driver loop |
+| `net` | `NET_MODULE_NAME` | — | Networking foundation |
+| `lan` | `LAN_MODULE_NAME` | `net` | `lan.scan`, `lan.node`, `lan.session_targets` — LAN discovery + pairing |
+| `surface` | `SURFACE_MODULE_NAME` | — | `surface.snapshot`, `surface.patch`, `surface.revision` |
+| `remote-session` | `REMOTE_SESSION_MODULE_NAME` | `net`, `lan` | Routing gate for `net_as` forwarding; no standalone commands |
+| `terminal` | `TERMINAL_MODULE_NAME` | — | `shell.execute` (routable), `shell.internal` (REPL), PTY/TUI on Desktop |
+| `terminal-motd` | `TERMINAL_MOTD_MODULE_NAME` | `terminal` | Fastfetch-style banner on terminal open |
+| `late` | `LATE_MODULE_NAME` | — | `late.*` — chat rooms, music stream, reactions |
+| `python-host` | `PYTHON_HOST_MODULE_NAME` | — | Python extension loader; scans `~/Arcadia/Extensions/` |
+| `permissions` | `PERMISSIONS_MODULE_NAME` | — | Permission catalog, grants, `permit`/`list` commands |
+| `tray` | `TRAY_MODULE_NAME` | — | Menu-bar (macOS) / system-tray (Windows/Linux) |
+| `cursor` | `CURSOR_MODULE_NAME` | — | OS-global cursor position + display size (desktop only) |
+| `overlay` | `OVERLAY_MODULE_NAME` | — | Always-on-top transparent HUD (desktop only) |
+| `workspace` | `WORKSPACE_MODULE_NAME` | — | `workspace.add/remove/list/grant/revoke/check` — directory registry + permissions |
+
+---
+
+## Navigation Quick Reference
+
+All pages in `PAGE_DEFINITIONS` (`navigation.rs`). Visibility from `required_module` — never hardcode.
+
+| Page ID | Title | Placement | Required Module |
+|---------|-------|-----------|-----------------|
+| `utility.shell` | Terminal | `utilities` group | `terminal` |
+| `utility.services` | Services | `utilities` group | _service-driven_ |
+| `global.dashboard` | Dashboard | sidebar global | — |
+| `global.settings` | Settings | sidebar global + hub root | — |
+| `global.logs` | Logs | app-title context menu | — |
+| `global.modules` | Modules | top bar | — |
+| `global.appearance` | Appearance | settings hub | — |
+| `global.permissions` | Permissions | settings hub | — |
+| `global.shortcuts` | Shortcuts | settings hub | — |
+| `global.workspaces` | Workspaces | settings hub | `workspace` |
+| `network.nodes` | Nodes | `network` group | `lan` |
+| `late.now_playing` | Late.sh | `social` group | `late` |
+| `late.experimental` | Experimental | `social` group | `late` |
+| `late.settings` | Late.sh settings | settings hub | `late` |
+| `python.settings` | Extensions | top bar | `python-host` |
+
+**Groups:** `utilities` (shell, services) · `network` (nodes) · `social` (late pages)
+
+**Special lists:**
+- `GLOBAL_PAGE_IDS` → sidebar global: `global.dashboard`, `global.settings`
+- `TOP_BAR_PAGE_IDS` → top bar: `python.settings`, `global.modules`
+- `SETTINGS_HUB_ROOT_PAGE_ID` → `global.settings`
+- `SETTINGS_HUB_PAGE_IDS` → `global.permissions`, `global.shortcuts`, `global.appearance`, `global.workspaces`, `late.settings`
 
 ---
 
@@ -103,25 +149,24 @@ Configuration/
 | What | Lives in | Consumed by |
 |------|----------|-------------|
 | Module list + deps | `config/modules.rs` `MODULE_REGISTRY` | everything |
-| Navigation pages/groups | `navigation.rs` `PAGE_DEFINITIONS` / `GROUP_DEFINITIONS` | Desktop gui, iOS via JSON |
-| Serializable nav | `NavigationRegistryOwned` in `navigation.rs` | `surface.snapshot`, FFI |
-| Desktop theme | `gui/theme/` | view files (never inline) |
-| iOS theme | `AppTheme.swift` | SwiftUI views (never inline) |
-| Config schema | `ModulesConfig` in `config/modules.rs` | CLI, GUI, iOS |
+| Navigation pages/groups | `navigation.rs` `PAGE_DEFINITIONS` / `GROUP_DEFINITIONS` | desktop + iOS GUI |
+| Serializable nav | `NavigationRegistryOwned` in `navigation.rs` | `surface.snapshot` payload |
+| Theme tokens | `Desktop/src/gui/theme/` | every render path |
+| Config schema | `ModulesConfig` in `config/modules.rs` | CLI, GUI |
 | Config migrations | `ModulesConfig::merge_defaults()` | every load path |
+| Workspace registry | `config/workspace.rs` `WorkspacesConfig` | workspace module + GUI panel |
 
-### Non-monolithic — thin surfaces, fat core
+### Thin surfaces, fat core, single UI layer
 
-Surface code (Desktop `gui/`, iOS `ArcadiaApp/`) must:
-- **Read** from registries and configs
-- **Render** what the registry says
-- **Dispatch** user actions to `arcadia_core`
+- `arcadia-core` owns business logic, state, commands.
+- `Desktop/src/gui/` (rendered via OpenFrame) is the UI. It runs identically on desktop and iOS — only the platform shell differs.
+- `Desktop/src/main.rs` and `Mobile/iOS/ArcadiaApp/` only initialize the runtime and dispatch native input.
 
-Surface code must NOT:
-- Re-implement business logic that belongs in `arcadia_core`
-- Hard-code module names, page IDs, or feature flags in render/layout logic
-- Add per-module booleans (`shell_enabled`, `net_enabled`) — query the config dynamically
-- Duplicate navigation structure that already exists in `navigation.rs`
+Surface entrypoints must NOT:
+- Re-implement business logic that belongs in `arcadia_core`.
+- Hard-code module names, page IDs, or feature flags.
+- Add per-module booleans (`shell_enabled`, `net_enabled`) — query dynamically via `is_module_enabled(name)`.
+- Duplicate navigation structure that already exists in `navigation.rs`.
 
 ---
 
@@ -130,50 +175,41 @@ Surface code must NOT:
 ### New module
 
 1. Add `pub const X_MODULE_NAME: &str = "x";` to `Shared/ArcadiaCore/src/config/modules.rs`.
-2. Add a `ModuleManifest` entry to `MODULE_REGISTRY` in the same file.
+2. Add a `ModuleManifest` entry to `MODULE_REGISTRY` in the same file (all 6 fields — see struct below).
 3. Create `Shared/ArcadiaCore/src/modules/x.rs` with a `commands()` fn returning `&[ModuleCommand]`.
-4. Register in `Shared/ArcadiaCore/src/modules/mod.rs`.
-5. Done — GUI, CLI, and iOS all pick it up from the registry automatically. No surface edits required.
+4. Register in `Shared/ArcadiaCore/src/modules/mod.rs`: `pub mod x;` + add to `module_commands()` match.
+5. Done — GUI and CLI pick it up from the registry automatically. No surface edits required.
 
 ### New navigation page
 
 1. Add a `NavigationPageDefinition` entry to `PAGE_DEFINITIONS` in `navigation.rs`. Set `required_module` if the page depends on a module.
-2. Add the page ID to the relevant `NavigationGroupDefinition.pages` slice, or create a new group.
-3. Implement the page panel: Desktop → new file under `gui/app/`; iOS → new view file in `ArcadiaApp/`.
+2. Add the page ID to the relevant `NavigationGroupDefinition.pages` slice, or add to `SETTINGS_HUB_PAGE_IDS`, `GLOBAL_PAGE_IDS`, or `TOP_BAR_PAGE_IDS` as appropriate.
+3. Implement the page panel under `Desktop/src/gui/app/` (single implementation — renders on desktop and iOS).
 4. Route in the surface content switch — derive visibility from `required_module`, **never** add a hardcoded match arm.
 
 ### New icon/glyph
 
 1. Add SVG to `Desktop/assets/icons/`.
-2. Add a match arm to `icon_path()` in `Desktop/src/gui/theme/mod.rs`.
+2. Add a match arm to `icon_path()` in `Desktop/src/gui/theme/icons.rs`.
 3. Use the key in `NavigationPageDefinition.glyph` or `NavigationGroupDefinition.glyph`.
 
 ### New theme color
 
-- Desktop: add named constant or helper fn to `Desktop/src/gui/theme/mod.rs` or the appropriate component file under `theme/modules/`.
-- iOS: add a computed property to `AppTheme` in `AppTheme.swift`.
-- Never inline `rgb(0x...)` in Rust view code or `Color(hex:)` in Swift view files.
+- Add a named constant or helper fn to `Desktop/src/gui/theme/mod.rs` or the appropriate component file under `theme/modules/`.
+- Never inline `rgb(0x...)` in view code.
 
 ### New mirrored state (thin-client)
 
 1. Extend `SurfaceSnapshot.extra` in `modules/surface.rs`.
 2. Add the corresponding `SurfacePatch` variant if clients need to push changes back.
-3. Wire Desktop + iOS surfaces to consume the new extra field from snapshot.
+3. Wire the panel to consume the new extra field from the snapshot result.
 4. Do not create ad-hoc `remote-session.*` verbs — keep the protocol under `surface.*`.
 
 ### Renaming a module
 
-1. Edit `MODULE_REGISTRY` name and constant in `config/modules.rs`.
+1. Edit `MODULE_REGISTRY` entry + constant in `config/modules.rs`.
 2. Add a migration in `ModulesConfig::merge_defaults()` following the `LEGACY_LAN_MODULE_NAME` pattern.
 3. Do not do ad-hoc renames at call sites.
-
-### After FFI changes
-
-Any edit to `ffi.rs` or exported FFI types requires:
-```sh
-bash Shared/Scripts/Builds/build-ios-framework.sh
-```
-This regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcframework`. Commit both.
 
 ---
 
@@ -185,7 +221,6 @@ This regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.x
 // BAD — named module booleans in surface state
 pub shell_enabled: bool,
 fn net_enabled(&self) -> bool { … }
-fn remote_session_enabled(&self) -> bool { … }
 
 // GOOD — single generic query using MODULE_NAME constants
 fn is_module_enabled(&self, name: &str) -> bool {
@@ -194,86 +229,194 @@ fn is_module_enabled(&self, name: &str) -> bool {
         .map(|(_, enabled)| *enabled)
         .unwrap_or(false)
 }
-// call as: self.is_module_enabled(SHELL_MODULE_NAME)
-```
-
-```swift
-// GOOD — Swift equivalent
-func isModuleEnabled(_ name: String) -> Bool {
-    modules.first(where: { $0.name == name })?.enabled ?? false
-}
+// call as: self.is_module_enabled(TERMINAL_MODULE_NAME)
 ```
 
 ### Hardcoded page ID match arms in visibility logic
 
 ```rust
 // BAD
-fn is_page_visible(&self, page_id: &str) -> bool {
-    match page_id {
-        "utility.shell" => self.shell_enabled,
-        "network.overview" => self.net_enabled(),
-        _ => true,
-    }
+match page_id {
+    "utility.shell" => self.shell_enabled,
+    "network.overview" => self.net_enabled(),
+    _ => true,
 }
 
 // GOOD — derive from the page's declared required_module
-fn is_page_visible(&self, page_id: &str) -> bool {
-    let Some(page) = navigation::page_by_id(page_id) else { return false };
-    match page.required_module {
-        Some(module_name) => self.is_module_enabled(module_name),
-        None => true,
-    }
+let Some(page) = navigation::page_by_id(page_id) else { return false };
+match page.required_module {
+    Some(module_name) => self.is_module_enabled(module_name),
+    None => true,
 }
 ```
 
-### Growing if-else chains for page dispatch
+### Growing if-else chains for page content dispatch
 
 ```rust
 // BAD — grows indefinitely as pages are added
-if self.active_page_id == "utility.shell" { … shell panel … }
-else if self.active_page_id == "global.modules" { … modules panel … }
-else if self.active_page_id == "network.nodes" { … }  // don't add here
-
-// GOOD — dispatch via page registry / lookup; new pages register themselves
+if self.active_page_id == "utility.shell" { … }
+else if self.active_page_id == "global.modules" { … }
 ```
 
-### Special-casing page IDs in event handlers
+Use the page registry / lookup; new pages should not require edits to dispatch.
 
-```swift
-// BAD — magic behavior on specific page ID in a generic handler
-.onChange(of: activePageID) { pageID in
-    if pageID == "global.modules" { reloadModules() }
-}
-
-// GOOD — modules page is just a page; reload via onAppear of ModulesView
-```
-
-### Inline colors in view code
+### Inline raw colors in view code
 
 ```rust
-// BAD — raw hex in app.rs or any render file
+// BAD
 .bg(rgb(0x151a22))
 .text_color(rgb(0x93c5fd))
 
-// GOOD — named token from theme/
+// GOOD
 .bg(theme::SURFACE_BG)
 .text_color(theme::accent_color(accent))
 ```
 
-```swift
-// BAD
-Color(hex: "151a22")
+### Duplicating core logic across the codebase
 
-// GOOD
-theme.surfaceBackground
+If the same logic lives in `arcadia-core` and `gui/app/`, move it into `arcadia-core`. If the same logic lives in `Desktop/src/main.rs` and `Mobile/iOS/ArcadiaApp/`, neither is the right home — put it in `arcadia-core` or `gui/app/entry*.rs`.
+
+### Ad-hoc `remote-session.*` verbs
+
+Do not create `remote-session.foo` commands for UI mirroring. Extend `surface.snapshot.extra` and `SurfacePatch` instead.
+
+### Config renames without migration
+
+Renaming a module name constant without a migration in `ModulesConfig::merge_defaults()` will silently strand user settings.
+
+### Secrets in channel payloads or enum variants
+
+```rust
+// BAD — API key travels through mpsc channel, lives on heap unencrypted,
+// appears in core dumps and channel debug output
+enum ProviderRouting {
+    OpenAi { api_key: String, model_id: String },
+}
+
+// GOOD — routing carries only non-secret routing metadata;
+// the inference thread loads the key directly at point of use
+enum ProviderRouting {
+    OpenAi { model_id: String },  // key loaded in inference thread via OpenAiConfig::load_or_create()
+}
 ```
 
-### Duplicating core logic across surfaces
+**Rule:** No credential (API key, token, password) in any `enum` variant, struct field that crosses a thread boundary, or message payload. Load secrets at the point of use.
+
+### Path scope checks using string prefix matching
+
+```rust
+// BAD — @/workspace/../../../etc/passwd bypasses this check
+pub fn is_path_in_scope(&self, path: &str) -> bool {
+    path.starts_with(&self.workspace_path)
+}
+
+// GOOD — canonicalize resolves symlinks and .. before comparing
+pub fn is_path_in_scope(&self, path: &str) -> bool {
+    let Ok(canon_ws) = std::fs::canonicalize(&self.workspace_path) else { return false; };
+    let canon = if let Ok(c) = std::fs::canonicalize(path) { c } else {
+        let p = std::path::Path::new(path);
+        let Ok(cp) = std::fs::canonicalize(p.parent().unwrap_or(p)) else { return false; };
+        cp.join(p.file_name().unwrap_or_default())
+    };
+    canon.starts_with(&canon_ws)
+}
+```
+
+**Rule:** Never use `starts_with()` on raw path strings for security decisions. Always canonicalize first.
+
+### Unrestricted `sh -c` execution
+
+```rust
+// BAD — grants AI ability to run rm -rf, curl | sh, sudo, etc.
+Command::new("sh").arg("-c").arg(model_supplied_cmd).output()
+
+// GOOD — allowlist enforced in ai_sandbox::sandboxed_exec before sh -c
+// EXEC_ALLOWLIST in ai_sandbox.rs defines permitted binary names
+```
+
+**Rule:** Any execution of user- or model-supplied shell commands must go through `sandboxed_exec()` in `ai_sandbox.rs`. The allowlist there is the single gate. Do not bypass it.
+
+### HTTP calls without timeouts
+
+```rust
+// BAD — server hang = UI hangs forever; inference thread blocks indefinitely
+ureq::post(&url).set("Content-Type", "application/json").send_json(&body)
+
+// GOOD — 120s ceiling; thread unblocks, error propagates to UI
+const HTTP_TIMEOUT: Duration = Duration::from_secs(120);
+let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
+agent.post(&url).set("Content-Type", "application/json").send_json(&body)
+```
+
+**Rule:** Every outbound HTTP call (AI providers, LAN APIs, webhooks) must use an `AgentBuilder` with an explicit timeout. `ureq::post()` with no agent is banned in production paths.
+
+### `expect()` / `unwrap()` in production code paths
+
+```rust
+// BAD — panics on thread creation failure, crashes the whole process
+std::thread::spawn(move || work()).expect("failed to spawn thread")
+
+// GOOD — degrade gracefully; surface error to user if appropriate
+match std::thread::Builder::new().spawn(move || work()) {
+    Ok(_) => { /* started */ }
+    Err(e) => { eprintln!("thread spawn failed: {e}"); /* show error in UI */ }
+}
+```
+
+**Rule:** `expect()` and `unwrap()` are only permitted inside `#[cfg(test)]` blocks and in static initializers that provably cannot fail. Everywhere else: propagate `Result`/`Option` or degrade gracefully with a user-visible error.
+
+### Silent error swallowing with `.ok()`
+
+```rust
+// BAD — config corruption silently disables tools with no feedback to user
+WorkspacesConfig::load_or_create().ok()
+    .and_then(|cfg| cfg.workspaces.into_iter().find(...))
+
+// GOOD — surface the error; log it, show a banner, or push an error message
+match WorkspacesConfig::load_or_create() {
+    Ok(cfg) => cfg.workspaces.into_iter().find(...),
+    Err(e) => { eprintln!("config load failed: {e}"); None }
+}
+```
+
+**Rule:** `.ok()` on a `Result` that represents a user-visible operation is not acceptable. Either propagate the error or log it explicitly.
+
+### Monolith files over 400 lines
+
+Files over 400 lines in `Shared/ArcadiaCore/src/modules/` or `Desktop/src/gui/app/` are a split candidate. Files over 600 lines are blocked without a documented split plan. The current known violations are tracked in `Documentation/ROADMAP.md`.
+
+---
+
+## AI Module Patterns
+
+### Adding a new AI provider
+
+1. Add provider module to `MODULE_REGISTRY` with `AI_MODULE_NAME` as a dependency.
+2. Add a `ProviderRouting` variant with only non-secret routing metadata (endpoint, model ID). **No API keys.**
+3. Load credentials in the inference thread via `ProviderConfig::load_or_create()` at call time.
+4. Add the binary names your provider uses to `EXEC_ALLOWLIST` in `ai_sandbox.rs` if needed.
+5. Use `ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build()` for all HTTP calls.
+6. Route all file/exec operations through `sandboxed_read` / `sandboxed_write` / `sandboxed_exec` in `ai_sandbox.rs` — never directly call `std::fs` or `Command` from the provider.
+
+### AI sandbox architecture
 
 ```
-// BAD — same logic in app.rs AND ContentView.swift
-// GOOD — implement once in arcadia-core; both surfaces call execute_command or FFI
+ai_chat_panel.rs        — builds TextGenerationRequest, resolves workspace context
+ai_runtime.rs           — inference thread; dispatches to provider fns
+  └── run_ollama()      — HTTP, 120s timeout, no credentials in routing
+  └── run_openai()      — loads API key from config; HTTP, 120s timeout
+  └── run_llama_cpp()   — local model; lazy-loads via LlamaCppConfig path
+ai_sandbox.rs           — SINGLE gate for all file/exec ops from AI
+  └── sandboxed_read()  — checks scope + workspace.read permission
+  └── sandboxed_write() — checks scope + workspace.write permission
+  └── sandboxed_exec()  — checks EXEC_ALLOWLIST + workspace.execute permission
+  └── EXEC_ALLOWLIST    — permitted binary names (cargo, npm, python, git, …)
+ai_context.rs           — @mention parsing, file context injection
+ai_types.rs             — AiWorkspaceContext (is_path_in_scope uses canonicalize)
+ai_tools.rs             — tool definitions and execution dispatch
 ```
+
+**Never** call `std::fs::read_to_string` or `Command::new` directly from a provider or tool handler. Always go through `ai_sandbox`.
 
 ---
 
@@ -283,7 +426,7 @@ theme.surfaceBackground
 
 ```rust
 // Local execution
-execute_command("shell.execute", "ls -la", ExecutionContext::local())
+execute_command("shell.execute", "ls -la", ExecutionContext::default())
 
 // LAN-routed execution — peer enforces its own module rules
 execute_command("shell.execute", "ls -la", ExecutionContext {
@@ -296,7 +439,7 @@ execute_command("shell.execute", "ls -la", ExecutionContext {
 
 ```
 Client calls: execute_command("surface.snapshot", "", context_pointing_at_host)
-Host returns: { modules: [...], revision: N, extra: { navigation_registry: "..." } }
+Host returns: { modules: [...], revision: N, extra: { schema_version: 1, navigation_registry: "..." } }
 
 Client calls: execute_command("surface.patch", json_ops, context_pointing_at_host)
 Host applies: module toggle ops, bumps revision
@@ -304,7 +447,7 @@ Host applies: module toggle ops, bumps revision
 
 ### Remote mirror drain
 
-iOS and Desktop poll `drain_remote_mirror_batch()` on a timer (iOS: 250ms). When `sync_local_surface` is true in the drain result, call `reload_modules()` to resync local UI with host state.
+The desktop GUI polls `remote_mirror::drain_*` on a timer when acting as a client; when state indicates a local-surface resync is needed, the panel calls back into `modules::reload_*` to refresh the GUI.
 
 ---
 
@@ -314,12 +457,17 @@ iOS and Desktop poll `drain_remote_mirror_batch()` on a timer (iOS: 250ms). When
 
 ```rust
 pub struct ModuleManifest {
-    pub name: &'static str,                      // unique key
+    pub name: &'static str,                                    // unique key, e.g. "terminal"
     pub version: &'static str,
     pub description: &'static str,
-    pub required_modules: &'static [&'static str], // transitive deps enforced on enable
+    pub required_modules: &'static [&'static str],             // transitive deps enforced on enable
+    pub required_permissions: &'static [&'static str],         // global permissions needed
+    pub workspace_permissions: &'static [WorkspacePermissionDef], // per-workspace grant toggles
+    pub supported_platforms: &'static [&'static str],          // empty = all platforms
 }
 ```
+
+`workspace_permissions` advertises per-directory grants this module needs. The workspace panel iterates all enabled modules and renders their entries as per-workspace toggle rows.
 
 ### ModulesConfig key methods
 
@@ -328,7 +476,7 @@ pub struct ModuleManifest {
 | `manifest_for(name)` | Lookup manifest by name |
 | `required_modules_for(name)` | Get declared deps |
 | `missing_requirements_for(name)` | Validate preconditions before enable |
-| `enable_with_requirements(name)` | Enable transitively (enables all deps first) |
+| `enable_with_requirements(name)` | Enable transitively |
 | `set_module_state(name, enabled)` | Toggle with validation |
 | `merge_defaults()` | Config migration — add legacy renames here |
 
@@ -336,10 +484,11 @@ pub struct ModuleManifest {
 
 ```rust
 // In Shared/ArcadiaCore/src/modules/yourmodule.rs
+pub const NAME: &str = "yourmodule";
+
 pub fn commands() -> &'static [ModuleCommand] {
     &[
-        ModuleCommand { token: "yourmodule.thing", description: "Does thing." },
-        // add new command here
+        ModuleCommand { name: "yourmodule.thing", description: "Does thing.", run: run_thing },
     ]
 }
 ```
@@ -352,13 +501,13 @@ pub fn commands() -> &'static [ModuleCommand] {
 
 ```rust
 pub struct NavigationPageDefinition {
-    pub id: &'static str,           // "group.name" format
+    pub id: &'static str,                       // "group.name" format
     pub title: &'static str,
     pub description: &'static str,
-    pub glyph: &'static str,        // key into icon_path() in theme.rs
-    pub system_image: &'static str, // SF Symbol name for iOS
-    pub accent: &'static str,       // accent palette key
-    pub required_module: Option<&'static str>, // drives visibility on all surfaces
+    pub glyph: &'static str,                    // key into icon_path() in theme/icons.rs
+    pub system_image: &'static str,             // SF Symbol name for iOS native contexts
+    pub accent: &'static str,                   // accent palette key
+    pub required_module: Option<&'static str>,  // drives visibility; None = always visible
 }
 ```
 
@@ -367,7 +516,7 @@ pub struct NavigationPageDefinition {
 ```rust
 page_by_id(id: &str) -> Option<&'static NavigationPageDefinition>
 group_by_id(id: &str) -> Option<&'static NavigationGroupDefinition>
-default_navigation_registry_json() -> String  // for FFI + surface.snapshot
+default_navigation_registry_json() -> String  // emitted via surface.snapshot.extra
 ```
 
 ---
@@ -376,9 +525,9 @@ default_navigation_registry_json() -> String  // for FFI + surface.snapshot
 
 ### Config file path logic
 
-Desktop: `~/.config/Arcadia/Configuration/` or `~/Arcadia/Configuration/` — see `config/mod.rs` `config_root_path()` for resolution order.
+Desktop: `$HOME/Arcadia/Configuration/` by default — see `config/mod.rs` `config_root_dir()`.
 
-iOS: caller must set path via `set_config_root_path(path)` before any config reads. Call this in `ArcadiaApp.swift` before first `execute_command`.
+iOS: the iOS host must call `arcadia_core::config::set_config_root(path)` before any config reads. This happens inside `arcadia_ios_start` (called from `ArcadiaApp.swift`) with the app's Documents directory.
 
 ### Migration pattern
 
@@ -397,11 +546,10 @@ Follow this pattern for any module rename — one place, no ad-hoc patches.
 ## Key Invariants
 
 - `MODULE_REGISTRY` drives module availability everywhere — don't bypass it.
-- `NavigationRegistry` (serialized to JSON in `navigation.rs`) is the iOS navigation contract — iOS deserializes it, never hardcodes page/group lists.
+- `NavigationRegistry` is the GUI navigation contract — never hardcode page/group lists in render code.
 - `ConfigFile::merge_defaults()` handles migration — when renaming a module, add the migration there.
-- All cross-platform logic lives in `arcadia_core` — if you find yourself writing the same logic in both `app.rs` and `ContentView.swift`, it belongs in the core instead.
+- All cross-platform logic lives in `arcadia_core`; all cross-platform UI lives in `Desktop/src/gui/app/`. Platform shells just boot the runtime and forward input.
 - `surface.*` is the protocol namespace for UI mirroring — do not create ad-hoc `remote-session.*` verbs.
-- After FFI changes: always rebuild `ArcadiaCore.xcframework` and commit `Generated/`.
 
 ---
 
@@ -409,28 +557,36 @@ Follow this pattern for any module rename — one place, no ad-hoc patches.
 
 ```sh
 # Desktop GUI
-cd Desktop && cargo build --features gui
-cd Desktop && cargo run --features gui
+cargo build --manifest-path Desktop/Cargo.toml --features gui
+cargo run   --manifest-path Desktop/Cargo.toml --features gui
 
 # Desktop headless (CLI)
-cd Desktop && cargo run
+cargo build --manifest-path Desktop/Cargo.toml                # default = headless
+cargo run   --manifest-path Desktop/Cargo.toml
 
 # Core tests (artifacts under Builds/workspace via /.cargo/config.toml)
 cargo test -p arcadia-core --manifest-path Shared/Cargo.toml
 
-# iOS framework rebuild (after ffi.rs changes)
-bash Shared/Scripts/Builds/build-ios-framework.sh
+# iOS static lib (consumed by Mobile/iOS/ArcadiaApp.xcodeproj)
+bash Shared/Scripts/Builds/build-ios-app.sh
+# or just open Mobile/iOS/ArcadiaApp.xcodeproj — the "Build Rust (cargo)"
+# phase runs cargo and copies libarcadia_ios.a automatically.
 
 # Global CLI wrappers (macOS)
 bash Shared/Scripts/Installers/install-global-commands-macos.sh
 ```
 
+Cargo output is unified at `Builds/workspace/` via `/.cargo/config.toml`. Override with `CARGO_TARGET_DIR=... cargo ...` if needed.
+
 ---
 
 ## Known Gotchas
 
-- `surface.revision` only advances on `surface.patch` — CLI/FFI writes bypass it. Do not use revision as a reliable freshness signal until gap 1 in `Documentation/GAPS.md` is resolved.
+- `surface.revision` advances on every `ModulesConfig::save` — all write paths bump it, including CLI. GUI polls `surface.revision` on a timer when a remote route is active and shows a stale banner + Reload when it diverges.
 - Multiple concurrent GUIs on the same host = last-write-wins on `modules.toml`. No merge semantics.
 - LAN forwarding requires `remote-session`, `lan`, and `net` enabled locally. The peer checks its own module rules for the forwarded token.
-- iOS `ArcadiaCore.xcframework` must be manually rebuilt after `ffi.rs` changes — no CI automation yet.
 - `ARCADIA_NET_AS` env var overrides `thin-client.toml` `preferred_remote_route` on startup.
+- `thin-client.toml` flag `navigation_from_host_only = true`: when set and a LAN route is active, the GUI uses only host `surface.snapshot` navigation — no fallback to compiled-in nav until the snapshot supplies `navigation_registry`.
+- iOS surface is OpenFrame rendered into a `CAMetalLayer`, not SwiftUI. The Swift host is a ~50-line UIKit shell (`ArcadiaApp.swift` + `MetalHostView.swift`) whose only job is to provide a Metal layer and forward `UITouch` events. All UI logic lives in `Desktop/src/gui/app/` (via OpenFrame on iOS).
+- `surface.patch` `client_id` is attribution only — not authentication or authorization. Do not build access control on it.
+- The UniFFI / `Generated/` / `ArcadiaCore.xcframework` path is dead. iOS uses `libarcadia_ios.a` via a 2-function C ABI in `ios_lib.rs`. Do not reintroduce it.

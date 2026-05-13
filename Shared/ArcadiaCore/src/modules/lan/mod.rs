@@ -162,21 +162,25 @@ pub fn commands() -> &'static [ModuleCommand] {
         ModuleCommand {
             name: "scan",
             description: "discover Arcadia LAN peers (--range, --self supported)",
+            required_permissions: &["network.lan"],
             run: discovery::scan,
         },
         ModuleCommand {
             name: "status",
             description: "show LAN service status, port, and local hostname",
+            required_permissions: &["network.lan"],
             run: discovery::service_status,
         },
         ModuleCommand {
             name: "node",
             description: "manage LAN nodes: pair|connect|accept|reject|alias|save|auto|status",
+            required_permissions: &["network.lan"],
             run: handlers::node,
         },
         ModuleCommand {
             name: "session_targets",
             description: "JSON [{\"ip\",\"hostname\"}] for connected approved LAN peers (remote route picker)",
+            required_permissions: &["network.lan"],
             run: session_targets,
         },
     ]

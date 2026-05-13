@@ -2,7 +2,7 @@
 
 **One Rust core. One Python SDK. An infinite extension surface. Zero rent.**
 
-Arcadia is a multi-platform runtime and shell — an **open platform for building system-integrated applications**. A single `arcadia-core` crate owns modules, commands, navigation, LAN protocol, and config; GPUI (desktop), SwiftUI (iOS), and a CLI are thin surfaces over that core.
+Arcadia is a multi-platform runtime and shell — an **open platform for building system-integrated applications**. A single `arcadia-core` crate owns modules, commands, navigation, LAN protocol, and config; a single Rust UI layer ([OpenFrame](https://github.com/zed-industries/zed)) renders it on desktop (GPUI) and iOS (Metal), with a headless CLI sharing the same core.
 
 Built on the same DNA as **[Holos](https://github.com/stack-node/holos)** — *utility over monetization, ownership over subscriptions* — with a hard rule: **no duplicated truth between platforms, no hardcoded IDs in surface code, no growing dispatch chains that break the next time a module ships.**
 
@@ -15,7 +15,7 @@ In-depth guides live under [`Documentation/`](Documentation/). Use this as the m
 | Doc | What it covers |
 |-----|----------------|
 | [**Vision**](Documentation/VISION.md) | Why Arcadia exists and where it is headed |
-| [**Architecture**](Documentation/ARCHITECTURE.md) | Command model, modules, navigation, thin-client, FFI |
+| [**Architecture**](Documentation/ARCHITECTURE.md) | Command model, modules, navigation, thin-client, iOS surface |
 | [**Module & navigation reference**](Documentation/REFERENCE.md) | Every module and page in the registry |
 | [**Repository layout**](Documentation/REPOSITORY.md) | Directory map of the whole repo |
 | [**Configuration**](Documentation/CONFIGURATION.md) | Config files, prerequisites, environment variables |
@@ -39,14 +39,15 @@ In short: the software is meant for **people** — personal, educational, resear
 | Capability | How |
 |------------|-----|
 | Native shell / PTY terminal | `shell.execute` (routable), `shell.internal` (REPL), full PTY/TUI on Desktop |
-| Shell welcome banner | `shell-motd` module — fastfetch-style on shell open |
+| Shell welcome banner | `terminal-motd` module — fastfetch-style on terminal open |
 | Manage modules | CLI (`module enable/disable`) or GUI toggle; same `modules.toml` |
 | Discover LAN peers | `lan.scan`, `lan.node`, LAN nodes UI on Desktop and iOS |
 | Route commands to another machine | `ExecutionContext.net_as = "lan:IP"`, session chip on Desktop, route picker on iOS |
 | Mirror host UI state to clients | `surface.snapshot` — modules + nav registry + revision |
 | Push module changes from client to host | `surface.patch` with `modules_set` op |
+| Register workspace directories | `workspace` module — `workspace.add`, per-workspace `read`/`write`/`execute` grants; GUI panel in Settings |
 | Run headless as a host | `cargo run` (default `headless` feature) |
-| Rebuild iOS after FFI changes | `bash Shared/Scripts/Builds/build-ios-framework.sh` |
+| Build the iOS app | Open `Mobile/iOS/ArcadiaApp.xcodeproj` and build — the project's "Build Rust (cargo)" phase produces `libarcadia_ios.a` automatically |
 | Install global CLI wrappers | `bash Shared/Scripts/Installers/install-global-commands-macos.sh` |
 
 ---
@@ -56,7 +57,7 @@ In short: the software is meant for **people** — personal, educational, resear
 Moves fast. Breaks occasionally. That's intentional.
 
 - Features land continuously on `development`.
-- APIs (especially FFI and `surface.*`) may evolve — see [**Roadmap**](Documentation/ROADMAP.md).
+- APIs (especially the iOS C ABI in `Desktop/src/ios_lib.rs` and `surface.*`) may evolve — see [**Roadmap**](Documentation/ROADMAP.md).
 - Building from source is the surest way to stay current.
 - Stable tagged builds will appear as the project matures; CI exercises desktop + iOS simulator paths.
 
@@ -69,21 +70,24 @@ Moves fast. Breaks occasionally. That's intentional.
 | Tool | Required for |
 |------|-------------|
 | Rust (`rustup`, `cargo`) | Core + Desktop |
-| Xcode + CLI tools | iOS app + xcframework build |
-| `rustup target add aarch64-apple-ios aarch64-apple-ios-sim` | `Builds/build-ios-framework.sh` |
+| Xcode + CLI tools | iOS app build |
+| `rustup target add aarch64-apple-ios aarch64-apple-ios-sim` | iOS device + simulator builds |
 
 **Build:**
 
 ```sh
 # Desktop GUI
-cd Desktop && cargo run --features gui
+cargo run --manifest-path Desktop/Cargo.toml --features gui
 
 # Desktop CLI (headless)
-cd Desktop && cargo run
+cargo run --manifest-path Desktop/Cargo.toml
 
 # Core tests
-cd Shared && cargo test -p arcadia-core
+cargo test -p arcadia-core --manifest-path Shared/Cargo.toml
 
-# iOS framework (after ffi.rs changes)
-bash Shared/Scripts/Builds/build-ios-framework.sh
+# iOS app — open in Xcode and build, or:
+xcodebuild -project Mobile/iOS/ArcadiaApp.xcodeproj -scheme ArcadiaApp \
+  -configuration Release -sdk iphonesimulator \
+  -destination "generic/platform=iOS Simulator" \
+  -derivedDataPath Builds/Mobile/iOS/DerivedData/Simulator build
 ```

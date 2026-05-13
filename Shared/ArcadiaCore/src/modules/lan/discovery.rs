@@ -177,7 +177,10 @@ pub fn scan(args: &[&str], _context: &ExecutionContext) -> String {
         Err(msg) => return msg,
     };
     if include_self {
-        targets.push(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), DISCOVERY_PORT));
+        targets.push(SocketAddrV4::new(
+            Ipv4Addr::new(127, 0, 0, 1),
+            DISCOVERY_PORT,
+        ));
     }
 
     match discover_at(targets) {
@@ -229,7 +232,6 @@ pub fn start_service() -> Result<(), String> {
     SERVICE_RUNNING.store(true, Ordering::SeqCst);
 
     let handle = thread::spawn(move || {
-
         let mut buf = [0_u8; RECV_BUF_SMALL];
         while SERVICE_RUNNING.load(Ordering::SeqCst) {
             let Ok((len, src)) = socket.recv_from(&mut buf) else {
@@ -326,9 +328,15 @@ pub fn start_service() -> Result<(), String> {
     // Reconnect to previously approved nodes in the background.
     thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(300));
-        let Ok(cfg) = super::config::load_node_config() else { return; };
-        if cfg.approved_nodes.is_empty() { return; }
-        let Ok(sock) = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0)) else { return; };
+        let Ok(cfg) = super::config::load_node_config() else {
+            return;
+        };
+        if cfg.approved_nodes.is_empty() {
+            return;
+        }
+        let Ok(sock) = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0)) else {
+            return;
+        };
         let payload = format!("{NODE_CONNECT_PREFIX}\t{}", local_hostname());
         for ip_str in &cfg.approved_nodes {
             let key = super::config::normalize_node_identifier(ip_str);

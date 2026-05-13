@@ -10,7 +10,7 @@ pub use ios_ffi::*;
 
 #[cfg(feature = "ios-gui")]
 mod ios_ffi {
-    use std::os::raw::c_char;
+    use std::os::raw::{c_char, c_void};
     use std::path::PathBuf;
 
     /// Called once from the Swift host after UIApplication starts.
@@ -31,5 +31,40 @@ mod ios_ffi {
     #[no_mangle]
     pub extern "C" fn arcadia_ios_inject_touch(x: f32, y: f32, phase: u8) {
         crate::gui::app::entry_ios::inject_touch(x, y, phase);
+    }
+
+    /// Populates `*out_count` with accessibility snapshot length after latest drawn frame.
+    #[no_mangle]
+    pub unsafe extern "C" fn arcadia_ios_accessibility_node_count(out_count: *mut usize) {
+        if out_count.is_null() {
+            return;
+        }
+        *out_count = openframe::snapshot_node_count();
+    }
+
+    /// Writes hit rectangle (`out_rect4` = x, y, w, h), traits, and NUL-terminated UTF-8 strings.
+    #[no_mangle]
+    pub unsafe extern "C" fn arcadia_ios_accessibility_query_node(
+        index: usize,
+        out_rect4: *mut f32,
+        out_traits: *mut u64,
+        label_buf: *mut c_void,
+        label_cap: usize,
+        hint_buf: *mut c_void,
+        hint_cap: usize,
+        out_label_len: *mut usize,
+        out_hint_len: *mut usize,
+    ) {
+        openframe::snapshot_query_node(
+            index,
+            out_rect4,
+            out_traits,
+            label_buf.cast::<u8>(),
+            label_cap,
+            hint_buf.cast::<u8>(),
+            hint_cap,
+            out_label_len,
+            out_hint_len,
+        );
     }
 }

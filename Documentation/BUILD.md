@@ -31,15 +31,36 @@ Artifacts go under `Builds/workspace/` with everything else:
 cargo test -p arcadia-core --manifest-path Shared/Cargo.toml
 ```
 
-## iOS framework + Swift bindings
+## iOS app
 
-Run after any change to `ffi.rs` or exported types:
+The iOS app links a Rust static library (`libarcadia_ios.a`) built from the `arcadia` package with `--features ios-gui`. The Xcode project's "Build Rust (cargo)" phase runs cargo automatically when you build the app, so the normal flow is just:
 
 ```sh
-bash Shared/Scripts/Builds/build-ios-framework.sh
+# Install Rust targets once
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+# Open and build
+open Mobile/iOS/ArcadiaApp.xcodeproj
 ```
 
-Regenerates `Mobile/iOS/ArcadiaCore/Generated/` and rebuilds `ArcadiaCore.xcframework`. Then open `ArcadiaApp` in Xcode and build.
+Or from the command line:
+
+```sh
+xcodebuild \
+  -project Mobile/iOS/ArcadiaApp.xcodeproj \
+  -scheme ArcadiaApp \
+  -configuration Release \
+  -sdk iphonesimulator \
+  -destination "generic/platform=iOS Simulator" \
+  -derivedDataPath Builds/Mobile/iOS/DerivedData/Simulator \
+  build
+```
+
+To build only the static lib (for inspection or manual linking):
+
+```sh
+bash Shared/Scripts/Builds/build-ios-app.sh
+```
 
 ## Launcher menus
 
