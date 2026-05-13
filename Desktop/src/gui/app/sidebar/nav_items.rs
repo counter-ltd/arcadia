@@ -254,6 +254,8 @@ impl ArcadiaRoot {
         let chevron_col   = nav_idle_text(glyph, is_dark);
         let chevron       = if self.settings_hub_expanded { "▼" } else { "▶" };
         let radius        = nav_radius(glyph);
+        let has_pinned = self.pinned_settings_pages.iter()
+            .any(|pid| self.is_page_visible(pid));
         div()
             .flex()
             .flex_col()
@@ -283,25 +285,30 @@ impl ArcadiaRoot {
                                     .child(render_icon(hub_page.glyph()).size_4().text_color(icon_col))
                                     .child(div().child(hub_page.title().to_string())),
                             )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(chevron_col)
-                                    .child(chevron),
-                            ),
+                            .when(has_pinned, |d| {
+                                d.child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(chevron_col)
+                                        .child(chevron),
+                                )
+                            }),
                     )
                     .on_mouse_down(
                         openframe::MouseButton::Left,
-                        cx.listener(|this, _, _, cx| {
+                        cx.listener(move |this, _, _, cx| {
                             this.active_page_id =
                                 navigation::SETTINGS_HUB_ROOT_PAGE_ID.to_string();
-                            this.settings_hub_expanded = !this.settings_hub_expanded;
+                            if has_pinned {
+                                this.settings_hub_expanded = !this.settings_hub_expanded;
+                            }
                             cx.notify();
                         }),
                     ),
             )
             .child(if self.settings_hub_expanded {
+                let pinned: Vec<String> = self.pinned_settings_pages.clone();
                 div()
                     .flex()
                     .flex_col()
@@ -310,14 +317,15 @@ impl ArcadiaRoot {
                     .border_l_2()
                     .border_color(expand_border)
                     .children(
-                        self.settings_hub_page_ids_effective()
+                        pinned
                             .into_iter()
                             .filter_map(|page_id| {
-                                if !self.is_page_visible(page_id) {
+                                if !self.is_page_visible(&page_id) {
                                     return None;
                                 }
-                                let page = self.page_ref(page_id)?;
-                                let page_id_owned = page_id.to_string();
+                                let page = self.page_ref(&page_id)?;
+                                let page_id_owned = page_id.clone();
+                                let page_id_rclick = page_id.clone();
                                 let is_active = self.active_page_id == page.id();
                                 let sub_pal   = theme::nav_accent_palette(page.accent(), is_dark);
                                 let sub_icon  = if is_active { nav_active_text(glyph, sub_pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
@@ -327,6 +335,8 @@ impl ArcadiaRoot {
                                 } else {
                                     nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x243246) } else { rgb(0xeef2ff) })
                                 };
+                                let title = page.title().to_string();
+                                let glyph_key = page.glyph().to_string();
                                 Some(
                                     div()
                                         .px_3()
@@ -343,8 +353,8 @@ impl ArcadiaRoot {
                                                 .flex()
                                                 .gap_2()
                                                 .items_center()
-                                                .child(render_icon(page.glyph()).size_4().text_color(sub_icon))
-                                                .child(div().child(page.title().to_string())),
+                                                .child(render_icon(&glyph_key).size_4().text_color(sub_icon))
+                                                .child(div().child(title)),
                                         )
                                         .on_mouse_down(
                                             openframe::MouseButton::Left,
@@ -354,6 +364,13 @@ impl ArcadiaRoot {
                                                     this.reload_modules();
                                                 }
                                                 this.sync_settings_hub_expanded_from_active_page();
+                                                cx.notify();
+                                            }),
+                                        )
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Right,
+                                            cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
+                                                this.settings_pin_context_menu = Some((page_id_rclick.clone(), event.position));
                                                 cx.notify();
                                             }),
                                         )

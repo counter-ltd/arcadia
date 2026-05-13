@@ -287,6 +287,12 @@ impl ArcadiaRoot {
                 self.extension_token_settings_panel_for_module(window, cx, is_dark, mid),
             );
         }
+        // Dynamic extension nav pages declared via arcadia.register_nav_page().
+        if let Some(ext_id) = navigation::parse_extension_nav_page_id(&active) {
+            return div().w_full().p_6().child(
+                self.extension_nav_panel(window, cx, is_dark, ext_id),
+            );
+        }
 
         // Standard padded panels — add new pages here as new match arms.
         // All arms share the same div().w_full().p_6() wrapper.
@@ -505,8 +511,12 @@ impl ArcadiaRoot {
                 }
                 let page = self.page_ref(page_id)?;
                 let page_id_owned = page_id.to_string();
+                let page_id_pin = page_id_owned.clone();
                 let pal = theme::nav_accent_palette(page.accent(), is_dark);
                 let r = p.radius_md.min(12.0);
+                let is_pinned = self.pinned_settings_pages.iter().any(|p| p == page_id);
+                let pin_glyph = if is_pinned { "pin-fill" } else { "pin" };
+                let pin_color = if is_pinned { pal.icon_active } else { p.content_meta };
                 Some(
                     div()
                         .w(px(280.))
@@ -539,6 +549,20 @@ impl ArcadiaRoot {
                                         .text_color(p.content_title)
                                         .flex_1()
                                         .child(page.title().to_string()),
+                                )
+                                .child(
+                                    div()
+                                        .cursor_pointer()
+                                        .opacity(if is_pinned { 1.0 } else { 0.35 })
+                                        .child(render_icon(pin_glyph).size_4().text_color(pin_color))
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(move |this, _, _, cx| {
+                                                cx.stop_propagation();
+                                                this.toggle_settings_pin(&page_id_pin);
+                                                cx.notify();
+                                            }),
+                                        ),
                                 ),
                         )
                         .child(

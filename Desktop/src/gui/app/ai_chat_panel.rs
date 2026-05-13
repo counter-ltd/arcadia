@@ -152,8 +152,7 @@ impl ArcadiaRoot {
             .flex()
             .flex_col()
             .gap_4()
-            .w_full()
-            .max_w(px(720.));
+            .w_full();
 
         if messages.is_empty() && !is_loading {
             msg_col = msg_col.child(
@@ -183,7 +182,8 @@ impl ArcadiaRoot {
                 .border_color(if is_user { bubble_bg } else { p.panel_border })
                 .text_sm()
                 .text_color(text_col)
-                .max_w(px(540.))
+                .when(is_user, |d| d.max_w(px(540.)))
+                .when(!is_user, |d| d.w_full())
                 .child(content);
 
             msg_col = msg_col.child(
@@ -209,6 +209,7 @@ impl ArcadiaRoot {
                     .flex_row()
                     .child(
                         div()
+                            .w_full()
                             .px_3()
                             .py_2()
                             .rounded(px(radius.min(12.0)))
@@ -228,6 +229,7 @@ impl ArcadiaRoot {
                     .flex_row()
                     .child(
                         div()
+                            .w_full()
                             .px_3()
                             .py_2()
                             .rounded(px(radius.min(12.0)))
@@ -314,7 +316,6 @@ impl ArcadiaRoot {
                     .overflow_y_scroll()
                     .flex()
                     .flex_col()
-                    .items_center()
                     .p_4()
                     .child(msg_col),
             )

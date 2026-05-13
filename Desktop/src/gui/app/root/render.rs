@@ -185,6 +185,10 @@ impl Render for ArcadiaRoot {
                         this.llama_cpp_provider_menu = None;
                         changed = true;
                     }
+                    if this.settings_pin_context_menu.is_some() {
+                        this.settings_pin_context_menu = None;
+                        changed = true;
+                    }
                     if this.ai_chat_model_picker_open {
                         this.ai_chat_model_picker_open = false;
                         changed = true;
@@ -766,6 +770,32 @@ impl ArcadiaRoot {
                             cx.notify();
                         }),
                     ),
+                )
+                .into_any_element()
+        } else if let Some((ref pin_page_id, pin_pos)) = self.settings_pin_context_menu.clone() {
+            let pin_page_id = pin_page_id.clone();
+            let danger = crate::gui::theme::ui_danger(cx, is_dark);
+            div()
+                .absolute()
+                .left(pin_pos.x)
+                .top(pin_pos.y)
+                .min_w(px(160.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|_, _, _, cx| {
+                    cx.stop_propagation();
+                }))
+                .child(
+                    menu_row("pin", "Unpin".into(), danger, danger)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            this.toggle_settings_pin(&pin_page_id);
+                            this.settings_pin_context_menu = None;
+                            cx.notify();
+                        })),
                 )
                 .into_any_element()
         } else if self.app_menu_open {

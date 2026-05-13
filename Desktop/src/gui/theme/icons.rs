@@ -27,6 +27,8 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "file-text" => "icons/file-text.svg",
         "chevron-right" => "icons/chevron-right.svg",
         "chevron-down" => "icons/chevron-down.svg",
+        "pin" => "icons/pin.svg",
+        "pin-fill" => "icons/pin-fill.svg",
         "code" => "icons/modules.svg",
         "message" => "icons/message.svg",
         _ => "icons/terminal.svg",

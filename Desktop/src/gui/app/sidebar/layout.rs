@@ -490,6 +490,43 @@ impl ArcadiaRoot {
                                                 .into_any_element(),
                                             );
                                         }
+                                        let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+                                        let dim_hover = if is_dark { rgb(0x718096) } else { rgb(0x6b7280) };
+                                        items.push(
+                                            div()
+                                                .ml_7()
+                                                .pl_2()
+                                                .py_1()
+                                                .text_xs()
+                                                .text_color(dim)
+                                                .cursor_pointer()
+                                                .hover(|d| d.text_color(dim_hover))
+                                                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                                    let id = this.code_editor_next_id;
+                                                    let title = format!("untitled-{id}");
+                                                    this.code_editor_tabs.push(crate::gui::app::CodeEditorTab {
+                                                        id,
+                                                        title,
+                                                        content: String::new(),
+                                                        cursor: 0,
+                                                        selection_anchor: None,
+                                                        language: None,
+                                                        hl_spans: vec![],
+                                                        decorations: vec![],
+                                                        highlight_dirty: true,
+                                                        workspace_path: None,
+                                                        file_path: None,
+                                                        saved_content: String::new(),
+                                                    });
+                                                    this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
+                                                    this.code_editor_next_id += 1;
+                                                    this.active_page_id = "editor.main".to_string();
+                                                    this.code_editor_focus.focus(window);
+                                                    cx.notify();
+                                                }))
+                                                .child("Click to Create")
+                                                .into_any_element(),
+                                        );
                                     }
                                     if page_id == "ai.models" {
                                         let providers = arcadia_core::modules::ai::enabled_ai_providers(&self.module_rows);
@@ -532,37 +569,51 @@ impl ArcadiaRoot {
                                         }
                                     }
                                     if page_id == "ai.chat" {
-                                        if self.ai_chats.is_empty() {
-                                            let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+                                        for chat in &self.ai_chats {
+                                            let label = chat.title.clone();
+                                            let chat_id = chat.id;
+                                            let is_sub_active = is_page_active
+                                                && self.active_ai_chat_id == chat_id;
                                             items.push(
-                                                div()
-                                                    .ml_7()
-                                                    .pl_2()
-                                                    .py_1()
-                                                    .text_xs()
-                                                    .text_color(dim)
-                                                    .child("Right-click to create")
-                                                    .into_any_element(),
+                                                Self::sidebar_ai_chat_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from(label),
+                                                    chat_id,
+                                                    is_sub_active,
+                                                    is_dark,
+                                                    glyph,
+                                                )
+                                                .into_any_element(),
                                             );
-                                        } else {
-                                            for chat in &self.ai_chats {
-                                                let label = chat.title.clone();
-                                                let chat_id = chat.id;
-                                                let is_sub_active = is_page_active
-                                                    && self.active_ai_chat_id == chat_id;
-                                                items.push(
-                                                    Self::sidebar_ai_chat_sub_item(
-                                                        cx,
-                                                        openframe::SharedString::from(label),
-                                                        chat_id,
-                                                        is_sub_active,
-                                                        is_dark,
-                                                        glyph,
-                                                    )
-                                                    .into_any_element(),
-                                                );
-                                            }
                                         }
+                                        let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+                                        let dim_hover = if is_dark { rgb(0x718096) } else { rgb(0x6b7280) };
+                                        items.push(
+                                            div()
+                                                .ml_7()
+                                                .pl_2()
+                                                .py_1()
+                                                .text_xs()
+                                                .text_color(dim)
+                                                .cursor_pointer()
+                                                .hover(|d| d.text_color(dim_hover))
+                                                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
+                                                    let id = this.ai_next_id;
+                                                    this.ai_chats.push(crate::gui::app::AiChat {
+                                                        id,
+                                                        title: format!("Chat {id}"),
+                                                        messages: vec![],
+                                                        input_draft: String::new(),
+                                                        is_loading: false,
+                                                    });
+                                                    this.active_ai_chat_id = id;
+                                                    this.ai_next_id += 1;
+                                                    this.active_page_id = "ai.chat".to_string();
+                                                    cx.notify();
+                                                }))
+                                                .child("Click to Create")
+                                                .into_any_element(),
+                                        );
                                     }
                                 }
                                 div().flex().flex_col().gap_1().children(items)

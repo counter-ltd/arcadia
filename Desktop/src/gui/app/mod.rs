@@ -8,6 +8,7 @@ mod entry;
 #[cfg(feature = "ios-gui")]
 pub mod entry_ios;
 mod appearance;
+mod extension_nav_panel;
 mod extension_token_settings;
 mod lan_nodes;
 mod late;
@@ -446,6 +447,10 @@ pub struct ArcadiaRoot {
     pub ios_shell_focus: FocusHandle,
     #[cfg(feature = "ios-gui")]
     pub ios_shell_scroll: ScrollHandle,
+    /// Settings pages the user has pinned to the sidebar. Persisted in `ui-prefs.toml`.
+    pub pinned_settings_pages: Vec<String>,
+    /// Active right-click context menu on a pinned settings sidebar item: (page_id, position).
+    pub settings_pin_context_menu: Option<(String, openframe::Point<openframe::Pixels>)>,
     /// Leader-sequence state: `(shortcut_id, next_step_index)`.
     #[cfg(any(feature = "gui", feature = "ios-gui"))]
     pub shortcut_sequence_pending: Option<(String, usize)>,

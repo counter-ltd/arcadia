@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod appearance;
+pub mod ui_prefs;
 pub mod llama_cpp;
 pub mod ollama;
 pub mod openai;

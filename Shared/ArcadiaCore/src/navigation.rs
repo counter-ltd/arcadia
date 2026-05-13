@@ -121,12 +121,35 @@ impl NavigationRegistryOwned {
         self.services.iter().any(|s| s.page_id == page_id)
     }
 
-    /// Static registry plus one Settings hub page per extension that registered `register_tokens`
-    /// without owning an Appearance style (see [`python_registry::standalone_extension_token_modules`]).
+    /// Static registry merged with all extension-contributed pages (token settings + nav pages).
     pub fn with_extension_token_settings_merged() -> Self {
         let mut r = Self::from_static_registry();
         r.merge_extension_token_settings_pages();
+        r.merge_python_nav_pages();
         r
+    }
+
+    pub fn merge_python_nav_pages(&mut self) {
+        for decl in python_registry::list_nav_pages() {
+            let page_id = extension_nav_page_id(&decl.extension_id);
+            if self.pages.iter().any(|p| p.id == page_id) {
+                continue;
+            }
+            self.pages.push(NavigationPageOwned {
+                id: page_id.clone(),
+                title: decl.title.clone(),
+                description: decl.description.clone(),
+                glyph: decl.glyph.clone(),
+                system_image: decl.system_image.clone(),
+                accent: decl.accent.clone(),
+                required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),
+            });
+            if let Some(group) = self.groups.iter_mut().find(|g| g.id == decl.group_id) {
+                if !group.pages.contains(&page_id) {
+                    group.pages.push(page_id);
+                }
+            }
+        }
     }
 
     pub fn merge_extension_token_settings_pages(&mut self) {
@@ -423,6 +446,17 @@ pub const DEFAULT_PAGE_ID: &str = "global.dashboard";
 
 /// Settings hub pages for extensions with standalone `register_tokens` (not style-linked).
 pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "python.extension_tokens|";
+
+/// Nav group pages declared dynamically by Python extensions via `register_nav_page`.
+pub const EXTENSION_NAV_PAGE_PREFIX: &str = "python.nav_page|";
+
+pub fn extension_nav_page_id(extension_id: &str) -> String {
+    format!("{EXTENSION_NAV_PAGE_PREFIX}{extension_id}")
+}
+
+pub fn parse_extension_nav_page_id(page_id: &str) -> Option<&str> {
+    page_id.strip_prefix(EXTENSION_NAV_PAGE_PREFIX)
+}
 
 pub fn extension_token_settings_page_id(module: &str) -> String {
     format!("{EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX}{module}")

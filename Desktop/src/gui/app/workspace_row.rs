@@ -7,7 +7,7 @@ use openframe::{
 };
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
+use crate::gui::theme;
 
 impl ArcadiaRoot {
     pub fn workspace_row(
@@ -94,7 +94,6 @@ impl ArcadiaRoot {
 
         div()
             .w_full()
-            .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
             .rounded(px(panel_radius))
             .border_1()
             .border_color(p.border)

@@ -90,6 +90,8 @@ struct PythonRegistry {
     /// Extension ids whose tokens should appear in the editor settings panel instead of as
     /// standalone settings pages.
     editor_token_modules: std::collections::HashSet<String>,
+    /// Nav pages declared by extensions via `register_nav_page`.
+    nav_pages: Vec<NavPageDeclaration>,
 }
 
 /// Glyph rendering parameters provided by a Python extension when registering a style.
@@ -125,6 +127,38 @@ pub struct GlyphParams {
     pub border_radius: f32,
 }
 
+/// Button style hint for a nav page action.
+#[derive(Clone, Debug, PartialEq)]
+pub enum NavActionStyle {
+    Primary,
+    Secondary,
+    Destructive,
+}
+
+/// A single callable action declared by an extension's nav page.
+#[derive(Clone, Debug)]
+pub struct NavPageAction {
+    pub label: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub style: NavActionStyle,
+}
+
+/// A navigation page declared by a Python extension via `arcadia.register_nav_page()`.
+/// The page ID is always `"python.nav_page|{extension_id}"`.
+#[derive(Clone, Debug)]
+pub struct NavPageDeclaration {
+    pub extension_id: String,
+    pub group_id: String,
+    pub title: String,
+    pub description: String,
+    pub glyph: String,
+    pub system_image: String,
+    pub accent: String,
+    pub status_command: Option<String>,
+    pub actions: Vec<NavPageAction>,
+}
+
 /// Metadata for a render style registered by a Python extension.
 #[derive(Clone, Debug)]
 pub struct StyleInfo {
@@ -153,6 +187,7 @@ impl PythonRegistry {
             highlight_providers: HashMap::new(),
             decoration_providers: Vec::new(),
             editor_token_modules: std::collections::HashSet::new(),
+            nav_pages: Vec::new(),
         }
     }
 }
@@ -743,7 +778,29 @@ pub fn clear() {
         reg.highlight_providers.clear();
         reg.decoration_providers.clear();
         reg.editor_token_modules.clear();
+        reg.nav_pages.clear();
     }
+}
+
+pub fn register_nav_page(decl: NavPageDeclaration) {
+    if let Ok(mut reg) = registry().lock() {
+        reg.nav_pages.retain(|p| p.extension_id != decl.extension_id);
+        reg.nav_pages.push(decl);
+    }
+}
+
+pub fn list_nav_pages() -> Vec<NavPageDeclaration> {
+    let Ok(reg) = registry().lock() else {
+        return Vec::new();
+    };
+    reg.nav_pages.clone()
+}
+
+pub fn nav_page_for(extension_id: &str) -> Option<NavPageDeclaration> {
+    let Ok(reg) = registry().lock() else {
+        return None;
+    };
+    reg.nav_pages.iter().find(|p| p.extension_id == extension_id).cloned()
 }
 
 pub fn try_dispatch(token: &str, args: &[&str]) -> Result<Option<String>, String> {

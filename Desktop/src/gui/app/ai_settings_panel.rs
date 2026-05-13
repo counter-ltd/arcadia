@@ -6,6 +6,8 @@ use openframe::{
     ParentElement, Styled, Window,
 };
 
+use openframe::prelude::FluentBuilder as _;
+
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
@@ -25,7 +27,7 @@ impl ArcadiaRoot {
 
         let mut root = div()
             .w_full()
-            .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+            .when(g_snap.is_some(), |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
             .flex()
             .flex_col()
             .gap_6()

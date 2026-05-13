@@ -246,6 +246,7 @@ impl ArcadiaRoot {
         let llama_cpp_create_mmproj_focus = cx.focus_handle();
         let openai_api_key_focus = cx.focus_handle();
         let openai_base_url_focus = cx.focus_handle();
+        let ui_prefs_cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
         let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
@@ -445,6 +446,8 @@ impl ArcadiaRoot {
             shortcut_edge_drag_start: None,
             #[cfg(any(feature = "gui", feature = "ios-gui"))]
             shortcut_hot_corner_dwell: std::collections::HashMap::new(),
+            pinned_settings_pages: ui_prefs_cfg.pinned_settings_pages,
+            settings_pin_context_menu: None,
         };
 
         if let Ok(tc) = ThinClientConfig::load_or_create() {
@@ -1033,6 +1036,19 @@ impl ArcadiaRoot {
             },
         )
         .detach();
+    }
+
+    pub fn toggle_settings_pin(&mut self, page_id: &str) {
+        if let Some(i) = self.pinned_settings_pages.iter().position(|p| p == page_id) {
+            self.pinned_settings_pages.remove(i);
+        } else {
+            self.pinned_settings_pages.push(page_id.to_string());
+        }
+        let mut cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
+        cfg.pinned_settings_pages = self.pinned_settings_pages.clone();
+        if let Err(e) = cfg.save() {
+            eprintln!("ui-prefs save failed: {e}");
+        }
     }
 }
 

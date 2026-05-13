@@ -850,6 +850,74 @@ fn register_decoration_provider(extension_id: String, handler: PyObject) {
     );
 }
 
+#[pyfunction]
+#[pyo3(signature = (
+    extension_id,
+    group_id,
+    *,
+    title,
+    description,
+    glyph = None,
+    system_image = None,
+    accent = None,
+    status_command = None,
+    actions = None,
+))]
+fn register_nav_page(
+    extension_id: String,
+    group_id: String,
+    title: String,
+    description: String,
+    glyph: Option<String>,
+    system_image: Option<String>,
+    accent: Option<String>,
+    status_command: Option<String>,
+    actions: Option<Vec<PyObject>>,
+) {
+    use python_registry::{NavActionStyle, NavPageAction, NavPageDeclaration};
+    let parsed_actions = actions
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|obj| {
+            Python::with_gil(|py| {
+                let d = obj.downcast_bound::<PyDict>(py).ok()?;
+                let label: String = d.get_item("label").ok()??.extract().ok()?;
+                let command: String = d.get_item("command").ok()??.extract().ok()?;
+                let args: Vec<String> = d
+                    .get_item("args")
+                    .ok()
+                    .flatten()
+                    .and_then(|v| v.extract::<Vec<String>>().ok())
+                    .unwrap_or_default();
+                let style = d
+                    .get_item("style")
+                    .ok()
+                    .flatten()
+                    .and_then(|v| v.extract::<String>().ok())
+                    .as_deref()
+                    .map(|s| match s {
+                        "primary" => NavActionStyle::Primary,
+                        "destructive" => NavActionStyle::Destructive,
+                        _ => NavActionStyle::Secondary,
+                    })
+                    .unwrap_or(NavActionStyle::Secondary);
+                Some(NavPageAction { label, command, args, style })
+            })
+        })
+        .collect();
+    python_registry::register_nav_page(NavPageDeclaration {
+        extension_id,
+        group_id,
+        title,
+        description,
+        glyph: glyph.unwrap_or_else(|| "extensions".to_string()),
+        system_image: system_image.unwrap_or_else(|| "square.grid.2x2".to_string()),
+        accent: accent.unwrap_or_else(|| "amber".to_string()),
+        status_command,
+        actions: parsed_actions,
+    });
+}
+
 #[pymodule]
 pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_module, m)?)?;
@@ -882,5 +950,6 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_editor_token_module, m)?)?;
     m.add_function(wrap_pyfunction!(register_highlight_provider, m)?)?;
     m.add_function(wrap_pyfunction!(register_decoration_provider, m)?)?;
+    m.add_function(wrap_pyfunction!(register_nav_page, m)?)?;
     Ok(())
 }

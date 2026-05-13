@@ -19,6 +19,7 @@ impl ArcadiaRoot {
     ) -> impl IntoElement {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
+        let is_glyph = g_snap.is_some();
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
         // If a specific llama-cpp model is selected, show its detail view.
@@ -26,7 +27,7 @@ impl ArcadiaRoot {
             if let Some(model) = self.llama_cpp_models.iter().find(|m| m.id == model_id).cloned() {
                 return div()
                     .w_full()
-                    .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+                    .when(is_glyph, |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
                     .flex()
                     .flex_col()
                     .gap_6()
@@ -86,7 +87,7 @@ impl ArcadiaRoot {
 
         let mut root = div()
             .w_full()
-            .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+            .when(is_glyph, |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
             .flex()
             .flex_col()
             .gap_6()
