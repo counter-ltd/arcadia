@@ -1,0 +1,5 @@
+c825221 fix: googly_eyes and overlay_pet refinements — claude pet removal, animation updates
+9dc38d9 feat: new extensions (rainbow_indent, rust_syntax, taurine), overlay_pet updates, remove default_theme
+f557f1f feat: extension icons in sidebar; overlay HUD display size; python icon refresh
+49df84d feat(googly-eyes): narrower wink line, hold-to-wink; extension icons; overlay_pet updates
+4c9e0ba Ignore .DS_Store

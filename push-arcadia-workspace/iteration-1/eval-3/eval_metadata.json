@@ -1,0 +1,27 @@
+{
+  "eval_id": 3,
+  "eval_name": "explicit-submodule-push",
+  "prompt": "User says 'commit and push everything including extensions'",
+  "assertions": [
+    {
+      "name": "submodule_committed_first",
+      "description": "Extensions submodule committed before main repo",
+      "check": "Extension commit message appears in transcript before main commit"
+    },
+    {
+      "name": "main_references_submodule",
+      "description": "Main repo commit includes submodule reference update",
+      "check": "Main commit message or log shows Extensions submodule hash update"
+    },
+    {
+      "name": "correct_branches",
+      "description": "Extensions pushed to main, main repo to development",
+      "check": "Push output shows 'main' for Extensions and 'development' for main repo"
+    },
+    {
+      "name": "all_cleaned_up",
+      "description": "Both repos clean after push (nothing to commit)",
+      "check": "Final git status shows 'working tree clean' for both"
+    }
+  ]
+}

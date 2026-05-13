@@ -1,0 +1,32 @@
+{
+  "eval_id": 1,
+  "eval_name": "simple-push-arcadia-command",
+  "prompt": "User says 'push arcadia'",
+  "assertions": [
+    {
+      "name": "extensions_committed",
+      "description": "Extensions submodule has a commit recorded",
+      "check": "Extension commit hash appears in output"
+    },
+    {
+      "name": "main_committed",
+      "description": "Main repo has a commit recorded",
+      "check": "Main repo commit hash appears in output"
+    },
+    {
+      "name": "extensions_pushed_to_main",
+      "description": "Extensions pushed to origin/main",
+      "check": "Output shows 'to origin/main' or similar"
+    },
+    {
+      "name": "main_pushed_to_development",
+      "description": "Main repo pushed to origin/development",
+      "check": "Output shows 'to origin/development' or similar"
+    },
+    {
+      "name": "submodule_first",
+      "description": "Submodule committed before main repo",
+      "check": "Extensions commit appears before main commit in transcript"
+    }
+  ]
+}

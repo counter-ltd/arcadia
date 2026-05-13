@@ -1,0 +1,22 @@
+{
+  "eval_id": 2,
+  "eval_name": "commit-and-push-all-variant",
+  "prompt": "User says 'push + commit all'",
+  "assertions": [
+    {
+      "name": "both_repos_committed",
+      "description": "Both Extensions and main repo committed",
+      "check": "Two commit hashes reported or git commits recorded in both repos"
+    },
+    {
+      "name": "both_repos_pushed",
+      "description": "Both repos pushed to remote",
+      "check": "Push output for both main and development branches"
+    },
+    {
+      "name": "descriptive_messages",
+      "description": "Commit messages are descriptive based on changes",
+      "check": "Messages include feat/fix type and specific details (not generic)"
+    }
+  ]
+}
