@@ -227,7 +227,7 @@ pub fn start_service() -> Result<(), String> {
     let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, DISCOVERY_PORT))
         .map_err(|err| format!("Failed to bind UDP socket on port {DISCOVERY_PORT}: {err}"))?;
     socket
-        .set_read_timeout(Some(Duration::from_millis(200)))
+        .set_read_timeout(Some(Duration::from_millis(1000)))
         .map_err(|err| format!("Failed to configure LAN service socket: {err}"))?;
     SERVICE_RUNNING.store(true, Ordering::SeqCst);
 

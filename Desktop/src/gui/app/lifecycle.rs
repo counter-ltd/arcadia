@@ -943,6 +943,34 @@ impl ArcadiaRoot {
     }
 
     #[cfg(any(feature = "gui", feature = "ios-gui"))]
+    pub(crate) fn any_text_input_focused(&self, window: &Window, cx: &Context<Self>) -> bool {
+        self.shell_focus.contains_focused(window, cx)
+            || self.ai_input_focus.contains_focused(window, cx)
+            || self.late_compose_focus.contains_focused(window, cx)
+            || self.late_settings_server_url_focus.contains_focused(window, cx)
+            || self.late_settings_username_focus.contains_focused(window, cx)
+            || self.late_settings_default_room_focus.contains_focused(window, cx)
+            || self.extension_token_focus.contains_focused(window, cx)
+            || self.modules_search_focus.contains_focused(window, cx)
+            || self.extensions_search_focus.contains_focused(window, cx)
+            || self.permissions_search_focus.contains_focused(window, cx)
+            || self.shortcuts_search_focus.contains_focused(window, cx)
+            || self.workspace_search_focus.contains_focused(window, cx)
+            || self.shortcut_create_label_focus.contains_focused(window, cx)
+            || self.shortcut_create_token_focus.contains_focused(window, cx)
+            || self.shortcut_create_args_focus.contains_focused(window, cx)
+            || self.code_editor_focus.contains_focused(window, cx)
+            || self.code_editor_char_width_focus.contains_focused(window, cx)
+            || self.openai_api_key_focus.contains_focused(window, cx)
+            || self.openai_base_url_focus.contains_focused(window, cx)
+            || self.llama_cpp_create_name_focus.contains_focused(window, cx)
+            || self.llama_cpp_create_path_focus.contains_focused(window, cx)
+            || self.llama_cpp_create_mmproj_focus.contains_focused(window, cx)
+            || self.workspace_create_label_focus.contains_focused(window, cx)
+            || self.workspace_create_path_focus.contains_focused(window, cx)
+    }
+
+    #[cfg(any(feature = "gui", feature = "ios-gui"))]
     pub fn ensure_text_caret_blink_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.text_caret_blink_task_started {
             return;
@@ -956,10 +984,12 @@ impl ArcadiaRoot {
                     loop {
                         Timer::after(Duration::from_millis(500)).await;
                         let should_stop = cx
-                            .update(|_, app| {
+                            .update(|window, app| {
                                 view.update(app, |this, cx| {
                                     this.text_caret_blink_visible = !this.text_caret_blink_visible;
-                                    cx.notify();
+                                    if this.any_text_input_focused(window, cx) {
+                                        cx.notify();
+                                    }
                                     false
                                 })
                                 .unwrap_or(true)

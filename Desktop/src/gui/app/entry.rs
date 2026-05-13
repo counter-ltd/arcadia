@@ -76,7 +76,7 @@ fn spawn_main_thread_pump(app: &mut openframe::App) {
 
     app.spawn(async |cx| {
         loop {
-            Timer::after(Duration::from_millis(16)).await;
+            Timer::after(Duration::from_millis(50)).await;
             if QUIT_REQUESTED.load(Ordering::Acquire) {
                 cx.update(|app| app.quit()).ok();
                 return;

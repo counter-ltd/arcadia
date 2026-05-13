@@ -109,6 +109,7 @@ struct EngineInner {
     tweens: BTreeMap<TweenId, TweenEntry>,
     next_id: u64,
     driver_started: bool,
+    driver_task_id: Option<scheduling::TaskId>,
 }
 
 static ENGINE: OnceLock<Mutex<EngineInner>> = OnceLock::new();
@@ -119,6 +120,7 @@ fn engine() -> &'static Mutex<EngineInner> {
             tweens: BTreeMap::new(),
             next_id: 1,
             driver_started: false,
+            driver_task_id: None,
         })
     })
 }
@@ -130,11 +132,12 @@ fn ensure_driver() {
     }
     inner.driver_started = true;
     drop(inner);
-    scheduling::spawn_interval_on_lane(
+    let id = scheduling::spawn_interval_on_lane(
         scheduling::TaskLane::Default,
         Duration::from_millis(16),
         tick,
     );
+    engine().lock().unwrap_or_else(|e| e.into_inner()).driver_task_id = Some(id);
 }
 
 fn tick() {
@@ -184,6 +187,20 @@ fn tick() {
     // Phase 4: fire on_complete without holding the lock.
     for cb in complete_cbs {
         cb();
+    }
+
+    // Phase 5: stop the recurring driver when all tweens have finished.
+    let cancel_id = {
+        let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
+        if inner.tweens.is_empty() {
+            inner.driver_started = false;
+            inner.driver_task_id.take()
+        } else {
+            None
+        }
+    };
+    if let Some(id) = cancel_id {
+        scheduling::cancel(id);
     }
 }
 
