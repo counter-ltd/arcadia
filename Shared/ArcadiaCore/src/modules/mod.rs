@@ -1,4 +1,6 @@
 pub mod ai;
+pub mod ai_chat_store;
+pub mod ai_exec_cli;
 pub mod ai_context;
 pub mod ai_sandbox;
 pub mod ai_tools;

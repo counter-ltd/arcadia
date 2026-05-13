@@ -1,8 +1,13 @@
+use arcadia_core::config::ai_rules::{all_rules, AiRulesConfig};
+use arcadia_core::config::ai_skills::{all_skills, AiSkillsConfig};
 use arcadia_core::config::ollama::OllamaConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::config::modules::{
-    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME, AI_EXEC_CODEX_MODULE_NAME,
+    AI_EXEC_GEMINI_MODULE_NAME, AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
+    AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
+use arcadia_core::modules::ai_exec_cli::cli_for_module;
 use arcadia_core::modules::ai::is_ai_provider_available;
 use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::{
@@ -303,8 +308,11 @@ impl ArcadiaRoot {
 
         self.ensure_text_caret_blink_task(window, cx);
 
-        div()
-            .size_full()
+        let strip = self.ai_rules_skills_strip(cx, is_dark);
+
+        let main_col = div()
+            .flex_1()
+            .min_w_0()
             .flex()
             .flex_col()
             .child(
@@ -319,7 +327,275 @@ impl ArcadiaRoot {
                     .p_4()
                     .child(msg_col),
             )
-            .child(input_area)
+            .child(strip)
+            .child(input_area);
+
+        div()
+            .size_full()
+            .flex()
+            .flex_row()
+            .child(main_col)
+    }
+
+    fn ai_rules_skills_strip(
+        &mut self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let g_snap = theme::glyph_snapshot(cx);
+        let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
+        let accent = theme::ui_accent(cx);
+        let accent_fg = theme::ui_accent_fg(cx);
+
+        let active_rules = self.ai_active_rule_ids.clone();
+        let active_skills = self.ai_active_skill_ids.clone();
+        let rule_picker_open = self.ai_rule_picker_open;
+        let skill_picker_open = self.ai_skill_picker_open;
+
+        // Load available rules + skills (ignore errors — degrade to empty).
+        let rules_cfg = AiRulesConfig::load_or_create().unwrap_or_default();
+        let skills_cfg = AiSkillsConfig::load_or_create().unwrap_or_default();
+        let all_r = all_rules(&rules_cfg);
+        let all_s = all_skills(&skills_cfg);
+
+        let mut row = div()
+            .w_full()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap_1p5()
+            .px_4()
+            .py_2()
+            .border_t_1()
+            .border_color(p.panel_border);
+
+        // Active rule chips
+        for id in &active_rules {
+            if let Some(rule) = all_r.iter().find(|r| &r.id == id) {
+                let rule_id = id.clone();
+                let chip = div()
+                    .px_2()
+                    .py_0p5()
+                    .rounded(px(radius.min(6.0)))
+                    .bg(accent)
+                    .text_xs()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(accent_fg)
+                    .cursor_pointer()
+                    .child(format!("R: {}", rule.name))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                        this.ai_active_rule_ids.retain(|r| r != &rule_id);
+                        cx.notify();
+                    }));
+                row = row.child(chip);
+            }
+        }
+
+        // Active skill chips
+        for id in &active_skills {
+            if let Some(skill) = all_s.iter().find(|s| &s.id == id) {
+                let skill_id = id.clone();
+                let chip = div()
+                    .px_2()
+                    .py_0p5()
+                    .rounded(px(radius.min(6.0)))
+                    .bg(p.panel_bg)
+                    .border_1()
+                    .border_color(accent)
+                    .text_xs()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(accent)
+                    .cursor_pointer()
+                    .child(format!("S: {}", skill.name))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                        this.ai_active_skill_ids.retain(|s| s != &skill_id);
+                        cx.notify();
+                    }));
+                row = row.child(chip);
+            }
+        }
+
+        // "+ Rule" toggle button
+        let rule_btn_bg = if rule_picker_open { accent } else { p.panel_bg };
+        let rule_btn_fg = if rule_picker_open { accent_fg } else { p.content_meta };
+        row = row.child(
+            div()
+                .px_2()
+                .py_0p5()
+                .rounded(px(radius.min(6.0)))
+                .bg(rule_btn_bg)
+                .border_1()
+                .border_color(p.panel_border)
+                .text_xs()
+                .text_color(rule_btn_fg)
+                .cursor_pointer()
+                .child("+ Rule")
+                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
+                    this.ai_rule_picker_open = !this.ai_rule_picker_open;
+                    this.ai_skill_picker_open = false;
+                    cx.notify();
+                })),
+        );
+
+        // "+ Skill" toggle button
+        let skill_btn_bg = if skill_picker_open { accent } else { p.panel_bg };
+        let skill_btn_fg = if skill_picker_open { accent_fg } else { p.content_meta };
+        row = row.child(
+            div()
+                .px_2()
+                .py_0p5()
+                .rounded(px(radius.min(6.0)))
+                .bg(skill_btn_bg)
+                .border_1()
+                .border_color(p.panel_border)
+                .text_xs()
+                .text_color(skill_btn_fg)
+                .cursor_pointer()
+                .child("+ Skill")
+                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
+                    this.ai_skill_picker_open = !this.ai_skill_picker_open;
+                    this.ai_rule_picker_open = false;
+                    cx.notify();
+                })),
+        );
+
+        // "Stage Writes" toggle chip
+        let stage_writes = self.ai_stage_writes;
+        let (sw_bg, sw_fg) = if stage_writes {
+            (accent, accent_fg)
+        } else {
+            (p.panel_bg, p.content_meta)
+        };
+        row = row.child(
+            div()
+                .px_2()
+                .py_0p5()
+                .rounded(px(radius.min(6.0)))
+                .bg(sw_bg)
+                .border_1()
+                .border_color(if stage_writes { accent } else { p.panel_border })
+                .text_xs()
+                .text_color(sw_fg)
+                .cursor_pointer()
+                .child(if stage_writes { "Stage On" } else { "Stage Off" })
+                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
+                    this.ai_stage_writes = !this.ai_stage_writes;
+                    cx.notify();
+                })),
+        );
+
+        // Picker panels (inline dropdown below the strip)
+        let picker = if rule_picker_open {
+            let mut picker_col = div()
+                .w_full()
+                .px_4()
+                .pb_2()
+                .flex()
+                .flex_col()
+                .gap_1();
+            for rule in &all_r {
+                let is_active = active_rules.contains(&rule.id);
+                let rule_id = rule.id.clone();
+                let item_bg = if is_active { accent } else { p.panel_bg };
+                let item_fg = if is_active { accent_fg } else { p.content_body };
+                picker_col = picker_col.child(
+                    div()
+                        .w_full()
+                        .px_3()
+                        .py_1p5()
+                        .rounded(px(radius.min(6.0)))
+                        .bg(item_bg)
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .flex()
+                        .flex_col()
+                        .gap_0p5()
+                        .cursor_pointer()
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(item_fg)
+                                .child(rule.name.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(if is_active { accent_fg } else { p.content_meta })
+                                .child(rule.system_fragment.chars().take(80).collect::<String>()),
+                        )
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            if this.ai_active_rule_ids.contains(&rule_id) {
+                                this.ai_active_rule_ids.retain(|r| r != &rule_id);
+                            } else {
+                                this.ai_active_rule_ids.push(rule_id.clone());
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+            Some(picker_col)
+        } else if skill_picker_open {
+            let mut picker_col = div()
+                .w_full()
+                .px_4()
+                .pb_2()
+                .flex()
+                .flex_col()
+                .gap_1();
+            for skill in &all_s {
+                let is_active = active_skills.contains(&skill.id);
+                let skill_id = skill.id.clone();
+                let item_bg = if is_active { accent } else { p.panel_bg };
+                let item_fg = if is_active { accent_fg } else { p.content_body };
+                picker_col = picker_col.child(
+                    div()
+                        .w_full()
+                        .px_3()
+                        .py_1p5()
+                        .rounded(px(radius.min(6.0)))
+                        .bg(item_bg)
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .flex()
+                        .flex_col()
+                        .gap_0p5()
+                        .cursor_pointer()
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(item_fg)
+                                .child(skill.name.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(if is_active { accent_fg } else { p.content_meta })
+                                .child(skill.system_fragment.chars().take(80).collect::<String>()),
+                        )
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            if this.ai_active_skill_ids.contains(&skill_id) {
+                                this.ai_active_skill_ids.retain(|s| s != &skill_id);
+                            } else {
+                                this.ai_active_skill_ids.push(skill_id.clone());
+                            }
+                            cx.notify();
+                        })),
+                );
+            }
+            Some(picker_col)
+        } else {
+            None
+        };
+
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .child(row)
+            .when_some(picker, |d, p| d.child(p))
     }
 
     pub fn ai_send_message(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -371,6 +647,19 @@ impl ArcadiaRoot {
                         .ok_or_else(|| format!("Model '{id}' not found.")),
                 }
             }
+            AI_EXEC_CLAUDE_MODULE_NAME
+            | AI_EXEC_CODEX_MODULE_NAME
+            | AI_EXEC_GEMINI_MODULE_NAME
+            | AI_EXEC_AIDER_MODULE_NAME => {
+                match cli_for_module(&provider) {
+                    Some((binary, model_flag)) => Ok(ProviderRouting::ExecCli {
+                        binary: binary.to_string(),
+                        model_flag: model_flag.map(str::to_string),
+                        model_value: model_id.as_deref().unwrap_or("").to_string(),
+                    }),
+                    None => Err(format!("Unknown CLI provider module: {provider}")),
+                }
+            }
             _ => Err("No AI provider enabled. Enable one in Modules.".to_string()),
         };
 
@@ -386,13 +675,17 @@ impl ArcadiaRoot {
                 None
             };
 
-        // Push user message + clear draft.
+        // Push user message + clear draft. Track provider/model for session persistence.
         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
             chat.messages.push(AiMessage {
                 role: AiMessageRole::User,
                 content: input.clone(),
             });
             chat.input_draft.clear();
+            chat.session_provider = provider.clone();
+            if let Some(ref mid) = model_id {
+                chat.session_model_id = mid.clone();
+            }
         }
 
         let routing = match routing_result {
@@ -449,6 +742,9 @@ impl ArcadiaRoot {
                 max_tokens: 512,
                 workspace_context,
                 tools,
+                active_rule_ids: self.ai_active_rule_ids.clone(),
+                active_skill_ids: self.ai_active_skill_ids.clone(),
+                stage_writes: self.ai_stage_writes,
             },
         });
 

@@ -33,8 +33,11 @@ mod shortcuts_create_modal;
 mod shortcuts_panel;
 mod shortcuts_row;
 mod ai_chat_panel;
+mod ai_diff_panel;
 mod ai_models_panel;
+mod ai_rules_panel;
 mod ai_settings_panel;
+mod ai_skills_panel;
 mod llama_cpp_create_model_modal;
 pub mod ai_runtime;
 mod code_editor_panel;
@@ -186,6 +189,44 @@ pub struct AiChat {
     pub messages: Vec<AiMessage>,
     pub input_draft: String,
     pub is_loading: bool,
+    /// Backing session ID on disk. None until first message is sent.
+    pub session_id: Option<String>,
+    /// Provider module used in this chat session.
+    pub session_provider: String,
+    /// Model ID used in this chat session.
+    pub session_model_id: String,
+}
+
+#[derive(Clone)]
+pub struct AiSessionSummary {
+    pub id: String,
+    pub title: String,
+    pub updated_at: u64,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum DiffHunkKind {
+    Added,
+    Removed,
+    Context,
+}
+
+#[derive(Clone)]
+pub struct DiffHunk {
+    pub index: usize,
+    pub orig_lines: Vec<String>,
+    pub new_lines: Vec<String>,
+    pub kind: DiffHunkKind,
+}
+
+#[derive(Clone)]
+pub struct AiPendingEdit {
+    pub path: String,
+    pub original: String,
+    pub proposed: String,
+    pub hunks: Vec<DiffHunk>,
+    pub accepted: std::collections::BTreeSet<usize>,
+    pub rejected: std::collections::BTreeSet<usize>,
 }
 
 #[derive(Clone)]
@@ -298,6 +339,11 @@ pub struct ArcadiaRoot {
     pub ai_next_id: usize,
     pub ai_context_menu_open: bool,
     pub ai_chat_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
+    /// Right-click context menu on a persisted session item (session_id, position).
+    pub ai_session_menu: Option<(String, openframe::Point<openframe::Pixels>)>,
+    /// Inline rename state for a session (session_id, draft_title).
+    pub ai_session_rename: Option<(String, String)>,
+    pub ai_rename_focus: FocusHandle,
     pub ai_input_focus: FocusHandle,
     pub ai_default_system_prompt: String,
     /// Model selected for use in chat (model ID string).
@@ -314,8 +360,28 @@ pub struct ArcadiaRoot {
     pub ai_stream_chat_id: Option<usize>,
     /// Whether the 50ms inference poll task is running.
     pub ai_poll_task_started: bool,
+    /// Active rule IDs for the current chat session.
+    pub ai_active_rule_ids: Vec<String>,
+    /// Active skill IDs for the current chat session.
+    pub ai_active_skill_ids: Vec<String>,
+    /// Whether the rule picker popover is open.
+    pub ai_rule_picker_open: bool,
+    /// Whether the skill picker popover is open.
+    pub ai_skill_picker_open: bool,
+    /// Whether the session history sidebar is visible.
+    pub ai_session_sidebar_open: bool,
+    /// Index of past chat sessions (loaded on startup, refreshed on save).
+    pub ai_sessions: Vec<AiSessionSummary>,
+    /// Staged file edits awaiting user approval.
+    pub ai_pending_edits: Vec<AiPendingEdit>,
+    /// Whether the diff review panel is open.
+    pub ai_diff_panel_open: bool,
+    /// Whether AI write tools stage edits for review rather than writing directly.
+    pub ai_stage_writes: bool,
     /// Module name of the provider selected in the Models sidebar (e.g. `"ai-provider-llama-cpp"`).
     pub active_ai_provider_module: String,
+    /// CLI AI providers detected on PATH at startup (claude, codex, gemini, aider, …).
+    pub detected_cli_providers: Vec<arcadia_core::modules::ai_exec_cli::DetectedCliProvider>,
     /// Models loaded from llama-cpp.toml.
     pub llama_cpp_models: Vec<arcadia_core::config::llama_cpp::LlamaCppModel>,
     /// Endpoint URL for Ollama (loaded from ollama.toml).
@@ -453,6 +519,10 @@ pub struct ArcadiaRoot {
     pub ios_shell_focus: FocusHandle,
     #[cfg(feature = "ios-gui")]
     pub ios_shell_scroll: ScrollHandle,
+    /// When true, the tilde command bar is open and focused in the top bar.
+    pub command_bar_open: bool,
+    pub command_bar_input: String,
+    pub command_bar_focus: FocusHandle,
     /// Settings pages the user has pinned to the sidebar. Persisted in `ui-prefs.toml`.
     pub pinned_settings_pages: Vec<String>,
     /// Active right-click context menu on a pinned settings sidebar item: (page_id, position).

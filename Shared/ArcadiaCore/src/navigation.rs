@@ -380,6 +380,24 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
     },
+    NavigationPageDefinition {
+        id: "ai.rules",
+        title: "Rules",
+        description: "Configure AI rules — per-chat constraints, forbidden tools, response format.",
+        glyph: "permissions",
+        system_image: "shield",
+        accent: "violet",
+        required_module: Some("ai-rules"),
+    },
+    NavigationPageDefinition {
+        id: "ai.skills",
+        title: "Skills",
+        description: "Configure AI skills — named behaviours with system prompt fragments and tool allowlists.",
+        glyph: "tools",
+        system_image: "wrench.and.screwdriver",
+        accent: "violet",
+        required_module: Some("ai-skills"),
+    },
 ];
 
 pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
@@ -420,7 +438,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
         label: "AI",
         glyph: "message",
         system_image: "message",
-        pages: &["ai.chat", "ai.models"],
+        pages: &["ai.chat", "ai.models", "ai.rules", "ai.skills"],
         accent: "violet",
     },
 ];

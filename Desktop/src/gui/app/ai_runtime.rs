@@ -1,7 +1,12 @@
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::Duration;
 
-use arcadia_core::config::{openai::OpenAiConfig, ConfigFile};
+use arcadia_core::config::{
+    ai_rules::{all_rules, AiRulesConfig},
+    ai_skills::{all_skills, AiSkillsConfig},
+    openai::OpenAiConfig,
+    ConfigFile,
+};
 use arcadia_core::modules::ai_context;
 use arcadia_core::modules::ai_tools;
 use arcadia_core::modules::ai_types::TextGenerationRequest;
@@ -12,6 +17,8 @@ pub enum RuntimeEvent {
     Token(String),
     Done,
     Error(String),
+    /// AI proposed a file edit that was staged instead of written to disk.
+    PendingEdit { path: String, original: String, proposed: String },
 }
 
 pub enum AiRuntimeRequest {
@@ -28,6 +35,9 @@ pub enum ProviderRouting {
     /// API key is NOT carried here — the inference thread loads it from config
     /// on demand so it never travels through the mpsc channel.
     OpenAi   { model_id: String },
+    /// Spawn an installed AI CLI binary (claude, codex, gemini, aider, …).
+    /// Prompt is delivered via stdin pipe — no shell interpolation of user content.
+    ExecCli  { binary: String, model_flag: Option<String>, model_value: String },
 }
 
 pub struct AiRuntimeHandle {
@@ -100,6 +110,9 @@ fn ai_thread_impl(rx: Receiver<AiRuntimeRequest>, tx: SyncSender<RuntimeEvent>) 
                 ProviderRouting::OpenAi { model_id } => {
                     run_openai(&model_id, request, &tx);
                 }
+                ProviderRouting::ExecCli { binary, model_flag, model_value } => {
+                    run_exec_cli(&binary, model_flag.as_deref(), &model_value, request, &tx);
+                }
             },
         }
     }
@@ -113,13 +126,88 @@ fn ai_thread_impl(rx: Receiver<AiRuntimeRequest>, tx: SyncSender<RuntimeEvent>) 
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
-/// Build the effective system prompt: inject file context from @mentions,
-/// then append tool definitions if tools are present.
-fn prepare_system(request: &TextGenerationRequest) -> Result<String, String> {
-    let mut system = request.system.clone();
+struct PreparedSystem {
+    system: String,
+    effective_max_tokens: i32,
+    /// Tool names blocked by active rules (never executed, model told they failed).
+    forbidden_tool_names: Vec<String>,
+}
 
-    // File context injection.
+/// Build the effective system prompt: inject rules/skills fragments, @mention
+/// file context, then append tool definitions (minus forbidden tools).
+fn prepare_system(request: &TextGenerationRequest) -> Result<PreparedSystem, String> {
+    let mut system = request.system.clone();
+    let mut effective_max_tokens = request.max_tokens;
+    let mut forbidden_tool_names: Vec<String> = Vec::new();
+    let mut skill_allowed_tools: Option<Vec<String>> = None;
+
+    // Rules & Skills injection.
+    if !request.active_rule_ids.is_empty() || !request.active_skill_ids.is_empty() {
+        let rules_cfg = AiRulesConfig::load_or_create().unwrap_or_default();
+        let skills_cfg = AiSkillsConfig::load_or_create().unwrap_or_default();
+        let all_r = all_rules(&rules_cfg);
+        let all_s = all_skills(&skills_cfg);
+
+        for id in &request.active_rule_ids {
+            if let Some(rule) = all_r.iter().find(|r| &r.id == id) {
+                system = format!("{system}\n\n{}", rule.system_fragment);
+                forbidden_tool_names.extend(rule.forbidden_tools.iter().cloned());
+                if let Some(mt) = rule.max_tokens_override {
+                    effective_max_tokens = effective_max_tokens.min(mt);
+                }
+            }
+        }
+
+        for id in &request.active_skill_ids {
+            if let Some(skill) = all_s.iter().find(|s| &s.id == id) {
+                system = format!("{system}\n\n{}", skill.system_fragment);
+                if let Some(mt) = skill.max_tokens_override {
+                    effective_max_tokens = effective_max_tokens.min(mt);
+                }
+                if !skill.allowed_tools.is_empty() {
+                    let allowed = skill_allowed_tools.get_or_insert_with(Vec::new);
+                    for t in &skill.allowed_tools {
+                        if !allowed.contains(t) {
+                            allowed.push(t.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Any tool not in the skill allow-list is effectively forbidden.
+        if let Some(ref allowed) = skill_allowed_tools {
+            for tool in &request.tools {
+                if !allowed.iter().any(|a| a == tool.name) && !forbidden_tool_names.iter().any(|f| f == tool.name) {
+                    forbidden_tool_names.push(tool.name.to_string());
+                }
+            }
+        }
+    }
+
+    // Workspace context injection.
     if let Some(ctx) = &request.workspace_context {
+        let perms: Vec<&str> = [
+            ("workspace.read",    "read"),
+            ("workspace.write",   "write"),
+            ("workspace.execute", "execute"),
+        ]
+        .iter()
+        .filter(|(id, _)| ctx.granted_permissions.iter().any(|p| p == id))
+        .map(|(_, label)| *label)
+        .collect();
+        let perm_str = if perms.is_empty() {
+            "none".to_string()
+        } else {
+            perms.join(", ")
+        };
+        system = format!(
+            "{system}\n\nWorkspace: {label} ({path})\nGranted permissions: {perm_str}",
+            label = ctx.workspace_label,
+            path  = ctx.workspace_path,
+        );
+
+        // File context injection from @mentions.
         let last_user = request
             .messages
             .last()
@@ -135,26 +223,31 @@ fn prepare_system(request: &TextGenerationRequest) -> Result<String, String> {
         }
     }
 
-    // Tool definition injection.
-    if !request.tools.is_empty() {
-        let tool_json = ai_tools::render_tool_definitions(&request.tools);
+    // Tool definition injection — omit forbidden tools so model never sees them.
+    let visible_tools: Vec<_> = request
+        .tools
+        .iter()
+        .filter(|t| !forbidden_tool_names.iter().any(|f| f == t.name))
+        .cloned()
+        .collect();
+
+    if !visible_tools.is_empty() {
+        let tool_json = ai_tools::render_tool_definitions(&visible_tools);
         system = format!(
             "{system}\n\nYou have access to tools. To call a tool, emit a ```json block with this shape:\n```json\n{{\"tool_calls\":[{{\"name\":\"<tool_name>\",\"arguments\":{{...}}}}]}}\n```\nAvailable tools:\n{tool_json}"
         );
     }
 
-    Ok(system)
+    Ok(PreparedSystem { system, effective_max_tokens, forbidden_tool_names })
 }
 
 /// Run a provider's single-shot generate fn in a tool-use loop.
-/// `generate` takes (system, messages, max_tokens) and streams tokens via tx,
-/// returning the assembled assistant turn as a String.
 fn tool_loop<F>(request: &TextGenerationRequest, tx: &SyncSender<RuntimeEvent>, mut generate: F)
 where
     F: FnMut(&str, &[(String, String)], i32, &SyncSender<RuntimeEvent>) -> Option<String>,
 {
-    let system = match prepare_system(request) {
-        Ok(s) => s,
+    let prepared = match prepare_system(request) {
+        Ok(p) => p,
         Err(e) => {
             let _ = tx.send(RuntimeEvent::Error(format!("Context: {e}")));
             return;
@@ -165,8 +258,8 @@ where
     const MAX_ROUNDS: usize = 8;
 
     for round in 0..MAX_ROUNDS {
-        let Some(output) = generate(&system, &messages, request.max_tokens, tx) else {
-            return; // generate already sent Error
+        let Some(output) = generate(&prepared.system, &messages, prepared.effective_max_tokens, tx) else {
+            return;
         };
 
         if request.tools.is_empty() {
@@ -183,7 +276,36 @@ where
         // Execute tools and collect results.
         let mut results = String::new();
         for call in &calls {
-            let result = ai_tools::execute_tool(call, request.workspace_context.as_ref());
+            // Block forbidden tools — model sees an error result without execution.
+            if prepared.forbidden_tool_names.iter().any(|f| f == &call.name) {
+                results.push_str(&format!(
+                    "Tool `{}` error: this tool is disabled by an active rule.\n\n",
+                    call.name
+                ));
+                continue;
+            }
+
+            let result = ai_tools::execute_tool(call, request.workspace_context.as_ref(), request.stage_writes);
+
+            // Detect staged writes and emit PendingEdit events.
+            if result.output.starts_with("STAGED\n") {
+                if let Some(rest) = result.output.strip_prefix("STAGED\n") {
+                    if let Some((original, proposed)) = rest.split_once("\n---\n") {
+                        let path = call.arguments["path"].as_str().unwrap_or("").to_string();
+                        let _ = tx.send(RuntimeEvent::PendingEdit {
+                            path,
+                            original: original.to_string(),
+                            proposed: proposed.to_string(),
+                        });
+                    }
+                }
+                results.push_str(&format!(
+                    "Tool `{}` result:\nEdit staged for review. The user will apply it.\n\n",
+                    result.name
+                ));
+                continue;
+            }
+
             if result.is_error {
                 results.push_str(&format!("Tool `{}` error: {}\n\n", result.name, result.output));
             } else {
@@ -501,5 +623,115 @@ fn run_llama_cpp(
         }
 
         Some(assembled)
+    });
+}
+
+// ── CLI exec provider ─────────────────────────────────────────────────────────
+
+fn run_exec_cli(
+    binary: &str,
+    model_flag: Option<&str>,
+    model_value: &str,
+    request: TextGenerationRequest,
+    tx: &SyncSender<RuntimeEvent>,
+) {
+    use arcadia_core::modules::ai_sandbox::is_binary_allowed;
+    use std::io::{BufRead, BufReader, Write};
+    use std::process::{Command, Stdio};
+    use std::time::Instant;
+
+    if !is_binary_allowed(binary) {
+        let _ = tx.send(RuntimeEvent::Error(format!(
+            "CLI exec denied: '{binary}' is not in the allowed binary list."
+        )));
+        return;
+    }
+
+    let binary = binary.to_string();
+    let model_flag = model_flag.map(str::to_string);
+    let model_value = model_value.to_string();
+
+    tool_loop(&request, tx, move |system, messages, _max_tokens, tx| {
+        // Build a plain-text prompt from the current system + message history.
+        // Each tool-loop round appends tool results as user turns so the CLI
+        // sees the full context on re-invocation.
+        let mut prompt = String::with_capacity(1024);
+        if !system.is_empty() {
+            prompt.push_str("System: ");
+            prompt.push_str(system);
+            prompt.push_str("\n\n");
+        }
+        for (role, content) in messages {
+            let label = if role == "user" { "User" } else { "Assistant" };
+            prompt.push_str(label);
+            prompt.push_str(": ");
+            prompt.push_str(content);
+            prompt.push_str("\n\n");
+        }
+        prompt.push_str("Assistant:");
+
+        let mut cmd = Command::new(&binary);
+        if let Some(ref flag) = model_flag {
+            if !model_value.is_empty() {
+                cmd.arg(flag).arg(&model_value);
+            }
+        }
+        cmd.stdin(Stdio::piped())
+           .stdout(Stdio::piped())
+           .stderr(Stdio::null());
+
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = tx.send(RuntimeEvent::Error(format!("Failed to spawn '{binary}': {e}")));
+                return None;
+            }
+        };
+
+        let prompt_bytes = prompt.into_bytes();
+        let stdin_handle = {
+            let mut stdin = child.stdin.take();
+            std::thread::spawn(move || {
+                if let Some(ref mut s) = stdin {
+                    let _ = s.write_all(&prompt_bytes);
+                }
+            })
+        };
+
+        let deadline = Instant::now() + HTTP_TIMEOUT;
+        let mut output = String::new();
+        if let Some(stdout) = child.stdout.take() {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                if Instant::now() > deadline {
+                    let _ = child.kill();
+                    let _ = stdin_handle.join();
+                    let _ = tx.send(RuntimeEvent::Error(
+                        "CLI exec timed out after 120s.".to_string(),
+                    ));
+                    return None;
+                }
+                match line {
+                    Ok(l) => { output.push_str(&l); output.push('\n'); }
+                    Err(_) => break,
+                }
+            }
+        }
+
+        let _ = stdin_handle.join();
+        let status = child.wait();
+
+        let text = output.trim().to_string();
+        if text.is_empty() {
+            let code = status.ok().and_then(|s| s.code()).unwrap_or(-1);
+            let _ = tx.send(RuntimeEvent::Error(format!(
+                "'{binary}' produced no output (exit code {code}). \
+                 Check that the CLI is logged in and supports non-interactive stdin mode."
+            )));
+            None
+        } else {
+            let _ = tx.send(RuntimeEvent::Token(text.clone()));
+            Some(text)
+        }
     });
 }

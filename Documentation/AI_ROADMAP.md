@@ -128,7 +128,7 @@ No other platform has all of these simultaneously.
 
 ### Tier 1 — Foundation
 
-**1. Rules & Skills System**
+**1. Rules & Skills System** ✅ *Shipped*
 - `AiRule` — constraint per request: forbidden tools, max_tokens cap, required format, persona
 - **Arcadia default rules** — shipped in-binary: `safe-exec`, `concise-output`, `diff-over-full-file`
 - **Per-chat rule UI** — chip strip in chat header; pick presets inline; active rules shown as chips
@@ -141,7 +141,7 @@ No other platform has all of these simultaneously.
 
 ---
 
-**2. Persistent Chat + Context Window Management**
+**2. Persistent Chat + Context Window Management** ✅ *Shipped*
 - Persist to `~/Arcadia/Configuration/ai-chats/` (newline-delimited JSON)
 - `ChatSession`: id, title (auto from first message), provider, model, messages, timestamps,
   workspace_id, active_rules, active_skills
@@ -156,7 +156,7 @@ No other platform has all of these simultaneously.
 
 ### Tier 2 — Intelligence Layer
 
-**3. Inline Diff Preview** *(Cursor — their #1 feature)*
+**3. Inline Diff Preview** *(Cursor — their #1 feature)* ✅ *Shipped*
 - AI proposes file edits as side-by-side or inline diff, not raw text
 - Per-hunk approve / reject / edit; "Accept all" / "Reject all"
 - AI writes to staging buffer; only commits to disk on user accept
@@ -611,7 +611,7 @@ Modified: `Shared/ArcadiaCore/src/modules/ai_index.rs` (cross-workspace similari
 
 ### Tier 6 — Provider Breadth & Quality
 
-**26. CLI Exec Providers** *(Codex exec mode — subscription over pay-per-token)*
+**26. CLI Exec Providers** *(Codex exec mode — subscription over pay-per-token)* ✅ *Shipped*
 
 Installed AI CLIs as first-class inference providers. Users with Claude Pro, ChatGPT Plus,
 Gemini Advanced get full Arcadia AI features without API keys or per-token billing.
@@ -3494,9 +3494,9 @@ Modified: `ai_skills.rs`, `ai_marketplace.rs`
 
 | # | Target | Source | Unlocks |
 |---|--------|--------|---------|
-| 1 | Rules & Skills + defaults + per-chat UI | Cursor, Continue | composability contract |
-| 2 | Persistent Chat + Context Window | Claude Projects | session continuity, token budget |
-| 3 | Inline Diff Preview | **Cursor** ★ | safe multi-file AI edits |
+| 1 | Rules & Skills + defaults + per-chat UI ✅ | Cursor, Continue | composability contract |
+| 2 | Persistent Chat + Context Window ✅ | Claude Projects | session continuity, token budget |
+| 3 | Inline Diff Preview ✅ | **Cursor** ★ | safe multi-file AI edits |
 | 4 | Flow Mode (Plan + Act) | **Windsurf Cascade**, Cline | autonomous operation |
 | 5 | Workspace Indexer (3 levels + repo map) | **Aider**, Windsurf | smart context, memory retrieval |
 | 6 | Checkpoints / Rollback | **Cline** | safety net for flow + orchestration |
@@ -3519,7 +3519,7 @@ Modified: `ai_skills.rs`, `ai_marketplace.rs`
 | 23 | **Cross-Model Debate** | **(original ★★)** | multi-model decisions + education |
 | 24 | **LAN Co-Pilot** — Shared AI Sessions | **(original ★★)** | pair AI over LAN |
 | 25 | Cross-Workspace Intelligence | **(original)** | pattern sharing across projects |
-| 26 | CLI Exec Providers (claude/codex/gemini/aider) | **Codex exec mode** | subscription inference; no API key |
+| 26 | CLI Exec Providers (claude/codex/gemini/aider) ✅ | **Codex exec mode** | subscription inference; no API key |
 | 27 | Custom Tool Registry | — | extension tool packs |
 | 28 | Structured Outputs + Validation | — | reliable agent data contracts |
 | 29 | Prompt Caching | — | cost efficiency |

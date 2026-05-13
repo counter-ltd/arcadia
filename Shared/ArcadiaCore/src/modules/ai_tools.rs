@@ -30,9 +30,13 @@ pub const WORKSPACE_TOOLS: &[AiToolDefinition] =
     &[TOOL_READ_FILE, TOOL_WRITE_FILE, TOOL_LIST_FILES, TOOL_RUN_COMMAND];
 
 /// Dispatch a parsed tool call through the sandbox layer.
+/// When `stage_writes` is true, `write_file` reads the original file and returns
+/// a STAGED result instead of writing to disk. The caller (ai_runtime) detects the
+/// "STAGED\n" prefix and emits a `RuntimeEvent::PendingEdit`.
 pub fn execute_tool(
     call: &AiToolCall,
     workspace: Option<&AiWorkspaceContext>,
+    stage_writes: bool,
 ) -> AiToolResult {
     let result: Result<String, String> = match call.name.as_str() {
         "read_file" => {
@@ -50,9 +54,16 @@ pub fn execute_tool(
             match (path, content) {
                 (None, _) => Err("Missing or empty 'path' argument".to_string()),
                 (_, None) => Err("Missing 'content' argument".to_string()),
-                (Some(path), Some(content)) => {
+                (Some(path), Some(proposed)) => {
                     let full = resolve_path(path, workspace);
-                    ai_sandbox::sandboxed_write(workspace, &full, content).map(|_| "ok".to_string())
+                    if stage_writes {
+                        // Read original (empty string if file doesn't exist yet).
+                        let original = ai_sandbox::sandboxed_read(workspace, &full)
+                            .unwrap_or_default();
+                        Ok(format!("STAGED\n{original}\n---\n{proposed}"))
+                    } else {
+                        ai_sandbox::sandboxed_write(workspace, &full, proposed).map(|_| "ok".to_string())
+                    }
                 }
             }
         }

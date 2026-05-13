@@ -1,4 +1,4 @@
-use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
+use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Styled, Window};
 use openframe::prelude::FluentBuilder as _;
 use arcadia_core::config::ConfigFile as _;
 
@@ -7,6 +7,7 @@ use arcadia_core::modules;
 use crate::gui::app::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use crate::gui::app::ShellMode;
+use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
 use crate::gui::theme::{self};
 
 const LATE_ROOMS: &[(&str, u32)] = &[("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)];
@@ -14,6 +15,7 @@ const LATE_ROOMS: &[(&str, u32)] = &[("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5
 impl ArcadiaRoot {
     pub(crate) fn render_main_top_bar(
         &self,
+        window: &Window,
         cx: &mut Context<Self>,
         active_page_title: openframe::SharedString,
         active_page_glyph: openframe::SharedString,
@@ -59,15 +61,32 @@ impl ArcadiaRoot {
                             )
                             .child({
                                 if self.active_page_id.as_str() == "ai.chat" {
-                                    let label = self.ai_chat_model_id
-                                        .as_deref()
-                                        .and_then(|id| {
-                                            self.llama_cpp_models
-                                                .iter()
-                                                .find(|m| m.id == id)
-                                                .map(|m| m.name.clone())
-                                        })
-                                        .unwrap_or_else(|| "No Model".to_string());
+                                    let label = {
+                                        use arcadia_core::config::modules::{
+                                            AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
+                                            AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME,
+                                        };
+                                        let provider = self.active_ai_provider_module.as_str();
+                                        let mid = self.ai_chat_model_id.as_deref();
+                                        // CLI providers: display name from detected list or module name
+                                        if matches!(provider, p if p == AI_EXEC_CLAUDE_MODULE_NAME
+                                            || p == AI_EXEC_CODEX_MODULE_NAME
+                                            || p == AI_EXEC_GEMINI_MODULE_NAME
+                                            || p == AI_EXEC_AIDER_MODULE_NAME)
+                                        {
+                                            self.detected_cli_providers.iter()
+                                                .find(|c| c.id == provider)
+                                                .map(|c| c.label.clone())
+                                                .unwrap_or_else(|| provider.to_string())
+                                        } else {
+                                            mid.and_then(|id| {
+                                                self.llama_cpp_models.iter().find(|m| m.id == id).map(|m| m.name.clone())
+                                                    .or_else(|| self.ollama_models.iter().find(|m| m.id == id).map(|m| m.name.clone()))
+                                                    .or_else(|| self.openai_models.iter().find(|m| m.id == id).map(|m| m.name.clone()))
+                                            })
+                                            .unwrap_or_else(|| "No Model".to_string())
+                                        }
+                                    };
                                     div()
                                         .px_2()
                                         .py_0p5()
@@ -561,6 +580,7 @@ impl ArcadiaRoot {
                             .flex()
                             .items_center()
                             .gap_2()
+                            .child(self.render_top_bar_command_bar(window, cx, is_dark, radius))
                             .children(self.top_bar_page_ids_effective().into_iter().filter_map(
                                 |page_id| {
                                     if !self.is_page_visible(page_id) {
@@ -592,5 +612,85 @@ impl ArcadiaRoot {
                         .child("─".repeat(300)),
                 )
             })
+    }
+
+    pub(crate) fn render_top_bar_command_bar(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        radius: f32,
+    ) -> impl IntoElement {
+        if !self.command_bar_open {
+            return div();
+        }
+
+        let focused = self.command_bar_focus.is_focused(window);
+        let blink = self.text_caret_blink_visible;
+        let text = self.command_bar_input.clone();
+        let fh = self.command_bar_focus.clone();
+        let bg = theme::action_pill_bg(cx, is_dark);
+        let border_c = theme::ui_accent(cx);
+        let tc = theme::action_pill_text(cx, is_dark);
+        let meta_c = theme::ui_subtext(cx, is_dark);
+
+        div()
+            .flex()
+            .items_center()
+            .px_2()
+            .py_0p5()
+            .rounded(px(radius))
+            .bg(bg)
+            .border_1()
+            .border_color(border_c)
+            .min_w(px(200.))
+            .text_xs()
+            .text_color(tc)
+            .track_focus(&self.command_bar_focus)
+            .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
+                fh.focus(window);
+            }))
+            .child(if text.is_empty() {
+                if focused && blink {
+                    div().text_color(tc).child(TEXT_INPUT_CARET_CHAR.to_string())
+                } else {
+                    div().text_color(meta_c).child("Internal command…")
+                }
+            } else {
+                div().child(text_with_trailing_caret(&text, focused, blink))
+            })
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window: &mut Window, cx| {
+                let key = event.keystroke.key.as_str();
+                let mods = event.keystroke.modifiers;
+                match key {
+                    "escape" => {
+                        this.command_bar_open = false;
+                        this.command_bar_input.clear();
+                        cx.notify();
+                    }
+                    "enter" => {
+                        let cmd = this.command_bar_input.trim().to_string();
+                        this.command_bar_open = false;
+                        this.command_bar_input.clear();
+                        if !cmd.is_empty() {
+                            let ctx = this.execution_context();
+                            let _ = modules::execute_command("shell.internal", &[&cmd], &ctx);
+                        }
+                        cx.notify();
+                    }
+                    "backspace" => {
+                        this.command_bar_input.pop();
+                        cx.notify();
+                    }
+                    _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
+                        if let Some(ch) = &event.keystroke.key_char {
+                            this.command_bar_input.push_str(ch);
+                            cx.notify();
+                        }
+                    }
+                    _ => {}
+                }
+                let _ = window;
+            }))
     }
 }

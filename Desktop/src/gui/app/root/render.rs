@@ -181,6 +181,14 @@ impl Render for ArcadiaRoot {
                         this.ai_chat_menu = None;
                         changed = true;
                     }
+                    if this.ai_session_menu.is_some() {
+                        this.ai_session_menu = None;
+                        changed = true;
+                    }
+                    if this.ai_session_rename.is_some() {
+                        this.ai_session_rename = None;
+                        changed = true;
+                    }
                     if this.llama_cpp_provider_menu.is_some() {
                         this.llama_cpp_provider_menu = None;
                         changed = true;
@@ -239,6 +247,7 @@ impl Render for ArcadiaRoot {
                         window_controls_top_padding(window)
                     })
                     .child(self.render_main_top_bar(
+                        window,
                         cx,
                         active_page_title,
                         active_page_glyph,
@@ -322,10 +331,34 @@ impl ArcadiaRoot {
         };
 
         if self.ai_chat_model_picker_open {
-            let all_models: Vec<(String, String, &'static str)> = {
+            // (model_id, display_name, type_label, provider_module)
+            let all_models: Vec<(String, String, &'static str, String)> = {
+                use arcadia_core::config::modules::{
+                    AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
+                    AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME,
+                    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME,
+                };
                 let mut v = Vec::new();
                 for model in &self.llama_cpp_models {
-                    v.push((model.id.clone(), model.name.clone(), model.model_kind.label()));
+                    v.push((model.id.clone(), model.name.clone(), model.model_kind.label(), AI_LLAMA_CPP_MODULE_NAME.to_string()));
+                }
+                for model in &self.ollama_models {
+                    v.push((model.id.clone(), model.name.clone(), "Ollama", AI_OLLAMA_MODULE_NAME.to_string()));
+                }
+                for model in &self.openai_models {
+                    v.push((model.id.clone(), model.name.clone(), "OpenAI", AI_OPENAI_MODULE_NAME.to_string()));
+                }
+                for cli in &self.detected_cli_providers {
+                    let module = match cli.binary.as_str() {
+                        "claude" => AI_EXEC_CLAUDE_MODULE_NAME,
+                        "codex"  => AI_EXEC_CODEX_MODULE_NAME,
+                        "gemini" => AI_EXEC_GEMINI_MODULE_NAME,
+                        "aider"  => AI_EXEC_AIDER_MODULE_NAME,
+                        _        => continue,
+                    };
+                    if self.is_module_enabled(module) {
+                        v.push((cli.id.clone(), cli.label.clone(), "CLI", module.to_string()));
+                    }
                 }
                 v
             };
@@ -351,12 +384,15 @@ impl ArcadiaRoot {
                         .py_1()
                         .text_xs()
                         .text_color(text_color)
-                        .child("No models configured. Enable ai-provider-llama-cpp and create a model."),
+                        .child("No models available. Enable an AI provider module and configure a model."),
                 );
             } else {
-                for (model_id, model_name, type_label) in all_models {
-                    let is_active = self.ai_chat_model_id.as_deref() == Some(model_id.as_str());
+                for (model_id, model_name, type_label, provider_module) in all_models {
+                    let is_active = self.active_ai_provider_module == provider_module
+                        && (self.ai_chat_model_id.as_deref() == Some(model_id.as_str())
+                            || (model_id == provider_module && self.ai_chat_model_id.is_none()));
                     let model_id2 = model_id.clone();
+                    let provider_module2 = provider_module.clone();
                     picker = picker.child(
                         div()
                             .w_full()
@@ -386,7 +422,13 @@ impl ArcadiaRoot {
                                     .child(type_label),
                             )
                             .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                this.ai_chat_model_id = if is_active { None } else { Some(model_id2.clone()) };
+                                this.active_ai_provider_module = provider_module2.clone();
+                                this.ai_chat_model_id = if model_id2 == provider_module2 {
+                                    // CLI providers use module name as id — no sub-model needed
+                                    None
+                                } else {
+                                    Some(model_id2.clone())
+                                };
                                 this.ai_chat_model_picker_open = false;
                                 cx.notify();
                             })),
@@ -737,6 +779,9 @@ impl ArcadiaRoot {
                                 messages: vec![],
                                 input_draft: String::new(),
                                 is_loading: false,
+                                session_id: None,
+                                session_provider: String::new(),
+                                session_model_id: String::new(),
                             });
                             this.active_ai_chat_id = id;
                             this.ai_next_id += 1;
@@ -774,6 +819,53 @@ impl ArcadiaRoot {
                             cx.notify();
                         }),
                     ),
+                )
+                .into_any_element()
+        } else if let Some((ref session_id, session_pos)) = self.ai_session_menu.clone() {
+            let session_id = session_id.clone();
+            let session_id_del = session_id.clone();
+            let danger = crate::gui::theme::ui_danger(cx, is_dark);
+            // Find current title for rename pre-fill.
+            let current_title = self.ai_sessions.iter()
+                .find(|s| s.id == session_id)
+                .map(|s| s.title.clone())
+                .unwrap_or_default();
+            div()
+                .absolute()
+                .left(session_pos.x)
+                .top(session_pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("pencil", "Rename".into(), text_color, text_color)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, window, cx| {
+                            this.ai_session_menu = None;
+                            this.ai_session_rename = Some((session_id.clone(), current_title.clone()));
+                            this.ai_rename_focus.focus(window);
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    menu_row("x", "Delete Chat".into(), danger, danger)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            this.ai_session_menu = None;
+                            let _ = arcadia_core::modules::ai_chat_store::delete_session(&session_id_del);
+                            this.ai_chats.retain(|c| c.session_id.as_deref() != Some(&session_id_del));
+                            if !this.ai_chats.is_empty() && !this.ai_chats.iter().any(|c| c.id == this.active_ai_chat_id) {
+                                this.active_ai_chat_id = this.ai_chats.last().map(|c| c.id).unwrap_or(0);
+                            }
+                            if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
+                                this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
+                                    id: s.id, title: s.title, updated_at: s.updated_at,
+                                }).collect();
+                            }
+                            cx.notify();
+                        })),
                 )
                 .into_any_element()
         } else if let Some((ref pin_page_id, pin_pos)) = self.settings_pin_context_menu.clone() {

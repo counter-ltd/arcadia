@@ -1,4 +1,7 @@
 pub mod ai;
+pub mod ai_exec_providers;
+pub mod ai_rules;
+pub mod ai_skills;
 pub mod appearance;
 pub mod ui_prefs;
 pub mod llama_cpp;

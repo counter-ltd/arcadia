@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use arcadia_core::config::ai::AiConfig;
+use arcadia_core::config::ai_exec_providers::{AiExecProvidersConfig, ExecCliEntry};
 use arcadia_core::config::llama_cpp::LlamaCppConfig;
+use arcadia_core::modules::ai_chat_store::{self, ChatSession, StoredMessage};
 use arcadia_core::config::appearance::AppearanceConfig;
 use arcadia_core::config::code_editor::CodeEditorConfig;
 use arcadia_core::config::extension_tokens;
@@ -239,6 +241,7 @@ impl ArcadiaRoot {
         let workspace_create_path_focus = cx.focus_handle();
         let code_editor_focus = cx.focus_handle();
         let code_editor_char_width_focus = cx.focus_handle();
+        let ai_rename_focus = cx.focus_handle();
         let ai_input_focus = cx.focus_handle();
         let llama_cpp_create_name_focus = cx.focus_handle();
         let llama_cpp_create_path_focus = cx.focus_handle();
@@ -248,6 +251,7 @@ impl ArcadiaRoot {
         let llama_cpp_edit_mmproj_focus = cx.focus_handle();
         let openai_api_key_focus = cx.focus_handle();
         let openai_base_url_focus = cx.focus_handle();
+        let command_bar_focus = cx.focus_handle();
         let ui_prefs_cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
@@ -332,6 +336,9 @@ impl ArcadiaRoot {
             ai_next_id: 1,
             ai_context_menu_open: false,
             ai_chat_menu: None,
+            ai_session_menu: None,
+            ai_session_rename: None,
+            ai_rename_focus,
             ai_input_focus,
             ai_default_system_prompt: ai_cfg.default_system_prompt,
             ai_chat_model_id: None,
@@ -341,7 +348,45 @@ impl ArcadiaRoot {
             ai_runtime: None,
             ai_stream_chat_id: None,
             ai_poll_task_started: false,
+            ai_active_rule_ids: Vec::new(),
+            ai_active_skill_ids: Vec::new(),
+            ai_rule_picker_open: false,
+            ai_skill_picker_open: false,
+            ai_session_sidebar_open: false,
+            ai_sessions: ai_chat_store::list_sessions().unwrap_or_default().into_iter().map(|s| crate::gui::app::AiSessionSummary {
+                id: s.id,
+                title: s.title,
+                updated_at: s.updated_at,
+            }).collect(),
+            ai_pending_edits: Vec::new(),
+            ai_diff_panel_open: false,
+            ai_stage_writes: false,
             active_ai_provider_module: String::new(),
+            detected_cli_providers: {
+                let detected = arcadia_core::modules::ai_exec_cli::scan_for_cli_providers();
+                // Merge newly detected providers into the persisted config so users can
+                // customise model_flag / model_value / extra_args without editing code.
+                let mut exec_cfg = AiExecProvidersConfig::load_or_create().unwrap_or_default();
+                let mut changed = false;
+                for p in &detected {
+                    if !exec_cfg.entries.iter().any(|e| e.id == p.id) {
+                        exec_cfg.entries.push(ExecCliEntry {
+                            id: p.id.clone(),
+                            binary: p.binary.clone(),
+                            label: p.label.clone(),
+                            model_flag: p.model_flag.clone(),
+                            model_value: String::new(),
+                            extra_args: p.extra_args.clone(),
+                            enabled: true,
+                        });
+                        changed = true;
+                    }
+                }
+                if changed {
+                    let _ = exec_cfg.save();
+                }
+                detected
+            },
             llama_cpp_models: llama_cpp_cfg.models,
             ollama_endpoint: ollama_cfg.endpoint,
             ollama_models: ollama_cfg.models,
@@ -454,6 +499,9 @@ impl ArcadiaRoot {
             shortcut_edge_drag_start: None,
             #[cfg(any(feature = "gui", feature = "ios-gui"))]
             shortcut_hot_corner_dwell: std::collections::HashMap::new(),
+            command_bar_open: false,
+            command_bar_input: String::new(),
+            command_bar_focus,
             pinned_settings_pages: ui_prefs_cfg.pinned_settings_pages,
             settings_pin_context_menu: None,
         };
@@ -767,15 +815,19 @@ impl ArcadiaRoot {
     /// Drain the inference event channel. Returns `true` if any event was processed.
     pub fn poll_ai_events(&mut self, cx: &mut Context<Self>) -> bool {
         use crate::gui::app::ai_runtime::RuntimeEvent;
-        use crate::gui::app::{AiMessage, AiMessageRole};
-
-        let Some(ref runtime) = self.ai_runtime else {
-            return false;
-        };
+        use crate::gui::app::{AiMessage, AiMessageRole, DiffHunk, DiffHunkKind, AiPendingEdit};
 
         let mut any = false;
+        let mut pending_autosave: Option<usize> = None;
+
         loop {
-            match runtime.event_rx.try_recv() {
+            // Borrow ai_runtime only for the try_recv call; drop before any &mut self calls.
+            let event = match self.ai_runtime.as_ref() {
+                Some(r) => r.event_rx.try_recv(),
+                None => break,
+            };
+
+            match event {
                 Ok(RuntimeEvent::Token(s)) => {
                     any = true;
                     if let Some(chat_id) = self.ai_stream_chat_id {
@@ -794,6 +846,7 @@ impl ArcadiaRoot {
                         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
                             chat.is_loading = false;
                         }
+                        pending_autosave = Some(chat_id);
                     }
                     self.ai_stream_chat_id = None;
                 }
@@ -813,11 +866,29 @@ impl ArcadiaRoot {
                                 }
                             }
                         }
+                        pending_autosave = Some(chat_id);
                     }
                     self.ai_stream_chat_id = None;
                 }
+                Ok(RuntimeEvent::PendingEdit { path, original, proposed }) => {
+                    any = true;
+                    let hunks = compute_diff_hunks(&original, &proposed);
+                    self.ai_pending_edits.push(AiPendingEdit {
+                        path,
+                        original,
+                        proposed,
+                        hunks,
+                        accepted: std::collections::BTreeSet::new(),
+                        rejected: std::collections::BTreeSet::new(),
+                    });
+                    self.ai_diff_panel_open = true;
+                }
                 Err(_) => break,
             }
+        }
+
+        if let Some(id) = pending_autosave {
+            self.autosave_session(id);
         }
 
         if any {
@@ -826,6 +897,185 @@ impl ArcadiaRoot {
         any
     }
 
+    fn autosave_session(&mut self, chat_id: usize) {
+        use crate::gui::app::AiMessageRole;
+
+        let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) else {
+            return;
+        };
+
+        // Assign a session_id on first save.
+        if chat.session_id.is_none() {
+            chat.session_id = Some(ai_chat_store::new_session_id());
+        }
+        let session_id = chat.session_id.clone().unwrap();
+
+        // Build or update the session from current chat state.
+        let mut session = ai_chat_store::load_session(&session_id).unwrap_or_else(|_| {
+            ChatSession::new(&chat.session_provider, &chat.session_model_id)
+        });
+
+        // Sync id from chat.
+        session.id = session_id.clone();
+        // Propagate explicit rename; auto-derive from first user message otherwise.
+        if chat.title != format!("Chat {}", chat.id) && chat.title != "New Chat" {
+            session.title = chat.title.clone();
+        } else if session.title == "New Chat" {
+            if let Some(first_user) = session.messages.iter().find(|m| m.role == "user") {
+                let derived: String = first_user.content
+                    .split_whitespace()
+                    .take(6)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if !derived.is_empty() {
+                    session.title = derived;
+                }
+            }
+        }
+        session.active_rule_ids = self.ai_active_rule_ids.clone();
+        session.active_skill_ids = self.ai_active_skill_ids.clone();
+        session.workspace_id = self.ai_chat_workspace_id.clone();
+
+        // Rebuild messages from chat (source of truth for in-memory state).
+        session.messages = chat.messages.iter().map(|m| {
+            let role = match m.role {
+                AiMessageRole::User => "user",
+                AiMessageRole::Assistant => "assistant",
+            };
+            StoredMessage {
+                role: role.to_string(),
+                content: m.content.clone(),
+                token_count: ai_chat_store::estimate_tokens(&m.content),
+            }
+        }).collect();
+
+        // Truncate at 80% of 8192-token default budget.
+        session.truncate_to_token_budget(6553);
+
+        if let Err(e) = ai_chat_store::save_session(&session) {
+            eprintln!("autosave_session: {e}");
+            return;
+        }
+
+        // Back-sync title from session to in-memory chat.
+        let chat = self.ai_chats.iter_mut().find(|c| c.id == chat_id).unwrap();
+        if session.title != "New Chat" {
+            chat.title = session.title.clone();
+        }
+
+        // Refresh session summary list.
+        if let Ok(summaries) = ai_chat_store::list_sessions() {
+            self.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
+                id: s.id,
+                title: s.title,
+                updated_at: s.updated_at,
+            }).collect();
+        }
+    }
+}
+
+fn compute_diff_hunks(original: &str, proposed: &str) -> Vec<crate::gui::app::DiffHunk> {
+    use crate::gui::app::{DiffHunk, DiffHunkKind};
+
+    let orig_lines: Vec<&str> = original.lines().collect();
+    let new_lines: Vec<&str> = proposed.lines().collect();
+
+    // Myers-inspired simple diff: LCS-based line diff.
+    // Build edit script then group into hunks.
+    let edits = lcs_diff(&orig_lines, &new_lines);
+    let mut hunks: Vec<DiffHunk> = Vec::new();
+    let mut idx = 0usize;
+    let mut i = 0;
+    while i < edits.len() {
+        match &edits[i] {
+            Edit::Keep(o, n) => {
+                let _ = (o, n);
+                i += 1;
+            }
+            _ => {
+                // Collect a contiguous block of non-Keep edits.
+                let start = i;
+                let mut orig_chunk: Vec<String> = Vec::new();
+                let mut new_chunk: Vec<String> = Vec::new();
+                while i < edits.len() {
+                    match &edits[i] {
+                        Edit::Keep(_, _) => break,
+                        Edit::Delete(o) => {
+                            orig_chunk.push(orig_lines[*o].to_string());
+                            i += 1;
+                        }
+                        Edit::Insert(n) => {
+                            new_chunk.push(new_lines[*n].to_string());
+                            i += 1;
+                        }
+                    }
+                }
+                let kind = match (orig_chunk.is_empty(), new_chunk.is_empty()) {
+                    (true, false) => DiffHunkKind::Added,
+                    (false, true) => DiffHunkKind::Removed,
+                    _ => DiffHunkKind::Context,
+                };
+                let _ = start;
+                hunks.push(DiffHunk {
+                    index: idx,
+                    orig_lines: orig_chunk,
+                    new_lines: new_chunk,
+                    kind,
+                });
+                idx += 1;
+            }
+        }
+    }
+    hunks
+}
+
+enum Edit {
+    Keep(usize, usize),
+    Delete(usize),
+    Insert(usize),
+}
+
+fn lcs_diff<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<Edit> {
+    let m = a.len();
+    let n = b.len();
+    // DP table for LCS lengths.
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in (0..m).rev() {
+        for j in (0..n).rev() {
+            dp[i][j] = if a[i] == b[j] {
+                dp[i + 1][j + 1] + 1
+            } else {
+                dp[i + 1][j].max(dp[i][j + 1])
+            };
+        }
+    }
+    let mut edits = Vec::new();
+    let (mut i, mut j) = (0, 0);
+    while i < m && j < n {
+        if a[i] == b[j] {
+            edits.push(Edit::Keep(i, j));
+            i += 1;
+            j += 1;
+        } else if dp[i + 1][j] >= dp[i][j + 1] {
+            edits.push(Edit::Delete(i));
+            i += 1;
+        } else {
+            edits.push(Edit::Insert(j));
+            j += 1;
+        }
+    }
+    while i < m {
+        edits.push(Edit::Delete(i));
+        i += 1;
+    }
+    while j < n {
+        edits.push(Edit::Insert(j));
+        j += 1;
+    }
+    edits
+}
+
+impl ArcadiaRoot {
     /// Spawn a background thread to fetch models from the running Ollama instance via /api/tags.
     /// Updates `self.ollama_models` on completion and clears `self.ollama_discovering`.
     pub fn discover_ollama_models(&mut self, window: &mut Window, cx: &mut Context<Self>) {

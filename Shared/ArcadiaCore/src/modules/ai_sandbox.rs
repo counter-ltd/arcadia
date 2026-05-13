@@ -76,6 +76,8 @@ const EXEC_ALLOWLIST: &[&str] = &[
     "go",
     "java", "javac", "mvn", "gradle",
     "ruby", "gem", "bundle",
+    // AI CLI exec providers (subscription-based; no API key)
+    "claude", "codex", "gemini", "aider",
 ];
 
 fn exec_binary(cmd: &str) -> Option<&str> {
@@ -87,6 +89,12 @@ fn is_exec_allowed(cmd: &str) -> bool {
         Some(bin) => EXEC_ALLOWLIST.contains(&bin),
         None => false,
     }
+}
+
+/// Check whether a standalone binary name is in the exec allowlist.
+/// Used by `run_exec_cli` before spawning a CLI provider process.
+pub fn is_binary_allowed(binary: &str) -> bool {
+    EXEC_ALLOWLIST.contains(&binary)
 }
 
 pub fn sandboxed_exec(ctx: Option<&AiWorkspaceContext>, cmd: &str) -> Result<String, String> {

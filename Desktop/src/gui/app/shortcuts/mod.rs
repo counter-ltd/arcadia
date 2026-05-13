@@ -105,6 +105,9 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
     if this.shortcuts_search_focus.contains_focused(window, cx) {
         return true;
     }
+    if this.command_bar_focus.contains_focused(window, cx) {
+        return true;
+    }
     if this.shortcut_create_label_focus.contains_focused(window, cx) {
         return true;
     }
@@ -297,11 +300,23 @@ impl ArcadiaRoot {
     fn fire_shortcut_ui_control(
         &mut self,
         control_id: &str,
-        _window: &mut Window,
+        window: &mut Window,
         _cx: &mut Context<Self>,
     ) {
         match control_id {
+            "arcadia.toggle_command_bar" => {
+                if self.command_bar_open {
+                    self.command_bar_open = false;
+                    self.command_bar_input.clear();
+                } else {
+                    self.command_bar_open = true;
+                    self.command_bar_input.clear();
+                    self.command_bar_focus.focus(window);
+                }
+            }
             "arcadia.dismiss_overlays" => {
+                self.command_bar_open = false;
+                self.command_bar_input.clear();
                 self.app_menu_open = false;
                 self.session_route_menu_open = false;
                 #[cfg(feature = "gui")]

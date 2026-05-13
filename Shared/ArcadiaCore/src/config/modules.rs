@@ -58,6 +58,12 @@ pub const AI_MODULE_NAME: &str = "ai";
 pub const AI_LLAMA_CPP_MODULE_NAME: &str = "ai-provider-llama-cpp";
 pub const AI_OLLAMA_MODULE_NAME: &str = "ai-provider-ollama";
 pub const AI_OPENAI_MODULE_NAME: &str = "ai-provider-openai";
+pub const AI_RULES_MODULE_NAME: &str = "ai-rules";
+pub const AI_SKILLS_MODULE_NAME: &str = "ai-skills";
+pub const AI_EXEC_CLAUDE_MODULE_NAME: &str = "ai-provider-exec-claude";
+pub const AI_EXEC_CODEX_MODULE_NAME: &str = "ai-provider-exec-codex";
+pub const AI_EXEC_GEMINI_MODULE_NAME: &str = "ai-provider-exec-gemini";
+pub const AI_EXEC_AIDER_MODULE_NAME: &str = "ai-provider-exec-aider";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -281,6 +287,60 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         name: AI_OPENAI_MODULE_NAME,
         version: "0.1.0",
         description: "OpenAI API provider for the AI chat module.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_RULES_MODULE_NAME,
+        version: "0.1.0",
+        description: "AI Rules — per-chat constraints: forbidden tools, response format, persona. Adds a configuration page to the AI sidebar.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_SKILLS_MODULE_NAME,
+        version: "0.1.0",
+        description: "AI Skills — named behaviours: system prompt fragments, tool allowlists, parameter overrides. Adds a configuration page to the AI sidebar.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_EXEC_CLAUDE_MODULE_NAME,
+        version: "0.1.0",
+        description: "Claude CLI provider — uses the installed `claude` binary with a Claude Pro subscription. No API key required.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_EXEC_CODEX_MODULE_NAME,
+        version: "0.1.0",
+        description: "Codex CLI provider — uses the installed `codex` binary with a ChatGPT Plus subscription. No API key required.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_EXEC_GEMINI_MODULE_NAME,
+        version: "0.1.0",
+        description: "Gemini CLI provider — uses the installed `gemini` binary with a Gemini Advanced subscription. No API key required.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_EXEC_AIDER_MODULE_NAME,
+        version: "0.1.0",
+        description: "Aider CLI provider — uses the installed `aider` binary with its own configured backend.",
         required_modules: &[AI_MODULE_NAME],
         required_permissions: &[],
         workspace_permissions: &[],

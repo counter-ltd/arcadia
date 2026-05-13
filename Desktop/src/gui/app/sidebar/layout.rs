@@ -566,23 +566,159 @@ impl ArcadiaRoot {
                                         }
                                     }
                                     if page_id == "ai.chat" {
-                                        for chat in &self.ai_chats {
-                                            let label = chat.title.clone();
-                                            let chat_id = chat.id;
+                                        let active_session_id = self.ai_chats.iter()
+                                            .find(|c| c.id == self.active_ai_chat_id)
+                                            .and_then(|c| c.session_id.clone());
+
+                                        for session in &self.ai_sessions {
+                                            let session_id = session.id.clone();
+                                            let session_id_rc = session.id.clone();
                                             let is_sub_active = is_page_active
-                                                && self.active_ai_chat_id == chat_id;
-                                            items.push(
-                                                Self::sidebar_ai_chat_sub_item(
-                                                    cx,
-                                                    openframe::SharedString::from(label),
-                                                    chat_id,
-                                                    is_sub_active,
-                                                    is_dark,
-                                                    glyph,
-                                                )
-                                                .into_any_element(),
-                                            );
+                                                && active_session_id.as_deref() == Some(session.id.as_str());
+                                            let is_renaming = self.ai_session_rename
+                                                .as_ref()
+                                                .map(|(id, _)| id == &session.id)
+                                                .unwrap_or(false);
+                                            let rename_draft = self.ai_session_rename
+                                                .as_ref()
+                                                .filter(|(id, _)| id == &session.id)
+                                                .map(|(_, d)| d.clone())
+                                                .unwrap_or_default();
+                                            let title = if is_renaming {
+                                                format!("{rename_draft}|")
+                                            } else if session.title.len() > 22 {
+                                                format!("{}…", &session.title[..22])
+                                            } else {
+                                                session.title.clone()
+                                            };
+                                            let pal = theme::nav_accent_palette("violet", is_dark);
+                                            let text_col = if is_sub_active || is_renaming {
+                                                pal.icon_active
+                                            } else {
+                                                glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::sidebar_nav_idle_foreground(is_dark))
+                                            };
+                                            let bg = if is_sub_active || is_renaming {
+                                                pal.row_selected
+                                            } else {
+                                                glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| if is_dark { rgb(0x171b22) } else { rgb(0xf6f7fb) })
+                                            };
+                                            let hover_bg = if is_sub_active {
+                                                pal.row_hover
+                                            } else if is_dark { rgb(0x1e1e2e) } else { rgb(0xede9fe) };
+                                            let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(6.0_f32);
+                                            let rename_focus = self.ai_rename_focus.clone();
+                                            let mut item = div()
+                                                    .ml_7()
+                                                    .pl_2()
+                                                    .pr_2()
+                                                    .py_1()
+                                                    .rounded(px(radius))
+                                                    .cursor_pointer()
+                                                    .text_xs()
+                                                    .font_weight(if is_sub_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
+                                                    .bg(bg)
+                                                    .text_color(text_col)
+                                                    .hover(move |s| s.bg(hover_bg))
+                                                    .child(div().child(title));
+                                            if is_renaming {
+                                                item = item
+                                                    .track_focus(&rename_focus)
+                                                    .on_key_down(cx.listener(move |this, ev: &openframe::KeyDownEvent, _, cx| {
+                                                        let Some((ref id, ref mut draft)) = this.ai_session_rename else { return; };
+                                                        if id != &session_id_rc { return; }
+                                                        match ev.keystroke.key.as_str() {
+                                                            "escape" => {
+                                                                this.ai_session_rename = None;
+                                                            }
+                                                            "enter" | "return" => {
+                                                                if let Some((ref sid, ref title)) = this.ai_session_rename.clone() {
+                                                                    let sid = sid.clone();
+                                                                    let title = title.clone();
+                                                                    if !title.is_empty() {
+                                                                        if let Ok(mut s) = arcadia_core::modules::ai_chat_store::load_session(&sid) {
+                                                                            s.title = title.clone();
+                                                                            let _ = arcadia_core::modules::ai_chat_store::save_session(&s);
+                                                                        }
+                                                                        for chat in &mut this.ai_chats {
+                                                                            if chat.session_id.as_deref() == Some(&sid) {
+                                                                                chat.title = title.clone();
+                                                                            }
+                                                                        }
+                                                                        if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
+                                                                            this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
+                                                                                id: s.id, title: s.title, updated_at: s.updated_at,
+                                                                            }).collect();
+                                                                        }
+                                                                    }
+                                                                    this.ai_session_rename = None;
+                                                                }
+                                                            }
+                                                            "backspace" => {
+                                                                if let Some((_, ref mut d)) = this.ai_session_rename { d.pop(); }
+                                                            }
+                                                            _ => {
+                                                                if !ev.keystroke.modifiers.platform
+                                                                    && !ev.keystroke.modifiers.control
+                                                                    && !ev.keystroke.modifiers.alt
+                                                                    && !ev.keystroke.modifiers.function
+                                                                {
+                                                                    if let Some(kc) = &ev.keystroke.key_char {
+                                                                        if let Some((_, ref mut d)) = this.ai_session_rename { d.push_str(kc); }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        cx.notify();
+                                                    }));
+                                            } else {
+                                                let session_id_left = session_id.clone();
+                                                item = item
+                                                    .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                                        if let Some(existing) = this.ai_chats.iter().find(|c| c.session_id.as_deref() == Some(session_id_left.as_str())) {
+                                                            this.active_ai_chat_id = existing.id;
+                                                            this.active_page_id = "ai.chat".to_string();
+                                                            cx.notify();
+                                                            return;
+                                                        }
+                                                        if let Ok(stored) = arcadia_core::modules::ai_chat_store::load_session(&session_id_left) {
+                                                            let id = this.ai_next_id;
+                                                            this.ai_next_id += 1;
+                                                            let messages = stored.messages.iter().map(|m| {
+                                                                let role = if m.role == "user" {
+                                                                    crate::gui::app::AiMessageRole::User
+                                                                } else {
+                                                                    crate::gui::app::AiMessageRole::Assistant
+                                                                };
+                                                                crate::gui::app::AiMessage { role, content: m.content.clone() }
+                                                            }).collect();
+                                                            this.ai_chats.push(crate::gui::app::AiChat {
+                                                                id,
+                                                                title: stored.title.clone(),
+                                                                messages,
+                                                                input_draft: String::new(),
+                                                                is_loading: false,
+                                                                session_id: Some(session_id_left.clone()),
+                                                                session_provider: stored.provider.clone(),
+                                                                session_model_id: stored.model_id.clone(),
+                                                            });
+                                                            this.active_ai_chat_id = id;
+                                                            this.active_page_id = "ai.chat".to_string();
+                                                            this.ai_active_rule_ids = stored.active_rule_ids.clone();
+                                                            this.ai_active_skill_ids = stored.active_skill_ids.clone();
+                                                            this.ai_chat_workspace_id = stored.workspace_id.clone();
+                                                            cx.notify();
+                                                        }
+                                                    }))
+                                                    .on_mouse_down(openframe::MouseButton::Right, cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
+                                                        this.ai_session_menu = Some((session_id.clone(), event.position));
+                                                        this.ai_context_menu_open = false;
+                                                        this.ai_chat_menu = None;
+                                                        cx.notify();
+                                                    }));
+                                            }
+                                            items.push(item.into_any_element());
                                         }
+
                                         let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
                                         let dim_hover = if is_dark { rgb(0x718096) } else { rgb(0x6b7280) };
                                         items.push(
@@ -602,6 +738,9 @@ impl ArcadiaRoot {
                                                         messages: vec![],
                                                         input_draft: String::new(),
                                                         is_loading: false,
+                                                        session_id: None,
+                                                        session_provider: String::new(),
+                                                        session_model_id: String::new(),
                                                     });
                                                     this.active_ai_chat_id = id;
                                                     this.ai_next_id += 1;

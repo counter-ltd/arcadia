@@ -1,4 +1,8 @@
-use arcadia_core::config::modules::{AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME};
+use arcadia_core::config::modules::{
+    AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME, AI_EXEC_CODEX_MODULE_NAME,
+    AI_EXEC_GEMINI_MODULE_NAME, AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
+    AI_OPENAI_MODULE_NAME,
+};
 use arcadia_core::modules::ai::enabled_ai_providers;
 use openframe::{
     div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
@@ -679,6 +683,83 @@ impl ArcadiaRoot {
                     }
                     card = card.child(model_list);
                 }
+            }
+
+            // Per-CLI exec providers: show detection status + select row.
+            let cli_module_binary: Option<&str> = match provider.module_name {
+                AI_EXEC_CLAUDE_MODULE_NAME => Some("claude"),
+                AI_EXEC_CODEX_MODULE_NAME  => Some("codex"),
+                AI_EXEC_GEMINI_MODULE_NAME => Some("gemini"),
+                AI_EXEC_AIDER_MODULE_NAME  => Some("aider"),
+                _ => None,
+            };
+            if let Some(binary) = cli_module_binary {
+                let module_name_owned = provider.module_name.to_string();
+                let detected = self.detected_cli_providers.iter()
+                    .find(|c| c.binary == binary)
+                    .cloned();
+                let status_row = if let Some(ref cli) = detected {
+                    let version = cli.version.clone();
+                    let is_active = active_module == provider.module_name;
+                    let row_bg = if is_active { pal.row_selected } else { p.panel_bg };
+                    let mn = module_name_owned.clone();
+                    div()
+                        .px_2()
+                        .py_1p5()
+                        .rounded(px(radius.min(6.0)))
+                        .bg(row_bg)
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .cursor_pointer()
+                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                            this.active_ai_provider_module = mn.clone();
+                            this.ai_chat_model_id = None;
+                            cx.notify();
+                        }))
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap_0p5()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(p.content_title)
+                                        .child(format!("`{binary}` detected")),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(p.content_meta)
+                                        .child(version),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .px_2()
+                                .py_0p5()
+                                .rounded(px(4.0))
+                                .bg(p.badge_muted_bg)
+                                .text_xs()
+                                .text_color(p.badge_muted_fg)
+                                .child("CLI"),
+                        )
+                } else {
+                    div()
+                        .px_2()
+                        .py_1p5()
+                        .text_sm()
+                        .text_color(p.content_meta)
+                        .child(format!("`{binary}` not found on PATH. Install it and restart Arcadia."))
+                };
+                card = card.child(
+                    div()
+                        .pt_2()
+                        .border_t_1()
+                        .border_color(p.panel_border)
+                        .child(status_row),
+                );
             }
 
             root = root.child(card);

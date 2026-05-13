@@ -17,6 +17,7 @@ pub enum AiModelKind {
 #[derive(Clone, Debug)]
 pub struct AiWorkspaceContext {
     pub workspace_id: String,
+    pub workspace_label: String,
     pub workspace_path: String,
     pub granted_permissions: Vec<String>,
 }
@@ -25,6 +26,7 @@ impl AiWorkspaceContext {
     pub fn from_workspace_entry(entry: &WorkspaceEntry) -> Self {
         Self {
             workspace_id: entry.id.clone(),
+            workspace_label: entry.label.clone(),
             workspace_path: entry.path.clone(),
             granted_permissions: entry.granted_permissions.clone(),
         }
@@ -97,6 +99,12 @@ pub struct TextGenerationRequest {
     pub workspace_context: Option<AiWorkspaceContext>,
     /// Tool definitions available to the model. Empty = no tool use.
     pub tools: Vec<AiToolDefinition>,
+    /// Active rule IDs — merged into system prompt by prepare_system().
+    pub active_rule_ids: Vec<String>,
+    /// Active skill IDs — merged into system prompt by prepare_system().
+    pub active_skill_ids: Vec<String>,
+    /// When true, write_file stages edits instead of writing directly to disk.
+    pub stage_writes: bool,
 }
 
 #[derive(Clone, Debug)]

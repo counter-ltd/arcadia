@@ -273,11 +273,20 @@ impl ArcadiaRoot {
             return self.render_late_now_playing(window, cx, is_dark);
         }
         if self.active_page_id.as_str() == "ai.chat" {
-            return div()
+            let diff_open = self.ai_diff_panel_open && !self.ai_pending_edits.is_empty();
+            let chat = self.ai_chat_panel(window, cx, is_dark);
+            let mut row = div()
                 .flex_1()
                 .h_full()
                 .min_h_0()
-                .child(self.ai_chat_panel(window, cx, is_dark));
+                .flex()
+                .flex_row()
+                .child(chat);
+            if diff_open {
+                let diff = self.ai_diff_panel(cx, is_dark);
+                row = row.child(diff);
+            }
+            return row;
         }
 
         // Dynamic extension-token settings pages (page IDs aren't in PAGE_DEFINITIONS).
@@ -310,6 +319,8 @@ impl ArcadiaRoot {
                 "global.workspaces" => Some(self.workspace_panel(window, cx, is_dark)),
                 "ai.settings"       => Some(self.ai_settings_panel(window, cx, is_dark).into_any_element()),
                 "ai.models"         => Some(self.ai_models_panel(window, cx, is_dark).into_any_element()),
+                "ai.rules"          => Some(self.ai_rules_panel(window, cx, is_dark).into_any_element()),
+                "ai.skills"         => Some(self.ai_skills_panel(window, cx, is_dark).into_any_element()),
                 navigation::SETTINGS_HUB_ROOT_PAGE_ID => {
                     Some(self.settings_hub_landing_panel(cx, is_dark).into_any_element())
                 }

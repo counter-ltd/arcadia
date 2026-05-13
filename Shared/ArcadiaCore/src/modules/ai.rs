@@ -28,6 +28,26 @@ pub const AI_PROVIDER_REGISTRY: &[AiProviderManifest] = &[
         display_name: "OpenAI",
         description: "Cloud inference via OpenAI API.",
     },
+    AiProviderManifest {
+        module_name: "ai-provider-exec-claude",
+        display_name: "Claude (CLI)",
+        description: "Claude Pro via installed `claude` CLI. No API key required.",
+    },
+    AiProviderManifest {
+        module_name: "ai-provider-exec-codex",
+        display_name: "Codex (CLI)",
+        description: "ChatGPT Plus via installed `codex` CLI. No API key required.",
+    },
+    AiProviderManifest {
+        module_name: "ai-provider-exec-gemini",
+        display_name: "Gemini (CLI)",
+        description: "Gemini Advanced via installed `gemini` CLI. No API key required.",
+    },
+    AiProviderManifest {
+        module_name: "ai-provider-exec-aider",
+        display_name: "Aider (CLI)",
+        description: "Aider with its configured backend. No API key required.",
+    },
 ];
 
 pub fn enabled_ai_providers(module_rows: &[(String, bool)]) -> Vec<&'static AiProviderManifest> {
