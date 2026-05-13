@@ -180,10 +180,18 @@ impl ThemePalette {
             rgb(0xdc2626)
         };
 
-        let badge_info_bg = g.map(|x| x.surface).unwrap_or(rgb(0x1e3a8a));
-        let badge_info_fg = g.map(|x| x.accent).unwrap_or(rgb(0xbfdbfe));
-        let badge_muted_bg = g.map(|x| x.surface2).unwrap_or(rgb(0x374151));
-        let badge_muted_fg = g.map(|x| x.dim).unwrap_or(rgb(0x9ca3af));
+        let badge_info_bg = g.map(|x| x.surface).unwrap_or_else(|| {
+            if is_dark { rgb(0x1e3a8a) } else { rgb(0xeff6ff) }
+        });
+        let badge_info_fg = g.map(|x| x.accent).unwrap_or_else(|| {
+            if is_dark { rgb(0xbfdbfe) } else { rgb(0x3b82f6) }
+        });
+        let badge_muted_bg = g.map(|x| x.surface2).unwrap_or_else(|| {
+            if is_dark { rgb(0x374151) } else { rgb(0xf1f5f9) }
+        });
+        let badge_muted_fg = g.map(|x| x.dim).unwrap_or_else(|| {
+            if is_dark { rgb(0x9ca3af) } else { rgb(0x64748b) }
+        });
 
         Self {
             canvas,

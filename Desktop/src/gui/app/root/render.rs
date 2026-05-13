@@ -371,11 +371,15 @@ impl ArcadiaRoot {
                             .justify_between()
                             .child(
                                 div()
+                                    .flex_1()
+                                    .min_w_0()
                                     .text_color(if is_active { crate::gui::theme::ui_accent(cx) } else { text_color })
                                     .child(model_name),
                             )
                             .child(
                                 div()
+                                    .flex_shrink_0()
+                                    .pl_2()
                                     .text_xs()
                                     .text_color(text_color)
                                     .opacity(0.5)

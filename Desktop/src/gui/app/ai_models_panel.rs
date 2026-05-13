@@ -7,6 +7,7 @@ use openframe::{
 use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::ArcadiaRoot;
+use crate::gui::app::LlamaCppModelCreateDraft;
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
@@ -25,7 +26,21 @@ impl ArcadiaRoot {
         // If a specific llama-cpp model is selected, show its detail view.
         if let Some(model_id) = self.active_llama_cpp_model_id.clone() {
             if let Some(model) = self.llama_cpp_models.iter().find(|m| m.id == model_id).cloned() {
-                return div()
+                // Edit mode — delegate to edit form renderer.
+                if self.llama_cpp_edit_draft.is_some() {
+                    return self.llama_cpp_edit_model_form(window, cx, is_dark);
+                }
+
+                let is_delete_confirm = self.llama_cpp_delete_confirm;
+                let is_vision = model.model_kind
+                    == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision;
+                let model_for_edit = model.clone();
+                let pal = theme::nav_accent_palette("violet", is_dark);
+                let delete_bg = if is_delete_confirm { p.danger } else { p.surface_elevated };
+                let delete_fg = if is_delete_confirm { p.on_accent } else { p.ui_subtext };
+                let delete_border = if is_delete_confirm { p.danger } else { p.border };
+
+                let mut detail = div()
                     .w_full()
                     .when(is_glyph, |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
                     .flex()
@@ -77,8 +92,95 @@ impl ArcadiaRoot {
                                         model.path.clone()
                                     }),
                             ),
-                    )
-                    .into_any_element();
+                    );
+
+                if is_vision {
+                    detail = detail.child(
+                        div()
+                            .rounded(px(radius.min(12.0)))
+                            .border_1()
+                            .border_color(p.panel_border)
+                            .bg(p.panel_bg)
+                            .p_4()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(p.ui_subtext)
+                                    .child("MMPROJ FILE"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(p.content_title)
+                                    .child(
+                                        model.mmproj_path
+                                            .as_deref()
+                                            .unwrap_or("No path configured.")
+                                            .to_string(),
+                                    ),
+                            ),
+                    );
+                }
+
+                detail = detail.child(
+                    div()
+                        .flex()
+                        .gap_2()
+                        .child(
+                            div()
+                                .px_3()
+                                .py_1p5()
+                                .rounded(px(radius.min(8.0)))
+                                .bg(p.surface_elevated)
+                                .border_1()
+                                .border_color(p.border)
+                                .text_sm()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(p.content_title)
+                                .cursor_pointer()
+                                .hover(move |s| s.border_color(pal.row_hover))
+                                .child("Edit")
+                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                    this.llama_cpp_edit_draft = Some(LlamaCppModelCreateDraft {
+                                        name: model_for_edit.name.clone(),
+                                        path: model_for_edit.path.clone(),
+                                        mmproj_path: model_for_edit.mmproj_path.clone().unwrap_or_default(),
+                                        model_kind: model_for_edit.model_kind.clone(),
+                                        error: None,
+                                    });
+                                    this.llama_cpp_delete_confirm = false;
+                                    cx.notify();
+                                })),
+                        )
+                        .child(
+                            div()
+                                .px_3()
+                                .py_1p5()
+                                .rounded(px(radius.min(8.0)))
+                                .bg(delete_bg)
+                                .border_1()
+                                .border_color(delete_border)
+                                .text_sm()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(delete_fg)
+                                .cursor_pointer()
+                                .child(if is_delete_confirm { "Confirm Delete" } else { "Delete" })
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
+                                    if this.llama_cpp_delete_confirm {
+                                        this.llama_cpp_delete_model(cx);
+                                    } else {
+                                        this.llama_cpp_delete_confirm = true;
+                                        cx.notify();
+                                    }
+                                })),
+                        ),
+                );
+
+                return detail.into_any_element();
             }
         }
 
@@ -178,6 +280,8 @@ impl ArcadiaRoot {
                     cx.listener(move |this, _, _, cx| {
                         this.active_ai_provider_module = module_name_click.clone();
                         this.active_llama_cpp_model_id = None;
+                        this.llama_cpp_edit_draft = None;
+                        this.llama_cpp_delete_confirm = false;
                         cx.notify();
                     }),
                 );
@@ -233,9 +337,12 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
+                                    cx.stop_propagation();
                                     this.active_llama_cpp_model_id = Some(model_id_hover.clone());
                                     this.active_ai_provider_module =
                                         AI_LLAMA_CPP_MODULE_NAME.to_string();
+                                    this.llama_cpp_edit_draft = None;
+                                    this.llama_cpp_delete_confirm = false;
                                     cx.notify();
                                 }),
                             ),

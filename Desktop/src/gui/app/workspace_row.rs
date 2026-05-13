@@ -1,6 +1,7 @@
 use arcadia_core::config::modules::MODULE_REGISTRY;
 use arcadia_core::config::workspace::WorkspaceEntry;
 use arcadia_core::modules;
+use openframe::prelude::FluentBuilder as _;
 use openframe::{
     AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Styled, div, px,
@@ -19,6 +20,8 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
         let panel_radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
+        let is_glyph = g_snap.is_some();
+        let r_track = panel_radius.min(8.0_f32).max(0.0);
 
         let ws_id = ws.id.clone();
         let ws_id_remove = ws.id.clone();
@@ -72,11 +75,60 @@ impl ArcadiaRoot {
                         )
                         .child(
                             div()
-                                .text_xs()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(if granted { p.accent } else { p.ui_subtext })
+                                .flex()
+                                .items_center()
+                                .gap_2()
                                 .cursor_pointer()
-                                .child(if granted { "ON" } else { "OFF" })
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(if granted { p.accent } else { p.ui_subtext })
+                                        .child(if granted { "ON" } else { "OFF" }),
+                                )
+                                .child(if granted {
+                                    div()
+                                        .w_10()
+                                        .h_6()
+                                        .px_0p5()
+                                        .when(!is_glyph, |d| d.rounded_full())
+                                        .rounded(px(r_track))
+                                        .border_1()
+                                        .border_color(p.border)
+                                        .bg(p.accent)
+                                        .flex()
+                                        .items_center()
+                                        .justify_end()
+                                        .child(
+                                            div()
+                                                .w_4()
+                                                .h_4()
+                                                .when(!is_glyph, |d| d.rounded_full())
+                                                .rounded(px(r_track))
+                                                .bg(p.on_accent),
+                                        )
+                                } else {
+                                    div()
+                                        .w_10()
+                                        .h_6()
+                                        .px_0p5()
+                                        .when(!is_glyph, |d| d.rounded_full())
+                                        .rounded(px(r_track))
+                                        .border_1()
+                                        .border_color(p.border)
+                                        .bg(p.surface_elevated)
+                                        .flex()
+                                        .items_center()
+                                        .justify_start()
+                                        .child(
+                                            div()
+                                                .w_4()
+                                                .h_4()
+                                                .when(!is_glyph, |d| d.rounded_full())
+                                                .rounded(px(r_track))
+                                                .bg(p.toggle_knob_off),
+                                        )
+                                })
                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                                     let ctx = this.execution_context();
                                     let _ = modules::execute_command(

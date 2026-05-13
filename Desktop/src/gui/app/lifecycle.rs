@@ -25,7 +25,6 @@ use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::{parse_surface_revision, parse_surface_snapshot};
 use arcadia_core::navigation;
 use openframe::{Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
-#[cfg(feature = "ios-gui")]
 use openframe::ScrollHandle;
 use crate::gui::theme::{
     ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
@@ -244,6 +243,9 @@ impl ArcadiaRoot {
         let llama_cpp_create_name_focus = cx.focus_handle();
         let llama_cpp_create_path_focus = cx.focus_handle();
         let llama_cpp_create_mmproj_focus = cx.focus_handle();
+        let llama_cpp_edit_name_focus = cx.focus_handle();
+        let llama_cpp_edit_path_focus = cx.focus_handle();
+        let llama_cpp_edit_mmproj_focus = cx.focus_handle();
         let openai_api_key_focus = cx.focus_handle();
         let openai_base_url_focus = cx.focus_handle();
         let ui_prefs_cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
@@ -358,6 +360,11 @@ impl ArcadiaRoot {
             llama_cpp_create_name_focus,
             llama_cpp_create_path_focus,
             llama_cpp_create_mmproj_focus,
+            llama_cpp_edit_draft: None,
+            llama_cpp_edit_name_focus,
+            llama_cpp_edit_path_focus,
+            llama_cpp_edit_mmproj_focus,
+            llama_cpp_delete_confirm: false,
             workspace_create_draft: None,
             workspace_create_label_focus,
             workspace_create_path_focus,
@@ -390,6 +397,7 @@ impl ArcadiaRoot {
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
             sidebar_visible: true,
+            group_tabs_scroll: ScrollHandle::new(),
             settings_hub_expanded: false,
             app_menu_open: false,
             session_route_menu_open: false,
@@ -966,6 +974,9 @@ impl ArcadiaRoot {
             || self.llama_cpp_create_name_focus.contains_focused(window, cx)
             || self.llama_cpp_create_path_focus.contains_focused(window, cx)
             || self.llama_cpp_create_mmproj_focus.contains_focused(window, cx)
+            || self.llama_cpp_edit_name_focus.contains_focused(window, cx)
+            || self.llama_cpp_edit_path_focus.contains_focused(window, cx)
+            || self.llama_cpp_edit_mmproj_focus.contains_focused(window, cx)
             || self.workspace_create_label_focus.contains_focused(window, cx)
             || self.workspace_create_path_focus.contains_focused(window, cx)
     }

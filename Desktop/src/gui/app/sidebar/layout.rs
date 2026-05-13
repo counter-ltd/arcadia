@@ -385,26 +385,23 @@ impl ArcadiaRoot {
                             .id("sidebar-group-tabs")
                             .w_full()
                             .overflow_x_scroll()
-                            .child(
-                                div()
-                                    .flex()
-                                    .gap_2()
-                                    .w_full()
-                                    .justify_center()
-                                    .items_start()
-                                    .children(visible_groups.iter().copied().map(|group| {
-                                        Self::sidebar_group_item(
-                                            cx,
-                                            openframe::SharedString::from(group.label().to_string()),
-                                            openframe::SharedString::from(group.glyph().to_string()),
-                                            group.id().to_string(),
-                                            self.active_group_id == group.id(),
-                                            is_dark,
-                                            group.accent().to_string(),
-                                            glyph,
-                                        )
-                                    })),
-                            ),
+                            .flex()
+                            .gap_2()
+                            .items_center()
+                            .track_scroll(&self.group_tabs_scroll)
+                            .children(visible_groups.iter().copied().enumerate().map(|(idx, group)| {
+                                Self::sidebar_group_item(
+                                    cx,
+                                    openframe::SharedString::from(group.label().to_string()),
+                                    openframe::SharedString::from(group.glyph().to_string()),
+                                    group.id().to_string(),
+                                    idx,
+                                    self.active_group_id == group.id(),
+                                    is_dark,
+                                    group.accent().to_string(),
+                                    glyph,
+                                )
+                            })),
                     )
                     .child(
                         div()

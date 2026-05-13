@@ -1,5 +1,5 @@
 use arcadia_core::navigation;
-use openframe::{div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Rgba, Styled};
+use openframe::{div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Rgba, ScrollHandle, Styled};
 use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::navigation::NavPageRef;
@@ -69,6 +69,7 @@ impl ArcadiaRoot {
         label: openframe::SharedString,
         system_image: openframe::SharedString,
         group_id: String,
+        index: usize,
         is_active: bool,
         is_dark: bool,
         accent: String,
@@ -87,6 +88,7 @@ impl ArcadiaRoot {
         div()
             .w_16()
             .h_16()
+            .flex_shrink_0()
             .flex()
             .items_center()
             .justify_center()
@@ -111,6 +113,7 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
+                    this.group_tabs_scroll.scroll_to_item(index);
                     this.active_group_id = group_id.clone();
                     if let Some(group) = this.effective_group(group_id.as_str()) {
                         if let Some(first_page_id) = group
