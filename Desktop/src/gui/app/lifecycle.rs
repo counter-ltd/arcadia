@@ -427,6 +427,8 @@ impl ArcadiaRoot {
             #[cfg(feature = "gui")]
             next_terminal_serial: 2,
             #[cfg(feature = "gui")]
+            terminal_show_dashboard: false,
+            #[cfg(feature = "gui")]
             terminal_context_menu_open: false,
             #[cfg(feature = "gui")]
             terminal_kill_menu: None,

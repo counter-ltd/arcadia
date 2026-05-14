@@ -3,9 +3,9 @@ use arcadia_core::config::ai_skills::{all_skills, AiSkillsConfig};
 use arcadia_core::config::ollama::OllamaConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::config::modules::{
-    AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME, AI_EXEC_CODEX_MODULE_NAME,
-    AI_EXEC_GEMINI_MODULE_NAME, AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
-    AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    AI_APFEL_MODULE_NAME, AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
+    AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME, AI_LLAMA_CPP_MODULE_NAME,
+    AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use arcadia_core::modules::ai_exec_cli::cli_for_module;
 use arcadia_core::modules::ai::is_ai_provider_available;
@@ -660,6 +660,7 @@ impl ArcadiaRoot {
                     None => Err(format!("Unknown CLI provider module: {provider}")),
                 }
             }
+            AI_APFEL_MODULE_NAME => Ok(ProviderRouting::Apfel),
             _ => Err("No AI provider enabled. Enable one in Modules.".to_string()),
         };
 

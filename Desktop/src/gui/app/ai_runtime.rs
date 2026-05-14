@@ -38,6 +38,9 @@ pub enum ProviderRouting {
     /// Spawn an installed AI CLI binary (claude, codex, gemini, aider, …).
     /// Prompt is delivered via stdin pipe — no shell interpolation of user content.
     ExecCli  { binary: String, model_flag: Option<String>, model_value: String },
+    /// Apple Intelligence via macOS Foundation Models framework (macOS 26+).
+    /// No model selection — the system model is used.
+    Apfel,
 }
 
 pub struct AiRuntimeHandle {
@@ -112,6 +115,9 @@ fn ai_thread_impl(rx: Receiver<AiRuntimeRequest>, tx: SyncSender<RuntimeEvent>) 
                 }
                 ProviderRouting::ExecCli { binary, model_flag, model_value } => {
                     run_exec_cli(&binary, model_flag.as_deref(), &model_value, request, &tx);
+                }
+                ProviderRouting::Apfel => {
+                    run_apfel(request, &tx);
                 }
             },
         }
@@ -731,6 +737,123 @@ fn run_exec_cli(
             None
         } else {
             let _ = tx.send(RuntimeEvent::Token(text.clone()));
+            Some(text)
+        }
+    });
+}
+
+// ── Apple Intelligence provider (macOS Foundation Models) ─────────────────────
+
+fn run_apfel(request: TextGenerationRequest, tx: &SyncSender<RuntimeEvent>) {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    // Write the Swift runner to a temp file. The script uses Foundation Models
+    // (available macOS 26+) and streams output to stdout.
+    let swift_src = r#"
+import FoundationModels
+import Foundation
+
+let promptData = FileHandle.standardInput.readDataToEndOfFile()
+let prompt = String(data: promptData, encoding: .utf8) ?? ""
+
+Task {
+    do {
+        let session = LanguageModelSession()
+        let stream = try session.streamResponse(to: prompt)
+        for try await fragment in stream {
+            print(fragment, terminator: "")
+            fflush(stdout)
+        }
+    } catch {
+        fputs("Apfel error: \(error)\n", stderr)
+    }
+    exit(0)
+}
+
+RunLoop.main.run()
+"#;
+
+    let tmp_path = std::env::temp_dir().join("arcadia_apfel_runner.swift");
+    if let Err(e) = std::fs::write(&tmp_path, swift_src) {
+        let _ = tx.send(RuntimeEvent::Error(format!("Failed to write Apfel runner: {e}")));
+        return;
+    }
+
+    tool_loop(&request, tx, move |system, messages, _max_tokens, tx| {
+        let mut prompt = String::with_capacity(1024);
+        if !system.is_empty() {
+            prompt.push_str("System: ");
+            prompt.push_str(system);
+            prompt.push_str("\n\n");
+        }
+        for (role, content) in messages {
+            let label = if role == "user" { "User" } else { "Assistant" };
+            prompt.push_str(label);
+            prompt.push_str(": ");
+            prompt.push_str(content);
+            prompt.push_str("\n\n");
+        }
+        prompt.push_str("Assistant:");
+
+        let mut child = match Command::new("swift")
+            .arg(tmp_path.as_os_str())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = tx.send(RuntimeEvent::Error(format!("Failed to spawn swift: {e}")));
+                return None;
+            }
+        };
+
+        let prompt_bytes = prompt.into_bytes();
+        let stdin_handle = {
+            let mut stdin = child.stdin.take();
+            std::thread::spawn(move || {
+                if let Some(ref mut s) = stdin {
+                    let _ = s.write_all(&prompt_bytes);
+                }
+            })
+        };
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        let mut output = String::new();
+
+        if let Some(stdout) = child.stdout.take() {
+            use std::io::BufRead;
+            let reader = std::io::BufReader::new(stdout);
+            for line in reader.lines() {
+                if std::time::Instant::now() > deadline {
+                    let _ = tx.send(RuntimeEvent::Error("Apfel timed out after 120 s.".to_string()));
+                    let _ = child.kill();
+                    return None;
+                }
+                match line {
+                    Ok(l) => {
+                        let _ = tx.send(RuntimeEvent::Token(l.clone()));
+                        output.push_str(&l);
+                        output.push('\n');
+                    }
+                    Err(_) => break,
+                }
+            }
+        }
+
+        let _ = stdin_handle.join();
+        let _ = child.wait();
+
+        let text = output.trim().to_string();
+        if text.is_empty() {
+            let _ = tx.send(RuntimeEvent::Error(
+                "Apple Intelligence returned no output. \
+                 Requires macOS 26 or later with Foundation Models available.".to_string()
+            ));
+            None
+        } else {
             Some(text)
         }
     });

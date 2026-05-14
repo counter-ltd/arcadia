@@ -411,7 +411,9 @@ impl ArcadiaRoot {
                             .relative()
                             .child({
                                 let mut items: Vec<AnyElement> = Vec::new();
-                                for page_id in active_group.page_ids() {
+                                let mut sorted_page_ids: Vec<&str> = active_group.page_ids().iter().copied().collect();
+                                sorted_page_ids.sort_by_key(|id| self.page_ref(id).map(|p| p.title().to_string()).unwrap_or_default());
+                                for page_id in sorted_page_ids {
                                     if !self.is_page_visible(page_id) {
                                         continue;
                                     }
@@ -527,7 +529,15 @@ impl ArcadiaRoot {
                                     }
                                     if page_id == "ai.models" {
                                         let providers = arcadia_core::modules::ai::enabled_ai_providers(&self.module_rows);
-                                        for provider in providers {
+                                        let cli_providers: Vec<_> = providers.iter().copied()
+                                            .filter(|p| arcadia_core::modules::ai::is_cli_provider(p.module_name))
+                                            .collect();
+                                        let has_cli = !cli_providers.is_empty();
+
+                                        for provider in &providers {
+                                            if arcadia_core::modules::ai::is_cli_provider(provider.module_name) {
+                                                continue;
+                                            }
                                             let module_name = provider.module_name.to_string();
                                             let label = provider.display_name.to_string();
                                             let is_sub_active = is_page_active
@@ -562,6 +572,43 @@ impl ArcadiaRoot {
                                                         .into_any_element(),
                                                     );
                                                 }
+                                            }
+                                        }
+
+                                        // Single "CLI" parent item for all exec-CLI providers.
+                                        if has_cli {
+                                            let any_cli_active = is_page_active
+                                                && arcadia_core::modules::ai::is_cli_provider(&self.active_ai_provider_module)
+                                                && self.active_llama_cpp_model_id.is_none();
+                                            let first_cli_module = cli_providers[0].module_name.to_string();
+                                            items.push(
+                                                Self::sidebar_ai_provider_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from("CLI"),
+                                                    first_cli_module,
+                                                    any_cli_active,
+                                                    is_dark,
+                                                    glyph,
+                                                )
+                                                .into_any_element(),
+                                            );
+                                            for cli_provider in &cli_providers {
+                                                let module_name = cli_provider.module_name.to_string();
+                                                let label = arcadia_core::modules::ai::cli_display_name(cli_provider.module_name).to_string();
+                                                let is_cli_sub_active = is_page_active
+                                                    && self.active_ai_provider_module == cli_provider.module_name
+                                                    && self.active_llama_cpp_model_id.is_none();
+                                                items.push(
+                                                    Self::sidebar_cli_provider_sub_item(
+                                                        cx,
+                                                        openframe::SharedString::from(label),
+                                                        module_name.clone(),
+                                                        is_cli_sub_active,
+                                                        is_dark,
+                                                        glyph,
+                                                    )
+                                                    .into_any_element(),
+                                                );
                                             }
                                         }
                                     }

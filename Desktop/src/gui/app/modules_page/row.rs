@@ -7,6 +7,7 @@ use openframe::{Context, FontWeight, InteractiveElement, IntoElement, MouseButto
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
+use crate::gui::theme::render_icon;
 
 impl ArcadiaRoot {
     pub fn module_row_item(
@@ -52,54 +53,66 @@ impl ArcadiaRoot {
             .child(
                 div()
                     .flex()
-                    .flex_col()
-                    .gap_2()
+                    .items_start()
+                    .gap_3()
                     .child(
-                        div()
-                            .text_base()
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(title_c)
-                            .child(module_name.clone()),
+                        render_icon(manifest.map(|m| m.glyph).unwrap_or("code"))
+                            .size_8()
+                            .flex_shrink_0()
+                            .text_color(title_c),
                     )
                     .child(
                         div()
                             .flex()
-                            .items_center()
+                            .flex_col()
                             .gap_2()
                             .child(
                                 div()
-                                    .text_xs()
-                                    .text_color(meta_c)
-                                    .child(format!("v{version}")),
+                                    .text_base()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(title_c)
+                                    .child(module_name.clone()),
                             )
                             .child(
                                 div()
-                                    .px_2()
-                                    .py_0p5()
-                                    .when(!is_glyph, |d| d.rounded_full())
-                                    .rounded(px(radius.min(12.0)))
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(meta_c)
+                                            .child(format!("v{version}")),
+                                    )
+                                    .child(
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .when(!is_glyph, |d| d.rounded_full())
+                                            .rounded(px(radius.min(12.0)))
+                                            .text_xs()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .bg(badge_bg)
+                                            .text_color(badge_fg)
+                                            .child(state),
+                                    ),
+                            )
+                            .child(
+                                div()
                                     .text_xs()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .bg(badge_bg)
-                                    .text_color(badge_fg)
-                                    .child(state),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(desc_c)
-                            .child(description),
-                    )
-                    .when(!runtime_supported, |col| {
-                        col.child(
-                            div()
-                                .text_xs()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(p.ui_subtext)
-                                .child("Platform Not Supported"),
-                        )
-                    }),
+                                    .text_color(desc_c)
+                                    .child(description),
+                            )
+                            .when(!runtime_supported, |col| {
+                                col.child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(p.ui_subtext)
+                                        .child("Platform Not Supported"),
+                                )
+                            }),
+                    ),
             )
             .child(Self::row_toggle(
                 cx,

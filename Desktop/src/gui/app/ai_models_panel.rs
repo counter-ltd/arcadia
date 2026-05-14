@@ -1,9 +1,8 @@
 use arcadia_core::config::modules::{
-    AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME, AI_EXEC_CODEX_MODULE_NAME,
-    AI_EXEC_GEMINI_MODULE_NAME, AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
+    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
     AI_OPENAI_MODULE_NAME,
 };
-use arcadia_core::modules::ai::enabled_ai_providers;
+use arcadia_core::modules::ai::{cli_binary_for_module, cli_display_name, enabled_ai_providers, is_cli_provider};
 use openframe::{
     div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
     ParentElement, Styled, Window,
@@ -233,7 +232,17 @@ impl ArcadiaRoot {
                 .into_any_element();
         }
 
+        let cli_providers: Vec<&arcadia_core::modules::ai::AiProviderManifest> = providers
+            .iter()
+            .copied()
+            .filter(|p| is_cli_provider(p.module_name))
+            .collect();
+
         for provider in &providers {
+            if is_cli_provider(provider.module_name) {
+                continue;
+            }
+
             let module_name = provider.module_name.to_string();
             let is_active = active_module == provider.module_name
                 && self.active_llama_cpp_model_id.is_none();
@@ -271,13 +280,6 @@ impl ArcadiaRoot {
                         .text_sm()
                         .text_color(p.content_meta)
                         .child(provider.description),
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(p.content_meta)
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(module_name.clone()),
                 )
                 .on_mouse_down(
                     MouseButton::Left,
@@ -685,55 +687,59 @@ impl ArcadiaRoot {
                 }
             }
 
-            // Per-CLI exec providers: show detection status + select row.
-            let cli_module_binary: Option<&str> = match provider.module_name {
-                AI_EXEC_CLAUDE_MODULE_NAME => Some("claude"),
-                AI_EXEC_CODEX_MODULE_NAME  => Some("codex"),
-                AI_EXEC_GEMINI_MODULE_NAME => Some("gemini"),
-                AI_EXEC_AIDER_MODULE_NAME  => Some("aider"),
-                _ => None,
-            };
-            if let Some(binary) = cli_module_binary {
-                let module_name_owned = provider.module_name.to_string();
+            root = root.child(card);
+        }
+
+        // Single CLI card grouping all enabled exec-CLI providers.
+        if !cli_providers.is_empty() {
+            let pal = theme::nav_accent_palette("violet", is_dark);
+            let any_cli_active = is_cli_provider(&active_module) && self.active_llama_cpp_model_id.is_none();
+            let card_border = if any_cli_active { pal.row_hover } else { p.panel_border };
+
+            let mut cli_rows = div()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .pt_2()
+                .border_t_1()
+                .border_color(p.panel_border);
+
+            for cli_provider in &cli_providers {
+                let mn = cli_provider.module_name.to_string();
+                let binary = cli_binary_for_module(cli_provider.module_name).unwrap_or("");
+                let name = cli_display_name(cli_provider.module_name);
                 let detected = self.detected_cli_providers.iter()
                     .find(|c| c.binary == binary)
                     .cloned();
-                let status_row = if let Some(ref cli) = detected {
+                let is_row_active = active_module == cli_provider.module_name;
+                let row_bg = if is_row_active { pal.row_selected } else { p.panel_bg };
+                let row_hover = pal.row_hover;
+                let name_col = if is_row_active { pal.icon_active } else { p.content_title };
+                let mn_click = mn.clone();
+
+                let row = if let Some(ref cli) = detected {
                     let version = cli.version.clone();
-                    let is_active = active_module == provider.module_name;
-                    let row_bg = if is_active { pal.row_selected } else { p.panel_bg };
-                    let mn = module_name_owned.clone();
                     div()
                         .px_2()
                         .py_1p5()
                         .rounded(px(radius.min(6.0)))
                         .bg(row_bg)
+                        .hover(move |s| s.bg(row_hover))
                         .flex()
                         .items_center()
                         .justify_between()
                         .cursor_pointer()
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                            this.active_ai_provider_module = mn.clone();
+                            this.active_ai_provider_module = mn_click.clone();
                             this.ai_chat_model_id = None;
                             cx.notify();
                         }))
                         .child(
                             div()
-                                .flex()
-                                .flex_col()
-                                .gap_0p5()
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(p.content_title)
-                                        .child(format!("`{binary}` detected")),
-                                )
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(p.content_meta)
-                                        .child(version),
-                                ),
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(name_col)
+                                .child(name),
                         )
                         .child(
                             div()
@@ -743,26 +749,65 @@ impl ArcadiaRoot {
                                 .bg(p.badge_muted_bg)
                                 .text_xs()
                                 .text_color(p.badge_muted_fg)
-                                .child("CLI"),
+                                .child(version),
                         )
+                        .into_any_element()
                 } else {
                     div()
                         .px_2()
                         .py_1p5()
-                        .text_sm()
-                        .text_color(p.content_meta)
-                        .child(format!("`{binary}` not found on PATH. Install it and restart Arcadia."))
+                        .rounded(px(radius.min(6.0)))
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(p.ui_subtext)
+                                .child(name),
+                        )
+                        .child(
+                            div()
+                                .px_2()
+                                .py_0p5()
+                                .rounded(px(4.0))
+                                .bg(p.badge_muted_bg)
+                                .text_xs()
+                                .text_color(p.badge_muted_fg)
+                                .child("Not installed"),
+                        )
+                        .into_any_element()
                 };
-                card = card.child(
-                    div()
-                        .pt_2()
-                        .border_t_1()
-                        .border_color(p.panel_border)
-                        .child(status_row),
-                );
+
+                cli_rows = cli_rows.child(row);
             }
 
-            root = root.child(card);
+            let cli_card = div()
+                .rounded(px(radius.min(12.0)))
+                .border_1()
+                .border_color(card_border)
+                .bg(p.panel_bg)
+                .p_4()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .text_base()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(p.content_title)
+                        .child("CLI Providers"),
+                )
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(p.content_meta)
+                        .child("Subscription-based CLI tools. No API key required."),
+                )
+                .child(cli_rows);
+
+            root = root.child(cli_card);
         }
 
         root.into_any_element()

@@ -440,6 +440,8 @@ pub struct ArcadiaRoot {
     #[cfg(feature = "gui")]
     pub next_terminal_serial: usize,
     #[cfg(feature = "gui")]
+    pub terminal_show_dashboard: bool,
+    #[cfg(feature = "gui")]
     pub terminal_context_menu_open: bool,
     #[cfg(feature = "gui")]
     pub terminal_kill_menu: Option<usize>,

@@ -345,6 +345,131 @@ impl ArcadiaRoot {
                     })
                     .collect();
 
+            let editor_bg_preview = if is_dark { rgb(0x141820) } else { rgb(0xf0f2f5) };
+            let editor_cards: Vec<AnyElement> = self
+                .code_editor_tabs
+                .iter()
+                .enumerate()
+                .map(|(tab_idx, tab)| {
+                    let title = tab.title.clone();
+                    let subtitle = tab
+                        .file_path
+                        .as_deref()
+                        .or(tab.workspace_path.as_deref())
+                        .unwrap_or("unsaved")
+                        .to_string();
+                    let is_dirty = tab.content != tab.saved_content;
+                    let preview_lines: Vec<String> = tab
+                        .content
+                        .lines()
+                        .take(9)
+                        .map(|l| {
+                            let s: String = l.chars().take(48).collect();
+                            s
+                        })
+                        .collect();
+                    let fh_card = self.code_editor_focus.clone();
+                    div()
+                        .w(px(280.))
+                        .cursor_pointer()
+                        .rounded(px(r))
+                        .bg(p.panel_bg)
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .hover(move |s| s.bg(p.row_bg).border_color(pal.row_hover))
+                        .flex()
+                        .flex_col()
+                        .overflow_hidden()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, window, cx| {
+                                this.active_code_editor_tab = tab_idx;
+                                this.code_editor_show_dashboard = false;
+                                this.active_page_id = "editor.main".to_string();
+                                fh_card.focus(window);
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_h(px(100.))
+                                .bg(editor_bg_preview)
+                                .p_2()
+                                .overflow_hidden()
+                                .flex()
+                                .flex_col()
+                                .gap_0()
+                                .children(preview_lines.into_iter().map(|line| {
+                                    div()
+                                        .text_xs()
+                                        .font_family("monospace")
+                                        .text_color(p.content_meta)
+                                        .flex_shrink_0()
+                                        .child(if line.is_empty() { " ".to_string() } else { line })
+                                        .into_any_element()
+                                })),
+                        )
+                        .child(
+                            div()
+                                .p_3()
+                                .flex()
+                                .flex_col()
+                                .gap_1()
+                                .border_t_1()
+                                .border_color(p.panel_border)
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .gap_1()
+                                        .items_center()
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .font_weight(FontWeight::SEMIBOLD)
+                                                .text_color(p.content_title)
+                                                .flex_1()
+                                                .child(title),
+                                        )
+                                        .child(if is_dirty {
+                                            div()
+                                                .w(px(6.))
+                                                .h(px(6.))
+                                                .rounded_full()
+                                                .bg(pal.icon_active)
+                                                .into_any_element()
+                                        } else {
+                                            div().into_any_element()
+                                        }),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(p.content_meta)
+                                        .child(subtitle),
+                                ),
+                        )
+                        .into_any_element()
+                })
+                .collect();
+
+            let editors_body: AnyElement = if editor_cards.is_empty() {
+                div()
+                    .text_sm()
+                    .text_color(p.content_meta)
+                    .child("No open editors.")
+                    .into_any_element()
+            } else {
+                div()
+                    .flex()
+                    .flex_row()
+                    .flex_wrap()
+                    .gap_4()
+                    .children(editor_cards)
+                    .into_any_element()
+            };
+
             let workspaces_body: AnyElement = if workspace_cards.is_empty() {
                 div()
                     .text_sm()
@@ -398,12 +523,7 @@ impl ArcadiaRoot {
                                 .text_color(p.content_title)
                                 .child("Open Editors"),
                         )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(p.content_meta)
-                                .child("No open editors."),
-                        ),
+                        .child(editors_body),
                 )
                 .into_any_element();
         }

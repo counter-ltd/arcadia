@@ -64,11 +64,13 @@ pub const AI_EXEC_CLAUDE_MODULE_NAME: &str = "ai-provider-exec-claude";
 pub const AI_EXEC_CODEX_MODULE_NAME: &str = "ai-provider-exec-codex";
 pub const AI_EXEC_GEMINI_MODULE_NAME: &str = "ai-provider-exec-gemini";
 pub const AI_EXEC_AIDER_MODULE_NAME: &str = "ai-provider-exec-aider";
+pub const AI_APFEL_MODULE_NAME: &str = "ai-provider-apfel";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
 pub struct ModuleManifest {
     pub name: &'static str,
+    pub glyph: &'static str,
     pub version: &'static str,
     pub description: &'static str,
     pub required_modules: &'static [&'static str],
@@ -85,6 +87,7 @@ pub struct ModuleManifest {
 pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     ModuleManifest {
         name: ANIMATION_MODULE_NAME,
+        glyph: "animation",
         version: "0.1.0",
         description: "Shared tween engine for modules and extensions. One 16 ms driver loop services all running animations.",
         required_modules: &[],
@@ -94,6 +97,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: LAN_MODULE_NAME,
+        glyph: "nodes",
         version: "1.0.0",
         description: "Local network discovery and peer communication.",
         required_modules: &[NET_MODULE_NAME],
@@ -103,6 +107,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: NET_MODULE_NAME,
+        glyph: "network",
         version: "1.0.0",
         description: "Shared networking foundation for routed module commands.",
         required_modules: &[],
@@ -112,6 +117,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: SURFACE_MODULE_NAME,
+        glyph: "surface",
         version: "0.1.0",
         description: "Generic UI snapshot (surface.snapshot) and patches (surface.patch); extend patches for new surfaces.",
         required_modules: &[],
@@ -121,6 +127,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: REMOTE_SESSION_MODULE_NAME,
+        glyph: "network",
         version: "0.1.0",
         description: "Permission to route execute_command over LAN (net_as: lan:…); transcript/mirror are automatic on hosts.",
         required_modules: &[NET_MODULE_NAME, LAN_MODULE_NAME],
@@ -130,6 +137,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: TERMINAL_MODULE_NAME,
+        glyph: "terminal",
         version: "1.0.0",
         description: "Interactive terminal command execution for Arcadia surfaces.",
         required_modules: &[],
@@ -139,6 +147,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: TERMINAL_MOTD_MODULE_NAME,
+        glyph: "terminal",
         version: "1.0.0",
         description: "Fastfetch-style banner when opening the Arcadia terminal (requires terminal).",
         required_modules: &[TERMINAL_MODULE_NAME],
@@ -148,6 +157,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: LATE_MODULE_NAME,
+        glyph: "coffee",
         version: "0.1.0",
         description: "Native late.sh client — chat rooms, music stream, reactions, and bonsai.",
         required_modules: &[],
@@ -157,6 +167,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: PYTHON_HOST_MODULE_NAME,
+        glyph: "python",
         version: "0.1.0",
         description: "Python extension loader. Scans ~/Arcadia/Extensions/ for .py files and registers their commands.",
         required_modules: &[],
@@ -166,6 +177,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: PERMISSIONS_MODULE_NAME,
+        glyph: "permissions",
         version: "0.1.0",
         description: "Permission catalog, grants, and headless permit/list commands.",
         required_modules: &[],
@@ -175,6 +187,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: TRAY_MODULE_NAME,
+        glyph: "tray",
         version: "0.1.0",
         description: "Menu-bar (macOS) and system-tray (Windows/Linux) icons with dynamic images and menus.",
         required_modules: &[],
@@ -184,6 +197,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: CURSOR_MODULE_NAME,
+        glyph: "cursor",
         version: "0.1.0",
         description: "OS-global cursor position and primary display size for extensions that track input.",
         required_modules: &[],
@@ -193,6 +207,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: OVERLAY_MODULE_NAME,
+        glyph: "overlay",
         version: "0.1.0",
         description: "Single always-on-top transparent HUD window for overlays (pointer pass-through v1).",
         required_modules: &[],
@@ -202,6 +217,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: WORKSPACE_MODULE_NAME,
+        glyph: "folder",
         version: "0.1.0",
         description: "Workspace directory registry with scoped file and execution permissions.",
         required_modules: &[],
@@ -230,6 +246,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: CODE_EDITOR_MODULE_NAME,
+        glyph: "file-code",
         version: "0.1.0",
         description: "Code editor with per-file tabs in the sidebar.",
         required_modules: &[],
@@ -239,6 +256,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_MODULE_NAME,
+        glyph: "ai-provider",
         version: "0.1.0",
         description: "AI chat interface. Requires an AI provider module to be enabled.",
         required_modules: &[],
@@ -267,6 +285,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_LLAMA_CPP_MODULE_NAME,
+        glyph: "llama-cpp",
         version: "0.1.0",
         description: "llama.cpp local inference provider for the AI chat module.",
         required_modules: &[AI_MODULE_NAME],
@@ -276,6 +295,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_OLLAMA_MODULE_NAME,
+        glyph: "ollama",
         version: "0.1.0",
         description: "Ollama local inference provider for the AI chat module.",
         required_modules: &[AI_MODULE_NAME],
@@ -285,6 +305,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_OPENAI_MODULE_NAME,
+        glyph: "openai",
         version: "0.1.0",
         description: "OpenAI API provider for the AI chat module.",
         required_modules: &[AI_MODULE_NAME],
@@ -294,6 +315,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_RULES_MODULE_NAME,
+        glyph: "tools",
         version: "0.1.0",
         description: "AI Rules — per-chat constraints: forbidden tools, response format, persona. Adds a configuration page to the AI sidebar.",
         required_modules: &[AI_MODULE_NAME],
@@ -303,6 +325,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_SKILLS_MODULE_NAME,
+        glyph: "flask",
         version: "0.1.0",
         description: "AI Skills — named behaviours: system prompt fragments, tool allowlists, parameter overrides. Adds a configuration page to the AI sidebar.",
         required_modules: &[AI_MODULE_NAME],
@@ -312,6 +335,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_EXEC_CLAUDE_MODULE_NAME,
+        glyph: "claude",
         version: "0.1.0",
         description: "Claude CLI provider — uses the installed `claude` binary with a Claude Pro subscription. No API key required.",
         required_modules: &[AI_MODULE_NAME],
@@ -321,6 +345,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_EXEC_CODEX_MODULE_NAME,
+        glyph: "codex",
         version: "0.1.0",
         description: "Codex CLI provider — uses the installed `codex` binary with a ChatGPT Plus subscription. No API key required.",
         required_modules: &[AI_MODULE_NAME],
@@ -330,6 +355,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_EXEC_GEMINI_MODULE_NAME,
+        glyph: "gemini",
         version: "0.1.0",
         description: "Gemini CLI provider — uses the installed `gemini` binary with a Gemini Advanced subscription. No API key required.",
         required_modules: &[AI_MODULE_NAME],
@@ -339,12 +365,23 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_EXEC_AIDER_MODULE_NAME,
+        glyph: "aider",
         version: "0.1.0",
         description: "Aider CLI provider — uses the installed `aider` binary with its own configured backend.",
         required_modules: &[AI_MODULE_NAME],
         required_permissions: &[],
         workspace_permissions: &[],
         supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: AI_APFEL_MODULE_NAME,
+        glyph: "apfel",
+        version: "0.1.0",
+        description: "Apple Intelligence provider — on-device inference via the macOS Foundation Models framework. No API key, no network required.",
+        required_modules: &[AI_MODULE_NAME],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &["macos"],
     },
 ];
 
@@ -547,6 +584,10 @@ impl ConfigFile for ModulesConfig {
             changed = true;
         }
         if self.modules.remove("lan-mobile").is_some() {
+            changed = true;
+        }
+
+        if self.modules.remove("ai-provider-exec-cli").is_some() {
             changed = true;
         }
 

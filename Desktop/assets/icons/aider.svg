@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <!-- row 0: _ X X _ -->
+  <rect x="8" y="2" width="3" height="3"/>
+  <rect x="12" y="2" width="3" height="3"/>
+  <!-- row 1: _ _ _ X -->
+  <rect x="16" y="6" width="3" height="3"/>
+  <!-- row 2: _ X X X -->
+  <rect x="8" y="10" width="3" height="3"/>
+  <rect x="12" y="10" width="3" height="3"/>
+  <rect x="16" y="10" width="3" height="3"/>
+  <!-- row 3: X _ _ X -->
+  <rect x="4" y="14" width="3" height="3"/>
+  <rect x="16" y="14" width="3" height="3"/>
+  <!-- row 4: _ X X X -->
+  <rect x="8" y="18" width="3" height="3"/>
+  <rect x="12" y="18" width="3" height="3"/>
+  <rect x="16" y="18" width="3" height="3"/>
+</svg>

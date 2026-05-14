@@ -174,9 +174,12 @@ impl ArcadiaRoot {
         } else {
             Vec::new()
         };
-        all.into_iter()
+        let mut visible: Vec<NavGroupRef<'_>> = all
+            .into_iter()
             .filter(|g| g.page_ids().iter().any(|pid| self.is_page_visible(pid)))
-            .collect()
+            .collect();
+        visible.sort_by_key(|g| g.label().to_string());
+        visible
     }
 
     pub(crate) fn effective_default_page(&self) -> &str {
@@ -513,8 +516,12 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
         let hub = self.page_ref(navigation::SETTINGS_HUB_ROOT_PAGE_ID);
 
-        let tiles: Vec<_> = self
-            .settings_hub_page_ids_effective()
+        let mut hub_page_ids = self.settings_hub_page_ids_effective();
+        hub_page_ids.sort_by_key(|id| {
+            self.page_ref(id).map(|p| p.title().to_string()).unwrap_or_default()
+        });
+
+        let tiles: Vec<_> = hub_page_ids
             .into_iter()
             .filter_map(|page_id| {
                 if !self.is_page_visible(page_id) {

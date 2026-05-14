@@ -435,6 +435,10 @@ impl ArcadiaRoot {
                     if _is_editor_page {
                         this.code_editor_show_dashboard = true;
                     }
+                    #[cfg(feature = "gui")]
+                    if _is_shell_page && this.terminals.len() > 1 {
+                        this.terminal_show_dashboard = true;
+                    }
                     cx.notify();
                 }),
             )
@@ -651,6 +655,56 @@ impl ArcadiaRoot {
             )
     }
 
+    pub fn sidebar_cli_provider_sub_item(
+        cx: &mut Context<Self>,
+        label: openframe::SharedString,
+        module_name: String,
+        is_active: bool,
+        is_dark: bool,
+        glyph: Option<GlyphStyleConfig>,
+    ) -> impl IntoElement {
+        let pal      = theme::nav_accent_palette("violet", is_dark);
+        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
+        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
+        let hover_bg = if is_active {
+            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
+        } else {
+            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1a1a2a) } else { rgb(0xf5f3ff) })
+        };
+        let dim_col  = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+        let radius   = nav_radius(glyph);
+        div()
+            .ml_12()
+            .pl_2()
+            .pr_2()
+            .py_1()
+            .rounded(px(radius))
+            .cursor_pointer()
+            .text_xs()
+            .font_weight(if is_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
+            .bg(bg)
+            .text_color(text_col)
+            .hover(move |s| s.bg(hover_bg))
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(
+                div()
+                    .text_color(dim_col)
+                    .child("·"),
+            )
+            .child(div().child(label))
+            .on_mouse_down(
+                openframe::MouseButton::Left,
+                cx.listener(move |this, _, _, cx| {
+                    this.active_ai_provider_module = module_name.clone();
+                    this.active_llama_cpp_model_id = None;
+                    this.active_page_id = "ai.models".to_string();
+                    cx.notify();
+                }),
+            )
+    }
+
     pub fn sidebar_ai_chat_sub_item(
         cx: &mut Context<Self>,
         label: openframe::SharedString,
@@ -737,6 +791,7 @@ impl ArcadiaRoot {
                     if terminal_id < this.terminals.len() {
                         this.active_terminal_id = terminal_id;
                         this.active_page_id = "utility.shell".to_string();
+                        this.terminal_show_dashboard = false;
                     }
                     cx.notify();
                 }),
