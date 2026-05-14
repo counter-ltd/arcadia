@@ -16,8 +16,12 @@ fn nav_idle_bg(g: Option<GlyphStyleConfig>, is_dark: bool) -> Rgba {
 fn nav_active_bg(_g: Option<GlyphStyleConfig>, pal_selected: Rgba) -> Rgba {
     pal_selected
 }
-fn nav_hover_bg_raw(_g: Option<GlyphStyleConfig>, _is_dark: bool, fallback: Rgba) -> Rgba {
-    fallback
+pub(super) fn nav_item_bg(idle: Rgba, sel: Rgba, active_alpha: f32, hover_alpha: f32) -> Rgba {
+    let idle_hov   = lerp_color(idle, sel, 0.4);
+    let active_hov = lerp_color(sel, Rgba { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }, 0.05);
+    let base       = lerp_color(idle, sel, active_alpha);
+    let dest       = lerp_color(idle_hov, active_hov, active_alpha);
+    lerp_color(base, dest, hover_alpha)
 }
 fn nav_idle_text(g: Option<GlyphStyleConfig>, is_dark: bool) -> Rgba {
     g.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::sidebar_nav_idle_foreground(is_dark))
@@ -29,9 +33,26 @@ fn nav_radius(g: Option<GlyphStyleConfig>) -> f32 {
     g.as_ref().map(|g| g.border_radius).unwrap_or(6.0)
 }
 
-fn lerp_color(a: Rgba, b: Rgba, t: f32) -> Rgba {
+pub fn lerp_color(a: Rgba, b: Rgba, t: f32) -> Rgba {
     use arcadia_core::modules::animation::lerp_f32;
     Rgba { r: lerp_f32(a.r, b.r, t), g: lerp_f32(a.g, b.g, t), b: lerp_f32(a.b, b.b, t), a: lerp_f32(a.a, b.a, t) }
+}
+
+fn transparent() -> Rgba {
+    Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }
+}
+
+fn active_border(pal_icon_idle: Rgba, active_alpha: f32) -> Rgba {
+    lerp_color(transparent(), pal_icon_idle, active_alpha)
+}
+
+pub(super) fn nav_item_text(idle: Rgba, active: Rgba, active_alpha: f32, hover_alpha: f32) -> Rgba {
+    let white      = Rgba { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
+    let idle_hov   = lerp_color(idle, active, 0.4);
+    let active_hov = lerp_color(active, white, 0.05);
+    let base = lerp_color(idle, active, active_alpha);
+    let dest = lerp_color(idle_hov, active_hov, active_alpha);
+    lerp_color(base, dest, hover_alpha)
 }
 
 fn ai_provider_accent(module_name: &str) -> &'static str {
@@ -97,13 +118,11 @@ impl ArcadiaRoot {
         active_alpha: f32,
     ) -> impl IntoElement {
         let pal        = theme::nav_accent_palette(accent.as_str(), is_dark);
-        let idle_bg       = nav_idle_bg(glyph, is_dark);
-        let sel_bg        = nav_active_bg(glyph, pal.row_selected);
-        // Hover target sits 40% toward active — always dimmer than the fully active state.
-        let hover_target  = lerp_color(idle_bg, sel_bg, 0.4);
-        let base_bg       = lerp_color(idle_bg, sel_bg, active_alpha);
-        let final_bg      = lerp_color(base_bg, hover_target, hover_alpha);
+        let idle_bg  = nav_idle_bg(glyph, is_dark);
+        let sel_bg   = nav_active_bg(glyph, pal.row_selected);
+        let final_bg = nav_item_bg(idle_bg, sel_bg, active_alpha, hover_alpha);
         let icon_col   = lerp_color(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), active_alpha);
+        let border_col = active_border(pal.icon_idle, active_alpha);
         let radius     = nav_radius(glyph);
         let gid_hover  = group_id.clone();
         div()
@@ -117,8 +136,10 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { FontWeight::BOLD } else { FontWeight::NORMAL })
+            .font_weight(FontWeight::NORMAL)
             .bg(final_bg)
+            .border_1()
+            .border_color(border_col)
             .text_color(icon_col)
             .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
                 this.start_tab_hover_anim(gid_hover.clone(), *hovered);
@@ -173,7 +194,7 @@ impl ArcadiaRoot {
             glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::top_bar_pill_bg(is_dark))
         };
         let hover_bg  = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
+            pal.row_hover
         } else {
             glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::top_bar_pill_hover_bg(is_dark))
         };
@@ -184,7 +205,7 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+            .font_weight(FontWeight::NORMAL)
             .bg(bg)
             .text_color(icon_col)
             .hover(move |s| s.bg(hover_bg))
@@ -218,26 +239,32 @@ impl ArcadiaRoot {
         is_dark: bool,
         accent: String,
         glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal       = theme::nav_accent_palette(accent.as_str(), is_dark);
-        let icon_col  = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg        = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg  = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        };
-        let radius    = nav_radius(glyph);
+        let idle_bg  = nav_idle_bg(glyph, is_dark);
+        let sel_bg   = nav_active_bg(glyph, pal.row_selected);
+        let icon_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
+        let final_bg = nav_item_bg(idle_bg, sel_bg, if is_active { 1.0 } else { 0.0 }, hover_alpha);
+        let border_col = active_border(pal.icon_idle, if is_active { 1.0 } else { 0.0 });
+        let radius   = nav_radius(glyph);
+        let item_key = format!("page:{}", page_id);
         div()
+            .id(SharedString::from(item_key.clone()))
             .px_3()
             .py_1()
             .rounded(px(radius))
             .cursor_pointer()
             .text_sm()
-            .font_weight(if is_active { FontWeight::BOLD } else { FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(FontWeight::NORMAL)
+            .bg(final_bg)
+            .border_1()
+            .border_color(border_col)
             .text_color(icon_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .child(
                 div()
                     .flex()
@@ -272,13 +299,12 @@ impl ArcadiaRoot {
                 .settings_hub_page_ids_effective()
                 .iter()
                 .any(|pid| *pid == self.active_page_id.as_str());
-        let icon_col  = if hub_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg        = if hub_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg  = if hub_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        };
+        let hub_idle_bg  = nav_idle_bg(glyph, is_dark);
+        let hub_sel_bg   = nav_active_bg(glyph, pal.row_selected);
+        let icon_col     = if hub_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
+        let hub_ha       = *self.item_hover_alphas.get("page:global.settings").unwrap_or(&0.0);
+        let hub_final_bg = nav_item_bg(hub_idle_bg, hub_sel_bg, if hub_active { 1.0 } else { 0.0 }, hub_ha);
+        let hub_border   = active_border(pal.icon_idle, if hub_active { 1.0 } else { 0.0 });
         let chevron_col   = nav_idle_text(glyph, is_dark);
         let chevron       = if self.settings_hub_expanded { "▼" } else { "▶" };
         let radius        = nav_radius(glyph);
@@ -290,15 +316,21 @@ impl ArcadiaRoot {
             .gap_0p5()
             .child(
                 div()
+                    .id(SharedString::from("page:global.settings"))
                     .px_3()
                     .py_1()
                     .rounded(px(radius))
                     .cursor_pointer()
                     .text_sm()
-                    .font_weight(if hub_active { FontWeight::BOLD } else { FontWeight::NORMAL })
-                    .bg(bg)
+                    .font_weight(FontWeight::NORMAL)
+                    .bg(hub_final_bg)
+                    .border_1()
+                    .border_color(hub_border)
                     .text_color(icon_col)
-                    .hover(move |s| s.bg(hover_bg))
+                    .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                        this.start_item_hover_anim("page:global.settings".to_string(), *hovered);
+                        cx.notify();
+                    }))
                     .child(
                         div()
                             .flex()
@@ -354,22 +386,25 @@ impl ArcadiaRoot {
                                 let page_id_rclick = page_id.clone();
                                 let is_active = self.active_page_id == page.id();
                                 let sub_pal   = theme::nav_accent_palette(page.accent(), is_dark);
-                                let sub_icon  = if is_active { nav_active_text(glyph, sub_pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-                                let sub_bg    = if is_active { nav_active_bg(glyph, sub_pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-                                let sub_hover = nav_hover_bg_raw(glyph, is_dark, sub_pal.row_hover);
+                                let sub_ha    = *self.item_hover_alphas.get(&format!("page:{}", page.id())).unwrap_or(&0.0);
+                                let sub_icon  = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, sub_pal.icon_active), if is_active { 1.0 } else { 0.0 }, sub_ha);
                                 let title = page.title().to_string();
                                 let glyph_key = page.glyph().to_string();
+                                let sub_item_key = format!("page:{}", page.id());
                                 Some(
                                     div()
+                                        .id(SharedString::from(sub_item_key.clone()))
                                         .px_3()
                                         .py_1()
                                         .rounded(px(radius))
                                         .cursor_pointer()
-                                        .text_sm()
-                                        .font_weight(if is_active { FontWeight::BOLD } else { FontWeight::NORMAL })
-                                        .bg(sub_bg)
+                                        .text_xs()
+                                        .font_weight(FontWeight::NORMAL)
                                         .text_color(sub_icon)
-                                        .hover(move |s| s.bg(sub_hover))
+                                        .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                                            this.start_item_hover_anim(sub_item_key.clone(), *hovered);
+                                            cx.notify();
+                                        }))
                                         .child(
                                             div()
                                                 .flex()
@@ -414,30 +449,36 @@ impl ArcadiaRoot {
         is_dark: bool,
         accent: String,
         glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette(accent.as_str(), is_dark);
+        let idle_bg  = nav_idle_bg(glyph, is_dark);
+        let sel_bg   = nav_active_bg(glyph, pal.row_selected);
         let icon_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        };
+        let final_bg = nav_item_bg(idle_bg, sel_bg, if is_active { 1.0 } else { 0.0 }, hover_alpha);
+        let border_col = active_border(pal.icon_idle, if is_active { 1.0 } else { 0.0 });
         let radius   = nav_radius(glyph);
         let _is_shell_page  = page_id == "utility.shell";
         let _is_editor_page = page_id == "editor.main";
         let _is_ai_page     = page_id == "ai.chat";
         let page_id_left    = page_id.clone();
+        let item_key = format!("page:{}", page_id);
         div()
+            .id(SharedString::from(item_key.clone()))
             .px_3()
             .py_2()
             .rounded(px(radius))
             .cursor_pointer()
             .text_sm()
-            .font_weight(if is_active { FontWeight::BOLD } else { FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(FontWeight::NORMAL)
+            .bg(final_bg)
+            .border_1()
+            .border_color(border_col)
             .text_color(icon_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .child(
                 div()
                     .flex()
@@ -512,18 +553,15 @@ impl ArcadiaRoot {
         is_active: bool,
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette("sky", is_dark);
-        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
+        let text_col = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), if is_active { 1.0 } else { 0.0 }, hover_alpha);
         let meta_col = if is_active { pal.icon_active } else if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1e2530) } else { rgb(0xe0f2fe) })
-        };
         let radius   = nav_radius(glyph);
+        let item_key = format!("editor:{}", editor_idx);
         div()
+            .id(SharedString::from(item_key.clone()))
             .ml_7()
             .pl_2()
             .pr_2()
@@ -531,10 +569,12 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(openframe::FontWeight::NORMAL)
             .text_color(text_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .flex()
             .flex_col()
             .gap(px(1.))
@@ -576,18 +616,15 @@ impl ArcadiaRoot {
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
         icon_key: &'static str,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette(ai_provider_accent(&module_name), is_dark);
-        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1e1e2e) } else { rgb(0xede9fe) })
-        };
+        let text_col = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), if is_active { 1.0 } else { 0.0 }, hover_alpha);
         let radius   = nav_radius(glyph);
+        let item_key = format!("aiprov:{}", module_name);
         let module_name_right = module_name.clone();
         div()
+            .id(SharedString::from(item_key.clone()))
             .ml_7()
             .pl_2()
             .pr_2()
@@ -595,10 +632,12 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(openframe::FontWeight::NORMAL)
             .text_color(text_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .flex()
             .items_center()
             .gap_1p5()
@@ -646,17 +685,14 @@ impl ArcadiaRoot {
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
         icon_key: &'static str,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette(ai_provider_accent(arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME), is_dark);
-        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1a1a2a) } else { rgb(0xf5f3ff) })
-        };
+        let text_col = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), if is_active { 1.0 } else { 0.0 }, hover_alpha);
         let radius   = nav_radius(glyph);
+        let item_key = format!("llamamod:{}", model_id);
         div()
+            .id(SharedString::from(item_key.clone()))
             .ml_12()
             .pl_2()
             .pr_2()
@@ -664,10 +700,12 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(openframe::FontWeight::NORMAL)
             .text_color(text_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .flex()
             .items_center()
             .gap_1p5()
@@ -697,21 +735,18 @@ impl ArcadiaRoot {
         is_active: bool,
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette(ai_provider_accent(&module_name), is_dark);
-        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1a1a2a) } else { rgb(0xf5f3ff) })
-        };
+        let text_col = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), if is_active { 1.0 } else { 0.0 }, hover_alpha);
         let provider_icon = arcadia_core::config::modules::MODULE_REGISTRY.iter()
             .find(|m| m.name == module_name.as_str())
             .map(|m| m.glyph)
             .unwrap_or("modules");
         let radius   = nav_radius(glyph);
+        let item_key = format!("cliprov:{}", module_name);
         div()
+            .id(SharedString::from(item_key.clone()))
             .ml_12()
             .pl_2()
             .pr_2()
@@ -719,10 +754,12 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(openframe::FontWeight::NORMAL)
             .text_color(text_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .flex()
             .items_center()
             .gap_1p5()
@@ -754,14 +791,15 @@ impl ArcadiaRoot {
         accent: &'static str,
         provider_icon: &'static str,
         workspace_label: Option<String>,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette(accent, is_dark);
-        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = nav_hover_bg_raw(glyph, is_dark, pal.row_hover);
+        let text_col = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), if is_active { 1.0 } else { 0.0 }, hover_alpha);
         let radius   = nav_radius(glyph);
         let meta_col = if is_active { pal.icon_active } else if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+        let item_key = format!("chat:{}", chat_id);
         div()
+            .id(SharedString::from(item_key.clone()))
             .ml_7()
             .pl_2()
             .pr_2()
@@ -769,10 +807,12 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(openframe::FontWeight::NORMAL)
             .text_color(text_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .flex()
             .flex_col()
             .gap(px(1.))
@@ -816,17 +856,14 @@ impl ArcadiaRoot {
         is_active: bool,
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette("emerald", is_dark);
-        let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1e2530) } else { rgb(0xeef2ff) })
-        };
+        let text_col = nav_item_text(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), if is_active { 1.0 } else { 0.0 }, hover_alpha);
         let radius   = nav_radius(glyph);
+        let item_key = format!("terminal:{}", terminal_id);
         div()
+            .id(SharedString::from(item_key.clone()))
             .ml_7()
             .pl_2()
             .pr_2()
@@ -834,10 +871,12 @@ impl ArcadiaRoot {
             .rounded(px(radius))
             .cursor_pointer()
             .text_xs()
-            .font_weight(if is_active { FontWeight::MEDIUM } else { FontWeight::NORMAL })
-            .bg(bg)
+            .font_weight(FontWeight::NORMAL)
             .text_color(text_col)
-            .hover(move |s| s.bg(hover_bg))
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
             .child(div().child(label))
             .on_mouse_down(
                 openframe::MouseButton::Left,

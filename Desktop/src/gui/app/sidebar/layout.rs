@@ -504,6 +504,7 @@ impl ArcadiaRoot {
                                         continue;
                                     };
                                     let is_page_active = self.active_page_id == page.id();
+                                    let page_ha = *self.item_hover_alphas.get(&format!("page:{}", page.id())).unwrap_or(&0.0);
                                     items.push(
                                         Self::sidebar_item(
                                             cx,
@@ -514,6 +515,7 @@ impl ArcadiaRoot {
                                             is_dark,
                                             page.accent().to_string(),
                                             glyph,
+                                            page_ha,
                                         )
                                         .into_any_element(),
                                     );
@@ -524,6 +526,7 @@ impl ArcadiaRoot {
                                             let is_sub_active = is_page_active
                                                 && self.active_terminal_id == i
                                                 && !self.terminal_show_dashboard;
+                                            let term_ha = *self.item_hover_alphas.get(&format!("terminal:{}", i)).unwrap_or(&0.0);
                                             items.push(
                                                 Self::sidebar_sub_item(
                                                     cx,
@@ -532,6 +535,7 @@ impl ArcadiaRoot {
                                                     is_sub_active,
                                                     is_dark,
                                                     glyph,
+                                                    term_ha,
                                                 )
                                                 .into_any_element(),
                                             );
@@ -560,6 +564,7 @@ impl ArcadiaRoot {
                                                             p.rsplit('/').next().unwrap_or(p).to_string()
                                                         })
                                                 });
+                                            let editor_ha = *self.item_hover_alphas.get(&format!("editor:{}", i)).unwrap_or(&0.0);
                                             items.push(
                                                 Self::sidebar_code_editor_sub_item(
                                                     cx,
@@ -569,6 +574,7 @@ impl ArcadiaRoot {
                                                     is_sub_active,
                                                     is_dark,
                                                     glyph,
+                                                    editor_ha,
                                                 )
                                                 .into_any_element(),
                                             );
@@ -633,18 +639,22 @@ impl ArcadiaRoot {
                                                 .find(|m| m.name == provider.module_name)
                                                 .map(|m| m.glyph)
                                                 .unwrap_or("modules");
-                                            items.push(
-                                                Self::sidebar_ai_provider_sub_item(
-                                                    cx,
-                                                    openframe::SharedString::from(label),
-                                                    module_name.clone(),
-                                                    is_sub_active,
-                                                    is_dark,
-                                                    glyph,
-                                                    provider_icon,
-                                                )
-                                                .into_any_element(),
-                                            );
+                                            {
+                                                let ha = *self.item_hover_alphas.get(&format!("aiprov:{}", module_name)).unwrap_or(&0.0);
+                                                items.push(
+                                                    Self::sidebar_ai_provider_sub_item(
+                                                        cx,
+                                                        openframe::SharedString::from(label),
+                                                        module_name.clone(),
+                                                        is_sub_active,
+                                                        is_dark,
+                                                        glyph,
+                                                        provider_icon,
+                                                        ha,
+                                                    )
+                                                    .into_any_element(),
+                                                );
+                                            }
                                             if module_name == arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME {
                                                 for model in &self.llama_cpp_models {
                                                     let model_id = model.id.clone();
@@ -652,6 +662,7 @@ impl ArcadiaRoot {
                                                     let model_icon = model.model_kind.icon_key();
                                                     let is_model_active = is_page_active
                                                         && self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
+                                                    let model_ha = *self.item_hover_alphas.get(&format!("llamamod:{}", model.id)).unwrap_or(&0.0);
                                                     items.push(
                                                         Self::sidebar_llama_cpp_model_sub_item(
                                                             cx,
@@ -661,6 +672,7 @@ impl ArcadiaRoot {
                                                             is_dark,
                                                             glyph,
                                                             model_icon,
+                                                            model_ha,
                                                         )
                                                         .into_any_element(),
                                                     );
@@ -674,6 +686,7 @@ impl ArcadiaRoot {
                                                 && arcadia_core::modules::ai::is_cli_provider(&self.active_ai_provider_module)
                                                 && self.active_llama_cpp_model_id.is_none();
                                             let first_cli_module = cli_providers[0].module_name.to_string();
+                                            let cli_parent_ha = *self.item_hover_alphas.get(&format!("aiprov:{}", first_cli_module)).unwrap_or(&0.0);
                                             items.push(
                                                 Self::sidebar_ai_provider_sub_item(
                                                     cx,
@@ -683,6 +696,7 @@ impl ArcadiaRoot {
                                                     is_dark,
                                                     glyph,
                                                     "terminal",
+                                                    cli_parent_ha,
                                                 )
                                                 .into_any_element(),
                                             );
@@ -692,6 +706,7 @@ impl ArcadiaRoot {
                                                 let is_cli_sub_active = is_page_active
                                                     && self.active_ai_provider_module == cli_provider.module_name
                                                     && self.active_llama_cpp_model_id.is_none();
+                                                let cli_ha = *self.item_hover_alphas.get(&format!("cliprov:{}", module_name)).unwrap_or(&0.0);
                                                 items.push(
                                                     Self::sidebar_cli_provider_sub_item(
                                                         cx,
@@ -700,6 +715,7 @@ impl ArcadiaRoot {
                                                         is_cli_sub_active,
                                                         is_dark,
                                                         glyph,
+                                                        cli_ha,
                                                     )
                                                     .into_any_element(),
                                                 );
@@ -739,6 +755,7 @@ impl ArcadiaRoot {
                                                         w.label.clone()
                                                     })
                                             });
+                                            let chat_ha = *self.item_hover_alphas.get(&format!("chat:{}", chat_id)).unwrap_or(&0.0);
                                             items.push(
                                                 Self::sidebar_ai_chat_sub_item(
                                                     cx,
@@ -750,6 +767,7 @@ impl ArcadiaRoot {
                                                     chat_accent,
                                                     chat_provider_icon,
                                                     chat_workspace_label,
+                                                    chat_ha,
                                                 )
                                                 .into_any_element(),
                                             );
@@ -793,22 +811,16 @@ impl ArcadiaRoot {
                                             });
                                             let meta_col_ses = if is_dark { rgb(0x4a5568_u32) } else { rgb(0x9ca3af_u32) };
                                             let pal = theme::nav_accent_palette(session_accent, is_dark);
-                                            let text_col = if is_sub_active || is_renaming {
-                                                pal.icon_active
-                                            } else {
-                                                glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::sidebar_nav_idle_foreground(is_dark))
-                                            };
-                                            let bg = if is_sub_active || is_renaming {
-                                                pal.row_selected
-                                            } else {
-                                                glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| if is_dark { rgb(0x171b22) } else { rgb(0xf6f7fb) })
-                                            };
-                                            let hover_bg = if is_sub_active {
-                                                pal.row_hover
-                                            } else if is_dark { rgb(0x1e1e2e) } else { rgb(0xede9fe) };
+                                            let idle_text = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::sidebar_nav_idle_foreground(is_dark));
+                                            let ses_item_key = format!("session:{}", session.id);
+                                            let ses_ha = *self.item_hover_alphas.get(&ses_item_key).unwrap_or(&0.0);
+                                            let ses_active_a = if is_sub_active || is_renaming { 1.0_f32 } else { 0.0_f32 };
+                                            let text_col = crate::gui::app::sidebar::nav_items::nav_item_text(idle_text, pal.icon_active, ses_active_a, ses_ha);
                                             let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(6.0_f32);
                                             let rename_focus = self.ai_rename_focus.clone();
+                                            let ses_item_key_hover = ses_item_key.clone();
                                             let mut item = div()
+                                                    .id(openframe::SharedString::from(ses_item_key))
                                                     .ml_7()
                                                     .pl_2()
                                                     .pr_2()
@@ -816,10 +828,12 @@ impl ArcadiaRoot {
                                                     .rounded(px(radius))
                                                     .cursor_pointer()
                                                     .text_xs()
-                                                    .font_weight(if is_sub_active { openframe::FontWeight::MEDIUM } else { openframe::FontWeight::NORMAL })
-                                                    .bg(bg)
+                                                    .font_weight(openframe::FontWeight::NORMAL)
                                                     .text_color(text_col)
-                                                    .hover(move |s| s.bg(hover_bg))
+                                                    .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                                                        this.start_item_hover_anim(ses_item_key_hover.clone(), *hovered);
+                                                        cx.notify();
+                                                    }))
                                                     .flex()
                                                     .flex_col()
                                                     .gap(px(1.))
@@ -861,7 +875,7 @@ impl ArcadiaRoot {
                                                                         }
                                                                         if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
                                                                             this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
-                                                                                id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id,
+                                                                                id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id, last_messages: s.last_messages,
                                                                             }).collect();
                                                                         }
                                                                     }
@@ -905,7 +919,7 @@ impl ArcadiaRoot {
                                                                 } else {
                                                                     crate::gui::app::AiMessageRole::Assistant
                                                                 };
-                                                                crate::gui::app::AiMessage { role, content: m.content.clone() }
+                                                                crate::gui::app::AiMessage { role, content: m.content.clone(), provider: stored.provider.clone() }
                                                             }).collect();
                                                             this.ai_chats.push(crate::gui::app::AiChat {
                                                                 id,
@@ -991,6 +1005,7 @@ impl ArcadiaRoot {
                                                     .into_any_element(),
                                             )
                                         } else {
+                                            let global_ha = *self.item_hover_alphas.get(&format!("page:{}", page.id())).unwrap_or(&0.0);
                                             Some(
                                                 Self::sidebar_global_item(
                                                     cx,
@@ -1005,6 +1020,7 @@ impl ArcadiaRoot {
                                                     is_dark,
                                                     page.accent().to_string(),
                                                     glyph,
+                                                    global_ha,
                                                 )
                                                 .into_any_element(),
                                             )

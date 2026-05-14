@@ -340,6 +340,7 @@ impl ArcadiaRoot {
                                     this.code_editor_next_id += 1;
                                     this.active_page_id = "editor.main".to_string();
                                     this.code_editor_show_dashboard = false;
+                                    this.save_editor_session();
                                     this.code_editor_focus.focus(window);
                                     cx.notify();
                                 }),
@@ -936,6 +937,7 @@ impl ArcadiaRoot {
                 }
                 if this.code_editor_tabs[idx].content.len() != content_len_before {
                     this.code_editor_tabs[idx].highlight_dirty = true;
+                    this.save_editor_session();
                 }
                 cx.notify();
             }))

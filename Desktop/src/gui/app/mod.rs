@@ -185,6 +185,7 @@ pub enum AiMessageRole {
 pub struct AiMessage {
     pub role: AiMessageRole,
     pub content: String,
+    pub provider: String,
 }
 
 pub struct AiChat {
@@ -209,6 +210,7 @@ pub struct AiSessionSummary {
     pub updated_at: u64,
     pub provider: String,
     pub workspace_id: Option<String>,
+    pub last_messages: Vec<(bool, String)>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -505,6 +507,9 @@ pub struct ArcadiaRoot {
     pub tab_hover_anims: HashMap<String, CaretAnim>,
     pub tab_active_anims: HashMap<String, CaretAnim>,
     pub tab_prev_active_id: String,
+    /// Hover alpha per sidebar sub-item (keyed by "chat:{id}", "aiprov:{module}", etc.)
+    pub item_hover_alphas: HashMap<String, f32>,
+    pub item_hover_anims: HashMap<String, CaretAnim>,
     /// When true, the sidebar Settings hub shows nested rows under the Settings header.
     pub settings_hub_expanded: bool,
     pub app_menu_open: bool,
@@ -594,6 +599,24 @@ impl ArcadiaRoot {
     #[cfg(feature = "gui")]
     pub(crate) fn active_terminal_mut(&mut self) -> &mut TerminalInstance {
         &mut self.terminals[self.active_terminal_id]
+    }
+
+    pub(crate) fn save_editor_session(&self) {
+        use arcadia_core::config::code_editor::{CodeEditorSession, PersistedTab};
+        use arcadia_core::config::ConfigFile;
+        let tabs = self.code_editor_tabs.iter().map(|t| PersistedTab {
+            id: t.id,
+            title: t.title.clone(),
+            file_path: t.file_path.clone(),
+            workspace_path: t.workspace_path.clone(),
+            cursor: t.cursor,
+            unsaved_content: if t.file_path.is_none() { Some(t.content.clone()) } else { None },
+        }).collect();
+        let _ = CodeEditorSession {
+            active_tab: self.active_code_editor_tab,
+            next_id: self.code_editor_next_id,
+            tabs,
+        }.save();
     }
 
     pub(crate) fn is_module_enabled(&self, name: &str) -> bool {

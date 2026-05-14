@@ -940,7 +940,7 @@ impl ArcadiaRoot {
                             }
                             if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
                                 this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
-                                    id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id,
+                                    id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id, last_messages: s.last_messages,
                                 }).collect();
                             }
                             cx.notify();
@@ -1042,6 +1042,7 @@ impl ArcadiaRoot {
                                             .min(this.code_editor_tabs.len() - 1);
                                     }
                                 }
+                                this.save_editor_session();
                             }
                             cx.notify();
                         }),
@@ -1178,6 +1179,7 @@ impl ArcadiaRoot {
                                                                 .active_code_editor_tab
                                                                 .min(this.code_editor_tabs.len() - 1);
                                                         }
+                                                        this.save_editor_session();
                                                     }
                                                     cx.notify();
                                                 }),
@@ -1214,6 +1216,7 @@ impl ArcadiaRoot {
                                                                     .active_code_editor_tab
                                                                     .min(this.code_editor_tabs.len() - 1);
                                                             }
+                                                            this.save_editor_session();
                                                         }
                                                         cx.notify();
                                                     }),

@@ -219,15 +219,6 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         required_module: None,
     },
     NavigationPageDefinition {
-        id: "global.dashboard",
-        title: "Dashboard",
-        description: "Overview of the Arcadia application surface.",
-        glyph: "home",
-        system_image: "house",
-        accent: "violet",
-        required_module: None,
-    },
-    NavigationPageDefinition {
         id: "global.logs",
         title: "Logs",
         description: "Recent logs and activity stream appear here.",
@@ -443,7 +434,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
     },
 ];
 
-pub const GLOBAL_PAGE_IDS: &[&str] = &["global.dashboard", "global.settings"];
+pub const GLOBAL_PAGE_IDS: &[&str] = &["global.settings"];
 pub const LOGS_PAGE_ID: &str = "global.logs";
 pub const TOP_BAR_PAGE_IDS: &[&str] = &["python.settings", "global.modules"];
 /// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; these are **nested only**
@@ -460,7 +451,7 @@ pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
     "ai.settings",
 ];
 pub const DEFAULT_GROUP_ID: &str = "utilities";
-pub const DEFAULT_PAGE_ID: &str = "global.dashboard";
+pub const DEFAULT_PAGE_ID: &str = "global.settings";
 
 /// Settings hub pages for extensions with standalone `register_tokens` (not style-linked).
 pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "python.extension_tokens|";
@@ -836,8 +827,8 @@ mod tests {
             name == crate::config::modules::TERMINAL_MODULE_NAME
         }));
         assert!(!is_page_visible_with("utility.shell", |_| false));
-        // global.dashboard has no required_module → always visible.
-        assert!(is_page_visible_with("global.dashboard", |_| false));
+        // global.settings has no required_module → always visible.
+        assert!(is_page_visible_with("global.settings", |_| false));
     }
 
     #[test]

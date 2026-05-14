@@ -12,7 +12,7 @@ use arcadia_core::modules::ai::is_ai_provider_available;
 use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::{
     div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, StatefulInteractiveElement, Styled, Window,
+    MouseButton, ParentElement, Rgba, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 use openframe::prelude::FluentBuilder as _;
 
@@ -20,6 +20,20 @@ use crate::gui::app::ai_runtime::{AiRuntimeHandle, AiRuntimeRequest, ProviderRou
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::{AiChat, AiMessage, AiMessageRole, ArcadiaRoot};
 use crate::gui::theme;
+
+fn provider_accent_key(provider: &str) -> &'static str {
+    match provider {
+        "ai-provider-openai"       => "emerald",
+        "ai-provider-ollama"       => "sky",
+        "ai-provider-llama-cpp"    => "amber",
+        "ai-provider-apfel"        => "violet",
+        "ai-provider-exec-claude"  => "cyan",
+        "ai-provider-exec-gemini"  => "indigo",
+        "ai-provider-exec-aider"   => "orange",
+        "ai-provider-exec-codex"   => "teal",
+        _                          => "sky",
+    }
+}
 
 impl ArcadiaRoot {
     pub(crate) fn ai_chat_panel(
@@ -50,8 +64,6 @@ impl ArcadiaRoot {
         let r = p.radius_md.min(12.0);
         let msg_bg_preview = if is_dark { rgb(0x141820) } else { rgb(0xf0f2f5) };
         let divider_col = if is_dark { rgb(0x2a3340) } else { rgb(0xe6e8ef) };
-        let active_id = self.active_ai_chat_id;
-
         // Workspace cards — clicking opens a new chat in that workspace
         let workspace_cards: Vec<openframe::AnyElement> =
             arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
@@ -132,35 +144,30 @@ impl ArcadiaRoot {
                 })
                 .collect();
 
-        // Open chat cards
+        // Open chat cards — rendered from ai_sessions so they persist across restarts.
+        // If a session is currently open in ai_chats, use live messages for the preview.
         let chat_cards: Vec<openframe::AnyElement> = self
-            .ai_chats
+            .ai_sessions
             .iter()
-            .map(|chat| {
-                let chat_id = chat.id;
-                let title = chat.title.clone();
-                let provider = chat.session_provider.clone();
-                let model = chat.session_model_id.clone();
-                let is_loading = chat.is_loading;
-                let is_active = chat.id == active_id;
-                let workspace_id_card = chat.workspace_id.clone();
-                let preview_msgs: Vec<String> = chat
-                    .messages
-                    .iter()
-                    .rev()
-                    .take(4)
-                    .map(|m| {
-                        let prefix = match m.role {
-                            crate::gui::app::AiMessageRole::User => "▸ ",
-                            crate::gui::app::AiMessageRole::Assistant => "  ",
-                        };
-                        let text: String = m.content.chars().take(52).collect();
-                        format!("{prefix}{text}")
-                    })
-                    .collect::<Vec<_>>()
-                    .into_iter()
-                    .rev()
-                    .collect();
+            .map(|session| {
+                let session_id = session.id.clone();
+                let title = session.title.clone();
+                let provider = session.provider.clone();
+                let workspace_id_card = session.workspace_id.clone();
+                let open_chat = self.ai_chats.iter().find(|c| c.session_id.as_deref() == Some(&session.id));
+                let is_loading = open_chat.map(|c| c.is_loading).unwrap_or(false);
+                let preview_msgs: Vec<(bool, String)> = if let Some(chat) = open_chat {
+                    chat.messages.iter().rev().take(4)
+                        .map(|m| {
+                            let is_user = matches!(m.role, crate::gui::app::AiMessageRole::User);
+                            let text: String = m.content.chars().take(44).collect();
+                            (is_user, text)
+                        })
+                        .collect::<Vec<_>>()
+                        .into_iter().rev().collect()
+                } else {
+                    session.last_messages.clone()
+                };
                 let provider_icon = if provider.is_empty() {
                     "ai-provider"
                 } else {
@@ -178,26 +185,72 @@ impl ArcadiaRoot {
                             w.label.clone()
                         })
                 });
-                let border_col = p.panel_border;
+                let provider_pal = theme::nav_accent_palette(provider_accent_key(&provider), is_dark);
+                let card_key = format!("chat-card-{}", session.id);
+                let card_key_hover = card_key.clone();
+                let ha = *self.item_hover_alphas.get(&card_key).unwrap_or(&0.0);
+                let card_bg    = crate::gui::app::sidebar::nav_items::lerp_color(p.panel_bg, p.row_bg, ha);
+                let card_border = crate::gui::app::sidebar::nav_items::lerp_color(p.panel_border, provider_pal.icon_idle, ha);
+                let divider_col = crate::gui::app::sidebar::nav_items::lerp_color(p.panel_border, provider_pal.icon_idle, ha);
                 div()
+                    .id(SharedString::from(card_key.clone()))
                     .flex_1()
                     .min_w(px(220.))
                     .cursor_pointer()
                     .rounded(px(r))
-                    .bg(p.panel_bg)
+                    .bg(card_bg)
                     .border_1()
-                    .border_color(border_col)
-                    .hover(move |s| s.bg(p.row_bg).border_color(chat_pal.row_hover))
+                    .border_color(card_border)
+                    .on_hover(cx.listener(move |this, hovered, _, cx| {
+                        this.start_item_hover_anim(card_key_hover.clone(), *hovered);
+                        cx.notify();
+                    }))
                     .flex()
                     .flex_col()
                     .overflow_hidden()
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.active_ai_chat_id = chat_id;
-                            this.ai_chat_show_dashboard = false;
-                            this.active_page_id = "ai.chat".to_string();
-                            cx.notify();
+                            // If already open, switch to it.
+                            if let Some(chat) = this.ai_chats.iter().find(|c| c.session_id.as_deref() == Some(&session_id)) {
+                                let chat_id = chat.id;
+                                this.active_ai_chat_id = chat_id;
+                                this.ai_chat_show_dashboard = false;
+                                this.active_page_id = "ai.chat".to_string();
+                                cx.notify();
+                                return;
+                            }
+                            // Load from disk.
+                            if let Ok(stored) = arcadia_core::modules::ai_chat_store::load_session(&session_id) {
+                                let id = this.ai_next_id;
+                                this.ai_next_id += 1;
+                                let messages = stored.messages.iter().map(|m| {
+                                    let role = if m.role == "user" {
+                                        crate::gui::app::AiMessageRole::User
+                                    } else {
+                                        crate::gui::app::AiMessageRole::Assistant
+                                    };
+                                    crate::gui::app::AiMessage { role, content: m.content.clone(), provider: stored.provider.clone() }
+                                }).collect();
+                                this.ai_chats.push(crate::gui::app::AiChat {
+                                    id,
+                                    title: stored.title.clone(),
+                                    messages,
+                                    input_draft: String::new(),
+                                    is_loading: false,
+                                    session_id: Some(session_id.clone()),
+                                    session_provider: stored.provider.clone(),
+                                    session_model_id: stored.model_id.clone(),
+                                    workspace_id: stored.workspace_id.clone(),
+                                });
+                                this.active_ai_chat_id = id;
+                                this.ai_chat_show_dashboard = false;
+                                this.active_page_id = "ai.chat".to_string();
+                                this.ai_active_rule_ids = stored.active_rule_ids.clone();
+                                this.ai_active_skill_ids = stored.active_skill_ids.clone();
+                                this.ai_chat_workspace_id = stored.workspace_id.clone();
+                                cx.notify();
+                            }
                         }),
                     )
                     .child(
@@ -209,25 +262,50 @@ impl ArcadiaRoot {
                             .overflow_hidden()
                             .flex()
                             .flex_col()
-                            .gap_0()
-                            .children(preview_msgs.into_iter().map(|line| {
+                            .justify_center()
+                            .gap_1()
+                            .children(preview_msgs.into_iter().map(|(is_user, text)| {
+                                let (bubble_bg, bubble_border, bubble_text) = if is_user {
+                                    (p.panel_bg, p.panel_border, p.content_body)
+                                } else {
+                                    (provider_pal.row_selected, provider_pal.icon_idle, provider_pal.icon_active)
+                                };
                                 div()
-                                    .text_xs()
-                                    .font_family("monospace")
-                                    .text_color(p.content_meta)
+                                    .flex()
+                                    .flex_row()
                                     .flex_shrink_0()
-                                    .child(if line.is_empty() { " ".to_string() } else { line })
+                                    .when(is_user, |d| d.justify_end())
+                                    .when(!is_user, |d| d.justify_start())
+                                    .child(
+                                        div()
+                                            .rounded(px(r.min(12.0)))
+                                            .bg(bubble_bg)
+                                            .border_1()
+                                            .border_color(bubble_border)
+                                            .px_2()
+                                            .py(px(3.))
+                                            .max_w(px(180.))
+                                            .text_xs()
+                                            .text_color(bubble_text)
+                                            .child(if text.is_empty() { "…".to_string() } else { text })
+                                    )
                                     .into_any_element()
                             })),
                     )
-                    .child(
+                    .child({
+                        use crate::gui::app::sidebar::nav_items::lerp_color;
+                        let footer_bg    = lerp_color(p.panel_bg, provider_pal.row_selected, ha);
+                        let title_col    = lerp_color(p.content_title, provider_pal.icon_active, ha);
+                        let meta_col     = lerp_color(p.content_meta, provider_pal.icon_active, ha);
+                        let icon_col     = lerp_color(provider_pal.icon_idle, provider_pal.icon_active, ha);
                         div()
                             .p_3()
                             .flex()
                             .flex_col()
                             .gap_1()
+                            .bg(footer_bg)
                             .border_t_1()
-                            .border_color(p.panel_border)
+                            .border_color(divider_col)
                             .child(
                                 div()
                                     .flex()
@@ -238,7 +316,7 @@ impl ArcadiaRoot {
                                         div()
                                             .text_sm()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(p.content_title)
+                                            .text_color(title_col)
                                             .flex_1()
                                             .child(title),
                                     )
@@ -262,18 +340,16 @@ impl ArcadiaRoot {
                                     .child(
                                         crate::gui::theme::render_icon(provider_icon)
                                             .size_3()
-                                            .text_color(p.content_meta),
+                                            .text_color(icon_col),
                                     )
-                                    .when_some(workspace_label, |d, ws| {
-                                        d.child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(p.content_meta)
-                                                .child(ws),
-                                        )
-                                    }),
-                            ),
-                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(meta_col)
+                                            .child(workspace_label.unwrap_or_else(|| "No Workspace".to_string())),
+                                    ),
+                            )
+                    })
                     .into_any_element()
             })
             .collect();
@@ -486,12 +562,13 @@ impl ArcadiaRoot {
 
         for msg in &messages {
             let is_user = msg.role == AiMessageRole::User;
-            let bubble_bg = if is_user {
-                theme::ui_accent(cx)
+            let (bubble_bg, bubble_border, text_col) = if is_user {
+                (p.panel_bg, p.panel_border, p.content_body)
             } else {
-                p.panel_bg
+                let accent_key = provider_accent_key(&msg.provider);
+                let pal = theme::nav_accent_palette(accent_key, is_dark);
+                (pal.row_selected, pal.icon_idle, pal.icon_active)
             };
-            let text_col = if is_user { theme::ui_accent_fg(cx) } else { p.content_body };
             let content = msg.content.clone();
 
             let bubble = div()
@@ -500,11 +577,10 @@ impl ArcadiaRoot {
                 .rounded(px(radius.min(12.0)))
                 .bg(bubble_bg)
                 .border_1()
-                .border_color(if is_user { bubble_bg } else { p.panel_border })
+                .border_color(bubble_border)
                 .text_sm()
                 .text_color(text_col)
-                .when(is_user, |d| d.max_w(px(540.)))
-                .when(!is_user, |d| d.w_full())
+                .max_w(px(540.))
                 .child(content);
 
             msg_col = msg_col.child(
@@ -997,6 +1073,7 @@ impl ArcadiaRoot {
             chat.messages.push(AiMessage {
                 role: AiMessageRole::User,
                 content: input.clone(),
+                provider: String::new(),
             });
             chat.input_draft.clear();
             chat.session_provider = provider.clone();
@@ -1012,6 +1089,7 @@ impl ArcadiaRoot {
                     chat.messages.push(AiMessage {
                         role: AiMessageRole::Assistant,
                         content: msg,
+                        provider: provider.clone(),
                     });
                 }
                 cx.notify();
@@ -1038,7 +1116,7 @@ impl ArcadiaRoot {
 
         // Placeholder assistant message (tokens stream into it).
         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
-            chat.messages.push(AiMessage { role: AiMessageRole::Assistant, content: String::new() });
+            chat.messages.push(AiMessage { role: AiMessageRole::Assistant, content: String::new(), provider: provider.clone() });
             chat.is_loading = true;
         }
 

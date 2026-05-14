@@ -3,7 +3,7 @@
 use crate::config::modules::TERMINAL_MODULE_NAME;
 
 use super::model::{
-    GestureEdge, HotCornerQuadrant, ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic,
+    ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic,
     ShortcutTriggerStatic, ShortcutTriggerStaticChord, ShortcutVisibility,
 };
 
@@ -52,29 +52,6 @@ pub static SHORTCUT_DEFINITIONS: &[ShortcutDefinition] = &[
         }],
         actions: &[ShortcutActionStatic::UiControl {
             control_id: "terminal.toggle_shell_mode",
-        }],
-    },
-    ShortcutDefinition {
-        id: "arcadia:goto-dashboard",
-        label: "Go to Dashboard",
-        owner: "arcadia",
-        required_registry_module: None,
-        scope: ShortcutScopeStatic::ArcadiaWide,
-        visibility: ShortcutVisibility::GlobalPrefsOnly,
-        priority: 10,
-        consumes: true,
-        bypass_text_focus: false,
-        system_wide: false,
-        triggers: &[ShortcutTriggerStatic::Chord {
-            key: "d",
-            control: false,
-            alt: false,
-            shift: false,
-            platform: true,
-            function: false,
-        }],
-        actions: &[ShortcutActionStatic::Navigate {
-            page_id: "global.dashboard",
         }],
     },
     ShortcutDefinition {
@@ -134,26 +111,6 @@ pub static SHORTCUT_DEFINITIONS: &[ShortcutDefinition] = &[
         }],
     },
     ShortcutDefinition {
-        id: "arcadia:hot-corner-dashboard",
-        label: "Hot corner — Dashboard (pointer)",
-        owner: "arcadia",
-        required_registry_module: None,
-        scope: ShortcutScopeStatic::ArcadiaWide,
-        visibility: ShortcutVisibility::GlobalPrefsOnly,
-        priority: 20,
-        consumes: false,
-        bypass_text_focus: false,
-        system_wide: false,
-        triggers: &[ShortcutTriggerStatic::HotCorner {
-            quadrant: HotCornerQuadrant::TopLeft,
-            margin_fraction: 0.06,
-            dwell_frames: 12,
-        }],
-        actions: &[ShortcutActionStatic::Navigate {
-            page_id: "global.dashboard",
-        }],
-    },
-    ShortcutDefinition {
         id: "arcadia:command-bar",
         label: "Open command bar",
         owner: "arcadia",
@@ -174,25 +131,6 @@ pub static SHORTCUT_DEFINITIONS: &[ShortcutDefinition] = &[
         }],
         actions: &[ShortcutActionStatic::UiControl {
             control_id: "arcadia.toggle_command_bar",
-        }],
-    },
-    ShortcutDefinition {
-        id: "arcadia:edge-swipe-dashboard",
-        label: "Edge swipe — Dashboard (pointer)",
-        owner: "arcadia",
-        required_registry_module: None,
-        scope: ShortcutScopeStatic::ArcadiaWide,
-        visibility: ShortcutVisibility::GlobalPrefsOnly,
-        priority: 15,
-        consumes: false,
-        bypass_text_focus: false,
-        system_wide: false,
-        triggers: &[ShortcutTriggerStatic::EdgeSwipe {
-            edge: GestureEdge::Left,
-            min_delta_px: 72.,
-        }],
-        actions: &[ShortcutActionStatic::Navigate {
-            page_id: "global.dashboard",
         }],
     },
 ];

@@ -8,7 +8,7 @@ use arcadia_core::config::ai_exec_providers::{AiExecProvidersConfig, ExecCliEntr
 use arcadia_core::config::llama_cpp::LlamaCppConfig;
 use arcadia_core::modules::ai_chat_store::{self, ChatSession, StoredMessage};
 use arcadia_core::config::appearance::AppearanceConfig;
-use arcadia_core::config::code_editor::CodeEditorConfig;
+use arcadia_core::config::code_editor::{CodeEditorConfig, CodeEditorSession};
 use arcadia_core::config::extension_tokens;
 use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::modules::{
@@ -37,7 +37,7 @@ use crate::gui::theme::{
 use super::super::tui;
 use super::ArcadiaRoot;
 #[cfg(feature = "gui")]
-use super::{ShellMode, TerminalInstance};
+use super::{CodeEditorTab, ShellMode, TerminalInstance};
 
 /// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
 /// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
@@ -264,6 +264,44 @@ impl ArcadiaRoot {
         let ui_prefs_cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
+        let editor_session = CodeEditorSession::load_or_create().unwrap_or_default();
+        let session_active_tab = editor_session.active_tab;
+        let session_next_id = editor_session.next_id.max(1);
+        let restored_tabs: Vec<CodeEditorTab> = editor_session.tabs.into_iter().filter_map(|pt| {
+            let (content, saved_content) = if let Some(ref path) = pt.file_path {
+                match std::fs::read_to_string(path) {
+                    Ok(text) => (text.clone(), text),
+                    Err(_) => return None,
+                }
+            } else {
+                let c = pt.unsaved_content.unwrap_or_default();
+                (c.clone(), String::new())
+            };
+            let lang = crate::gui::app::code_editor_panel::detect_language(&pt.title);
+            let cursor = pt.cursor.min(content.len());
+            Some(CodeEditorTab {
+                id: pt.id,
+                title: pt.title,
+                content,
+                cursor,
+                selection_anchor: None,
+                language: lang,
+                hl_spans: vec![],
+                decorations: vec![],
+                highlight_dirty: true,
+                workspace_path: pt.workspace_path,
+                file_path: pt.file_path,
+                saved_content,
+                cached_lines: vec![],
+                cached_line_byte_starts: vec![],
+            })
+        }).collect();
+        let restored_active = if !restored_tabs.is_empty() {
+            session_active_tab.min(restored_tabs.len() - 1)
+        } else {
+            0
+        };
+        let restored_show_dashboard = !restored_tabs.is_empty();
         let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
         let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
         let ollama_cfg = arcadia_core::config::ollama::OllamaConfig::load_or_create().unwrap_or_default();
@@ -332,16 +370,16 @@ impl ArcadiaRoot {
                 .map(|v| format!("{:.2}", v))
                 .unwrap_or_default(),
             code_editor_char_width_editing: false,
-            code_editor_tabs: vec![],
-            active_code_editor_tab: 0,
-            code_editor_next_id: 1,
+            code_editor_tabs: restored_tabs,
+            active_code_editor_tab: restored_active,
+            code_editor_next_id: session_next_id,
             code_editor_focus,
             code_editor_char_width_focus,
             code_editor_workspace_picker_open: false,
             code_editor_explorer_open: false,
             code_editor_explorer_expanded: std::collections::HashSet::new(),
             code_editor_context_menu_open: false,
-            code_editor_show_dashboard: false,
+            code_editor_show_dashboard: restored_show_dashboard,
             code_editor_tab_menu: None,
             code_editor_close_confirm: None,
             code_editor_line_bounds: std::rc::Rc::new(std::cell::RefCell::new(vec![])),
@@ -375,6 +413,7 @@ impl ArcadiaRoot {
                 updated_at: s.updated_at,
                 provider: s.provider,
                 workspace_id: s.workspace_id,
+                last_messages: s.last_messages,
             }).collect(),
             ai_pending_edits: Vec::new(),
             ai_diff_panel_open: false,
@@ -478,6 +517,8 @@ impl ArcadiaRoot {
             tab_hover_anims: std::collections::HashMap::new(),
             tab_active_anims: std::collections::HashMap::new(),
             tab_prev_active_id: navigation::DEFAULT_GROUP_ID.to_string(),
+            item_hover_alphas: std::collections::HashMap::new(),
+            item_hover_anims: std::collections::HashMap::new(),
             settings_hub_expanded: false,
             app_menu_open: false,
             session_route_menu_open: false,
@@ -903,6 +944,7 @@ impl ArcadiaRoot {
                     if let Some(chat_id) = self.ai_stream_chat_id {
                         if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
                             chat.is_loading = false;
+                            let chat_provider = chat.session_provider.clone();
                             if let Some(last) = chat.messages.last_mut() {
                                 if last.role == AiMessageRole::Assistant && last.content.is_empty() {
                                     last.content = format!("Error: {e}");
@@ -910,6 +952,7 @@ impl ArcadiaRoot {
                                     chat.messages.push(AiMessage {
                                         role: AiMessageRole::Assistant,
                                         content: format!("Error: {e}"),
+                                        provider: chat_provider,
                                     });
                                 }
                             }
@@ -1024,6 +1067,7 @@ impl ArcadiaRoot {
                 updated_at: s.updated_at,
                 provider: s.provider,
                 workspace_id: s.workspace_id,
+                last_messages: s.last_messages,
             }).collect();
         }
     }
@@ -1310,6 +1354,7 @@ impl ArcadiaRoot {
                 from: self.caret_left_alpha,
                 to: if can_left { 1.0 } else { 0.0 },
             });
+            if !can_left { self.tab_scrolling_left = false; }
         }
         if can_right != self.caret_prev_right {
             self.caret_prev_right = can_right;
@@ -1318,6 +1363,7 @@ impl ArcadiaRoot {
                 from: self.caret_right_alpha,
                 to: if can_right { 1.0 } else { 0.0 },
             });
+            if !can_right { self.tab_scrolling_right = false; }
         }
 
         let mut running = false;
@@ -1344,7 +1390,7 @@ impl ArcadiaRoot {
             }
         }
 
-        if let Some(anim) = &self.tab_scroll_anim {
+        if let Some(anim) = &self.tab_scroll_anim.clone() {
             let raw_t = (now - anim.start).as_secs_f32() / DURATION_S;
             let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
             let new_x = anim.from_x + (anim.to_x - anim.from_x) * t;
@@ -1352,6 +1398,9 @@ impl ArcadiaRoot {
             self.group_tabs_scroll.set_offset(point(px(new_x), cur_y));
             if raw_t >= 1.0 {
                 self.tab_scroll_anim = None;
+                self.tab_scrolling_left = false;
+                self.tab_scrolling_right = false;
+                self.tab_scroll_prev_x = new_x;
             } else {
                 running = true;
             }
@@ -1401,6 +1450,21 @@ impl ArcadiaRoot {
             }
         }
 
+        // Tick per-item hover animations (AI chat/model/provider sub-items).
+        let item_keys: Vec<String> = self.item_hover_anims.keys().cloned().collect();
+        for key in item_keys {
+            if let Some(anim) = self.item_hover_anims.get(&key).cloned() {
+                let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
+                let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+                self.item_hover_alphas.insert(key.clone(), anim.from + (anim.to - anim.from) * t);
+                if raw_t >= 1.0 {
+                    self.item_hover_anims.remove(&key);
+                } else {
+                    running = true;
+                }
+            }
+        }
+
         running
     }
 
@@ -1410,6 +1474,14 @@ impl ArcadiaRoot {
         let from = *self.tab_hover_alphas.get(&group_id).unwrap_or(&0.0);
         let to = if hovered { 1.0_f32 } else { 0.0_f32 };
         self.tab_hover_anims.insert(group_id, super::CaretAnim { start: Instant::now(), from, to });
+    }
+
+    /// Start or reverse a hover fade for a sidebar sub-item (chat, model, provider, etc.).
+    pub fn start_item_hover_anim(&mut self, key: String, hovered: bool) {
+        use std::time::Instant;
+        let from = *self.item_hover_alphas.get(&key).unwrap_or(&0.0);
+        let to = if hovered { 1.0_f32 } else { 0.0_f32 };
+        self.item_hover_anims.insert(key, super::CaretAnim { start: Instant::now(), from, to });
     }
 
     /// Compute the minimal scroll offset to bring tab `ix` fully into view, then animate to it.

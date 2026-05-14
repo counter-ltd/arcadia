@@ -123,6 +123,8 @@ pub struct SessionSummary {
     pub updated_at: u64,
     pub provider: String,
     pub workspace_id: Option<String>,
+    /// Last few messages for dashboard preview: (role == "user", truncated content).
+    pub last_messages: Vec<(bool, String)>,
 }
 
 pub fn save_session(session: &ChatSession) -> io::Result<()> {
@@ -154,12 +156,17 @@ pub fn list_sessions() -> io::Result<Vec<SessionSummary>> {
             Err(_) => continue,
         };
         if let Ok(session) = serde_json::from_str::<ChatSession>(&json) {
+            let last_messages = session.messages.iter().rev().take(4)
+                .map(|m| (m.role == "user", m.content.chars().take(44).collect::<String>()))
+                .collect::<Vec<_>>()
+                .into_iter().rev().collect();
             summaries.push(SessionSummary {
                 id: session.id,
                 title: session.title,
                 updated_at: session.updated_at,
                 provider: session.provider.clone(),
                 workspace_id: session.workspace_id.clone(),
+                last_messages,
             });
         }
     }

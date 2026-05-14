@@ -268,7 +268,7 @@ impl ArcadiaRoot {
             let is_active = active_module == provider.module_name
                 && self.active_llama_cpp_model_id.is_none();
             let pal = theme::nav_accent_palette(provider_accent(provider.module_name), is_dark);
-            let card_border = if is_active { pal.row_hover } else { p.panel_border };
+            let card_border = pal.icon_idle;
             let glyph_key = provider_glyph(provider.module_name);
             let title_col = pal.icon_active;
 
@@ -280,7 +280,6 @@ impl ArcadiaRoot {
                 .bg(p.panel_bg)
                 .p_4()
                 .cursor_pointer()
-                .hover(move |s| s.border_color(pal.row_hover))
                 .flex()
                 .flex_col()
                 .gap_2()
@@ -745,7 +744,7 @@ impl ArcadiaRoot {
             } else {
                 theme::nav_accent_palette("violet", is_dark)
             };
-            let card_border = if any_cli_active { cli_card_pal.row_hover } else { p.panel_border };
+            let card_border = cli_card_pal.icon_idle;
 
             let mut cli_rows = div()
                 .flex()

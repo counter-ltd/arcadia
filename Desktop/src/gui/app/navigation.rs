@@ -466,6 +466,7 @@ impl ArcadiaRoot {
                                             tab.selection_anchor = None;
                                             tab.highlight_dirty = true;
                                         }
+                                        this.save_editor_session();
                                         cx.notify();
                                     }
                                 }))
@@ -552,9 +553,9 @@ impl ArcadiaRoot {
                         .rounded(px(r))
                         .bg(p.panel_bg)
                         .border_1()
-                        .border_color(p.panel_border)
+                        .border_color(pal.icon_idle)
                         .hover(move |s| {
-                            s.bg(p.row_bg).border_color(pal.row_hover)
+                            s.bg(p.row_bg).border_color(pal.icon_active)
                         })
                         .flex()
                         .flex_col()

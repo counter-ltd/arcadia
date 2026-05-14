@@ -27,3 +27,34 @@ impl ConfigFile for CodeEditorConfig {
         FILE_NAME
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PersistedTab {
+    pub id: usize,
+    pub title: String,
+    #[serde(default)]
+    pub file_path: Option<String>,
+    #[serde(default)]
+    pub workspace_path: Option<String>,
+    #[serde(default)]
+    pub cursor: usize,
+    /// Stored only for unsaved buffers (no `file_path`). File-backed tabs reload from disk.
+    #[serde(default)]
+    pub unsaved_content: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CodeEditorSession {
+    #[serde(default)]
+    pub active_tab: usize,
+    #[serde(default)]
+    pub next_id: usize,
+    #[serde(default)]
+    pub tabs: Vec<PersistedTab>,
+}
+
+impl ConfigFile for CodeEditorSession {
+    fn file_name() -> &'static str {
+        "code-editor-session.toml"
+    }
+}

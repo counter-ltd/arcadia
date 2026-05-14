@@ -60,19 +60,7 @@ impl ConfigFile for ShortcutsConfig {
     }
 
     fn merge_defaults(&mut self) -> bool {
-        let mut changed = false;
-        const OFF_BY_DEFAULT: &[&str] = &[
-            "arcadia:hot-corner-dashboard",
-            "arcadia:edge-swipe-dashboard",
-        ];
-        for id in OFF_BY_DEFAULT {
-            let e = self.overrides.entry((*id).to_string()).or_default();
-            if e.disabled.is_none() {
-                e.disabled = Some(true);
-                changed = true;
-            }
-        }
-        changed
+        false
     }
 
     fn save(&self) -> io::Result<()> {

@@ -368,6 +368,7 @@ impl ArcadiaRoot {
                                                                                             tab.selection_anchor = None;
                                                                                             tab.highlight_dirty = true;
                                                                                         }
+                                                                                        this.save_editor_session();
                                                                                         cx.notify();
                                                                                     }).ok();
                                                                                 }).ok();
@@ -392,9 +393,10 @@ impl ArcadiaRoot {
                                                                     if let Some(path) = tab.file_path.clone() {
                                                                         let _ = std::fs::write(&path, &tab.content);
                                                                         tab.saved_content = tab.content.clone();
-                                                                        cx.notify();
                                                                     }
                                                                 }
+                                                                this.save_editor_session();
+                                                                cx.notify();
                                                             }),
                                                         )
                                                 )
@@ -443,6 +445,7 @@ impl ArcadiaRoot {
                                                                                     tab.language = lang;
                                                                                     tab.highlight_dirty = true;
                                                                                 }
+                                                                                this.save_editor_session();
                                                                                 cx.notify();
                                                                             }).ok();
                                                                         }).ok();
