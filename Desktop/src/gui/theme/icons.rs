@@ -31,6 +31,7 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "pin-fill" => "icons/pin-fill.svg",
         "code" => "icons/modules.svg",
         "modules" => "icons/modules.svg",
+        "shortcuts" => "icons/shortcuts.svg",
         "message" => "icons/message.svg",
         "animation" => "icons/animation.svg",
         "surface" => "icons/surface.svg",
@@ -46,6 +47,10 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "gemini"      => "icons/gemini.svg",
         "aider"       => "icons/aider.svg",
         "apfel"       => "icons/apfel.svg",
+        "type-text"      => "icons/type-text.svg",
+        "type-image"     => "icons/type-image.svg",
+        "type-vision"    => "icons/type-vision.svg",
+        "type-embedding" => "icons/type-embedding.svg",
         _ => "icons/terminal.svg",
     }
 }

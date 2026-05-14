@@ -233,10 +233,19 @@ impl ArcadiaRoot {
         let permissions_search_focus = cx.focus_handle();
         let shortcuts_search_focus = cx.focus_handle();
         let shortcut_listen_focus = cx.focus_handle();
+        let shortcut_sub = cx.observe_keystrokes(|this, event, window, cx| {
+            let key_down = openframe::KeyDownEvent {
+                keystroke: event.keystroke.clone(),
+                is_held: false,
+            };
+            this.try_dispatch_shortcuts_key(&key_down, window, cx);
+        });
         let shortcut_create_label_focus = cx.focus_handle();
         let shortcut_create_token_focus = cx.focus_handle();
         let shortcut_create_args_focus = cx.focus_handle();
         let workspace_search_focus = cx.focus_handle();
+        let rules_search_focus = cx.focus_handle();
+        let skills_search_focus = cx.focus_handle();
         let workspace_create_label_focus = cx.focus_handle();
         let workspace_create_path_focus = cx.focus_handle();
         let code_editor_focus = cx.focus_handle();
@@ -296,14 +305,19 @@ impl ArcadiaRoot {
             permissions_search_query: String::new(),
             shortcuts_search_query: String::new(),
             workspace_search_query: String::new(),
+            rules_search_query: String::new(),
+            skills_search_query: String::new(),
             modules_search_focus,
             extensions_search_focus,
             permissions_search_focus,
             shortcuts_search_focus,
             workspace_search_focus,
+            rules_search_focus,
+            skills_search_focus,
             shortcut_listening_id: None,
             shortcut_listening_sequence: None,
             shortcut_listen_focus,
+            _shortcut_sub: shortcut_sub,
             shortcut_create_draft: None,
             shortcut_draft_recording_chord: false,
             shortcut_draft_recording_seq: false,

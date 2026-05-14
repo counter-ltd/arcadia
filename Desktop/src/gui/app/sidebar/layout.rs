@@ -543,6 +543,10 @@ impl ArcadiaRoot {
                                             let is_sub_active = is_page_active
                                                 && self.active_ai_provider_module == provider.module_name
                                                 && self.active_llama_cpp_model_id.is_none();
+                                            let provider_icon = arcadia_core::config::modules::MODULE_REGISTRY.iter()
+                                                .find(|m| m.name == provider.module_name)
+                                                .map(|m| m.glyph)
+                                                .unwrap_or("modules");
                                             items.push(
                                                 Self::sidebar_ai_provider_sub_item(
                                                     cx,
@@ -551,6 +555,7 @@ impl ArcadiaRoot {
                                                     is_sub_active,
                                                     is_dark,
                                                     glyph,
+                                                    provider_icon,
                                                 )
                                                 .into_any_element(),
                                             );
@@ -558,6 +563,7 @@ impl ArcadiaRoot {
                                                 for model in &self.llama_cpp_models {
                                                     let model_id = model.id.clone();
                                                     let model_label = model.name.clone();
+                                                    let model_icon = model.model_kind.icon_key();
                                                     let is_model_active = is_page_active
                                                         && self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
                                                     items.push(
@@ -568,6 +574,7 @@ impl ArcadiaRoot {
                                                             is_model_active,
                                                             is_dark,
                                                             glyph,
+                                                            model_icon,
                                                         )
                                                         .into_any_element(),
                                                     );
@@ -589,6 +596,7 @@ impl ArcadiaRoot {
                                                     any_cli_active,
                                                     is_dark,
                                                     glyph,
+                                                    "terminal",
                                                 )
                                                 .into_any_element(),
                                             );

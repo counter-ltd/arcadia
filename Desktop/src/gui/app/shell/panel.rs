@@ -177,7 +177,8 @@ impl ArcadiaRoot {
                     .collect();
                 let border_col = if is_active_term { pal.icon_active } else { p.panel_border };
                 div()
-                    .w(px(280.))
+                    .flex_1()
+                    .min_w(px(220.))
                     .cursor_pointer()
                     .rounded(px(r))
                     .bg(p.panel_bg)
@@ -275,7 +276,10 @@ impl ArcadiaRoot {
                                     .flex_row()
                                     .flex_wrap()
                                     .gap_4()
-                                    .children(cards),
+                                    .children(cards)
+                                    .children(
+                                        (0..5).map(|_| div().flex_1().min_w(px(220.)).into_any_element()).collect::<Vec<_>>()
+                                    ),
                             ),
                     ),
             )

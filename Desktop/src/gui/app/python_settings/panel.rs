@@ -194,10 +194,20 @@ impl ArcadiaRoot {
                     .items_start()
                     .gap_3()
                     .child(
-                        render_icon(&format!("extension-icon/{name}"))
-                            .size_8()
-                            .flex_shrink_0()
-                            .text_color(p.content_title),
+                        {
+                            let has_icon = arcadia_core::modules::python_registry::resolve_extension_asset_path(&name, "icon.svg")
+                                .map(|p| p.exists())
+                                .unwrap_or(false);
+                            let icon_key = if has_icon {
+                                format!("extension-icon/{name}")
+                            } else {
+                                "extensions".to_string()
+                            };
+                            render_icon(&icon_key)
+                                .size_8()
+                                .flex_shrink_0()
+                                .text_color(p.content_title)
+                        },
                     )
                     .child(
                 div()
@@ -435,7 +445,7 @@ impl ArcadiaRoot {
                 .rounded(px(g.border_radius.min(12.0)))
                 .bg(g.surface2)
                 .border_1()
-                .border_color(g.border)
+                .border_color(if enabled { p.accent } else { g.border })
                 .child(row_inner)
                 .into_any_element()
         } else {
@@ -444,7 +454,7 @@ impl ArcadiaRoot {
                 .rounded(px(border_radius.min(12.0)))
                 .bg(p.row_bg)
                 .border_1()
-                .border_color(p.row_border)
+                .border_color(if enabled { p.accent } else { p.row_border })
                 .child(row_inner)
                 .into_any_element()
         }

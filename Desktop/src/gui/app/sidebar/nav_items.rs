@@ -29,6 +29,20 @@ fn nav_radius(g: Option<GlyphStyleConfig>) -> f32 {
     g.as_ref().map(|g| g.border_radius).unwrap_or(6.0)
 }
 
+fn ai_provider_accent(module_name: &str) -> &'static str {
+    use arcadia_core::config::modules::*;
+    match module_name {
+        AI_EXEC_CLAUDE_MODULE_NAME              => "orange",
+        AI_EXEC_GEMINI_MODULE_NAME              => "sky",
+        AI_EXEC_CODEX_MODULE_NAME | AI_OPENAI_MODULE_NAME => "emerald",
+        AI_EXEC_AIDER_MODULE_NAME               => "teal",
+        AI_LLAMA_CPP_MODULE_NAME                => "amber",
+        AI_OLLAMA_MODULE_NAME                   => "cyan",
+        AI_APFEL_MODULE_NAME                    => "indigo",
+        _                                       => "violet",
+    }
+}
+
 // ---------------------------------------------------------------------------
 
 impl ArcadiaRoot {
@@ -124,6 +138,7 @@ impl ArcadiaRoot {
                             this.active_page_id = first_page_id.to_string();
                         }
                     }
+                    this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
             )
@@ -439,6 +454,7 @@ impl ArcadiaRoot {
                     if _is_shell_page && this.terminals.len() > 1 {
                         this.terminal_show_dashboard = true;
                     }
+                    this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
             )
@@ -530,6 +546,7 @@ impl ArcadiaRoot {
                         this.active_code_editor_tab = editor_idx;
                         this.active_page_id = "editor.main".to_string();
                         this.code_editor_show_dashboard = false;
+                        this.sync_settings_hub_expanded_from_active_page();
                     }
                     cx.notify();
                 }),
@@ -551,8 +568,9 @@ impl ArcadiaRoot {
         is_active: bool,
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
+        icon_key: &'static str,
     ) -> impl IntoElement {
-        let pal      = theme::nav_accent_palette("violet", is_dark);
+        let pal      = theme::nav_accent_palette(ai_provider_accent(&module_name), is_dark);
         let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
         let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
         let hover_bg = if is_active {
@@ -574,6 +592,14 @@ impl ArcadiaRoot {
             .bg(bg)
             .text_color(text_col)
             .hover(move |s| s.bg(hover_bg))
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .child(
+                render_icon(icon_key)
+                    .size(px(12.))
+                    .text_color(text_col),
+            )
             .child(div().child(label))
             .on_mouse_down(
                 openframe::MouseButton::Left,
@@ -581,6 +607,7 @@ impl ArcadiaRoot {
                     this.active_ai_provider_module = module_name.clone();
                     this.active_llama_cpp_model_id = None;
                     this.active_page_id = "ai.models".to_string();
+                    this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
             )
@@ -611,8 +638,9 @@ impl ArcadiaRoot {
         is_active: bool,
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
+        icon_key: &'static str,
     ) -> impl IntoElement {
-        let pal      = theme::nav_accent_palette("violet", is_dark);
+        let pal      = theme::nav_accent_palette(ai_provider_accent(arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME), is_dark);
         let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
         let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
         let hover_bg = if is_active {
@@ -620,7 +648,6 @@ impl ArcadiaRoot {
         } else {
             nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1a1a2a) } else { rgb(0xf5f3ff) })
         };
-        let dim_col  = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
         let radius   = nav_radius(glyph);
         div()
             .ml_12()
@@ -636,11 +663,11 @@ impl ArcadiaRoot {
             .hover(move |s| s.bg(hover_bg))
             .flex()
             .items_center()
-            .gap_1()
+            .gap_1p5()
             .child(
-                div()
-                    .text_color(dim_col)
-                    .child("·"),
+                render_icon(icon_key)
+                    .size(px(11.))
+                    .text_color(text_col),
             )
             .child(div().child(label))
             .on_mouse_down(
@@ -650,6 +677,7 @@ impl ArcadiaRoot {
                     this.active_ai_provider_module =
                         arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME.to_string();
                     this.active_page_id = "ai.models".to_string();
+                    this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
             )
@@ -663,7 +691,7 @@ impl ArcadiaRoot {
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
     ) -> impl IntoElement {
-        let pal      = theme::nav_accent_palette("violet", is_dark);
+        let pal      = theme::nav_accent_palette(ai_provider_accent(&module_name), is_dark);
         let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
         let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
         let hover_bg = if is_active {
@@ -671,7 +699,10 @@ impl ArcadiaRoot {
         } else {
             nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1a1a2a) } else { rgb(0xf5f3ff) })
         };
-        let dim_col  = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+        let provider_icon = arcadia_core::config::modules::MODULE_REGISTRY.iter()
+            .find(|m| m.name == module_name.as_str())
+            .map(|m| m.glyph)
+            .unwrap_or("modules");
         let radius   = nav_radius(glyph);
         div()
             .ml_12()
@@ -687,11 +718,11 @@ impl ArcadiaRoot {
             .hover(move |s| s.bg(hover_bg))
             .flex()
             .items_center()
-            .gap_1()
+            .gap_1p5()
             .child(
-                div()
-                    .text_color(dim_col)
-                    .child("·"),
+                render_icon(provider_icon)
+                    .size(px(11.))
+                    .text_color(text_col),
             )
             .child(div().child(label))
             .on_mouse_down(
@@ -700,6 +731,7 @@ impl ArcadiaRoot {
                     this.active_ai_provider_module = module_name.clone();
                     this.active_llama_cpp_model_id = None;
                     this.active_page_id = "ai.models".to_string();
+                    this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
             )
@@ -740,6 +772,7 @@ impl ArcadiaRoot {
                 cx.listener(move |this, _, _, cx| {
                     this.active_ai_chat_id = chat_id;
                     this.active_page_id = "ai.chat".to_string();
+                    this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
             )
@@ -792,6 +825,7 @@ impl ArcadiaRoot {
                         this.active_terminal_id = terminal_id;
                         this.active_page_id = "utility.shell".to_string();
                         this.terminal_show_dashboard = false;
+                        this.sync_settings_hub_expanded_from_active_page();
                     }
                     cx.notify();
                 }),

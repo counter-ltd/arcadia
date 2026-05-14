@@ -132,7 +132,7 @@ impl ArcadiaRoot {
                 .rounded(px(g.border_radius.min(12.0)))
                 .bg(g.surface2)
                 .border_1()
-                .border_color(g.border)
+                .border_color(if enabled { p.accent } else { g.border })
                 .child(row)
                 .into_any_element()
         } else {
@@ -141,7 +141,7 @@ impl ArcadiaRoot {
                 .rounded(px(p.radius_md.min(12.0)))
                 .bg(p.row_bg)
                 .border_1()
-                .border_color(p.row_border)
+                .border_color(if enabled { p.accent } else { p.row_border })
                 .child(row)
                 .into_any_element()
         }

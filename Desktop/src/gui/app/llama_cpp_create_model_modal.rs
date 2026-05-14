@@ -10,7 +10,7 @@ use openframe::{
 
 use super::ArcadiaRoot;
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
-use crate::gui::theme;
+use crate::gui::theme::{self, render_icon};
 use crate::gui::theme::palette::ThemePalette;
 
 fn text_field(
@@ -200,6 +200,7 @@ impl ArcadiaRoot {
                 let bg = if is_selected { p.accent } else { p.surface_elevated };
                 let fg = if is_selected { p.on_accent } else { p.content_title };
                 let border = if is_selected { p.accent } else { p.border };
+                let icon_key = mt.icon_key();
                 row = row.child(
                     div()
                         .px_3()
@@ -212,6 +213,10 @@ impl ArcadiaRoot {
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(fg)
                         .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .gap_1p5()
+                        .child(render_icon(icon_key).size(px(11.)).text_color(fg))
                         .child(mt.label())
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                             if let Some(ref mut d) = this.llama_cpp_create_draft {
@@ -588,6 +593,7 @@ impl ArcadiaRoot {
                 let bg = if is_selected { p.accent } else { p.surface_elevated };
                 let fg = if is_selected { p.on_accent } else { p.content_title };
                 let border = if is_selected { p.accent } else { p.border };
+                let icon_key = mt.icon_key();
                 row = row.child(
                     div()
                         .px_3()
@@ -600,6 +606,10 @@ impl ArcadiaRoot {
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(fg)
                         .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .gap_1p5()
+                        .child(render_icon(icon_key).size(px(11.)).text_color(fg))
                         .child(mt.label())
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                             if let Some(ref mut d) = this.llama_cpp_edit_draft {

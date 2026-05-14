@@ -55,7 +55,7 @@ use std::time::Instant;
 use arcadia_core::modules::python_registry::{DecorationRect, HighlightSpan, StyleInfo};
 use arcadia_core::shortcuts::KeyChordSpec;
 use arcadia_core::navigation::NavigationRegistryOwned;
-use openframe::{Bounds, FocusHandle, Pixels, ScrollHandle, SharedString};
+use openframe::{Bounds, FocusHandle, Pixels, ScrollHandle, SharedString, Subscription};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -296,17 +296,25 @@ pub struct ArcadiaRoot {
     pub shortcuts_search_query: String,
     /// Filters rows on global.workspaces (UI-only).
     pub workspace_search_query: String,
+    /// Filters rows on ai.rules (UI-only).
+    pub rules_search_query: String,
+    /// Filters rows on ai.skills (UI-only).
+    pub skills_search_query: String,
     pub modules_search_focus: FocusHandle,
     pub extensions_search_focus: FocusHandle,
     pub permissions_search_focus: FocusHandle,
     pub shortcuts_search_focus: FocusHandle,
     pub workspace_search_focus: FocusHandle,
+    pub rules_search_focus: FocusHandle,
+    pub skills_search_focus: FocusHandle,
     /// When `Some(id)`, shortcuts panel captures the next keystroke as a new chord override for that shortcut.
     pub shortcut_listening_id: Option<String>,
     /// When `Some((id, captured_steps, total_steps))`, captures successive keystrokes into a sequence override.
     pub shortcut_listening_sequence: Option<(String, Vec<arcadia_core::shortcuts::KeyChordSpec>, usize)>,
-    /// Focused while listening (chord or sequence) so key events reach the root `on_key_down`.
+    /// Focused while listening (chord or sequence) to keep the div in the dispatch path.
     pub shortcut_listen_focus: FocusHandle,
+    /// Keeps the app-level keystroke observer alive for the lifetime of this view.
+    pub _shortcut_sub: Subscription,
     /// Draft state for the Create Shortcut modal.
     pub shortcut_create_draft: Option<ShortcutCreateDraft>,
     /// When true, next key event goes to `shortcut_create_draft.chord`.

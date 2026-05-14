@@ -277,7 +277,8 @@ impl ArcadiaRoot {
                     .map(|ws| {
                         let ws_path_clone = ws.path.clone();
                         div()
-                            .w(px(280.))
+                            .flex_1()
+                            .min_w(px(220.))
                             .cursor_pointer()
                             .p_4()
                             .rounded(px(r))
@@ -370,7 +371,8 @@ impl ArcadiaRoot {
                         .collect();
                     let fh_card = self.code_editor_focus.clone();
                     div()
-                        .w(px(280.))
+                        .flex_1()
+                        .min_w(px(220.))
                         .cursor_pointer()
                         .rounded(px(r))
                         .bg(p.panel_bg)
@@ -461,12 +463,16 @@ impl ArcadiaRoot {
                     .child("No open editors.")
                     .into_any_element()
             } else {
+                let phantoms: Vec<_> = (0..5)
+                    .map(|_| div().flex_1().min_w(px(220.)).into_any_element())
+                    .collect();
                 div()
                     .flex()
                     .flex_row()
                     .flex_wrap()
                     .gap_4()
                     .children(editor_cards)
+                    .children(phantoms)
                     .into_any_element()
             };
 
@@ -477,12 +483,16 @@ impl ArcadiaRoot {
                     .child("No workspaces registered. Add one in Settings → Workspaces.")
                     .into_any_element()
             } else {
+                let phantoms: Vec<_> = (0..5)
+                    .map(|_| div().flex_1().min_w(px(220.)).into_any_element())
+                    .collect();
                 div()
                     .flex()
                     .flex_row()
                     .flex_wrap()
                     .gap_4()
                     .children(workspace_cards)
+                    .children(phantoms)
                     .into_any_element()
             };
 

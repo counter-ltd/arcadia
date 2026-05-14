@@ -14,6 +14,12 @@ pub struct AiSkill {
     pub allowed_tools: Vec<String>,
     #[serde(default)]
     pub max_tokens_override: Option<i32>,
+    #[serde(default = "default_skill_icon")]
+    pub icon: String,
+}
+
+fn default_skill_icon() -> String {
+    "tools".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +53,7 @@ pub fn builtin_skills() -> Vec<AiSkill> {
             system_fragment: "You are acting as a code reviewer. For each file or snippet shown, identify bugs, security issues, performance problems, and style violations. Be specific: cite line numbers and explain the risk. Propose concrete fixes.".to_string(),
             allowed_tools: vec!["read_file".to_string(), "list_files".to_string()],
             max_tokens_override: None,
+            icon: "code".to_string(),
         },
         AiSkill {
             id: "shell-assistant".to_string(),
@@ -54,6 +61,7 @@ pub fn builtin_skills() -> Vec<AiSkill> {
             system_fragment: "You are a shell command specialist. Before running any command, explain what it does in plain English. Prefer safe, reversible commands. Warn clearly about destructive operations.".to_string(),
             allowed_tools: Vec::new(),
             max_tokens_override: None,
+            icon: "terminal".to_string(),
         },
         AiSkill {
             id: "summariser".to_string(),
@@ -61,6 +69,7 @@ pub fn builtin_skills() -> Vec<AiSkill> {
             system_fragment: "Your job is to compress and summarise. Output bullet points. Strip filler. Lead with the most important point. Keep total output under 200 words unless explicitly asked for more.".to_string(),
             allowed_tools: vec!["read_file".to_string()],
             max_tokens_override: Some(512),
+            icon: "file-text".to_string(),
         },
         AiSkill {
             id: "security-auditor".to_string(),
@@ -68,6 +77,7 @@ pub fn builtin_skills() -> Vec<AiSkill> {
             system_fragment: "You are a security auditor. Focus exclusively on security vulnerabilities: injection flaws, authentication bypasses, insecure defaults, exposed secrets, privilege escalation paths, and OWASP Top 10. Classify each finding by severity (Critical / High / Medium / Low). Ignore non-security issues.".to_string(),
             allowed_tools: vec!["read_file".to_string(), "list_files".to_string()],
             max_tokens_override: None,
+            icon: "permissions".to_string(),
         },
     ]
 }

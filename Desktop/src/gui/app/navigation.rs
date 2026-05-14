@@ -155,17 +155,15 @@ impl ArcadiaRoot {
             .unwrap_or_else(|| navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect())
     }
 
-    /// Expand the Settings hub when the active page is the hub root or a nested registry target.
+    /// Expand or collapse the Settings hub based on whether the active page is a settings page.
     pub(crate) fn sync_settings_hub_expanded_from_active_page(&mut self) {
         let active = self.active_page_id.as_str();
-        if active == navigation::SETTINGS_HUB_ROOT_PAGE_ID
+        let in_settings = active == navigation::SETTINGS_HUB_ROOT_PAGE_ID
             || self
                 .settings_hub_page_ids_effective()
                 .iter()
-                .any(|p| *p == active)
-        {
-            self.settings_hub_expanded = true;
-        }
+                .any(|p| *p == active);
+        self.settings_hub_expanded = in_settings;
     }
 
     pub(crate) fn visible_groups_effective(&self) -> Vec<NavGroupRef<'_>> {
@@ -537,7 +535,8 @@ impl ArcadiaRoot {
                 let pin_color = if is_pinned { pal.icon_active } else { p.content_meta };
                 Some(
                     div()
-                        .w(px(280.))
+                        .flex_1()
+                        .min_w(px(220.))
                         .cursor_pointer()
                         .p_4()
                         .rounded(px(r))
@@ -640,13 +639,22 @@ impl ArcadiaRoot {
                     .child("No settings pages are available right now.")
                     .into_any_element()
             } else {
-                div()
-                    .flex()
-                    .flex_row()
-                    .flex_wrap()
-                    .gap_4()
-                    .children(tiles)
-                    .into_any_element()
+                {
+                    // Phantom spacers keep last-row tiles the same width as full rows.
+                    // 5 spacers covers up to 6 columns; they are invisible and non-interactive.
+                    let phantoms: Vec<_> = (0..5)
+                        .map(|_| div().flex_1().min_w(px(220.)).into_any_element())
+                        .collect();
+                    div()
+                        .flex()
+                        .flex_row()
+                        .flex_wrap()
+                        .gap_4()
+                        .max_w(px(1168.))
+                        .children(tiles)
+                        .children(phantoms)
+                        .into_any_element()
+                }
             })
     }
 
@@ -711,6 +719,7 @@ impl ArcadiaRoot {
         };
         if let Some(p) = page_fix {
             self.active_page_id = p;
+            self.sync_settings_hub_expanded_from_active_page();
         }
     }
 }

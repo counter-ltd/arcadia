@@ -1,166 +1,271 @@
 use arcadia_core::config::ai_rules::{all_rules, AiRulesConfig};
 use arcadia_core::config::ConfigFile;
 use openframe::{
-    div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    AnyElement, div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
     ParentElement, Styled, Window,
 };
 use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme;
-
-const GLYPH_PANEL_CONTENT_MAX_W_PX: f32 = 680.0;
+use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
+use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
     pub fn ai_rules_panel(
         &mut self,
-        _window: &mut Window,
+        window: &Window,
         cx: &mut Context<Self>,
         is_dark: bool,
-    ) -> impl IntoElement {
+    ) -> AnyElement {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
-        let is_glyph = g_snap.is_some();
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
-        let accent = theme::ui_accent(cx);
-        let accent_fg = theme::ui_accent_fg(cx);
 
         let active_ids = self.ai_active_rule_ids.clone();
         let cfg = AiRulesConfig::load_or_create().unwrap_or_default();
         let all = all_rules(&cfg);
+        let q = self.rules_search_query.trim().to_ascii_lowercase();
 
-        let mut root = div()
-            .w_full()
-            .when(is_glyph, |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
-            .flex()
-            .flex_col()
-            .gap_6()
-            .child(
-                div()
+        let search_bar = self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Rules);
+
+        let filtered: Vec<_> = all
+            .into_iter()
+            .filter(|r| list_panel_row_matches(&q, &r.name, &[r.system_fragment.as_str()]))
+            .collect();
+
+        let rows: Vec<AnyElement> = filtered
+            .into_iter()
+            .map(|rule| {
+                let rule_id = rule.id.clone();
+                let rule_id_toggle = rule_id.clone();
+                let rule_icon = rule.icon.clone();
+                let is_active = active_ids.contains(&rule_id);
+
+                let (badge_bg, badge_fg) = if is_active {
+                    (p.accent, p.on_accent)
+                } else {
+                    (p.surface_elevated, p.ui_subtext)
+                };
+
+                let r_track = radius.min(8.0_f32).max(0.0);
+                let is_glyph = g_snap.is_some();
+
+                let row_inner = div()
+                    .w_full()
+                    .px_4()
+                    .py_3()
                     .flex()
-                    .flex_col()
-                    .gap_1()
+                    .justify_between()
+                    .items_center()
+                    .gap_4()
                     .child(
                         div()
-                            .text_2xl()
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(p.content_title)
-                            .child("Rules"),
+                            .flex()
+                            .flex_1()
+                            .min_w_0()
+                            .items_start()
+                            .gap_3()
+                            .child(
+                                render_icon(&rule_icon)
+                                    .size_8()
+                                    .flex_shrink_0()
+                                    .text_color(p.content_title),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .text_base()
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(p.content_title)
+                                            .child(rule.name.clone()),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .items_center()
+                                            .gap_2()
+                                            .child(
+                                                div()
+                                                    .px_2()
+                                                    .py_0p5()
+                                                    .when(!is_glyph, |d| d.rounded_full())
+                                                    .rounded(px(radius.min(12.0)))
+                                                    .text_xs()
+                                                    .font_weight(FontWeight::SEMIBOLD)
+                                                    .bg(badge_bg)
+                                                    .text_color(badge_fg)
+                                                    .child(if is_active { "Active" } else { "Inactive" }),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(p.content_body)
+                                            .child(rule.system_fragment.clone()),
+                                    )
+                                    .when(!rule.forbidden_tools.is_empty(), |col| {
+                                        col.child(
+                                            div()
+                                                .flex()
+                                                .flex_row()
+                                                .gap_1()
+                                                .flex_wrap()
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(p.content_meta)
+                                                        .child("Blocks: "),
+                                                )
+                                                .children(rule.forbidden_tools.iter().map(|t| {
+                                                    div()
+                                                        .px_1p5()
+                                                        .py_0p5()
+                                                        .rounded(px(3.0))
+                                                        .bg(p.badge_muted_bg)
+                                                        .text_xs()
+                                                        .text_color(p.badge_muted_fg)
+                                                        .child(t.clone())
+                                                })),
+                                        )
+                                    }),
+                            ),
                     )
                     .child(
                         div()
-                            .text_sm()
-                            .text_color(p.content_meta)
-                            .child("Per-chat constraints injected into the system prompt. Active rules show as chips in the chat header."),
-                    ),
-            );
-
-        for rule in &all {
-            let rule_id = rule.id.clone();
-            let rule_id_toggle = rule_id.clone();
-            let is_active = active_ids.contains(&rule_id);
-            let (badge_bg, badge_fg) = if is_active {
-                (accent, accent_fg)
-            } else {
-                (p.badge_muted_bg, p.badge_muted_fg)
-            };
-
-            let card = div()
-                .rounded(px(radius.min(12.0)))
-                .border_1()
-                .border_color(if is_active { accent } else { p.panel_border })
-                .bg(p.panel_bg)
-                .p_4()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_0p5()
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(p.content_title)
-                                        .child(rule.name.clone()),
-                                )
-                                .child(
-                                    div()
-                                        .px_2()
-                                        .py_0p5()
-                                        .rounded(px(4.0))
-                                        .bg(badge_bg)
-                                        .text_xs()
-                                        .text_color(badge_fg)
-                                        .child(if is_active { "Active" } else { "Inactive" }),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .px_3()
-                                .py_1()
-                                .rounded(px(radius.min(8.0)))
-                                .bg(if is_active { p.panel_bg } else { accent })
-                                .border_1()
-                                .border_color(if is_active { p.panel_border } else { accent })
-                                .text_xs()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(if is_active { p.content_meta } else { accent_fg })
-                                .cursor_pointer()
-                                .child(if is_active { "Deactivate" } else { "Activate" })
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                    if this.ai_active_rule_ids.contains(&rule_id_toggle) {
-                                        this.ai_active_rule_ids.retain(|id| id != &rule_id_toggle);
-                                    } else {
-                                        this.ai_active_rule_ids.push(rule_id_toggle.clone());
-                                    }
-                                    cx.notify();
-                                })),
-                        ),
-                )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(p.content_meta)
-                        .child(rule.system_fragment.clone()),
-                )
-                .when(!rule.forbidden_tools.is_empty(), |d| {
-                    d.child(
-                        div()
                             .flex()
-                            .flex_row()
-                            .gap_1()
-                            .flex_wrap()
+                            .items_center()
+                            .gap_2()
+                            .cursor_pointer()
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(p.content_meta)
-                                    .child("Blocks: "),
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(if is_active { p.accent } else { p.ui_subtext })
+                                    .child(if is_active { "ON" } else { "OFF" }),
                             )
-                            .children(rule.forbidden_tools.iter().map(|t| {
-                                div()
-                                    .px_1p5()
-                                    .py_0p5()
-                                    .rounded(px(3.0))
-                                    .bg(p.badge_muted_bg)
-                                    .text_xs()
-                                    .text_color(p.badge_muted_fg)
-                                    .child(t.clone())
+                            .child(
+                                if is_active {
+                                    div()
+                                        .w_10()
+                                        .h_6()
+                                        .px_0p5()
+                                        .when(!is_glyph, |d| d.rounded_full())
+                                        .rounded(px(r_track))
+                                        .border_1()
+                                        .border_color(p.border)
+                                        .bg(p.accent)
+                                        .flex()
+                                        .items_center()
+                                        .justify_end()
+                                        .child(
+                                            div()
+                                                .w_4()
+                                                .h_4()
+                                                .when(!is_glyph, |d| d.rounded_full())
+                                                .rounded(px(r_track))
+                                                .bg(p.on_accent),
+                                        )
+                                } else {
+                                    div()
+                                        .w_10()
+                                        .h_6()
+                                        .px_0p5()
+                                        .when(!is_glyph, |d| d.rounded_full())
+                                        .rounded(px(r_track))
+                                        .border_1()
+                                        .border_color(p.border)
+                                        .bg(p.surface_elevated)
+                                        .flex()
+                                        .items_center()
+                                        .justify_start()
+                                        .child(
+                                            div()
+                                                .w_4()
+                                                .h_4()
+                                                .when(!is_glyph, |d| d.rounded_full())
+                                                .rounded(px(r_track))
+                                                .bg(p.toggle_knob_off),
+                                        )
+                                },
+                            )
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                if this.ai_active_rule_ids.contains(&rule_id_toggle) {
+                                    this.ai_active_rule_ids.retain(|id| id != &rule_id_toggle);
+                                } else {
+                                    this.ai_active_rule_ids.push(rule_id_toggle.clone());
+                                }
+                                cx.notify();
                             })),
-                    )
-                });
+                    );
 
-            root = root.child(card);
+                let row = if let Some(ref g) = g_snap {
+                    div()
+                        .w_full()
+                        .rounded(px(g.border_radius.min(12.0)))
+                        .bg(g.surface2)
+                        .border_1()
+                        .border_color(if is_active { p.accent } else { g.border })
+                        .child(row_inner)
+                        .into_any_element()
+                } else {
+                    div()
+                        .w_full()
+                        .rounded(px(radius.min(12.0)))
+                        .bg(p.row_bg)
+                        .border_1()
+                        .border_color(if is_active { p.accent } else { p.row_border })
+                        .child(row_inner)
+                        .into_any_element()
+                };
+
+                row
+            })
+            .collect();
+
+        let list_body = div().flex().flex_col().gap_3().children(rows).into_any_element();
+
+        if let Some(ref g) = g_snap {
+            let r = g.border_radius.min(12.0);
+            div()
+                .w_full()
+                .flex()
+                .justify_center()
+                .child(
+                    div()
+                        .w_full()
+                        .max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+                        .p_4()
+                        .rounded(px(r))
+                        .bg(g.surface)
+                        .border_1()
+                        .border_color(g.border)
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(search_bar)
+                        .child(list_body),
+                )
+                .into_any_element()
+        } else {
+            let panel_bg = theme::module_panel_bg(is_dark);
+            let panel_border = theme::module_panel_stroke(is_dark);
+            div()
+                .w_full()
+                .p_4()
+                .rounded(px(8.0))
+                .bg(panel_bg)
+                .border_1()
+                .border_color(panel_border)
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(search_bar)
+                .child(list_body)
+                .into_any_element()
         }
-
-        root
     }
 }

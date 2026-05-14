@@ -424,16 +424,6 @@ impl ArcadiaRoot {
         }
     }
 
-    pub(crate) fn handle_global_key_down(
-        &mut self,
-        event: &KeyDownEvent,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if self.try_dispatch_shortcuts_key(event, window, cx) {
-            return;
-        }
-    }
 }
 
 pub(crate) fn global_shortcuts_for_settings() -> Vec<EffectiveMergedShortcut> {

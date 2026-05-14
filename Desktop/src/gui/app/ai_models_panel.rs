@@ -1,6 +1,6 @@
 use arcadia_core::config::modules::{
     AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
-    AI_OPENAI_MODULE_NAME,
+    AI_OPENAI_MODULE_NAME, MODULE_REGISTRY,
 };
 use arcadia_core::modules::ai::{cli_binary_for_module, cli_display_name, enabled_ai_providers, is_cli_provider};
 use openframe::{
@@ -12,7 +12,28 @@ use openframe::prelude::FluentBuilder as _;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::app::LlamaCppModelCreateDraft;
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
-use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
+use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
+
+fn provider_accent(module_name: &str) -> &'static str {
+    use arcadia_core::config::modules::*;
+    match module_name {
+        AI_EXEC_CLAUDE_MODULE_NAME                            => "orange",
+        AI_EXEC_GEMINI_MODULE_NAME                           => "sky",
+        AI_EXEC_CODEX_MODULE_NAME | AI_OPENAI_MODULE_NAME    => "emerald",
+        AI_EXEC_AIDER_MODULE_NAME                            => "teal",
+        AI_LLAMA_CPP_MODULE_NAME                             => "amber",
+        AI_OLLAMA_MODULE_NAME                                => "cyan",
+        AI_APFEL_MODULE_NAME                                 => "indigo",
+        _                                                    => "violet",
+    }
+}
+
+fn provider_glyph(module_name: &str) -> &'static str {
+    MODULE_REGISTRY.iter()
+        .find(|m| m.name == module_name)
+        .map(|m| m.glyph)
+        .unwrap_or("ai-provider")
+}
 
 impl ArcadiaRoot {
     pub(crate) fn ai_models_panel(
@@ -40,7 +61,7 @@ impl ArcadiaRoot {
                 let model_for_edit = model.clone();
                 let pal = theme::nav_accent_palette("violet", is_dark);
                 let delete_bg = if is_delete_confirm { p.danger } else { p.surface_elevated };
-                let delete_fg = if is_delete_confirm { p.on_accent } else { p.ui_subtext };
+                let delete_fg = if is_delete_confirm { p.on_accent } else { p.danger };
                 let delete_border = if is_delete_confirm { p.danger } else { p.border };
 
                 let mut detail = div()
@@ -246,8 +267,10 @@ impl ArcadiaRoot {
             let module_name = provider.module_name.to_string();
             let is_active = active_module == provider.module_name
                 && self.active_llama_cpp_model_id.is_none();
-            let pal = theme::nav_accent_palette("violet", is_dark);
+            let pal = theme::nav_accent_palette(provider_accent(provider.module_name), is_dark);
             let card_border = if is_active { pal.row_hover } else { p.panel_border };
+            let glyph_key = provider_glyph(provider.module_name);
+            let title_col = pal.icon_active;
 
             let module_name_click = module_name.clone();
             let mut card = div()
@@ -269,10 +292,17 @@ impl ArcadiaRoot {
                         .justify_between()
                         .child(
                             div()
-                                .text_base()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(p.content_title)
-                                .child(provider.display_name),
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(render_icon(glyph_key).size_5().text_color(title_col))
+                                .child(
+                                    div()
+                                        .text_base()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(title_col)
+                                        .child(provider.display_name),
+                                ),
                         ),
                 )
                 .child(
@@ -307,6 +337,7 @@ impl ArcadiaRoot {
                     let model_id_hover = model_id.clone();
                     let name = model.name.clone();
                     let type_label = model.model_kind.label();
+                    let type_icon = model.model_kind.icon_key();
                     let is_model_active = self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
                     let row_bg = if is_model_active { pal.row_selected } else { p.panel_bg };
                     let row_hover = pal.row_hover;
@@ -332,13 +363,15 @@ impl ArcadiaRoot {
                             )
                             .child(
                                 div()
-                                    .px_2()
+                                    .px_1p5()
                                     .py_0p5()
                                     .rounded(px(4.0))
                                     .bg(p.badge_muted_bg)
-                                    .text_xs()
-                                    .text_color(p.badge_muted_fg)
-                                    .child(type_label),
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(render_icon(type_icon).size_3().text_color(p.badge_muted_fg))
+                                    .child(div().text_xs().text_color(p.badge_muted_fg).child(type_label)),
                             )
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -412,6 +445,7 @@ impl ArcadiaRoot {
                     for model in &ollama_models {
                         let name = model.name.clone();
                         let kind_label = model.model_kind.label();
+                        let kind_icon = model.model_kind.icon_key();
                         model_list = model_list.child(
                             div()
                                 .px_2()
@@ -428,13 +462,15 @@ impl ArcadiaRoot {
                                 )
                                 .child(
                                     div()
-                                        .px_2()
+                                        .px_1p5()
                                         .py_0p5()
                                         .rounded(px(4.0))
                                         .bg(p.badge_muted_bg)
-                                        .text_xs()
-                                        .text_color(p.badge_muted_fg)
-                                        .child(kind_label),
+                                        .flex()
+                                        .items_center()
+                                        .gap_1()
+                                        .child(render_icon(kind_icon).size_3().text_color(p.badge_muted_fg))
+                                        .child(div().text_xs().text_color(p.badge_muted_fg).child(kind_label)),
                                 ),
                         );
                     }
@@ -644,6 +680,7 @@ impl ArcadiaRoot {
                     for model in &openai_models {
                         let name = model.name.clone();
                         let kind_label = model.model_kind.label();
+                        let kind_icon = model.model_kind.icon_key();
                         let model_id_label = model.model_id.clone();
                         model_list = model_list.child(
                             div()
@@ -673,13 +710,15 @@ impl ArcadiaRoot {
                                 )
                                 .child(
                                     div()
-                                        .px_2()
+                                        .px_1p5()
                                         .py_0p5()
                                         .rounded(px(4.0))
                                         .bg(p.badge_muted_bg)
-                                        .text_xs()
-                                        .text_color(p.badge_muted_fg)
-                                        .child(kind_label),
+                                        .flex()
+                                        .items_center()
+                                        .gap_1()
+                                        .child(render_icon(kind_icon).size_3().text_color(p.badge_muted_fg))
+                                        .child(div().text_xs().text_color(p.badge_muted_fg).child(kind_label)),
                                 ),
                         );
                     }
@@ -692,9 +731,14 @@ impl ArcadiaRoot {
 
         // Single CLI card grouping all enabled exec-CLI providers.
         if !cli_providers.is_empty() {
-            let pal = theme::nav_accent_palette("violet", is_dark);
             let any_cli_active = is_cli_provider(&active_module) && self.active_llama_cpp_model_id.is_none();
-            let card_border = if any_cli_active { pal.row_hover } else { p.panel_border };
+            // Use the active provider's accent for the card border, else neutral.
+            let cli_card_pal = if any_cli_active {
+                theme::nav_accent_palette(provider_accent(&active_module), is_dark)
+            } else {
+                theme::nav_accent_palette("violet", is_dark)
+            };
+            let card_border = if any_cli_active { cli_card_pal.row_hover } else { p.panel_border };
 
             let mut cli_rows = div()
                 .flex()
@@ -712,9 +756,12 @@ impl ArcadiaRoot {
                     .find(|c| c.binary == binary)
                     .cloned();
                 let is_row_active = active_module == cli_provider.module_name;
-                let row_bg = if is_row_active { pal.row_selected } else { p.panel_bg };
-                let row_hover = pal.row_hover;
-                let name_col = if is_row_active { pal.icon_active } else { p.content_title };
+                let row_pal = theme::nav_accent_palette(provider_accent(cli_provider.module_name), is_dark);
+                let row_bg = if is_row_active { row_pal.row_selected } else { p.panel_bg };
+                let row_hover = row_pal.row_hover;
+                let name_col = if is_row_active { row_pal.icon_active } else { p.content_title };
+                let icon_col = row_pal.icon_active;
+                let glyph = provider_glyph(cli_provider.module_name);
                 let mn_click = mn.clone();
 
                 let row = if let Some(ref cli) = detected {
@@ -736,10 +783,17 @@ impl ArcadiaRoot {
                         }))
                         .child(
                             div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(name_col)
-                                .child(name),
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(render_icon(glyph).size_4().text_color(icon_col))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(name_col)
+                                        .child(name),
+                                ),
                         )
                         .child(
                             div()
@@ -762,10 +816,17 @@ impl ArcadiaRoot {
                         .justify_between()
                         .child(
                             div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(p.ui_subtext)
-                                .child(name),
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(render_icon(glyph).size_4().text_color(p.ui_subtext))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(p.ui_subtext)
+                                        .child(name),
+                                ),
                         )
                         .child(
                             div()

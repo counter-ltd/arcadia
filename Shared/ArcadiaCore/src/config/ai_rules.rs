@@ -13,6 +13,12 @@ pub struct AiRule {
     pub forbidden_tools: Vec<String>,
     #[serde(default)]
     pub max_tokens_override: Option<i32>,
+    #[serde(default = "default_rule_icon")]
+    pub icon: String,
+}
+
+fn default_rule_icon() -> String {
+    "permissions".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +52,7 @@ pub fn builtin_rules() -> Vec<AiRule> {
             system_fragment: "Before any run_command call, briefly explain what the command does and confirm it is safe to run.".to_string(),
             forbidden_tools: Vec::new(),
             max_tokens_override: None,
+            icon: "permissions".to_string(),
         },
         AiRule {
             id: "concise-output".to_string(),
@@ -53,6 +60,7 @@ pub fn builtin_rules() -> Vec<AiRule> {
             system_fragment: "Prefer short, direct responses. Omit preamble, filler, and unnecessary explanation.".to_string(),
             forbidden_tools: Vec::new(),
             max_tokens_override: Some(1024),
+            icon: "file-text".to_string(),
         },
         AiRule {
             id: "diff-over-full-file".to_string(),
@@ -60,6 +68,7 @@ pub fn builtin_rules() -> Vec<AiRule> {
             system_fragment: "When editing files, emit only the changed portion using a diff or snippet — do not rewrite the entire file.".to_string(),
             forbidden_tools: Vec::new(),
             max_tokens_override: None,
+            icon: "file-code".to_string(),
         },
         AiRule {
             id: "no-exec".to_string(),
@@ -67,6 +76,7 @@ pub fn builtin_rules() -> Vec<AiRule> {
             system_fragment: "You may not run shell commands in this session. Use read_file, list_files, and write_file only.".to_string(),
             forbidden_tools: vec!["run_command".to_string()],
             max_tokens_override: None,
+            icon: "terminal".to_string(),
         },
     ]
 }

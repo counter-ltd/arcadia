@@ -33,6 +33,15 @@ impl LlamaCppModelKind {
         ]
     }
 
+    pub fn icon_key(&self) -> &'static str {
+        match self {
+            Self::TextGeneration  => "type-text",
+            Self::ImageGeneration => "type-image",
+            Self::Vision          => "type-vision",
+            Self::Embedding       => "type-embedding",
+        }
+    }
+
     pub fn as_ai_model_kind(&self) -> AiModelKind {
         match self {
             Self::TextGeneration  => AiModelKind::TextGeneration,

@@ -223,12 +223,6 @@ impl Render for ArcadiaRoot {
             .on_mouse_move(cx.listener(|this, ev, window, cx| {
                 this.handle_shortcut_pointer_move(ev, window, cx);
             }))
-            .on_key_down(cx.listener({
-                #[cfg(any(feature = "gui", feature = "ios-gui"))]
-                { Self::handle_global_key_down }
-                #[cfg(not(any(feature = "gui", feature = "ios-gui")))]
-                { |_this: &mut ArcadiaRoot, _ev, _window, _cx| {} }
-            }))
             .child(if self.sidebar_visible {
                 self.render_sidebar(window, cx, &visible_groups, active_group, is_dark)
             } else {
@@ -331,33 +325,36 @@ impl ArcadiaRoot {
         };
 
         if self.ai_chat_model_picker_open {
-            // (model_id, display_name, type_label, provider_module)
-            let all_models: Vec<(String, String, &'static str, String)> = {
+            // (model_id, display_name, type_label, provider_module, icon_key)
+            let all_models: Vec<(String, String, &'static str, String, &'static str)> = {
                 use arcadia_core::config::modules::{
-                    AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
+                    AI_APFEL_MODULE_NAME, AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
                     AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME,
                     AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME,
                 };
                 let mut v = Vec::new();
                 for model in &self.llama_cpp_models {
-                    v.push((model.id.clone(), model.name.clone(), model.model_kind.label(), AI_LLAMA_CPP_MODULE_NAME.to_string()));
+                    v.push((model.id.clone(), model.name.clone(), model.model_kind.label(), AI_LLAMA_CPP_MODULE_NAME.to_string(), model.model_kind.icon_key()));
                 }
                 for model in &self.ollama_models {
-                    v.push((model.id.clone(), model.name.clone(), "Ollama", AI_OLLAMA_MODULE_NAME.to_string()));
+                    v.push((model.id.clone(), model.name.clone(), "Ollama", AI_OLLAMA_MODULE_NAME.to_string(), "ollama"));
                 }
                 for model in &self.openai_models {
-                    v.push((model.id.clone(), model.name.clone(), "OpenAI", AI_OPENAI_MODULE_NAME.to_string()));
+                    v.push((model.id.clone(), model.name.clone(), "OpenAI", AI_OPENAI_MODULE_NAME.to_string(), "openai"));
+                }
+                if self.is_module_enabled(AI_APFEL_MODULE_NAME) {
+                    v.push((AI_APFEL_MODULE_NAME.to_string(), "Apple Intelligence".to_string(), "On-device", AI_APFEL_MODULE_NAME.to_string(), "apfel"));
                 }
                 for cli in &self.detected_cli_providers {
-                    let module = match cli.binary.as_str() {
-                        "claude" => AI_EXEC_CLAUDE_MODULE_NAME,
-                        "codex"  => AI_EXEC_CODEX_MODULE_NAME,
-                        "gemini" => AI_EXEC_GEMINI_MODULE_NAME,
-                        "aider"  => AI_EXEC_AIDER_MODULE_NAME,
+                    let (module, icon): (&'static str, &'static str) = match cli.binary.as_str() {
+                        "claude" => (AI_EXEC_CLAUDE_MODULE_NAME, "claude"),
+                        "codex"  => (AI_EXEC_CODEX_MODULE_NAME,  "codex"),
+                        "gemini" => (AI_EXEC_GEMINI_MODULE_NAME,  "gemini"),
+                        "aider"  => (AI_EXEC_AIDER_MODULE_NAME,   "aider"),
                         _        => continue,
                     };
                     if self.is_module_enabled(module) {
-                        v.push((cli.id.clone(), cli.label.clone(), "CLI", module.to_string()));
+                        v.push((cli.id.clone(), cli.label.clone(), "CLI", module.to_string(), icon));
                     }
                 }
                 v
@@ -387,12 +384,13 @@ impl ArcadiaRoot {
                         .child("No models available. Enable an AI provider module and configure a model."),
                 );
             } else {
-                for (model_id, model_name, type_label, provider_module) in all_models {
+                for (model_id, model_name, type_label, provider_module, icon_key) in all_models {
                     let is_active = self.active_ai_provider_module == provider_module
                         && (self.ai_chat_model_id.as_deref() == Some(model_id.as_str())
                             || (model_id == provider_module && self.ai_chat_model_id.is_none()));
                     let model_id2 = model_id.clone();
                     let provider_module2 = provider_module.clone();
+                    let row_fg = if is_active { crate::gui::theme::ui_accent(cx) } else { text_color };
                     picker = picker.child(
                         div()
                             .w_full()
@@ -407,9 +405,17 @@ impl ArcadiaRoot {
                             .justify_between()
                             .child(
                                 div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1p5()
                                     .flex_1()
                                     .min_w_0()
-                                    .text_color(if is_active { crate::gui::theme::ui_accent(cx) } else { text_color })
+                                    .text_color(row_fg)
+                                    .child(
+                                        render_icon(icon_key)
+                                            .size(px(13.))
+                                            .text_color(row_fg),
+                                    )
                                     .child(model_name),
                             )
                             .child(
