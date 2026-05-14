@@ -108,3 +108,10 @@ pub fn cli_display_name(module_name: &str) -> &'static str {
         _ => "CLI",
     }
 }
+
+pub fn provider_display_name(module_name: &str) -> Option<&'static str> {
+    AI_PROVIDER_REGISTRY
+        .iter()
+        .find(|p| p.module_name == module_name)
+        .map(|p| p.display_name)
+}

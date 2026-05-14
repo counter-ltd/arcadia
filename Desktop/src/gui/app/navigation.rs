@@ -2,8 +2,8 @@ use arcadia_core::config::modules::AI_MODULE_NAME;
 use arcadia_core::modules::ai::any_ai_provider_enabled;
 use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
 use openframe::{
-    div, px, Context, Div, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Styled, Window,
+    div, px, rgb, Context, Div, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Styled, Window,
 };
 use openframe::prelude::FluentBuilder as _;
 
@@ -144,7 +144,7 @@ impl ArcadiaRoot {
     }
 
     pub(crate) fn settings_hub_page_ids_effective(&self) -> Vec<&str> {
-        self.navigation_registry()
+        let mut ids: Vec<&str> = self.navigation_registry()
             .map(|nav| {
                 if nav.settings_hub_pages.is_empty() {
                     navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect()
@@ -152,7 +152,9 @@ impl ArcadiaRoot {
                     nav.settings_hub_pages.iter().map(|s| s.as_str()).collect()
                 }
             })
-            .unwrap_or_else(|| navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect())
+            .unwrap_or_else(|| navigation::SETTINGS_HUB_PAGE_IDS.iter().copied().collect());
+        ids.sort_by_key(|id| navigation::page_by_id(id).map(|p| p.title).unwrap_or(""));
+        ids
     }
 
     /// Expand or collapse the Settings hub based on whether the active page is a settings page.
@@ -328,6 +330,14 @@ impl ArcadiaRoot {
                 _ => None,
             };
             if let Some(content) = panel {
+                if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
+                    return div()
+                        .w_full()
+                        .h_full()
+                        .bg(if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) })
+                        .p_8()
+                        .child(content);
+                }
                 return div().w_full().p_6().child(content);
             }
         }
@@ -609,7 +619,6 @@ impl ArcadiaRoot {
             .flex()
             .flex_col()
             .gap_6()
-            .items_start()
             .child(
                 div()
                     .flex()
@@ -650,7 +659,6 @@ impl ArcadiaRoot {
                         .flex_row()
                         .flex_wrap()
                         .gap_4()
-                        .max_w(px(1168.))
                         .children(tiles)
                         .children(phantoms)
                         .into_any_element()

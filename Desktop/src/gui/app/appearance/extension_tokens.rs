@@ -458,6 +458,42 @@ impl ArcadiaRoot {
                                 .child("(invalid numeric default)")
                                 .into_any_element(),
                         }
+                    } else if !spec.options.is_empty() {
+                        let options = spec.options.clone();
+                        div()
+                            .flex()
+                            .flex_row()
+                            .flex_wrap()
+                            .gap_2()
+                            .children(options.into_iter().map(|opt| {
+                                let selected = display_val.trim() == opt.as_str();
+                                let m = row_module.clone();
+                                let k = row_key.clone();
+                                let opt_val = opt.clone();
+                                div()
+                                    .px_3()
+                                    .py_1()
+                                    .rounded(px(panel_radius))
+                                    .border_1()
+                                    .border_color(if selected { p.accent } else { input_border })
+                                    .bg(if selected { p.accent } else { input_bg })
+                                    .text_sm()
+                                    .font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+                                    .text_color(if selected { p.on_accent } else { header_color })
+                                    .cursor_pointer()
+                                    .child(opt.clone())
+                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                        if let Some((ref em, ref ek)) = this.extension_token_editing.clone() {
+                                            this.flush_extension_token_edit(em.clone(), ek.clone(), cx);
+                                        }
+                                        this.extension_token_editing = None;
+                                        let pair = (m.clone(), k.clone());
+                                        this.extension_token_values.insert(pair, opt_val.clone());
+                                        this.flush_extension_token_edit(m.clone(), k.clone(), cx);
+                                        cx.notify();
+                                    }))
+                            }))
+                            .into_any_element()
                     } else if is_editing {
                         let show_caret = ext_token_focus.is_focused(window) && is_editing;
                         let blink = self.text_caret_blink_visible;

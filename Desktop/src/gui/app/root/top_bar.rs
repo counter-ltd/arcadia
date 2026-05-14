@@ -60,23 +60,30 @@ impl ArcadiaRoot {
                                     .child(active_page_title),
                             )
                             .child({
-                                if self.active_page_id.as_str() == "ai.chat" {
+                                if self.active_page_id.as_str() == "ai.chat"
+                                    && !self.ai_chat_show_dashboard
+                                    && !self.ai_chats.is_empty()
+                                {
                                     let label = {
                                         use arcadia_core::config::modules::{
-                                            AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
-                                            AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME,
+                                            AI_APFEL_MODULE_NAME, AI_EXEC_AIDER_MODULE_NAME,
+                                            AI_EXEC_CLAUDE_MODULE_NAME, AI_EXEC_CODEX_MODULE_NAME,
+                                            AI_EXEC_GEMINI_MODULE_NAME,
                                         };
+                                        use arcadia_core::modules::ai::provider_display_name;
                                         let provider = self.active_ai_provider_module.as_str();
                                         let mid = self.ai_chat_model_id.as_deref();
-                                        // CLI providers: display name from detected list or module name
+                                        // CLI providers and on-device providers: display name needs no model ID
                                         if matches!(provider, p if p == AI_EXEC_CLAUDE_MODULE_NAME
                                             || p == AI_EXEC_CODEX_MODULE_NAME
                                             || p == AI_EXEC_GEMINI_MODULE_NAME
-                                            || p == AI_EXEC_AIDER_MODULE_NAME)
+                                            || p == AI_EXEC_AIDER_MODULE_NAME
+                                            || p == AI_APFEL_MODULE_NAME)
                                         {
                                             self.detected_cli_providers.iter()
                                                 .find(|c| c.id == provider)
                                                 .map(|c| c.label.clone())
+                                                .or_else(|| provider_display_name(provider).map(|s| s.to_string()))
                                                 .unwrap_or_else(|| provider.to_string())
                                         } else {
                                             mid.and_then(|id| {
@@ -115,6 +122,8 @@ impl ArcadiaRoot {
                             })
                             .child({
                                 if self.active_page_id.as_str() == "ai.chat"
+                                    && !self.ai_chat_show_dashboard
+                                    && !self.ai_chats.is_empty()
                                     && self.is_module_enabled(arcadia_core::config::modules::WORKSPACE_MODULE_NAME)
                                 {
                                     let ws_label = self.ai_chat_workspace_id
@@ -233,6 +242,7 @@ impl ArcadiaRoot {
                                 {
                                     if self.active_page_id.as_str() == "editor.main"
                                         && !self.code_editor_tabs.is_empty()
+                                        && !self.code_editor_show_dashboard
                                     {
                                         let active_idx = self.active_code_editor_tab
                                             .min(self.code_editor_tabs.len().saturating_sub(1));
@@ -472,7 +482,9 @@ impl ArcadiaRoot {
                             .child({
                                 #[cfg(feature = "gui")]
                                 {
-                                    if self.active_page_id.as_str() == "utility.shell" {
+                                    if self.active_page_id.as_str() == "utility.shell"
+                                        && !self.terminal_show_dashboard
+                                    {
                                         div()
                                             .px_2()
                                             .py_0p5()
@@ -500,6 +512,7 @@ impl ArcadiaRoot {
                                 #[cfg(feature = "gui")]
                                 {
                                     if self.active_page_id.as_str() == "utility.shell"
+                                        && !self.terminal_show_dashboard
                                         && self.active_terminal().shell_mode == ShellMode::Generic
                                     {
                                         div()
@@ -520,7 +533,9 @@ impl ArcadiaRoot {
                             .child({
                                 #[cfg(feature = "gui")]
                                 {
-                                    if self.active_page_id.as_str() == "utility.shell" {
+                                    if self.active_page_id.as_str() == "utility.shell"
+                                        && !self.terminal_show_dashboard
+                                    {
                                         div()
                                             .px_2()
                                             .py_0p5()
@@ -548,7 +563,9 @@ impl ArcadiaRoot {
                             .child({
                                 #[cfg(feature = "gui")]
                                 {
-                                    if self.active_page_id.as_str() == "utility.shell" {
+                                    if self.active_page_id.as_str() == "utility.shell"
+                                        && !self.terminal_show_dashboard
+                                    {
                                         div()
                                             .px_2()
                                             .py_0p5()

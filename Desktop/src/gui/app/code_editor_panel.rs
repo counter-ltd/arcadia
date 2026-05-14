@@ -332,6 +332,8 @@ impl ArcadiaRoot {
                                         workspace_path: Some(ws_path_clone.clone()),
                                         file_path: None,
                                         saved_content: String::new(),
+                                        cached_lines: vec![],
+                                        cached_line_byte_starts: vec![],
                                     });
                                     this.active_code_editor_tab =
                                         this.code_editor_tabs.len() - 1;
@@ -541,10 +543,8 @@ impl ArcadiaRoot {
         let idx = self
             .active_code_editor_tab
             .min(self.code_editor_tabs.len().saturating_sub(1));
-        let content = self.code_editor_tabs[idx].content.clone();
         let cursor = self.code_editor_tabs[idx].cursor;
         let selection_anchor = self.code_editor_tabs[idx].selection_anchor;
-        // Derive language from filename if not already stored, then call highlight provider once.
         let tab_title = self.code_editor_tabs[idx].title.clone();
         let language = self.code_editor_tabs[idx]
             .language
@@ -553,34 +553,58 @@ impl ArcadiaRoot {
         let focused = self.code_editor_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
 
-        // (line_idx, col_byte_in_line) for cursor
+        // Rebuild highlight + decoration caches (and line caches) only when content changed.
+        if self.code_editor_tabs[idx].highlight_dirty {
+            let content = &self.code_editor_tabs[idx].content;
+            let mut new_lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+            if new_lines.is_empty() || content.ends_with('\n') || content.is_empty() {
+                new_lines.push(String::new());
+            }
+            let mut new_byte_starts: Vec<usize> = Vec::with_capacity(new_lines.len());
+            {
+                let mut pos = 0usize;
+                for line in &new_lines {
+                    new_byte_starts.push(pos);
+                    pos += line.len() + 1;
+                }
+            }
+            let hl = language
+                .as_deref()
+                .map(|lang| python_registry::call_highlight_provider(lang, content))
+                .unwrap_or_default();
+            let deco: Vec<Vec<_>> = new_lines
+                .iter()
+                .enumerate()
+                .map(|(i, line)| {
+                    let expanded = expand_tabs(line);
+                    python_registry::call_decoration_providers(&expanded, i)
+                })
+                .collect();
+            let tab = &mut self.code_editor_tabs[idx];
+            tab.hl_spans = hl;
+            tab.decorations = deco;
+            tab.highlight_dirty = false;
+            tab.cached_lines = new_lines;
+            tab.cached_line_byte_starts = new_byte_starts;
+        }
+
+        // (line_idx, col_byte_in_line) for cursor — O(log N) via binary search.
         let cursor_line_col: Option<(usize, usize)> = if focused && blink {
-            let before = &content[..cursor.min(content.len())];
-            let line_idx = before.bytes().filter(|&b| b == b'\n').count();
-            let line_start = before.rfind('\n').map(|i| i + 1).unwrap_or(0);
-            Some((line_idx, cursor - line_start))
+            let starts = &self.code_editor_tabs[idx].cached_line_byte_starts;
+            let cursor_clamped = cursor.min(self.code_editor_tabs[idx].content.len());
+            let line_idx = starts.partition_point(|&s| s <= cursor_clamped).saturating_sub(1);
+            let line_start = starts.get(line_idx).copied().unwrap_or(0);
+            Some((line_idx, cursor_clamped - line_start))
         } else {
             None
         };
 
         // Selection range as (start, end) byte offsets, or None
         let sel_range: Option<(usize, usize)> = selection_anchor.map(|a| {
-            if a <= cursor {
-                (a, cursor)
-            } else {
-                (cursor, a)
-            }
+            if a <= cursor { (a, cursor) } else { (cursor, a) }
         });
 
-        let lines: Vec<String> = {
-            let mut v: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-            if v.is_empty() || content.ends_with('\n') || content.is_empty() {
-                v.push(String::new());
-            }
-            v
-        };
-
-        let line_count = lines.len();
+        let line_count = self.code_editor_tabs[idx].cached_lines.len();
         let gutter_w = if line_count >= 1000 {
             px(56.)
         } else if line_count >= 100 {
@@ -599,53 +623,28 @@ impl ArcadiaRoot {
         let show_marks = self.code_editor_show_indentation_marks;
         let indent_guide_color = if is_dark { rgb(0x2d3748) } else { rgb(0xd1d5db) };
 
-        // Compute line byte starts for selection range mapping
-        let mut line_byte_starts: Vec<usize> = Vec::with_capacity(lines.len());
-        {
-            let mut pos = 0usize;
-            for line in &lines {
-                line_byte_starts.push(pos);
-                pos += line.len() + 1; // +1 for '\n'
-            }
-        }
-
-        // Rebuild highlight + decoration caches only when content changed.
-        if self.code_editor_tabs[idx].highlight_dirty {
-            let hl = language
-                .as_deref()
-                .map(|lang| python_registry::call_highlight_provider(lang, &content))
-                .unwrap_or_default();
-            let deco: Vec<Vec<_>> = lines
-                .iter()
-                .enumerate()
-                .map(|(i, line)| {
-                    let expanded = expand_tabs(line);
-                    python_registry::call_decoration_providers(&expanded, i)
-                })
-                .collect();
-            let tab = &mut self.code_editor_tabs[idx];
-            tab.hl_spans = hl;
-            tab.decorations = deco;
-            tab.highlight_dirty = false;
-        }
-
         let char_width = self.code_editor_char_width_override.unwrap_or_else(|| {
             let font_size = window.rem_size() * 0.875;
             let ts = window.text_system();
             let fid = ts.resolve_font(&font("monospace"));
             ts.ch_advance(fid, font_size).map(f32::from).unwrap_or(8.4)
         });
-        let hl_spans = self.code_editor_tabs[idx].hl_spans.clone();
-        let cached_decorations = self.code_editor_tabs[idx].decorations.clone();
         let fh_click = self.code_editor_focus.clone();
         let fh_click2 = self.code_editor_focus.clone();
         let fh = self.code_editor_focus.clone();
         let bounds_cell = self.code_editor_line_bounds.clone();
 
+        // Borrow cached data by reference — no per-frame heap allocation.
+        let line_byte_starts = &self.code_editor_tabs[idx].cached_line_byte_starts;
+        let hl_spans = &self.code_editor_tabs[idx].hl_spans;
+        let cached_decorations = &self.code_editor_tabs[idx].decorations;
+        let lines = &self.code_editor_tabs[idx].cached_lines;
+
         let line_els: Vec<AnyElement> = lines
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(i, line)| {
+                let line = line.as_str();
                 let line_start_byte = *line_byte_starts.get(i).unwrap_or(&0);
                 let line_end_byte = line_start_byte + line.len();
 

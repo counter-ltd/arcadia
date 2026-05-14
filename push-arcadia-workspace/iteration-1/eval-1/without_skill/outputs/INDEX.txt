@@ -1,0 +1,166 @@
+================================================================================
+OUTPUT FILES INDEX
+================================================================================
+
+Location: /Users/x/Arcadia/push-arcadia-workspace/iteration-1/eval-1/without_skill/outputs/
+
+Generated: 2026-05-13
+Test Type: Baseline (without skill automation)
+Task: Manual git commit and push of Arcadia + Extensions repos
+
+================================================================================
+FILE MANIFEST
+================================================================================
+
+1. README.md (5.0K)
+   - High-level overview and summary
+   - Workflow description
+   - Key metrics and observations
+   - File structure guide
+   START HERE for a quick understanding
+
+2. EXECUTION_SUMMARY.txt (5.6K)
+   - Detailed execution log
+   - Initial and final state comparison
+   - Complete command sequence
+   - Commit details and file listing
+   COMPREHENSIVE REFERENCE for what was executed
+
+3. commit-message.txt (79B)
+   - The commit hash and message used
+   - Simple one-liner reference
+   QUICK REFERENCE for commit identifier
+
+4. git-log-before.txt (796B)
+   - 10 most recent commits before staging
+   - Baseline commit history snapshot
+   STATE SNAPSHOT at test start
+
+5. git-log-after.txt (797B)
+   - 10 most recent commits after push
+   - Shows new commit (053deef) at HEAD
+   - Verifies successful push
+   STATE SNAPSHOT at test end
+
+6. git-status-before.txt (261B)
+   - Working tree status before operations
+   - Shows 16 untracked files in push-arcadia-workspace/
+   BASELINE: Untracked files that were staged
+
+7. git-status-after.txt (1.2K)
+   - Working tree status after all operations
+   - Shows additional untracked files (from other eval iterations)
+   - Main repo is clean and up to date
+   FINAL: Confirms clean state after push
+
+8. extensions-git-log-before.txt (417B)
+   - Last 5 commits from Extensions submodule
+   - Baseline state: c825221 (up to date with origin/main)
+   EXTENSIONS SNAPSHOT: Verified no changes needed
+
+9. extensions-git-status-before.txt (100B)
+   - Extensions submodule status
+   - Confirms: up to date with origin/main
+   EXTENSIONS STATUS: No push needed
+
+10. INDEX.txt (this file)
+    - File manifest and descriptions
+    - Quick navigation guide
+    NAVIGATION: You are here
+
+================================================================================
+QUICK START GUIDE
+================================================================================
+
+For a quick overview:
+  1. Read: README.md (3 minutes)
+  2. Skim: EXECUTION_SUMMARY.txt (2 minutes)
+  3. Check: commit-message.txt (10 seconds)
+
+For detailed analysis:
+  1. Read: EXECUTION_SUMMARY.txt (5 minutes)
+  2. Review: git-log-before.txt and git-log-after.txt (1 minute)
+  3. Compare: git-status-before.txt and git-status-after.txt (1 minute)
+  4. Verify: extensions-git-*.txt files (1 minute)
+
+================================================================================
+KEY METRICS
+================================================================================
+
+Commit Hash: 053deef
+Message: test: add push-arcadia baseline test outputs (iteration 1 eval states)
+
+Files Staged: 16
+Files Changed: 16
+Insertions: 480
+Deletions: 0
+
+Repos Pushed: 1 (Arcadia main)
+Extensions Status: No changes (already up to date)
+
+Commands Executed: 10 git commands
+Execution Time: < 30 seconds
+Success Rate: 100%
+
+================================================================================
+STATE SUMMARY
+================================================================================
+
+BEFORE:
+  Main Repo: 9f96724 (feat: AI models UI refinements...)
+  Extensions: c825221 (fix: googly_eyes and overlay_pet...)
+  Status: 16 untracked files in push-arcadia-workspace/
+  
+AFTER:
+  Main Repo: 053deef (test: add push-arcadia baseline test outputs...)
+  Extensions: c825221 (unchanged, no push needed)
+  Status: All changes committed and pushed successfully
+
+================================================================================
+VERIFICATION CHECKLIST
+================================================================================
+
+✓ Baseline files captured (before)
+✓ Changes staged successfully
+✓ Commit created with semantic message
+✓ Push to remote successful
+✓ Extensions submodule verified (no changes)
+✓ Final state captured (after)
+✓ All output files generated
+✓ Consistency verified across snapshots
+
+================================================================================
+COMPARISON POINTS
+================================================================================
+
+This baseline can be compared against:
+- Skill-based execution (with_skill/)
+- Other evaluation iterations (eval-2, eval-3)
+
+Metrics to compare:
+- Execution time
+- Number of commands
+- Commit message quality
+- Handling of multiple repos
+- Error detection and recovery
+- State management and verification
+
+================================================================================
+TECHNICAL DETAILS
+================================================================================
+
+Working Directory: /Users/x/Arcadia
+Git User: anti-limited
+Branch: development
+Remote: origin (github-counter:counter-ltd/arcadia.git)
+
+Operations:
+  1. git add push-arcadia-workspace/
+  2. git commit -m "test: add push-arcadia baseline test outputs..."
+  3. git push origin development
+  4. git -C /Users/x/Arcadia/Extensions log/status
+  5. State capture and verification
+
+No conflicts, errors, or warnings.
+
+================================================================================

@@ -1,0 +1,17 @@
+=== ARCADIA MAIN REPO GIT STATUS ===
+
+On branch development
+Your branch is up to date with 'origin/development'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	push-arcadia-workspace/
+
+nothing added to commit but untracked files present (use "git track" to include in what you will commit)
+
+Recent commits:
+9f96724 feat: AI models UI refinements and sidebar navigation improvements
+a4f62bf fix: desktop entry, lifecycle, animation, and LAN discovery refinements
+179e873 feat: documentation updates and feature additions — AGENTS, CLAUDE, Documentation/Features
+6b5fa95 feat: extensions system and UI preferences — plugin nav panel, extension registry, UI config
+11b5d60 docs: expand AI_ROADMAP to 140 features — MCP, deep research, deep reasoning, UX tiers

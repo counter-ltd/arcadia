@@ -121,6 +121,8 @@ pub struct SessionSummary {
     pub id: String,
     pub title: String,
     pub updated_at: u64,
+    pub provider: String,
+    pub workspace_id: Option<String>,
 }
 
 pub fn save_session(session: &ChatSession) -> io::Result<()> {
@@ -156,6 +158,8 @@ pub fn list_sessions() -> io::Result<Vec<SessionSummary>> {
                 id: session.id,
                 title: session.title,
                 updated_at: session.updated_at,
+                provider: session.provider.clone(),
+                workspace_id: session.workspace_id.clone(),
             });
         }
     }

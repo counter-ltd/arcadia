@@ -175,7 +175,7 @@ impl ArcadiaRoot {
                     .into_iter()
                     .rev()
                     .collect();
-                let border_col = if is_active_term { pal.icon_active } else { p.panel_border };
+                let border_col = p.panel_border;
                 div()
                     .flex_1()
                     .min_w(px(220.))
@@ -246,6 +246,7 @@ impl ArcadiaRoot {
         div()
             .w_full()
             .h_full()
+            .bg(if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) })
             .flex()
             .flex_col()
             .child(
@@ -260,6 +261,7 @@ impl ArcadiaRoot {
                     .gap_8()
                     .child(
                         div()
+                            .w_full()
                             .flex()
                             .flex_col()
                             .gap_4()

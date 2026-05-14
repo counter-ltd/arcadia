@@ -375,6 +375,19 @@ fn register_tokens(module: String, tokens: Bound<'_, PyAny>) -> PyResult<()> {
             }
             None
         };
+        let options: Vec<String> = match d.get_item("options")? {
+            Some(v) => {
+                let list = v.downcast::<PyList>().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        format!("token {key}: 'options' must be a list of strings"),
+                    )
+                })?;
+                list.iter()
+                    .map(|x| x.extract::<String>())
+                    .collect::<PyResult<Vec<String>>>()?
+            }
+            None => Vec::new(),
+        };
         out.push(StyleTokenSpec {
             key,
             label,
@@ -382,6 +395,7 @@ fn register_tokens(module: String, tokens: Bound<'_, PyAny>) -> PyResult<()> {
             default_value,
             visibility,
             numeric,
+            options,
         });
     }
     python_registry::register_tokens(module, out);

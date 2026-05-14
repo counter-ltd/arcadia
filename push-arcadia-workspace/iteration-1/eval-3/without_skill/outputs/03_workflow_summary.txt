@@ -1,0 +1,44 @@
+=== MANUAL COMMIT AND PUSH WORKFLOW ===
+
+SCENARIO: User requests "commit and push everything including extensions"
+
+EXECUTION PLAN:
+1. Check Extensions submodule status (read-only; permission denied for cd into submodule)
+2. Check main repo status (clean working tree)
+3. Commit Extensions if changes exist (cannot execute due to permission restrictions)
+4. Commit main repo with submodule reference
+5. Push both repositories
+
+CURRENT STATE ANALYSIS:
+- Main repo: working tree clean (no staged or unstaged changes)
+- Extensions submodule: cannot access (permission denied for cross-directory git operations)
+- Untracked files: push-arcadia-workspace/ directory (test output)
+
+ISSUE ENCOUNTERED:
+The initial gitStatus snapshot showed multiple modified files:
+  - Desktop/Cargo.lock, Desktop/Cargo.toml
+  - Desktop/src/gui/app/*.rs (multiple files)
+  - Shared/ArcadiaCore/src/*.rs
+  - Shared/ArcadiaPython/src/arcadia_module.rs
+  - New files: extension_nav_panel.rs, EXTENSIONS.md, ui_prefs.rs
+
+However, git status command now shows clean working tree. This suggests either:
+a) Changes were already committed in a previous session
+b) The gitStatus snapshot was stale
+c) Working directory state changed between snapshot and execution
+
+MANUAL WORKFLOW CONSTRAINTS:
+1. Cannot execute `cd Extensions && git ...` operations (permission denied)
+2. Main repo operations work without restriction
+3. Submodule reference commit requires access to Extensions submodule
+
+RECOMMENDATION:
+If there ARE actual changes to commit:
+  - Extensions: requires `cd Extensions && git add . && git commit && git push origin HEAD:development`
+  - Main repo: `git add . && git commit -m "..."` then `git push origin development`
+  - Submodule ref: auto-captured in main repo commit if Extensions HEAD changes
+
+If working tree is clean (current state):
+  - No commit needed
+  - Nothing to push
+

@@ -1,0 +1,32 @@
+=== FINAL GIT STATE ===
+On branch development
+Your branch is up to date with 'origin/development'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	push-arcadia-workspace/iteration-1/eval-1/with_skill/outputs/skill_definition.md
+	push-arcadia-workspace/iteration-1/eval-1/without_skill/outputs/commit-message.txt
+	push-arcadia-workspace/iteration-1/eval-1/without_skill/outputs/git-log-after.txt
+	push-arcadia-workspace/iteration-1/eval-1/without_skill/outputs/git-status-after.txt
+	push-arcadia-workspace/iteration-1/eval-2/with_skill/outputs/git-log-submodules.txt
+	push-arcadia-workspace/iteration-1/eval-2/with_skill/outputs/git-status-all.txt
+	push-arcadia-workspace/iteration-1/eval-2/with_skill/outputs/pre-push-status.txt
+	push-arcadia-workspace/iteration-1/eval-2/without_skill/outputs/arcadia-main-status.txt
+	push-arcadia-workspace/iteration-1/eval-2/without_skill/outputs/final-git-log.txt
+	push-arcadia-workspace/iteration-1/eval-2/without_skill/outputs/submodule-status.txt
+	push-arcadia-workspace/iteration-1/eval-3/without_skill/outputs/03_workflow_summary.txt
+	push-arcadia-workspace/iteration-1/eval-3/without_skill/outputs/04_git_branches_and_remotes.txt
+	push-arcadia-workspace/iteration-1/eval-3/without_skill/outputs/05_final_state.txt
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+=== RECENT COMMITS ===
+053deef test: add push-arcadia baseline test outputs (iteration 1 eval states)
+9f96724 feat: AI models UI refinements and sidebar navigation improvements
+a4f62bf fix: desktop entry, lifecycle, animation, and LAN discovery refinements
+179e873 feat: documentation updates and feature additions — AGENTS, CLAUDE, Documentation/Features
+6b5fa95 feat: extensions system and UI preferences — plugin nav panel, extension registry, UI config
+
+=== SUBMODULES ===
+ c8252218bfdade6a1b87663a48475f7ba98c7ae5 Extensions (heads/main)
+ 04e2db5ae0d2a9fa55c1b664ad27784a555e22c6 Libraries/OpenFrame (heads/main)

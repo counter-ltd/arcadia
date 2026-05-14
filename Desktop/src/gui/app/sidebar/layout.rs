@@ -1,12 +1,13 @@
 use arcadia_core::config::modules::REMOTE_SESSION_MODULE_NAME;
+use arcadia_core::config::ConfigFile as _;
 use arcadia_core::navigation;
 #[cfg(not(feature = "gui"))]
 use arcadia_core::config::thin_client::ThinClientConfig;
 #[cfg(not(feature = "gui"))]
 use arcadia_core::modules::lan::connected_approved_session_peers;
 use openframe::{
-    div, img, px, rgb, AnyElement, Context, Div, IntoElement, InteractiveElement, ParentElement,
-    StatefulInteractiveElement, Styled, Window,
+    div, img, px, rgb, AnyElement, Context, Div, IntoElement, InteractiveElement,
+    ParentElement, StatefulInteractiveElement, Styled, Window,
 };
 use openframe::prelude::FluentBuilder as _;
 
@@ -380,29 +381,111 @@ impl ArcadiaRoot {
                             }
                         }
                     })
-                    .child(
+                    .child({
+                        let offset_x  = self.group_tabs_scroll.offset().x;
+                        let max_x     = self.group_tabs_scroll.max_offset().width;
+                        let can_left  = offset_x < px(-0.5);
+                        let can_right = max_x > px(0.5) && offset_x > -max_x + px(0.5);
+                        let caret_dim    = glyph.as_ref().map(|g| g.dim)
+                            .unwrap_or_else(|| if is_dark { rgb(0x6b7280) } else { rgb(0x9ca3af) });
+                        let caret_accent = glyph.as_ref().map(|g| g.accent)
+                            .unwrap_or_else(|| theme::ui_accent(cx));
+                        let scrolling_left  = self.tab_scrolling_left;
+                        let scrolling_right = self.tab_scrolling_right;
+                        let left_color  = if scrolling_left  { caret_accent } else { caret_dim };
+                        let right_color = if scrolling_right { caret_accent } else { caret_dim };
+                        let left_alpha  = self.caret_left_alpha;
+                        let right_alpha = self.caret_right_alpha;
+                        // Break out of parent px_5 so tabs get full sidebar width.
                         div()
-                            .id("sidebar-group-tabs")
-                            .w_full()
-                            .overflow_x_scroll()
+                            .ml(px(-20.)).mr(px(-20.))
                             .flex()
-                            .gap_2()
                             .items_center()
-                            .track_scroll(&self.group_tabs_scroll)
-                            .children(visible_groups.iter().copied().enumerate().map(|(idx, group)| {
-                                Self::sidebar_group_item(
-                                    cx,
-                                    openframe::SharedString::from(group.label().to_string()),
-                                    openframe::SharedString::from(group.glyph().to_string()),
-                                    group.id().to_string(),
-                                    idx,
-                                    self.active_group_id == group.id(),
-                                    is_dark,
-                                    group.accent().to_string(),
-                                    glyph,
-                                )
-                            })),
-                    )
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .w_5()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .opacity(left_alpha)
+                                    .when(can_left, |d| d
+                                        .cursor_pointer()
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, _, _, cx| {
+                                                let cur = this.group_tabs_scroll.offset();
+                                                let new_x = (cur.x + px(72.0)).min(px(0.0));
+                                                this.start_scroll_x_anim(new_x);
+                                                cx.notify();
+                                            }),
+                                        )
+                                    )
+                                    .child(
+                                        theme::render_icon("chevron-left")
+                                            .size_3()
+                                            .text_color(left_color)
+                                    )
+                            )
+                            .child(
+                                div()
+                                    .id("sidebar-group-tabs")
+                                    .flex_1()
+                                    .min_w_0()
+                                    .overflow_x_scroll()
+                                    .flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .track_scroll(&self.group_tabs_scroll)
+                                    .children(visible_groups.iter().copied().enumerate().map(|(idx, group)| {
+                                        let gid = group.id();
+                                        let is_active   = self.active_group_id == gid;
+                                        let hover_alpha  = *self.tab_hover_alphas.get(gid).unwrap_or(&0.0);
+                                        let active_alpha = *self.tab_active_alphas.get(gid)
+                                            .unwrap_or(&(if is_active { 1.0 } else { 0.0 }));
+                                        Self::sidebar_group_item(
+                                            cx,
+                                            openframe::SharedString::from(group.label().to_string()),
+                                            openframe::SharedString::from(group.glyph().to_string()),
+                                            gid.to_string(),
+                                            idx,
+                                            is_active,
+                                            is_dark,
+                                            group.accent().to_string(),
+                                            glyph,
+                                            hover_alpha,
+                                            active_alpha,
+                                        )
+                                    })),
+                            )
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .w_5()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .opacity(right_alpha)
+                                    .when(can_right, |d| d
+                                        .cursor_pointer()
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, _, _, cx| {
+                                                let cur = this.group_tabs_scroll.offset();
+                                                let max_x = this.group_tabs_scroll.max_offset().width;
+                                                let new_x = (cur.x - px(72.0)).max(-max_x);
+                                                this.start_scroll_x_anim(new_x);
+                                                cx.notify();
+                                            }),
+                                        )
+                                    )
+                                    .child(
+                                        theme::render_icon("chevron-right")
+                                            .size_3()
+                                            .text_color(right_color)
+                                    )
+                            )
+                    })
                     .child(
                         div()
                             .id("sidebar-subtabs")
@@ -439,7 +522,8 @@ impl ArcadiaRoot {
                                         for i in 0..self.terminals.len() {
                                             let label = self.terminals[i].label.clone();
                                             let is_sub_active = is_page_active
-                                                && self.active_terminal_id == i;
+                                                && self.active_terminal_id == i
+                                                && !self.terminal_show_dashboard;
                                             items.push(
                                                 Self::sidebar_sub_item(
                                                     cx,
@@ -516,6 +600,8 @@ impl ArcadiaRoot {
                                                         workspace_path: None,
                                                         file_path: None,
                                                         saved_content: String::new(),
+                                                        cached_lines: vec![],
+                                                        cached_line_byte_starts: vec![],
                                                     });
                                                     this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
                                                     this.code_editor_next_id += 1;
@@ -625,11 +711,57 @@ impl ArcadiaRoot {
                                             .find(|c| c.id == self.active_ai_chat_id)
                                             .and_then(|c| c.session_id.clone());
 
+                                        // Unsaved in-memory chats (no session_id yet)
+                                        let ws_cfg_mem = arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok();
+                                        for chat in &self.ai_chats {
+                                            if chat.session_id.is_some() {
+                                                continue;
+                                            }
+                                            let chat_id = chat.id;
+                                            let label = if chat.title.len() > 22 {
+                                                format!("{}…", &chat.title[..22])
+                                            } else {
+                                                chat.title.clone()
+                                            };
+                                            let is_sub_active = is_page_active
+                                                && self.active_ai_chat_id == chat.id
+                                                && !self.ai_chat_show_dashboard;
+                                            let chat_provider_icon: &'static str = arcadia_core::config::modules::MODULE_REGISTRY.iter()
+                                                .find(|m| m.name == chat.session_provider.as_str())
+                                                .map(|m| m.glyph)
+                                                .unwrap_or("ai-provider");
+                                            let chat_accent = crate::gui::app::ai_models_panel::provider_accent(&chat.session_provider);
+                                            let chat_workspace_label = chat.workspace_id.as_deref().and_then(|ws_id| {
+                                                ws_cfg_mem.as_ref()?.workspaces.iter().find(|w| w.id == ws_id)
+                                                    .map(|w| if w.label.is_empty() {
+                                                        w.path.rsplit('/').next().unwrap_or(&w.path).to_string()
+                                                    } else {
+                                                        w.label.clone()
+                                                    })
+                                            });
+                                            items.push(
+                                                Self::sidebar_ai_chat_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from(label),
+                                                    chat_id,
+                                                    is_sub_active,
+                                                    is_dark,
+                                                    glyph,
+                                                    chat_accent,
+                                                    chat_provider_icon,
+                                                    chat_workspace_label,
+                                                )
+                                                .into_any_element(),
+                                            );
+                                        }
+
+                                        let ws_cfg_ses = arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok();
                                         for session in &self.ai_sessions {
                                             let session_id = session.id.clone();
                                             let session_id_rc = session.id.clone();
                                             let is_sub_active = is_page_active
-                                                && active_session_id.as_deref() == Some(session.id.as_str());
+                                                && active_session_id.as_deref() == Some(session.id.as_str())
+                                                && !self.ai_chat_show_dashboard;
                                             let is_renaming = self.ai_session_rename
                                                 .as_ref()
                                                 .map(|(id, _)| id == &session.id)
@@ -646,7 +778,21 @@ impl ArcadiaRoot {
                                             } else {
                                                 session.title.clone()
                                             };
-                                            let pal = theme::nav_accent_palette("violet", is_dark);
+                                            let session_provider_icon: &'static str = arcadia_core::config::modules::MODULE_REGISTRY.iter()
+                                                .find(|m| m.name == session.provider.as_str())
+                                                .map(|m| m.glyph)
+                                                .unwrap_or("ai-provider");
+                                            let session_accent = crate::gui::app::ai_models_panel::provider_accent(&session.provider);
+                                            let session_workspace_label = session.workspace_id.as_deref().and_then(|ws_id| {
+                                                ws_cfg_ses.as_ref()?.workspaces.iter().find(|w| w.id == ws_id)
+                                                    .map(|w| if w.label.is_empty() {
+                                                        w.path.rsplit('/').next().unwrap_or(&w.path).to_string()
+                                                    } else {
+                                                        w.label.clone()
+                                                    })
+                                            });
+                                            let meta_col_ses = if is_dark { rgb(0x4a5568_u32) } else { rgb(0x9ca3af_u32) };
+                                            let pal = theme::nav_accent_palette(session_accent, is_dark);
                                             let text_col = if is_sub_active || is_renaming {
                                                 pal.icon_active
                                             } else {
@@ -674,7 +820,21 @@ impl ArcadiaRoot {
                                                     .bg(bg)
                                                     .text_color(text_col)
                                                     .hover(move |s| s.bg(hover_bg))
-                                                    .child(div().child(title));
+                                                    .flex()
+                                                    .flex_col()
+                                                    .gap(px(1.))
+                                                    .child(
+                                                        div()
+                                                            .flex()
+                                                            .flex_row()
+                                                            .gap_1()
+                                                            .items_center()
+                                                            .child(crate::gui::theme::render_icon(session_provider_icon).size_3().text_color(text_col))
+                                                            .child(div().child(title)),
+                                                    )
+                                                    .when_some(session_workspace_label, |d, ws| {
+                                                        d.child(div().text_color(meta_col_ses).child(ws))
+                                                    });
                                             if is_renaming {
                                                 item = item
                                                     .track_focus(&rename_focus)
@@ -701,7 +861,7 @@ impl ArcadiaRoot {
                                                                         }
                                                                         if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
                                                                             this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
-                                                                                id: s.id, title: s.title, updated_at: s.updated_at,
+                                                                                id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id,
                                                                             }).collect();
                                                                         }
                                                                     }
@@ -732,6 +892,7 @@ impl ArcadiaRoot {
                                                         if let Some(existing) = this.ai_chats.iter().find(|c| c.session_id.as_deref() == Some(session_id_left.as_str())) {
                                                             this.active_ai_chat_id = existing.id;
                                                             this.active_page_id = "ai.chat".to_string();
+                                                            this.ai_chat_show_dashboard = false;
                                                             cx.notify();
                                                             return;
                                                         }
@@ -755,9 +916,11 @@ impl ArcadiaRoot {
                                                                 session_id: Some(session_id_left.clone()),
                                                                 session_provider: stored.provider.clone(),
                                                                 session_model_id: stored.model_id.clone(),
+                                                                workspace_id: stored.workspace_id.clone(),
                                                             });
                                                             this.active_ai_chat_id = id;
                                                             this.active_page_id = "ai.chat".to_string();
+                                                            this.ai_chat_show_dashboard = false;
                                                             this.ai_active_rule_ids = stored.active_rule_ids.clone();
                                                             this.ai_active_skill_ids = stored.active_skill_ids.clone();
                                                             this.ai_chat_workspace_id = stored.workspace_id.clone();
@@ -796,10 +959,12 @@ impl ArcadiaRoot {
                                                         session_id: None,
                                                         session_provider: String::new(),
                                                         session_model_id: String::new(),
+                                                        workspace_id: None,
                                                     });
                                                     this.active_ai_chat_id = id;
                                                     this.ai_next_id += 1;
                                                     this.active_page_id = "ai.chat".to_string();
+                                                    this.ai_chat_show_dashboard = false;
                                                     cx.notify();
                                                 }))
                                                 .child("Click to Create")

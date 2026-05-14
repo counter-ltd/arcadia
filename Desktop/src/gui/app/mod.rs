@@ -169,6 +169,10 @@ pub struct CodeEditorTab {
     pub file_path: Option<String>,
     /// Content at last save. Used for dirty detection and Restore.
     pub saved_content: String,
+    /// Cached split of `content` into lines. Rebuilt when `highlight_dirty` is true.
+    pub cached_lines: Vec<String>,
+    /// Byte offset of each line's first character in `content`. Rebuilt with `cached_lines`.
+    pub cached_line_byte_starts: Vec<usize>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -195,6 +199,7 @@ pub struct AiChat {
     pub session_provider: String,
     /// Model ID used in this chat session.
     pub session_model_id: String,
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Clone)]
@@ -202,6 +207,8 @@ pub struct AiSessionSummary {
     pub id: String,
     pub title: String,
     pub updated_at: u64,
+    pub provider: String,
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -243,6 +250,20 @@ pub struct WorkspaceCreateDraft {
     pub label: String,
     pub path: String,
     pub error: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct CaretAnim {
+    pub start: Instant,
+    pub from: f32,
+    pub to: f32,
+}
+
+#[derive(Clone)]
+pub struct TabScrollAnim {
+    pub start: Instant,
+    pub from_x: f32,
+    pub to_x: f32,
 }
 
 #[derive(Clone)]
@@ -345,6 +366,7 @@ pub struct ArcadiaRoot {
     pub ai_chats: Vec<AiChat>,
     pub active_ai_chat_id: usize,
     pub ai_next_id: usize,
+    pub ai_chat_show_dashboard: bool,
     pub ai_context_menu_open: bool,
     pub ai_chat_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
     /// Right-click context menu on a persisted session item (session_id, position).
@@ -468,6 +490,21 @@ pub struct ArcadiaRoot {
     pub splash_tick_started: bool,
     pub sidebar_visible: bool,
     pub group_tabs_scroll: ScrollHandle,
+    pub caret_left_alpha: f32,
+    pub caret_right_alpha: f32,
+    pub caret_prev_left: bool,
+    pub caret_prev_right: bool,
+    pub caret_left_anim: Option<CaretAnim>,
+    pub caret_right_anim: Option<CaretAnim>,
+    pub tab_scroll_anim: Option<TabScrollAnim>,
+    pub tab_scroll_prev_x: f32,
+    pub tab_scrolling_left: bool,
+    pub tab_scrolling_right: bool,
+    pub tab_hover_alphas: HashMap<String, f32>,
+    pub tab_active_alphas: HashMap<String, f32>,
+    pub tab_hover_anims: HashMap<String, CaretAnim>,
+    pub tab_active_anims: HashMap<String, CaretAnim>,
+    pub tab_prev_active_id: String,
     /// When true, the sidebar Settings hub shows nested rows under the Settings header.
     pub settings_hub_expanded: bool,
     pub app_menu_open: bool,

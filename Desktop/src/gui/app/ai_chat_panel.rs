@@ -11,7 +11,7 @@ use arcadia_core::modules::ai_exec_cli::cli_for_module;
 use arcadia_core::modules::ai::is_ai_provider_available;
 use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::{
-    div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, StatefulInteractiveElement, Styled, Window,
 };
 use openframe::prelude::FluentBuilder as _;
@@ -28,8 +28,8 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
-        if self.ai_chats.is_empty() {
-            return self.ai_empty_state_panel(cx, is_dark).into_any_element();
+        if self.ai_chats.is_empty() || self.ai_chat_show_dashboard {
+            return self.ai_chat_dashboard(cx, is_dark).into_any_element();
         }
 
         if !is_ai_provider_available(&self.module_rows) {
@@ -37,6 +37,322 @@ impl ArcadiaRoot {
         }
 
         self.ai_active_chat_panel(window, cx, is_dark).into_any_element()
+    }
+
+    fn ai_chat_dashboard(
+        &mut self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let ws_pal = theme::nav_accent_palette("emerald", is_dark);
+        let chat_pal = theme::nav_accent_palette("violet", is_dark);
+        let r = p.radius_md.min(12.0);
+        let msg_bg_preview = if is_dark { rgb(0x141820) } else { rgb(0xf0f2f5) };
+        let divider_col = if is_dark { rgb(0x2a3340) } else { rgb(0xe6e8ef) };
+        let active_id = self.active_ai_chat_id;
+
+        // Workspace cards — clicking opens a new chat in that workspace
+        let workspace_cards: Vec<openframe::AnyElement> =
+            arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
+                .map(|cfg| cfg.workspaces)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|ws| {
+                    let ws_id = ws.id.clone();
+                    let ws_label = if ws.label.is_empty() {
+                        ws.path.rsplit('/').next().unwrap_or(&ws.path).to_string()
+                    } else {
+                        ws.label.clone()
+                    };
+                    let ws_path = ws.path.clone();
+                    div()
+                        .flex_1()
+                        .min_w(px(220.))
+                        .cursor_pointer()
+                        .p_4()
+                        .rounded(px(r))
+                        .bg(p.panel_bg)
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .hover(move |s| s.bg(p.row_bg).border_color(ws_pal.row_hover))
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(
+                            div()
+                                .flex()
+                                .gap_3()
+                                .items_center()
+                                .child(
+                                    theme::render_icon("folder-open")
+                                        .size_6()
+                                        .text_color(ws_pal.icon_active),
+                                )
+                                .child(
+                                    div()
+                                        .text_base()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(p.content_title)
+                                        .flex_1()
+                                        .child(ws_label),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(p.content_meta)
+                                .max_w(px(248.))
+                                .child(ws_path),
+                        )
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                let id = this.ai_next_id;
+                                this.ai_chats.push(crate::gui::app::AiChat {
+                                    id,
+                                    title: format!("Chat {id}"),
+                                    messages: vec![],
+                                    input_draft: String::new(),
+                                    is_loading: false,
+                                    session_id: None,
+                                    session_provider: String::new(),
+                                    session_model_id: String::new(),
+                                    workspace_id: Some(ws_id.clone()),
+                                });
+                                this.active_ai_chat_id = id;
+                                this.ai_next_id += 1;
+                                this.ai_chat_workspace_id = Some(ws_id.clone());
+                                this.ai_chat_show_dashboard = false;
+                                this.active_page_id = "ai.chat".to_string();
+                                cx.notify();
+                            }),
+                        )
+                        .into_any_element()
+                })
+                .collect();
+
+        // Open chat cards
+        let chat_cards: Vec<openframe::AnyElement> = self
+            .ai_chats
+            .iter()
+            .map(|chat| {
+                let chat_id = chat.id;
+                let title = chat.title.clone();
+                let provider = chat.session_provider.clone();
+                let model = chat.session_model_id.clone();
+                let is_loading = chat.is_loading;
+                let is_active = chat.id == active_id;
+                let workspace_id_card = chat.workspace_id.clone();
+                let preview_msgs: Vec<String> = chat
+                    .messages
+                    .iter()
+                    .rev()
+                    .take(4)
+                    .map(|m| {
+                        let prefix = match m.role {
+                            crate::gui::app::AiMessageRole::User => "▸ ",
+                            crate::gui::app::AiMessageRole::Assistant => "  ",
+                        };
+                        let text: String = m.content.chars().take(52).collect();
+                        format!("{prefix}{text}")
+                    })
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .collect();
+                let provider_icon = if provider.is_empty() {
+                    "ai-provider"
+                } else {
+                    arcadia_core::config::modules::MODULE_REGISTRY.iter()
+                        .find(|m| m.name == provider.as_str())
+                        .map(|m| m.glyph)
+                        .unwrap_or("ai-provider")
+                };
+                let workspace_label = workspace_id_card.as_deref().and_then(|ws_id| {
+                    arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok()
+                        .and_then(|cfg| cfg.workspaces.into_iter().find(|w| w.id == ws_id))
+                        .map(|w| if w.label.is_empty() {
+                            w.path.rsplit('/').next().unwrap_or(&w.path).to_string()
+                        } else {
+                            w.label.clone()
+                        })
+                });
+                let border_col = p.panel_border;
+                div()
+                    .flex_1()
+                    .min_w(px(220.))
+                    .cursor_pointer()
+                    .rounded(px(r))
+                    .bg(p.panel_bg)
+                    .border_1()
+                    .border_color(border_col)
+                    .hover(move |s| s.bg(p.row_bg).border_color(chat_pal.row_hover))
+                    .flex()
+                    .flex_col()
+                    .overflow_hidden()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.active_ai_chat_id = chat_id;
+                            this.ai_chat_show_dashboard = false;
+                            this.active_page_id = "ai.chat".to_string();
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_h(px(100.))
+                            .bg(msg_bg_preview)
+                            .p_2()
+                            .overflow_hidden()
+                            .flex()
+                            .flex_col()
+                            .gap_0()
+                            .children(preview_msgs.into_iter().map(|line| {
+                                div()
+                                    .text_xs()
+                                    .font_family("monospace")
+                                    .text_color(p.content_meta)
+                                    .flex_shrink_0()
+                                    .child(if line.is_empty() { " ".to_string() } else { line })
+                                    .into_any_element()
+                            })),
+                    )
+                    .child(
+                        div()
+                            .p_3()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .border_t_1()
+                            .border_color(p.panel_border)
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap_1()
+                                    .items_center()
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(p.content_title)
+                                            .flex_1()
+                                            .child(title),
+                                    )
+                                    .when(is_loading, |d| {
+                                        d.child(
+                                            div()
+                                                .w(px(6.))
+                                                .h(px(6.))
+                                                .rounded_full()
+                                                .bg(chat_pal.icon_active)
+                                                .into_any_element(),
+                                        )
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap_1()
+                                    .items_center()
+                                    .child(
+                                        crate::gui::theme::render_icon(provider_icon)
+                                            .size_3()
+                                            .text_color(p.content_meta),
+                                    )
+                                    .when_some(workspace_label, |d, ws| {
+                                        d.child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(p.content_meta)
+                                                .child(ws),
+                                        )
+                                    }),
+                            ),
+                    )
+                    .into_any_element()
+            })
+            .collect();
+
+        let ws_phantoms: Vec<_> = (0..5)
+            .map(|_| div().flex_1().min_w(px(220.)).into_any_element())
+            .collect();
+        let chat_phantoms: Vec<_> = (0..5)
+            .map(|_| div().flex_1().min_w(px(220.)).into_any_element())
+            .collect();
+
+        let workspaces_body: openframe::AnyElement = if workspace_cards.is_empty() {
+            div()
+                .text_sm()
+                .text_color(p.content_meta)
+                .child("No workspaces registered. Add one in Settings → Workspaces.")
+                .into_any_element()
+        } else {
+            div()
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .gap_4()
+                .children(workspace_cards)
+                .children(ws_phantoms)
+                .into_any_element()
+        };
+
+        let chats_body: openframe::AnyElement = div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap_4()
+            .children(chat_cards)
+            .children(chat_phantoms)
+            .into_any_element();
+
+        div()
+            .id("ai-chat-dashboard-scroll")
+            .w_full()
+            .h_full()
+            .overflow_y_scroll()
+            .bg(if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) })
+            .p_8()
+            .flex()
+            .flex_col()
+            .gap_8()
+            // Workspaces section
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_4()
+                    .child(
+                        div()
+                            .text_xl()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(p.content_title)
+                            .child("Workspaces"),
+                    )
+                    .child(workspaces_body),
+            )
+            // Divider
+            .child(div().w_full().h(px(1.)).bg(divider_col))
+            // Open chats section
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_4()
+                    .child(
+                        div()
+                            .text_xl()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(p.content_title)
+                            .child("Open Chats"),
+                    )
+                    .child(chats_body),
+            )
     }
 
     fn ai_empty_state_panel(

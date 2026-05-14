@@ -1,0 +1,20 @@
+Entering 'Extensions'
+=== Extensions ===
+c825221 fix: googly_eyes and overlay_pet refinements — claude pet removal, animation updates
+9dc38d9 feat: new extensions (rainbow_indent, rust_syntax, taurine), overlay_pet updates, remove default_theme
+f557f1f feat: extension icons in sidebar; overlay HUD display size; python icon refresh
+49df84d feat(googly-eyes): narrower wink line, hold-to-wink; extension icons; overlay_pet updates
+4c9e0ba Ignore .DS_Store
+237c0a2 Add overlay_pet extension, theme asset placeholders, update googly_eyes
+82afb28 feat: terminal_theme rename from tui_style; add googly_eyes extension
+f52ee8a fix: tui_style updates
+9cc9e34 feat: add arcadia-theme and terminal styles; omit alternate style
+289040c feat: add hello demo Python extension
+Entering 'Libraries/OpenFrame'
+=== Libraries/OpenFrame ===
+04e2db5 feat: accessibility properties; window platform updates
+b7a0a67 feat: accessibility properties; window platform updates
+a5cbbf9 feat(ui): improve color picker layout and hex display
+9f8db05 docs: reorganize license and readme, add adaptation summary
+82b5d5e feat: style context, color picker, glyph border, iOS platform support
+2df02d3 Initial commit: OpenFrame (GPUI 0.2.2 fork for Arcadia)

@@ -1,5 +1,5 @@
 use arcadia_core::navigation;
-use openframe::{div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Rgba, ScrollHandle, Styled};
+use openframe::{div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Rgba, ScrollHandle, SharedString, StatefulInteractiveElement, Styled};
 use openframe::prelude::FluentBuilder as _;
 
 use crate::gui::app::navigation::NavPageRef;
@@ -27,6 +27,11 @@ fn nav_active_text(_g: Option<GlyphStyleConfig>, pal_active: Rgba) -> Rgba {
 }
 fn nav_radius(g: Option<GlyphStyleConfig>) -> f32 {
     g.as_ref().map(|g| g.border_radius).unwrap_or(6.0)
+}
+
+fn lerp_color(a: Rgba, b: Rgba, t: f32) -> Rgba {
+    use arcadia_core::modules::animation::lerp_f32;
+    Rgba { r: lerp_f32(a.r, b.r, t), g: lerp_f32(a.g, b.g, t), b: lerp_f32(a.b, b.b, t), a: lerp_f32(a.a, b.a, t) }
 }
 
 fn ai_provider_accent(module_name: &str) -> &'static str {
@@ -88,18 +93,21 @@ impl ArcadiaRoot {
         is_dark: bool,
         accent: String,
         glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
+        active_alpha: f32,
     ) -> impl IntoElement {
         let pal        = theme::nav_accent_palette(accent.as_str(), is_dark);
-        let icon_col   = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let label_col  = icon_col;
-        let bg         = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg   = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x243246) } else { rgb(0xeef2ff) })
-        };
+        let idle_bg       = nav_idle_bg(glyph, is_dark);
+        let sel_bg        = nav_active_bg(glyph, pal.row_selected);
+        // Hover target sits 40% toward active — always dimmer than the fully active state.
+        let hover_target  = lerp_color(idle_bg, sel_bg, 0.4);
+        let base_bg       = lerp_color(idle_bg, sel_bg, active_alpha);
+        let final_bg      = lerp_color(base_bg, hover_target, hover_alpha);
+        let icon_col   = lerp_color(nav_idle_text(glyph, is_dark), nav_active_text(glyph, pal.icon_active), active_alpha);
         let radius     = nav_radius(glyph);
+        let gid_hover  = group_id.clone();
         div()
+            .id(SharedString::from(format!("tab-grp-{}", group_id)))
             .w_16()
             .h_16()
             .flex_shrink_0()
@@ -110,9 +118,12 @@ impl ArcadiaRoot {
             .cursor_pointer()
             .text_xs()
             .font_weight(if is_active { FontWeight::BOLD } else { FontWeight::NORMAL })
-            .bg(bg)
-            .text_color(label_col)
-            .hover(move |s| s.bg(hover_bg))
+            .bg(final_bg)
+            .text_color(icon_col)
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_tab_hover_anim(gid_hover.clone(), *hovered);
+                cx.notify();
+            }))
             .child(
                 div()
                     .flex()
@@ -127,7 +138,7 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    this.group_tabs_scroll.scroll_to_item(index);
+                    this.start_tab_scroll_anim(index);
                     this.active_group_id = group_id.clone();
                     if let Some(group) = this.effective_group(group_id.as_str()) {
                         if let Some(first_page_id) = group
@@ -214,7 +225,7 @@ impl ArcadiaRoot {
         let hover_bg  = if is_active {
             nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
         } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x243246) } else { rgb(0xeef2ff) })
+            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
         };
         let radius    = nav_radius(glyph);
         div()
@@ -266,9 +277,8 @@ impl ArcadiaRoot {
         let hover_bg  = if hub_active {
             nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
         } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x243246) } else { rgb(0xeef2ff) })
+            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
         };
-        let expand_border = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| if is_dark { rgb(0x374151) } else { rgb(0xe5e7eb) });
         let chevron_col   = nav_idle_text(glyph, is_dark);
         let chevron       = if self.settings_hub_expanded { "▼" } else { "▶" };
         let radius        = nav_radius(glyph);
@@ -332,8 +342,6 @@ impl ArcadiaRoot {
                     .flex_col()
                     .gap_0p5()
                     .pl_4()
-                    .border_l_2()
-                    .border_color(expand_border)
                     .children(
                         pinned
                             .into_iter()
@@ -348,11 +356,7 @@ impl ArcadiaRoot {
                                 let sub_pal   = theme::nav_accent_palette(page.accent(), is_dark);
                                 let sub_icon  = if is_active { nav_active_text(glyph, sub_pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
                                 let sub_bg    = if is_active { nav_active_bg(glyph, sub_pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-                                let sub_hover = if is_active {
-                                    nav_hover_bg_raw(glyph, is_dark, sub_pal.row_hover)
-                                } else {
-                                    nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x243246) } else { rgb(0xeef2ff) })
-                                };
+                                let sub_hover = nav_hover_bg_raw(glyph, is_dark, sub_pal.row_hover);
                                 let title = page.title().to_string();
                                 let glyph_key = page.glyph().to_string();
                                 Some(
@@ -417,7 +421,7 @@ impl ArcadiaRoot {
         let hover_bg = if is_active {
             nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
         } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x243246) } else { rgb(0xeef2ff) })
+            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
         };
         let radius   = nav_radius(glyph);
         let _is_shell_page  = page_id == "utility.shell";
@@ -453,6 +457,9 @@ impl ArcadiaRoot {
                     #[cfg(feature = "gui")]
                     if _is_shell_page && this.terminals.len() > 1 {
                         this.terminal_show_dashboard = true;
+                    }
+                    if _is_ai_page {
+                        this.ai_chat_show_dashboard = true;
                     }
                     this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
@@ -508,7 +515,7 @@ impl ArcadiaRoot {
     ) -> impl IntoElement {
         let pal      = theme::nav_accent_palette("sky", is_dark);
         let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
-        let meta_col = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+        let meta_col = if is_active { pal.icon_active } else if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
         let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
         let hover_bg = if is_active {
             nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
@@ -744,16 +751,16 @@ impl ArcadiaRoot {
         is_active: bool,
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
+        accent: &'static str,
+        provider_icon: &'static str,
+        workspace_label: Option<String>,
     ) -> impl IntoElement {
-        let pal      = theme::nav_accent_palette("violet", is_dark);
+        let pal      = theme::nav_accent_palette(accent, is_dark);
         let text_col = if is_active { nav_active_text(glyph, pal.icon_active) } else { nav_idle_text(glyph, is_dark) };
         let bg       = if is_active { nav_active_bg(glyph, pal.row_selected) } else { nav_idle_bg(glyph, is_dark) };
-        let hover_bg = if is_active {
-            nav_hover_bg_raw(glyph, is_dark, pal.row_hover)
-        } else {
-            nav_hover_bg_raw(glyph, is_dark, if is_dark { rgb(0x1e1e2e) } else { rgb(0xede9fe) })
-        };
+        let hover_bg = nav_hover_bg_raw(glyph, is_dark, pal.row_hover);
         let radius   = nav_radius(glyph);
+        let meta_col = if is_active { pal.icon_active } else if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
         div()
             .ml_7()
             .pl_2()
@@ -766,12 +773,27 @@ impl ArcadiaRoot {
             .bg(bg)
             .text_color(text_col)
             .hover(move |s| s.bg(hover_bg))
-            .child(div().child(label))
+            .flex()
+            .flex_col()
+            .gap(px(1.))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .gap_1()
+                    .items_center()
+                    .child(render_icon(provider_icon).size_3().text_color(text_col))
+                    .child(div().child(label)),
+            )
+            .when_some(workspace_label, |d, ws| {
+                d.child(div().text_color(meta_col).child(ws))
+            })
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
                     this.active_ai_chat_id = chat_id;
                     this.active_page_id = "ai.chat".to_string();
+                    this.ai_chat_show_dashboard = false;
                     this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),

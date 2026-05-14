@@ -78,6 +78,15 @@ impl Render for ArcadiaRoot {
         self.ensure_remote_revision_poll_task(window, cx);
         self.ensure_lan_poll_task(window, cx);
         self.ensure_late_poll_task(window, cx);
+        {
+            let ox = self.group_tabs_scroll.offset().x;
+            let mx = self.group_tabs_scroll.max_offset().width;
+            let can_left  = ox < px(-0.5);
+            let can_right = mx > px(0.5) && ox > -mx + px(0.5);
+            if self.tick_caret_anims(can_left, can_right) {
+                window.request_animation_frame();
+            }
+        }
         #[cfg(feature = "gui")]
         if self.terminals[self.active_terminal_id].tui_session.is_some() {
             self.sync_tui_size(window);
@@ -117,11 +126,72 @@ impl Render for ArcadiaRoot {
         let active_page = self
             .active_page_if_visible()
             .or_else(|| self.page_ref(self.effective_default_page()));
-        let active_page_title = openframe::SharedString::from(
-            active_page
-                .map(|page| page.title().to_string())
-                .unwrap_or_else(|| "Arcadia".to_string()),
-        );
+        let raw_page_title = active_page
+            .map(|page| page.title().to_string())
+            .unwrap_or_else(|| "Arcadia".to_string());
+        let active_page_title = openframe::SharedString::from({
+            let pid = self.active_page_id.as_str();
+            if pid == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
+                "Settings  ~  Dashboard".to_string()
+            } else if self.settings_hub_page_ids_effective().iter().any(|p| *p == pid) {
+                format!("Settings  ~  {raw_page_title}")
+            } else if pid == "utility.shell" {
+                #[cfg(feature = "gui")]
+                {
+                    if self.terminal_show_dashboard {
+                        "Terminal  ~  Dashboard".to_string()
+                    } else {
+                        let label = self.terminals.get(self.active_terminal_id)
+                            .map(|t| t.label.clone())
+                            .unwrap_or_else(|| "1".to_string());
+                        format!("Terminal  ~  {label}")
+                    }
+                }
+                #[cfg(not(feature = "gui"))]
+                { raw_page_title }
+            } else if pid == "ai.chat" {
+                if self.ai_chats.is_empty() || self.ai_chat_show_dashboard {
+                    "Chat  ~  Dashboard".to_string()
+                } else {
+                    let chat_title = self.ai_chats.iter()
+                        .find(|c| c.id == self.active_ai_chat_id)
+                        .map(|c| c.title.clone());
+                    if let Some(title) = chat_title {
+                        format!("Chat  ~  {title}")
+                    } else {
+                        raw_page_title
+                    }
+                }
+            } else if pid == "ai.models" {
+                if let Some(ref model_id) = self.active_llama_cpp_model_id {
+                    let model_name = self.llama_cpp_models.iter()
+                        .find(|m| &m.id == model_id)
+                        .map(|m| m.name.clone())
+                        .unwrap_or_else(|| model_id.clone());
+                    format!("Models  ~  {model_name}")
+                } else {
+                    raw_page_title
+                }
+            } else if pid == "editor.main" {
+                #[cfg(feature = "gui")]
+                {
+                    if self.code_editor_show_dashboard || self.code_editor_tabs.is_empty() {
+                        "Editor  ~  Dashboard".to_string()
+                    } else {
+                        let idx = self.active_code_editor_tab
+                            .min(self.code_editor_tabs.len().saturating_sub(1));
+                        let tab_title = self.code_editor_tabs.get(idx)
+                            .map(|t| t.title.clone())
+                            .unwrap_or_else(|| "untitled".to_string());
+                        format!("Editor  ~  {tab_title}")
+                    }
+                }
+                #[cfg(not(feature = "gui"))]
+                { raw_page_title }
+            } else {
+                raw_page_title
+            }
+        });
         let active_page_glyph = openframe::SharedString::from(
             active_page
                 .map(|page| page.glyph().to_string())
@@ -557,6 +627,8 @@ impl ArcadiaRoot {
                                 workspace_path: None,
                                 file_path: None,
                                 saved_content: String::new(),
+                                cached_lines: vec![],
+                                cached_line_byte_starts: vec![],
                             });
                             this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
                             this.code_editor_next_id += 1;
@@ -788,6 +860,7 @@ impl ArcadiaRoot {
                                 session_id: None,
                                 session_provider: String::new(),
                                 session_model_id: String::new(),
+                                workspace_id: None,
                             });
                             this.active_ai_chat_id = id;
                             this.ai_next_id += 1;
@@ -867,7 +940,7 @@ impl ArcadiaRoot {
                             }
                             if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
                                 this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
-                                    id: s.id, title: s.title, updated_at: s.updated_at,
+                                    id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id,
                                 }).collect();
                             }
                             cx.notify();

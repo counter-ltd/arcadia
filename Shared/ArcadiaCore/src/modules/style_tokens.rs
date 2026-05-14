@@ -18,6 +18,8 @@ pub struct StyleTokenSpec {
     pub visibility: Option<StyleTokenVisibility>,
     /// Optional int/float slider bounds. `None` = use built-in defaults + heuristic max at UI time.
     pub numeric: Option<StyleTokenNumericBounds>,
+    /// When non-empty, the UI renders a segmented chip selector instead of a free-text input.
+    pub options: Vec<String>,
 }
 
 /// Step / decimal policy for float sliders; int tokens always use whole steps.
@@ -569,6 +571,7 @@ mod tests {
             default_value: default.to_string(),
             visibility: None,
             numeric: None,
+            options: Vec::new(),
         }
     }
 
@@ -593,6 +596,7 @@ mod tests {
                     literal: "2".into(),
                 }),
                 numeric: None,
+                options: Vec::new(),
             },
         ];
         let module = "googly-eyes";
@@ -630,6 +634,7 @@ mod tests {
                     },
                 ])),
                 numeric: None,
+                options: Vec::new(),
             },
         ];
         let module = "m";

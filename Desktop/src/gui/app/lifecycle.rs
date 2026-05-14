@@ -26,7 +26,7 @@ use arcadia_core::modules::python_registry::{clamp_numeric_display_for_spec, Sty
 use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::{parse_surface_revision, parse_surface_snapshot};
 use arcadia_core::navigation;
-use openframe::{Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
+use openframe::{point, px, Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
 use openframe::ScrollHandle;
 use crate::gui::theme::{
     ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
@@ -271,9 +271,10 @@ impl ArcadiaRoot {
         let workspace_entries = arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
             .map(|c| c.workspaces)
             .unwrap_or_default();
-        let module_rows = ModulesConfig::load_or_create()
+        let mut module_rows = ModulesConfig::load_or_create()
             .map(|cfg| cfg.modules.into_iter().collect::<Vec<(String, bool)>>())
             .unwrap_or_default();
+        module_rows.sort_by(|a, b| a.0.cmp(&b.0));
         let appearance_cfg = AppearanceConfig::load_or_create().unwrap_or_default();
         let active_style = appearance_cfg.active_style.clone();
         let available_styles = built_in_styles();
@@ -348,6 +349,7 @@ impl ArcadiaRoot {
             ai_chats: vec![],
             active_ai_chat_id: 0,
             ai_next_id: 1,
+            ai_chat_show_dashboard: false,
             ai_context_menu_open: false,
             ai_chat_menu: None,
             ai_session_menu: None,
@@ -371,6 +373,8 @@ impl ArcadiaRoot {
                 id: s.id,
                 title: s.title,
                 updated_at: s.updated_at,
+                provider: s.provider,
+                workspace_id: s.workspace_id,
             }).collect(),
             ai_pending_edits: Vec::new(),
             ai_diff_panel_open: false,
@@ -459,6 +463,21 @@ impl ArcadiaRoot {
             splash_tick_started: false,
             sidebar_visible: true,
             group_tabs_scroll: ScrollHandle::new(),
+            caret_left_alpha: 0.0,
+            caret_right_alpha: 0.0,
+            caret_prev_left: false,
+            caret_prev_right: false,
+            caret_left_anim: None,
+            caret_right_anim: None,
+            tab_scroll_anim: None,
+            tab_scroll_prev_x: 0.0,
+            tab_scrolling_left: false,
+            tab_scrolling_right: false,
+            tab_hover_alphas: std::collections::HashMap::new(),
+            tab_active_alphas: std::collections::HashMap::new(),
+            tab_hover_anims: std::collections::HashMap::new(),
+            tab_active_anims: std::collections::HashMap::new(),
+            tab_prev_active_id: navigation::DEFAULT_GROUP_ID.to_string(),
             settings_hub_expanded: false,
             app_menu_open: false,
             session_route_menu_open: false,
@@ -558,8 +577,11 @@ impl ArcadiaRoot {
             }
             // Startup may co-enable native modules (e.g. `overlay` for HUD extensions).
             root.reload_modules();
-            root.python_extension_rows =
-                arcadia_core::modules::python_registry::list_modules();
+            root.python_extension_rows = {
+                let mut rows = arcadia_core::modules::python_registry::list_modules();
+                rows.sort_by(|a, b| a.0.cmp(&b.0));
+                rows
+            };
             // Merge styles from Python extensions into available_styles.
             root.available_styles = merged_available_styles();
         }
@@ -623,6 +645,9 @@ impl ArcadiaRoot {
                     let disp = extension_tokens::value_to_display_string(&val);
                     self.extension_token_values.insert(pair, disp);
                     self.apply_style(self.active_style.clone(), self.current_color_scheme_dark(), cx);
+                    let reload_cmd = format!("{module}.reload");
+                    let ctx = arcadia_core::modules::ExecutionContext::default();
+                    let _ = modules::execute_command(&reload_cmd, &[], &ctx);
                 }
             }
             Err(_) => {}
@@ -630,8 +655,11 @@ impl ArcadiaRoot {
     }
 
     pub fn reload_python_extensions(&mut self, cx: &mut Context<Self>) {
-        self.python_extension_rows =
-            arcadia_core::modules::python_registry::list_modules();
+        self.python_extension_rows = {
+            let mut rows = arcadia_core::modules::python_registry::list_modules();
+            rows.sort_by(|a, b| a.0.cmp(&b.0));
+            rows
+        };
         // Merge any newly registered styles from Python extensions.
         let styles = merged_available_styles();
         // Re-apply active style; fall back to default if the extension providing it was disabled.
@@ -726,7 +754,7 @@ impl ArcadiaRoot {
             match modules::execute_command("surface.snapshot", &[], &ctx) {
                 Ok(Some(json)) => {
                     let parsed = parse_surface_snapshot(&json);
-                    self.module_rows = parsed.modules;
+                    self.module_rows = { let mut r = parsed.modules; r.sort_by(|a, b| a.0.cmp(&b.0)); r };
                     self.remote_nav = parsed.navigation_registry;
                     self.last_surface_revision = Some(parsed.revision);
                     self.remote_surface_stale = false;
@@ -742,9 +770,13 @@ impl ArcadiaRoot {
             self.remote_nav = None;
             self.last_surface_revision = None;
             self.remote_surface_stale = false;
-            self.module_rows = ModulesConfig::load_or_create()
-                .map(|cfg| cfg.modules.into_iter().collect())
-                .unwrap_or_default();
+            self.module_rows = {
+                let mut r = ModulesConfig::load_or_create()
+                    .map(|cfg| cfg.modules.into_iter().collect::<Vec<_>>())
+                    .unwrap_or_default();
+                r.sort_by(|a, b| a.0.cmp(&b.0));
+                r
+            };
         }
         self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();
@@ -927,16 +959,21 @@ impl ArcadiaRoot {
         let session_id = chat.session_id.clone().unwrap();
 
         // Build or update the session from current chat state.
+        let chat_title = chat.title.clone();
         let mut session = ai_chat_store::load_session(&session_id).unwrap_or_else(|_| {
-            ChatSession::new(&chat.session_provider, &chat.session_model_id)
+            let mut s = ChatSession::new(&chat.session_provider, &chat.session_model_id);
+            s.title = chat_title;
+            s
         });
 
         // Sync id from chat.
         session.id = session_id.clone();
         // Propagate explicit rename; auto-derive from first user message otherwise.
-        if chat.title != format!("Chat {}", chat.id) && chat.title != "New Chat" {
+        let default_title = format!("Chat {}", chat.id);
+        let is_default = session.title == "New Chat" || session.title == default_title;
+        if !is_default && chat.title != "New Chat" && chat.title != default_title {
             session.title = chat.title.clone();
-        } else if session.title == "New Chat" {
+        } else if is_default {
             if let Some(first_user) = session.messages.iter().find(|m| m.role == "user") {
                 let derived: String = first_user.content
                     .split_whitespace()
@@ -975,7 +1012,7 @@ impl ArcadiaRoot {
 
         // Back-sync title from session to in-memory chat.
         let chat = self.ai_chats.iter_mut().find(|c| c.id == chat_id).unwrap();
-        if session.title != "New Chat" {
+        if session.title != "New Chat" && session.title != format!("Chat {}", chat.id) {
             chat.title = session.title.clone();
         }
 
@@ -985,6 +1022,8 @@ impl ArcadiaRoot {
                 id: s.id,
                 title: s.title,
                 updated_at: s.updated_at,
+                provider: s.provider,
+                workspace_id: s.workspace_id,
             }).collect();
         }
     }
@@ -1245,6 +1284,173 @@ impl ArcadiaRoot {
             || self.llama_cpp_edit_mmproj_focus.contains_focused(window, cx)
             || self.workspace_create_label_focus.contains_focused(window, cx)
             || self.workspace_create_path_focus.contains_focused(window, cx)
+    }
+
+    /// Tick the nav caret fade-in/out animations using the arcadia animation engine's easing
+    /// functions. Returns `true` while any animation is still running (caller should request
+    /// another animation frame).
+    pub fn tick_caret_anims(&mut self, can_left: bool, can_right: bool) -> bool {
+        use arcadia_core::modules::animation::{apply_easing, Easing};
+        use std::time::Instant;
+        const DURATION_S: f32 = 0.18;
+
+        let now = Instant::now();
+
+        // Detect scroll direction from frame-to-frame offset delta.
+        let cur_x = f32::from(self.group_tabs_scroll.offset().x);
+        let dx = cur_x - self.tab_scroll_prev_x;
+        self.tab_scrolling_left  = dx >  0.5;
+        self.tab_scrolling_right = dx < -0.5;
+        self.tab_scroll_prev_x   = cur_x;
+
+        if can_left != self.caret_prev_left {
+            self.caret_prev_left = can_left;
+            self.caret_left_anim = Some(super::CaretAnim {
+                start: now,
+                from: self.caret_left_alpha,
+                to: if can_left { 1.0 } else { 0.0 },
+            });
+        }
+        if can_right != self.caret_prev_right {
+            self.caret_prev_right = can_right;
+            self.caret_right_anim = Some(super::CaretAnim {
+                start: now,
+                from: self.caret_right_alpha,
+                to: if can_right { 1.0 } else { 0.0 },
+            });
+        }
+
+        let mut running = false;
+
+        if let Some(anim) = &self.caret_left_anim {
+            let raw_t = (now - anim.start).as_secs_f32() / DURATION_S;
+            let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+            self.caret_left_alpha = anim.from + (anim.to - anim.from) * t;
+            if raw_t >= 1.0 {
+                self.caret_left_anim = None;
+            } else {
+                running = true;
+            }
+        }
+
+        if let Some(anim) = &self.caret_right_anim {
+            let raw_t = (now - anim.start).as_secs_f32() / DURATION_S;
+            let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+            self.caret_right_alpha = anim.from + (anim.to - anim.from) * t;
+            if raw_t >= 1.0 {
+                self.caret_right_anim = None;
+            } else {
+                running = true;
+            }
+        }
+
+        if let Some(anim) = &self.tab_scroll_anim {
+            let raw_t = (now - anim.start).as_secs_f32() / DURATION_S;
+            let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+            let new_x = anim.from_x + (anim.to_x - anim.from_x) * t;
+            let cur_y = self.group_tabs_scroll.offset().y;
+            self.group_tabs_scroll.set_offset(point(px(new_x), cur_y));
+            if raw_t >= 1.0 {
+                self.tab_scroll_anim = None;
+            } else {
+                running = true;
+            }
+        }
+
+        // Detect active group change and kick off active-state transition.
+        if self.active_group_id != self.tab_prev_active_id {
+            let old_id = self.tab_prev_active_id.clone();
+            let new_id = self.active_group_id.clone();
+            if !old_id.is_empty() {
+                let from = *self.tab_active_alphas.get(&old_id).unwrap_or(&1.0);
+                self.tab_active_anims.insert(old_id, super::CaretAnim { start: now, from, to: 0.0 });
+            }
+            let from = *self.tab_active_alphas.get(&new_id).unwrap_or(&0.0);
+            self.tab_active_anims.insert(new_id.clone(), super::CaretAnim { start: now, from, to: 1.0 });
+            self.tab_prev_active_id = self.active_group_id.clone();
+        }
+
+        // Tick per-tab hover animations.
+        const HOVER_DURATION_S: f32 = 0.12;
+        let hover_keys: Vec<String> = self.tab_hover_anims.keys().cloned().collect();
+        for gid in hover_keys {
+            if let Some(anim) = self.tab_hover_anims.get(&gid).cloned() {
+                let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
+                let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+                self.tab_hover_alphas.insert(gid.clone(), anim.from + (anim.to - anim.from) * t);
+                if raw_t >= 1.0 {
+                    self.tab_hover_anims.remove(&gid);
+                } else {
+                    running = true;
+                }
+            }
+        }
+
+        // Tick per-tab active animations.
+        let active_keys: Vec<String> = self.tab_active_anims.keys().cloned().collect();
+        for gid in active_keys {
+            if let Some(anim) = self.tab_active_anims.get(&gid).cloned() {
+                let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
+                let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+                self.tab_active_alphas.insert(gid.clone(), anim.from + (anim.to - anim.from) * t);
+                if raw_t >= 1.0 {
+                    self.tab_active_anims.remove(&gid);
+                } else {
+                    running = true;
+                }
+            }
+        }
+
+        running
+    }
+
+    /// Start or reverse a hover fade for a tab group item.
+    pub fn start_tab_hover_anim(&mut self, group_id: String, hovered: bool) {
+        use std::time::Instant;
+        let from = *self.tab_hover_alphas.get(&group_id).unwrap_or(&0.0);
+        let to = if hovered { 1.0_f32 } else { 0.0_f32 };
+        self.tab_hover_anims.insert(group_id, super::CaretAnim { start: Instant::now(), from, to });
+    }
+
+    /// Compute the minimal scroll offset to bring tab `ix` fully into view, then animate to it.
+    /// Falls back to `scroll_to_item` snap if child bounds are not yet available.
+    pub fn start_tab_scroll_anim(&mut self, ix: usize) {
+        use std::time::Instant;
+        let viewport = self.group_tabs_scroll.bounds();
+        let cur_x = self.group_tabs_scroll.offset().x;
+
+        let to_x = if let Some(item) = self.group_tabs_scroll.bounds_for_item(ix) {
+            if item.left() + cur_x < viewport.left() {
+                viewport.left() - item.left()
+            } else if item.right() + cur_x > viewport.right() {
+                viewport.right() - item.right()
+            } else {
+                cur_x  // already fully in view
+            }
+        } else {
+            self.group_tabs_scroll.scroll_to_item(ix);
+            return;
+        };
+
+        if (to_x - cur_x).abs() < px(0.5) {
+            return;
+        }
+
+        self.start_scroll_x_anim(to_x);
+    }
+
+    /// Animate `group_tabs_scroll` from its current x to `to_x`.
+    pub fn start_scroll_x_anim(&mut self, to_x: openframe::Pixels) {
+        use std::time::Instant;
+        let from_x = self.group_tabs_scroll.offset().x;
+        if (to_x - from_x).abs() < px(0.5) {
+            return;
+        }
+        self.tab_scroll_anim = Some(super::TabScrollAnim {
+            start: Instant::now(),
+            from_x: f32::from(from_x),
+            to_x: f32::from(to_x),
+        });
     }
 
     #[cfg(any(feature = "gui", feature = "ios-gui"))]

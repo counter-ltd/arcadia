@@ -1,0 +1,15 @@
+=== SUBMODULE STATUS ===
+
+Main Repo Submodules:
+ c8252218bfdade6a1b87663a48475f7ba98c7ae5 Extensions (heads/main)
+ 04e2db5ae0d2a9fa55c1b664ad27784a555e22c6 Libraries/OpenFrame (heads/main)
+
+Extensions Submodule:
+- Status: ON BRANCH main
+- Remote status: Up to date with origin/main
+- Clean working tree: YES
+
+Libraries/OpenFrame Submodule:
+- Status: ON BRANCH main
+- Remote status: Up to date with origin/main
+- Clean working tree: YES

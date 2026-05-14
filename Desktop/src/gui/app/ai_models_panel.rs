@@ -14,7 +14,7 @@ use crate::gui::app::LlamaCppModelCreateDraft;
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
-fn provider_accent(module_name: &str) -> &'static str {
+pub(crate) fn provider_accent(module_name: &str) -> &'static str {
     use arcadia_core::config::modules::*;
     match module_name {
         AI_EXEC_CLAUDE_MODULE_NAME                            => "orange",
@@ -356,10 +356,17 @@ impl ArcadiaRoot {
                             .justify_between()
                             .child(
                                 div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(name_col)
-                                    .child(name),
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(render_icon(type_icon).size_4().text_color(name_col))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(name_col)
+                                            .child(name),
+                                    ),
                             )
                             .child(
                                 div()
