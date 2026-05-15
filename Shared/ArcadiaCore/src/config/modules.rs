@@ -98,7 +98,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: LAN_MODULE_NAME,
-        glyph: "nodes",
+        glyph: "network",
         version: "1.0.0",
         description: "Local network discovery and peer communication.",
         required_modules: &[NET_MODULE_NAME],
@@ -316,7 +316,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_RULES_MODULE_NAME,
-        glyph: "tools",
+        glyph: "ai-rule",
         version: "0.1.0",
         description: "AI Rules — per-chat constraints: forbidden tools, response format, persona. Adds a configuration page to the AI sidebar.",
         required_modules: &[AI_MODULE_NAME],
@@ -326,7 +326,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: AI_SKILLS_MODULE_NAME,
-        glyph: "flask",
+        glyph: "ai-skill",
         version: "0.1.0",
         description: "AI Skills — named behaviours: system prompt fragments, tool allowlists, parameter overrides. Adds a configuration page to the AI sidebar.",
         required_modules: &[AI_MODULE_NAME],
