@@ -582,6 +582,12 @@ fn tray_icon_screen_bounds(
 }
 
 #[pyfunction]
+fn tray_item_registered(extension_id: String, tray_item_id: String) -> PyResult<bool> {
+    ensure_python_permission(&extension_id, "tray.create")?;
+    Ok(core_tray::item_registered(&tray_item_id))
+}
+
+#[pyfunction]
 fn cursor_position(extension_id: String) -> PyResult<Option<(f64, f64)>> {
     ensure_python_permission(&extension_id, "cursor.global_position")?;
     Ok(core_cursor::position().map(|p| (p.x, p.y)))
@@ -629,7 +635,7 @@ fn overlay_hud_set_sprite(
         display_width,
         display_height,
     };
-    overlay_hud_sprite::set_sprite(payload)
+    overlay_hud_sprite::set_sprite(extension_id, payload)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
 }
 
@@ -948,6 +954,7 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_tray_icon_click_handler, m)?)?;
     m.add_function(wrap_pyfunction!(tray_remove, m)?)?;
     m.add_function(wrap_pyfunction!(tray_icon_screen_bounds, m)?)?;
+    m.add_function(wrap_pyfunction!(tray_item_registered, m)?)?;
     m.add_function(wrap_pyfunction!(cursor_position, m)?)?;
     m.add_function(wrap_pyfunction!(cursor_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(screen_size, m)?)?;

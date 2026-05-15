@@ -209,6 +209,7 @@ pub struct AiChat {
 pub struct AiSessionSummary {
     pub id: String,
     pub title: String,
+    #[allow(dead_code)]
     pub updated_at: u64,
     pub provider: String,
     pub workspace_id: Option<String>,
@@ -227,6 +228,7 @@ pub struct DiffHunk {
     pub index: usize,
     pub orig_lines: Vec<String>,
     pub new_lines: Vec<String>,
+    #[allow(dead_code)]
     pub kind: DiffHunkKind,
 }
 
@@ -234,6 +236,7 @@ pub struct DiffHunk {
 pub struct AiPendingEdit {
     pub path: String,
     pub original: String,
+    #[allow(dead_code)]
     pub proposed: String,
     pub hunks: Vec<DiffHunk>,
     pub accepted: std::collections::BTreeSet<usize>,
@@ -246,6 +249,14 @@ pub struct LlamaCppModelCreateDraft {
     pub path: String,
     pub mmproj_path: String,
     pub model_kind: arcadia_core::config::llama_cpp::LlamaCppModelKind,
+    pub error: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct OpenAiProviderDraft {
+    pub name: String,
+    pub api_key: String,
+    pub base_url: String,
     pub error: Option<String>,
 }
 
@@ -268,6 +279,34 @@ pub struct TabScrollAnim {
     pub start: Instant,
     pub from_x: f32,
     pub to_x: f32,
+}
+
+/// Phase of the notification badge preview animation.
+#[derive(Clone, PartialEq)]
+pub enum NotificationPreviewPhase {
+    /// Pill was collapsed: animate open with preview text (300 ms).
+    PillEnter,
+    /// Pill was collapsed: hold expanded showing preview (2 s).
+    PillHold,
+    /// Pill was collapsed: animate closed (300 ms).
+    PillExit,
+    /// Pill was expanded: fade existing label out (200 ms).
+    TextFadeOut,
+    /// Pill was expanded: fade preview text in after swap (200 ms).
+    TextFadeInPreview,
+    /// Pill was expanded: hold showing preview (2 s).
+    TextHold,
+    /// Pill was expanded: fade preview text out (200 ms).
+    TextFadeOutPreview,
+    /// Pill was expanded: fade original label back in (200 ms).
+    TextFadeInLabel,
+}
+
+/// State for the multi-phase notification badge preview animation.
+#[derive(Clone)]
+pub struct NotificationPreviewAnim {
+    pub phase_start: Instant,
+    pub phase: NotificationPreviewPhase,
 }
 
 #[derive(Clone)]
@@ -422,23 +461,30 @@ pub struct ArcadiaRoot {
     pub ollama_models: Vec<arcadia_core::config::ollama::OllamaModel>,
     /// True while a background /api/tags discovery call is in flight.
     pub ollama_discovering: bool,
-    /// OpenAI API key (loaded from openai.toml).
-    pub openai_api_key: String,
-    /// OpenAI base URL (loaded from openai.toml).
-    pub openai_base_url: String,
-    /// Draft values for the OpenAI settings editor fields (Some = editing mode).
-    pub openai_api_key_draft: Option<String>,
-    pub openai_base_url_draft: Option<String>,
-    pub openai_api_key_focus: FocusHandle,
-    pub openai_base_url_focus: FocusHandle,
-    /// Models loaded from openai.toml.
-    pub openai_models: Vec<arcadia_core::config::openai::OpenAiModel>,
+    /// OpenAI-compatible providers loaded from openai.toml.
+    pub openai_providers: Vec<arcadia_core::config::openai::OpenAiProvider>,
+    /// Provider selected in the OpenAI detail/edit view (None = list view).
+    pub active_openai_provider_id: Option<String>,
+    /// Edit draft for the active provider (Some = editing mode).
+    pub openai_provider_edit_draft: Option<OpenAiProviderDraft>,
+    pub openai_edit_name_focus: FocusHandle,
+    pub openai_edit_api_key_focus: FocusHandle,
+    pub openai_edit_base_url_focus: FocusHandle,
+    /// Confirm-delete state for the active provider.
+    pub openai_provider_delete_confirm: bool,
+    /// Create draft for a new provider (Some = create form visible).
+    pub openai_create_draft: Option<OpenAiProviderDraft>,
+    pub openai_create_name_focus: FocusHandle,
+    pub openai_create_api_key_focus: FocusHandle,
+    pub openai_create_base_url_focus: FocusHandle,
     /// Workspace entries loaded from workspace.toml — refreshed on module reload.
     pub workspace_entries: Vec<arcadia_core::config::workspace::WorkspaceEntry>,
     /// ID of the model sub-item selected under llama.cpp in the sidebar.
     pub active_llama_cpp_model_id: Option<String>,
     /// Right-click context menu on the llama.cpp provider sidebar item.
     pub llama_cpp_provider_menu: Option<openframe::Point<openframe::Pixels>>,
+    /// Right-click context menu on the Ollama provider sidebar item.
+    pub ollama_provider_menu: Option<openframe::Point<openframe::Pixels>>,
     /// Draft state for Create Model modal.
     pub llama_cpp_create_draft: Option<LlamaCppModelCreateDraft>,
     pub llama_cpp_create_name_focus: FocusHandle,
@@ -455,6 +501,9 @@ pub struct ArcadiaRoot {
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
     pub python_extension_rows: Vec<(String, String, String, bool, Vec<String>, Vec<String>)>,
+    /// Set once `PythonExtensionHost::start` has been called so `reload_modules` can start the
+    /// host on-demand when python-host is enabled at runtime rather than at startup.
+    pub python_host_started: bool,
     /// Active render style name ("default", "tui", or python-registered).
     pub active_style: String,
     /// Built-in styles prepended, then python-registered styles appended on extension reload.
@@ -589,6 +638,13 @@ pub struct ArcadiaRoot {
     pub notification_max_count_focus: FocusHandle,
     /// Whether the notification destination dropdown is expanded.
     pub notification_dest_open: bool,
+    /// Non-empty when a badge preview is active; contains the notification title to display.
+    pub notification_preview_text: String,
+    /// Opacity multiplier for the notification pill's text label during a cross-fade on an
+    /// already-expanded pill. Normally 1.0; animated 1→0→1 during text swap.
+    pub notification_content_alpha: f32,
+    /// Drives the multi-phase notification badge preview animation.
+    pub notification_preview_anim: Option<NotificationPreviewAnim>,
     /// Settings pages the user has pinned to the sidebar. Persisted in `ui-prefs.toml`.
     pub pinned_settings_pages: Vec<String>,
     /// Active right-click context menu on a pinned settings sidebar item: (page_id, position).

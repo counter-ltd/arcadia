@@ -15,7 +15,9 @@ pub struct TuiSession {
     pub parser: Arc<Mutex<vt100::Parser>>,
     pub queue: Arc<Mutex<Vec<Vec<u8>>>>,
     pub done: Arc<AtomicBool>,
+    #[allow(dead_code)]
     pub rows: u16,
+    #[allow(dead_code)]
     pub cols: u16,
     _master: Box<dyn portable_pty::MasterPty + Send>,
     _child: Box<dyn portable_pty::Child + Send + Sync>,

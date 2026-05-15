@@ -13,12 +13,12 @@ use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest}
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, Rgba, SharedString, StatefulInteractiveElement, Styled, Window,
+    ParentElement, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
 use crate::gui::app::ai_runtime::{AiRuntimeHandle, AiRuntimeRequest, ProviderRouting};
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
-use crate::gui::app::{AiChat, AiMessage, AiMessageRole, ArcadiaRoot};
+use crate::gui::app::{AiMessage, AiMessageRole, ArcadiaRoot};
 use crate::gui::theme;
 
 
@@ -1074,11 +1074,15 @@ impl ArcadiaRoot {
             AI_OPENAI_MODULE_NAME => match model_id.as_deref() {
                 None => Err("No model selected. Choose a model from the top bar.".to_string()),
                 Some(id) => self
-                    .openai_models
+                    .openai_providers
                     .iter()
-                    .find(|m| m.id == id)
-                    .map(|m| ProviderRouting::OpenAi {
-                        model_id: m.model_id.clone(),
+                    .find_map(|p| {
+                        p.models.iter().find(|m| m.id == id).map(|m| {
+                            ProviderRouting::OpenAi {
+                                provider_id: p.id.clone(),
+                                model_id: m.model_id.clone(),
+                            }
+                        })
                     })
                     .ok_or_else(|| format!("Model '{id}' not found.")),
             },

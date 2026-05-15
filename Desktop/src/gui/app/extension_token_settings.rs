@@ -1,4 +1,5 @@
-use arcadia_core::modules::python_registry::{self, list_style_tokens};
+use arcadia_core::modules::python_registry::{self, extension_enabled, list_style_tokens};
+use arcadia_core::modules;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
@@ -29,21 +30,68 @@ impl ArcadiaRoot {
         let wrong_surface = token_specs.is_empty()
             || python_registry::extension_tokens_editable_under_appearance(module_id);
 
+        let is_ext_enabled = extension_enabled(module_id);
+        let module_id_for_btn = module_id.to_string();
+
+        let title_row = {
+            let title_text = self
+                .page_ref(self.active_page_id.as_str())
+                .map(|pg| pg.title().to_string())
+                .unwrap_or_else(|| "Extension tokens".into());
+
+            let mut row = div()
+                .w_full()
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .gap_4()
+                .child(
+                    div()
+                        .text_2xl()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(p.content_title)
+                        .child(title_text),
+                );
+
+            if is_ext_enabled {
+                row = row.child(
+                    div()
+                        .px_3()
+                        .py_1()
+                        .rounded(px(p.radius_md))
+                        .bg(p.danger)
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(p.on_accent)
+                        .cursor_pointer()
+                        .child("Disable Extension")
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                let ctx = this.execution_context();
+                                let _ = modules::execute_command(
+                                    "python-host.extension-disable",
+                                    &[module_id_for_btn.as_str()],
+                                    &ctx,
+                                );
+                                this.reload_python_extensions(cx);
+                                this.active_page_id = "python.settings".into();
+                                this.sync_settings_hub_expanded_from_active_page();
+                                cx.notify();
+                            }),
+                        ),
+                );
+            }
+
+            row
+        };
+
         let header = div()
             .flex()
             .flex_col()
             .gap_1()
-            .child(
-                div()
-                    .text_2xl()
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(p.content_title)
-                    .child(
-                        self.page_ref(self.active_page_id.as_str())
-                            .map(|pg| pg.title().to_string())
-                            .unwrap_or_else(|| "Extension tokens".into()),
-                    ),
-            )
+            .child(title_row)
             .child(
                 div().text_sm().text_color(p.content_body).child(
                     self.page_ref(self.active_page_id.as_str())

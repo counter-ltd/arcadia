@@ -2,7 +2,7 @@ use arcadia_core::navigation;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Rgba,
-    ScrollHandle, SharedString, StatefulInteractiveElement, Styled,
+    SharedString, StatefulInteractiveElement, Styled,
 };
 
 use crate::gui::app::navigation::NavPageRef;
@@ -95,8 +95,9 @@ fn ai_provider_accent(module_name: &str) -> &'static str {
     match module_name {
         AI_EXEC_CLAUDE_MODULE_NAME => "orange",
         AI_EXEC_GEMINI_MODULE_NAME => "sky",
-        AI_EXEC_CODEX_MODULE_NAME | AI_OPENAI_MODULE_NAME => "emerald",
-        AI_EXEC_AIDER_MODULE_NAME => "teal",
+        AI_EXEC_CODEX_MODULE_NAME => "cyan",
+        AI_OPENAI_MODULE_NAME => "emerald",
+        AI_EXEC_AIDER_MODULE_NAME => "emerald",
         AI_LLAMA_CPP_MODULE_NAME => "amber",
         AI_OLLAMA_MODULE_NAME => "cyan",
         AI_APFEL_MODULE_NAME => "indigo",
@@ -163,7 +164,7 @@ impl ArcadiaRoot {
         system_image: openframe::SharedString,
         group_id: String,
         index: usize,
-        is_active: bool,
+        _is_active: bool,
         is_dark: bool,
         accent: String,
         glyph: Option<GlyphStyleConfig>,
@@ -247,6 +248,7 @@ impl ArcadiaRoot {
         accent: String,
         glyph: Option<GlyphStyleConfig>,
         pill_expand_alpha: Option<f32>,
+        content_alpha: f32,
     ) -> impl IntoElement {
         let pal = theme::nav_accent_palette(accent.as_str(), is_dark);
         let icon_col = if is_active {
@@ -311,12 +313,12 @@ impl ArcadiaRoot {
                                         .overflow_hidden()
                                         .whitespace_nowrap()
                                         .max_w(px(alpha * 120.0))
-                                        .opacity(alpha)
+                                        .opacity(alpha * content_alpha)
                                         .child(label),
                                 )
                             }
                         } else {
-                            d.child(div().child(label))
+                            d.child(div().opacity(content_alpha).child(label))
                         }
                     }),
             )
@@ -806,6 +808,21 @@ impl ArcadiaRoot {
                     if module_name_right == arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME
                     {
                         this.llama_cpp_provider_menu = Some(event.position);
+                        this.ollama_provider_menu = None;
+                        this.ai_context_menu_open = false;
+                        this.ai_chat_menu = None;
+                        #[cfg(feature = "gui")]
+                        {
+                            this.terminal_context_menu_open = false;
+                            this.terminal_kill_menu = None;
+                            this.code_editor_context_menu_open = false;
+                            this.context_menu_position = event.position;
+                        }
+                        cx.notify();
+                    } else if module_name_right == arcadia_core::config::modules::AI_OLLAMA_MODULE_NAME
+                    {
+                        this.ollama_provider_menu = Some(event.position);
+                        this.llama_cpp_provider_menu = None;
                         this.ai_context_menu_open = false;
                         this.ai_chat_menu = None;
                         #[cfg(feature = "gui")]

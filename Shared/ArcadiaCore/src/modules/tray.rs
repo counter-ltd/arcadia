@@ -285,6 +285,15 @@ pub fn icon_screen_bounds(tray_item_id: &str) -> Option<(f64, f64, f64, f64, f64
     rx.recv_timeout(Duration::from_millis(100)).ok().flatten()
 }
 
+/// Returns `true` if `id` is currently registered in the tray state (i.e. not yet removed).
+pub fn item_registered(id: &str) -> bool {
+    state()
+        .items
+        .lock()
+        .map(|items| items.contains_key(id))
+        .unwrap_or(false)
+}
+
 /// Remove every tray item registered under `owner` (e.g. `python:googly-eyes`). Also removes
 /// multi-slot items whose owner is `owner + "::" + …` (see Python `tray_register(..., instance=…)`).
 /// Called when a Python extension is disabled so its menu-bar icons disappear immediately instead

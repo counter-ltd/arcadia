@@ -18,6 +18,7 @@ pub struct OverlayHudSpritePayload {
 struct Inner {
     version: u64,
     sprite: Option<OverlayHudSpritePayload>,
+    owner: Option<String>,
 }
 
 impl Inner {
@@ -25,6 +26,7 @@ impl Inner {
         Self {
             version: 0,
             sprite: None,
+            owner: None,
         }
     }
 }
@@ -36,7 +38,7 @@ pub fn version() -> u64 {
     STATE.lock().map(|g| g.version).unwrap_or(0)
 }
 
-pub fn set_sprite(payload: OverlayHudSpritePayload) -> Result<(), String> {
+pub fn set_sprite(owner: String, payload: OverlayHudSpritePayload) -> Result<(), String> {
     let expected = (payload.width as usize)
         .checked_mul(payload.height as usize)
         .and_then(|n| n.checked_mul(4))
@@ -51,6 +53,7 @@ pub fn set_sprite(payload: OverlayHudSpritePayload) -> Result<(), String> {
         .lock()
         .map_err(|_| "overlay sprite: state lock poisoned".to_string())?;
     g.sprite = Some(payload);
+    g.owner = Some(owner);
     g.version = g.version.wrapping_add(1);
     Ok(())
 }
@@ -58,7 +61,19 @@ pub fn set_sprite(payload: OverlayHudSpritePayload) -> Result<(), String> {
 pub fn clear_sprite() {
     if let Ok(mut g) = STATE.lock() {
         g.sprite = None;
+        g.owner = None;
         g.version = g.version.wrapping_add(1);
+    }
+}
+
+/// Clears the sprite only if it was set by `owner`. No-op if a different extension owns it.
+pub fn clear_sprite_for_owner(owner: &str) {
+    if let Ok(mut g) = STATE.lock() {
+        if g.owner.as_deref() == Some(owner) {
+            g.sprite = None;
+            g.owner = None;
+            g.version = g.version.wrapping_add(1);
+        }
     }
 }
 

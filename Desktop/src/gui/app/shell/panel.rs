@@ -149,7 +149,7 @@ impl ArcadiaRoot {
             .map(|idx| {
                 let label = self.terminals[idx].label.clone();
                 let cwd = self.terminals[idx].shell_display_cwd.clone();
-                let is_active_term = self.active_terminal_id == idx;
+                let _is_active_term = self.active_terminal_id == idx;
                 let preview_lines: Vec<String> = self.terminals[idx]
                     .shell_history
                     .iter()

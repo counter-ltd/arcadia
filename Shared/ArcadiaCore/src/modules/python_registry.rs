@@ -253,6 +253,28 @@ pub fn register_module(
 ///
 /// `declared_platforms` is pre-parsed from `platforms=[...]` in the same call (see
 /// `arcadia-python`); empty means all platforms.
+/// Statically extract a quoted string value for `key=` from a `register_module(...)` call
+/// without executing Python. Handles both `"..."` and `'...'` string literals on the same line.
+fn parse_register_module_field(source: &str, key: &str) -> Option<String> {
+    let needle = format!("{key}=");
+    for line in source.lines() {
+        let trimmed = line.trim();
+        let Some(pos) = trimmed.find(needle.as_str()) else {
+            continue;
+        };
+        let after = trimmed[pos + needle.len()..].trim_start();
+        let quote = after.chars().next()?;
+        if quote != '"' && quote != '\'' {
+            continue;
+        }
+        let rest = &after[1..];
+        if let Some(end) = rest.find(quote) {
+            return Some(rest[..end].to_string());
+        }
+    }
+    None
+}
+
 pub fn register_discovered(
     id: String,
     path: PathBuf,
@@ -263,6 +285,14 @@ pub fn register_discovered(
     if id.is_empty() {
         return;
     }
+
+    // Statically parse version + description from the source file so stubs show real metadata.
+    let source = std::fs::read_to_string(&path).unwrap_or_default();
+    let stub_version = parse_register_module_field(&source, "version")
+        .unwrap_or_else(|| "0.0.0".to_string());
+    let stub_description = parse_register_module_field(&source, "description")
+        .unwrap_or_default();
+
     if let Ok(mut reg) = registry().lock() {
         if let Some(existing) = reg.modules.iter_mut().find(|m| m.name == id) {
             existing.path = Some(path);
@@ -275,12 +305,23 @@ pub fn register_discovered(
             if !existing.loaded && !declared_platforms.is_empty() {
                 existing.supported_platforms = declared_platforms;
             }
+            // Update stub metadata if the body hasn't set it yet.
+            if !existing.loaded {
+                if existing.version == "0.0.0" && !stub_version.is_empty() {
+                    existing.version = stub_version;
+                }
+                if existing.description.is_empty() || existing.description == "(not loaded)" {
+                    if !stub_description.is_empty() {
+                        existing.description = stub_description;
+                    }
+                }
+            }
             return;
         }
         reg.modules.push(PythonModuleInfo {
             name: id,
-            version: "0.0.0".to_string(),
-            description: "(not loaded)".to_string(),
+            version: stub_version,
+            description: stub_description,
             enabled: persisted_enabled,
             required_permissions: declared_permissions,
             supported_platforms: declared_platforms,
@@ -411,10 +452,11 @@ pub fn unregister_extension_contributions(name: &str) {
         reg.highlight_providers.retain(|_, (id, _)| id != name);
         reg.decoration_providers.retain(|(id, _)| id != name);
         reg.editor_token_modules.remove(name);
-        if let Some(m) = reg.modules.iter_mut().find(|m| m.name == name) {
-            m.loaded = false;
-        }
+        reg.nav_pages.retain(|p| p.extension_id != name);
     }
+    // Clear any overlay sprite this extension set — owner tracking not implemented yet so
+    // we clear unconditionally on any disable. An extension that didn't set a sprite is a no-op.
+    crate::modules::overlay_hud_sprite::clear_sprite_for_owner(name);
 }
 
 pub fn set_extension_enabled(name: &str, enabled: bool) {

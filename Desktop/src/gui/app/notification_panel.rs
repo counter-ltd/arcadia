@@ -3,7 +3,7 @@ use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
     ParentElement, SharedString, Styled, Window,
 };
 

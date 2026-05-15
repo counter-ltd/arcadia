@@ -282,6 +282,10 @@ impl Render for ArcadiaRoot {
                         this.llama_cpp_provider_menu = None;
                         changed = true;
                     }
+                    if this.ollama_provider_menu.is_some() {
+                        this.ollama_provider_menu = None;
+                        changed = true;
+                    }
                     if this.settings_pin_context_menu.is_some() {
                         this.settings_pin_context_menu = None;
                         changed = true;
@@ -442,14 +446,17 @@ impl ArcadiaRoot {
                         "ollama",
                     ));
                 }
-                for model in &self.openai_models {
-                    v.push((
-                        model.id.clone(),
-                        model.name.clone(),
-                        "OpenAI",
-                        AI_OPENAI_MODULE_NAME.to_string(),
-                        "openai",
-                    ));
+                for provider in &self.openai_providers {
+                    let type_label: &'static str = "OpenAI";
+                    for model in &provider.models {
+                        v.push((
+                            model.id.clone(),
+                            model.name.clone(),
+                            type_label,
+                            AI_OPENAI_MODULE_NAME.to_string(),
+                            "openai",
+                        ));
+                    }
                 }
                 if self.is_module_enabled(AI_APFEL_MODULE_NAME) {
                     v.push((
@@ -925,6 +932,26 @@ impl ArcadiaRoot {
                                 error: None,
                             });
                             cx.notify();
+                        })),
+                )
+                .into_any_element()
+        } else if let Some(menu_pos) = self.ollama_provider_menu {
+            div()
+                .absolute()
+                .left(menu_pos.x)
+                .top(menu_pos.y)
+                .min_w(px(172.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .child(
+                    menu_row("search", "Discover Models".into(), text_color, text_color)
+                        .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
+                            this.ollama_provider_menu = None;
+                            this.discover_ollama_models(window, cx);
                         })),
                 )
                 .into_any_element()

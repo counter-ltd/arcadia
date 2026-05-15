@@ -1,6 +1,6 @@
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
+    div, px, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
 };
 
 use arcadia_core::modules;

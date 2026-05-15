@@ -20,8 +20,9 @@ pub(crate) fn provider_accent(module_name: &str) -> &'static str {
     match module_name {
         AI_EXEC_CLAUDE_MODULE_NAME => "orange",
         AI_EXEC_GEMINI_MODULE_NAME => "sky",
-        AI_EXEC_CODEX_MODULE_NAME | AI_OPENAI_MODULE_NAME => "emerald",
-        AI_EXEC_AIDER_MODULE_NAME => "teal",
+        AI_EXEC_CODEX_MODULE_NAME => "cyan",
+        AI_OPENAI_MODULE_NAME => "emerald",
+        AI_EXEC_AIDER_MODULE_NAME => "emerald",
         AI_LLAMA_CPP_MODULE_NAME => "amber",
         AI_OLLAMA_MODULE_NAME => "cyan",
         AI_APFEL_MODULE_NAME => "indigo",
@@ -236,6 +237,21 @@ impl ArcadiaRoot {
             }
         }
 
+        // OpenAI: create form early-return (takes priority over detail view).
+        if let Some(ref draft) = self.openai_create_draft.clone() {
+            return self.openai_provider_create_form(window, cx, is_dark, draft.clone()).into_any_element();
+        }
+
+        // OpenAI: provider detail / edit view early-return.
+        if let Some(provider_id) = self.active_openai_provider_id.clone() {
+            if let Some(provider) = self.openai_providers.iter().find(|p| p.id == provider_id).cloned() {
+                if self.openai_provider_edit_draft.is_some() {
+                    return self.openai_provider_edit_form(window, cx, is_dark, provider.clone()).into_any_element();
+                }
+                return self.openai_provider_detail(window, cx, is_dark, provider).into_any_element();
+            }
+        }
+
         let providers = enabled_ai_providers(&self.module_rows);
         let active_module = self.active_ai_provider_module.clone();
 
@@ -293,7 +309,7 @@ impl ArcadiaRoot {
             }
 
             let module_name = provider.module_name.to_string();
-            let is_active =
+            let _is_active =
                 active_module == provider.module_name && self.active_llama_cpp_model_id.is_none();
             let pal = theme::nav_accent_palette(provider_accent(provider.module_name), is_dark);
             let card_border = pal.icon_idle;
@@ -349,99 +365,150 @@ impl ArcadiaRoot {
                     }),
                 );
 
-            // llama.cpp: show model list
-            if provider.module_name == AI_LLAMA_CPP_MODULE_NAME && !self.llama_cpp_models.is_empty()
-            {
-                let mut model_list = div()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .pt_2()
-                    .border_t_1()
-                    .border_color(p.panel_border);
+            // llama.cpp: show model list + Create Model button
+            if provider.module_name == AI_LLAMA_CPP_MODULE_NAME {
+                if !self.llama_cpp_models.is_empty() {
+                    let mut model_list = div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .pt_2()
+                        .border_t_1()
+                        .border_color(p.panel_border);
 
-                for model in &self.llama_cpp_models {
-                    let model_id = model.id.clone();
-                    let model_id_hover = model_id.clone();
-                    let name = model.name.clone();
-                    let type_label = model.model_kind.label();
-                    let type_icon = model.model_kind.icon_key();
-                    let is_model_active =
-                        self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
-                    let row_bg = if is_model_active {
-                        pal.row_selected
-                    } else {
-                        p.panel_bg
-                    };
-                    let row_hover = pal.row_hover;
-                    let name_col = if is_model_active {
-                        pal.icon_active
-                    } else {
-                        p.content_title
-                    };
+                    for model in &self.llama_cpp_models {
+                        let model_id = model.id.clone();
+                        let model_id_hover = model_id.clone();
+                        let name = model.name.clone();
+                        let type_label = model.model_kind.label();
+                        let type_icon = model.model_kind.icon_key();
+                        let is_model_active =
+                            self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
+                        let row_bg = if is_model_active {
+                            pal.row_selected
+                        } else {
+                            p.panel_bg
+                        };
+                        let row_hover = pal.row_hover;
+                        let name_col = if is_model_active {
+                            pal.icon_active
+                        } else {
+                            p.content_title
+                        };
 
-                    model_list = model_list.child(
-                        div()
-                            .px_2()
-                            .py_1p5()
-                            .rounded(px(radius.min(6.0)))
-                            .bg(row_bg)
-                            .hover(move |s| s.bg(row_hover))
-                            .cursor_pointer()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(render_icon(type_icon).size_4().text_color(name_col))
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .text_color(name_col)
-                                            .child(name),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .px_1p5()
-                                    .py_0p5()
-                                    .rounded(px(4.0))
-                                    .bg(p.badge_muted_bg)
-                                    .flex()
-                                    .items_center()
-                                    .gap_1()
-                                    .child(
-                                        render_icon(type_icon)
-                                            .size_3()
-                                            .text_color(p.badge_muted_fg),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(p.badge_muted_fg)
-                                            .child(type_label),
-                                    ),
-                            )
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(move |this, _, _, cx| {
-                                    cx.stop_propagation();
-                                    this.active_llama_cpp_model_id = Some(model_id_hover.clone());
-                                    this.active_ai_provider_module =
-                                        AI_LLAMA_CPP_MODULE_NAME.to_string();
-                                    this.llama_cpp_edit_draft = None;
-                                    this.llama_cpp_delete_confirm = false;
-                                    cx.notify();
-                                }),
-                            ),
-                    );
+                        model_list = model_list.child(
+                            div()
+                                .px_2()
+                                .py_1p5()
+                                .rounded(px(radius.min(6.0)))
+                                .bg(row_bg)
+                                .hover(move |s| s.bg(row_hover))
+                                .cursor_pointer()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap_2()
+                                        .child(render_icon(type_icon).size_4().text_color(name_col))
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .font_weight(FontWeight::MEDIUM)
+                                                .text_color(name_col)
+                                                .child(name),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .px_1p5()
+                                        .py_0p5()
+                                        .rounded(px(4.0))
+                                        .bg(p.badge_muted_bg)
+                                        .flex()
+                                        .items_center()
+                                        .gap_1()
+                                        .child(
+                                            render_icon(type_icon)
+                                                .size_3()
+                                                .text_color(p.badge_muted_fg),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(p.badge_muted_fg)
+                                                .child(type_label),
+                                        ),
+                                )
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.active_llama_cpp_model_id = Some(model_id_hover.clone());
+                                        this.active_ai_provider_module =
+                                            AI_LLAMA_CPP_MODULE_NAME.to_string();
+                                        this.llama_cpp_edit_draft = None;
+                                        this.llama_cpp_delete_confirm = false;
+                                        cx.notify();
+                                    }),
+                                ),
+                        );
+                    }
+
+                    card = card.child(model_list);
                 }
 
-                card = card.child(model_list);
+                let has_models = !self.llama_cpp_models.is_empty();
+                let create_btn = div()
+                    .px_3()
+                    .py_1()
+                    .rounded(px(radius.min(8.0)))
+                    .bg(p.surface_elevated)
+                    .border_1()
+                    .border_color(p.border)
+                    .text_xs()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(p.content_title)
+                    .cursor_pointer()
+                    .child("Create Model")
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.llama_cpp_create_draft =
+                                Some(crate::gui::app::LlamaCppModelCreateDraft {
+                                    name: String::new(),
+                                    path: String::new(),
+                                    mmproj_path: String::new(),
+                                    model_kind: arcadia_core::config::llama_cpp::LlamaCppModelKind::TextGeneration,
+                                    error: None,
+                                });
+                            cx.notify();
+                        }),
+                    );
+
+                card = card.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .pt_2()
+                        .border_t_1()
+                        .border_color(p.panel_border)
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(p.ui_subtext)
+                                .child(if has_models {
+                                    format!("{} model(s)", self.llama_cpp_models.len())
+                                } else {
+                                    "No models configured".to_string()
+                                }),
+                        )
+                        .child(create_btn),
+                );
             }
 
             // Ollama: show discovered model list + Discover button
@@ -548,271 +615,36 @@ impl ArcadiaRoot {
                 card = card.child(section);
             }
 
-            // OpenAI: show api_key + base_url settings + models list
+            // OpenAI: show provider list + Add Provider button
             if provider.module_name == AI_OPENAI_MODULE_NAME {
-                let api_key_focused = self.openai_api_key_focus.is_focused(window);
-                let base_url_focused = self.openai_base_url_focus.is_focused(window);
-                let blink = self.text_caret_blink_visible;
+                let openai_providers = self.openai_providers.clone();
+                let has_providers = !openai_providers.is_empty();
 
-                let api_key_display = if let Some(ref draft) = self.openai_api_key_draft {
-                    text_with_trailing_caret(draft, api_key_focused, blink)
-                } else if self.openai_api_key.is_empty() {
-                    "Not set".to_string()
-                } else {
-                    // Mask all but last 4 chars
-                    let key = &self.openai_api_key;
-                    if key.len() > 4 {
-                        format!("{}…{}", "•".repeat(8), &key[key.len() - 4..])
-                    } else {
-                        "•".repeat(key.len())
-                    }
-                };
-
-                let base_url_display = if let Some(ref draft) = self.openai_base_url_draft {
-                    text_with_trailing_caret(draft, base_url_focused, blink)
-                } else {
-                    self.openai_base_url.clone()
-                };
-
-                let editing_api_key = self.openai_api_key_draft.is_some();
-                let editing_base_url = self.openai_base_url_draft.is_some();
-                let api_key_fh = self.openai_api_key_focus.clone();
-                let base_url_fh = self.openai_base_url_focus.clone();
-
-                let openai_settings = div()
-                    .flex()
-                    .flex_col()
-                    .gap_3()
-                    .pt_2()
-                    .border_t_1()
-                    .border_color(p.panel_border)
-                    // API Key row
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(p.ui_subtext)
-                                    .child("API KEY"),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .flex_1()
-                                            .px_3()
-                                            .py_2()
-                                            .rounded(px(radius.min(8.0)))
-                                            .bg(p.surface_elevated)
-                                            .border_1()
-                                            .border_color(if api_key_focused {
-                                                p.accent
-                                            } else {
-                                                p.border
-                                            })
-                                            .text_sm()
-                                            .text_color(
-                                                if self.openai_api_key_draft.is_none()
-                                                    && self.openai_api_key.is_empty()
-                                                {
-                                                    p.ui_subtext
-                                                } else {
-                                                    p.content_title
-                                                },
-                                            )
-                                            .track_focus(&api_key_fh)
-                                            .on_mouse_down(
-                                                MouseButton::Left,
-                                                cx.listener(|this, _, window, cx| {
-                                                    this.openai_api_key_draft.get_or_insert_with(
-                                                        || this.openai_api_key.clone(),
-                                                    );
-                                                    this.openai_api_key_focus.focus(window);
-                                                    cx.notify();
-                                                }),
-                                            )
-                                            .on_key_down(cx.listener(
-                                                |this, event: &KeyDownEvent, _, cx| {
-                                                    if this.openai_api_key_draft.is_none() {
-                                                        return;
-                                                    }
-                                                    let key = event.keystroke.key.as_str();
-                                                    let mods = event.keystroke.modifiers;
-                                                    if key == "escape" {
-                                                        this.openai_api_key_draft = None;
-                                                    } else if key == "enter" {
-                                                        this.openai_save_settings(cx);
-                                                        return;
-                                                    } else if let Some(ref mut d) =
-                                                        this.openai_api_key_draft
-                                                    {
-                                                        if key == "backspace" {
-                                                            d.pop();
-                                                        } else if !mods.control
-                                                            && !mods.alt
-                                                            && !mods.platform
-                                                            && !mods.function
-                                                        {
-                                                            if let Some(kc) =
-                                                                &event.keystroke.key_char
-                                                            {
-                                                                d.push_str(kc);
-                                                            }
-                                                        }
-                                                    }
-                                                    cx.notify();
-                                                },
-                                            ))
-                                            .child(api_key_display),
-                                    )
-                                    .when(editing_api_key, |d| {
-                                        d.child(
-                                            div()
-                                                .px_3()
-                                                .py_2()
-                                                .rounded(px(radius.min(8.0)))
-                                                .bg(p.accent)
-                                                .text_xs()
-                                                .font_weight(FontWeight::SEMIBOLD)
-                                                .text_color(p.on_accent)
-                                                .cursor_pointer()
-                                                .child("Save")
-                                                .on_mouse_down(
-                                                    MouseButton::Left,
-                                                    cx.listener(|this, _, _, cx| {
-                                                        this.openai_save_settings(cx);
-                                                    }),
-                                                ),
-                                        )
-                                    }),
-                            ),
-                    )
-                    // Base URL row
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(p.ui_subtext)
-                                    .child("BASE URL"),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .flex_1()
-                                            .px_3()
-                                            .py_2()
-                                            .rounded(px(radius.min(8.0)))
-                                            .bg(p.surface_elevated)
-                                            .border_1()
-                                            .border_color(if base_url_focused {
-                                                p.accent
-                                            } else {
-                                                p.border
-                                            })
-                                            .text_sm()
-                                            .text_color(p.content_title)
-                                            .track_focus(&base_url_fh)
-                                            .on_mouse_down(
-                                                MouseButton::Left,
-                                                cx.listener(|this, _, window, cx| {
-                                                    this.openai_base_url_draft.get_or_insert_with(
-                                                        || this.openai_base_url.clone(),
-                                                    );
-                                                    this.openai_base_url_focus.focus(window);
-                                                    cx.notify();
-                                                }),
-                                            )
-                                            .on_key_down(cx.listener(
-                                                |this, event: &KeyDownEvent, _, cx| {
-                                                    if this.openai_base_url_draft.is_none() {
-                                                        return;
-                                                    }
-                                                    let key = event.keystroke.key.as_str();
-                                                    let mods = event.keystroke.modifiers;
-                                                    if key == "escape" {
-                                                        this.openai_base_url_draft = None;
-                                                    } else if key == "enter" {
-                                                        this.openai_save_settings(cx);
-                                                        return;
-                                                    } else if let Some(ref mut d) =
-                                                        this.openai_base_url_draft
-                                                    {
-                                                        if key == "backspace" {
-                                                            d.pop();
-                                                        } else if !mods.control
-                                                            && !mods.alt
-                                                            && !mods.platform
-                                                            && !mods.function
-                                                        {
-                                                            if let Some(kc) =
-                                                                &event.keystroke.key_char
-                                                            {
-                                                                d.push_str(kc);
-                                                            }
-                                                        }
-                                                    }
-                                                    cx.notify();
-                                                },
-                                            ))
-                                            .child(base_url_display),
-                                    )
-                                    .when(editing_base_url, |d| {
-                                        d.child(
-                                            div()
-                                                .px_3()
-                                                .py_2()
-                                                .rounded(px(radius.min(8.0)))
-                                                .bg(p.accent)
-                                                .text_xs()
-                                                .font_weight(FontWeight::SEMIBOLD)
-                                                .text_color(p.on_accent)
-                                                .cursor_pointer()
-                                                .child("Save")
-                                                .on_mouse_down(
-                                                    MouseButton::Left,
-                                                    cx.listener(|this, _, _, cx| {
-                                                        this.openai_save_settings(cx);
-                                                    }),
-                                                ),
-                                        )
-                                    }),
-                            ),
-                    );
-
-                card = card.child(openai_settings);
-
-                // OpenAI model list
-                if !self.openai_models.is_empty() {
-                    let openai_models = self.openai_models.clone();
-                    let mut model_list = div()
+                if has_providers {
+                    let mut provider_list = div()
                         .flex()
                         .flex_col()
                         .gap_1()
                         .pt_2()
                         .border_t_1()
                         .border_color(p.panel_border);
-                    for model in &openai_models {
-                        let name = model.name.clone();
-                        let kind_label = model.model_kind.label();
-                        let kind_icon = model.model_kind.icon_key();
-                        let model_id_label = model.model_id.clone();
-                        model_list = model_list.child(
+
+                    for prov in &openai_providers {
+                        let pid = prov.id.clone();
+                        let pname = prov.name.clone();
+                        let key_hint = if prov.api_key.is_empty() {
+                            "No key".to_string()
+                        } else {
+                            let k = &prov.api_key;
+                            if k.len() > 4 {
+                                format!("{}…{}", "•".repeat(4), &k[k.len() - 4..])
+                            } else {
+                                "•".repeat(k.len())
+                            }
+                        };
+                        let base = prov.base_url.clone();
+                        let model_count = prov.models.len();
+                        provider_list = provider_list.child(
                             div()
                                 .px_2()
                                 .py_1p5()
@@ -820,19 +652,25 @@ impl ArcadiaRoot {
                                 .flex()
                                 .items_center()
                                 .justify_between()
+                                .cursor_pointer()
+                                .hover(move |s| s.bg(p.surface_elevated))
                                 .child(
                                     div()
                                         .flex()
                                         .flex_col()
                                         .gap_0p5()
                                         .child(
-                                            div().text_sm().text_color(p.content_title).child(name),
+                                            div()
+                                                .text_sm()
+                                                .font_weight(FontWeight::MEDIUM)
+                                                .text_color(p.content_title)
+                                                .child(pname),
                                         )
                                         .child(
                                             div()
                                                 .text_xs()
                                                 .text_color(p.content_meta)
-                                                .child(model_id_label),
+                                                .child(format!("{base}  ·  {key_hint}")),
                                         ),
                                 )
                                 .child(
@@ -841,25 +679,72 @@ impl ArcadiaRoot {
                                         .py_0p5()
                                         .rounded(px(4.0))
                                         .bg(p.badge_muted_bg)
-                                        .flex()
-                                        .items_center()
-                                        .gap_1()
-                                        .child(
-                                            render_icon(kind_icon)
-                                                .size_3()
-                                                .text_color(p.badge_muted_fg),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(p.badge_muted_fg)
-                                                .child(kind_label),
-                                        ),
+                                        .text_xs()
+                                        .text_color(p.badge_muted_fg)
+                                        .child(format!("{model_count} model(s)")),
+                                )
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        this.active_openai_provider_id = Some(pid.clone());
+                                        this.openai_provider_edit_draft = None;
+                                        this.openai_provider_delete_confirm = false;
+                                        cx.notify();
+                                    }),
                                 ),
                         );
                     }
-                    card = card.child(model_list);
+
+                    card = card.child(provider_list);
                 }
+
+                let add_btn = div()
+                    .px_3()
+                    .py_1()
+                    .rounded(px(radius.min(8.0)))
+                    .bg(p.surface_elevated)
+                    .border_1()
+                    .border_color(p.border)
+                    .text_xs()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(p.content_title)
+                    .cursor_pointer()
+                    .child("Add Provider")
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.openai_create_draft = Some(crate::gui::app::OpenAiProviderDraft {
+                                name: String::new(),
+                                api_key: String::new(),
+                                base_url: "https://api.openai.com".to_string(),
+                                error: None,
+                            });
+                            this.active_openai_provider_id = None;
+                            cx.notify();
+                        }),
+                    );
+
+                card = card.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .pt_2()
+                        .border_t_1()
+                        .border_color(p.panel_border)
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(p.ui_subtext)
+                                .child(if has_providers {
+                                    format!("{} provider(s)", openai_providers.len())
+                                } else {
+                                    "No providers configured".to_string()
+                                }),
+                        )
+                        .child(add_btn),
+                );
             }
 
             root = root.child(card);
@@ -1023,5 +908,598 @@ impl ArcadiaRoot {
         }
 
         root.into_any_element()
+    }
+
+    fn openai_provider_detail(
+        &mut self,
+        _window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        provider: arcadia_core::config::openai::OpenAiProvider,
+    ) -> impl IntoElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let g_snap = theme::glyph_snapshot(cx);
+        let is_glyph = g_snap.is_some();
+        let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
+        let pal = theme::nav_accent_palette("emerald", is_dark);
+
+        let is_delete_confirm = self.openai_provider_delete_confirm;
+        let delete_bg = if is_delete_confirm { p.danger } else { p.surface_elevated };
+        let delete_fg = if is_delete_confirm { p.on_accent } else { p.danger };
+        let delete_border = if is_delete_confirm { p.danger } else { p.border };
+
+        let key_display = if provider.api_key.is_empty() {
+            "Not set".to_string()
+        } else {
+            let k = &provider.api_key;
+            if k.len() > 4 {
+                format!("{}…{}", "•".repeat(8), &k[k.len() - 4..])
+            } else {
+                "•".repeat(k.len())
+            }
+        };
+
+        let prov_for_edit = provider.clone();
+        let mut detail = div()
+            .w_full()
+            .when(is_glyph, |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
+            .flex()
+            .flex_col()
+            .gap_6()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_2xl()
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(p.content_title)
+                            .child(provider.name.clone()),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(p.content_meta)
+                            .child("OpenAI-compatible provider"),
+                    ),
+            )
+            .child(
+                div()
+                    .rounded(px(radius.min(12.0)))
+                    .border_1()
+                    .border_color(p.panel_border)
+                    .bg(p.panel_bg)
+                    .p_4()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_0p5()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(p.ui_subtext)
+                                    .child("BASE URL"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(p.content_title)
+                                    .child(if provider.base_url.is_empty() {
+                                        "https://api.openai.com".to_string()
+                                    } else {
+                                        provider.base_url.clone()
+                                    }),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_0p5()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(p.ui_subtext)
+                                    .child("API KEY"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(if provider.api_key.is_empty() {
+                                        p.ui_subtext
+                                    } else {
+                                        p.content_title
+                                    })
+                                    .child(key_display),
+                            ),
+                    ),
+            );
+
+        if !provider.models.is_empty() {
+            let mut model_list = div()
+                .rounded(px(radius.min(12.0)))
+                .border_1()
+                .border_color(p.panel_border)
+                .bg(p.panel_bg)
+                .p_4()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(p.ui_subtext)
+                        .child(format!("MODELS ({})", provider.models.len())),
+                );
+            for model in &provider.models {
+                let name = model.name.clone();
+                let model_id_label = model.model_id.clone();
+                let kind_label = model.model_kind.label();
+                let kind_icon = model.model_kind.icon_key();
+                model_list = model_list.child(
+                    div()
+                        .px_1()
+                        .py_1()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap_0p5()
+                                .child(div().text_sm().text_color(p.content_title).child(name))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(p.content_meta)
+                                        .child(model_id_label),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .px_1p5()
+                                .py_0p5()
+                                .rounded(px(4.0))
+                                .bg(p.badge_muted_bg)
+                                .flex()
+                                .items_center()
+                                .gap_1()
+                                .child(
+                                    render_icon(kind_icon)
+                                        .size_3()
+                                        .text_color(p.badge_muted_fg),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(p.badge_muted_fg)
+                                        .child(kind_label),
+                                ),
+                        ),
+                );
+            }
+            detail = detail.child(model_list);
+        }
+
+        detail = detail.child(
+            div()
+                .flex()
+                .gap_2()
+                .child(
+                    div()
+                        .px_3()
+                        .py_1p5()
+                        .rounded(px(radius.min(8.0)))
+                        .bg(p.surface_elevated)
+                        .border_1()
+                        .border_color(p.border)
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(p.content_title)
+                        .cursor_pointer()
+                        .hover(move |s| s.border_color(pal.row_hover))
+                        .child("Edit")
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.openai_provider_edit_draft =
+                                    Some(crate::gui::app::OpenAiProviderDraft {
+                                        name: prov_for_edit.name.clone(),
+                                        api_key: prov_for_edit.api_key.clone(),
+                                        base_url: prov_for_edit.base_url.clone(),
+                                        error: None,
+                                    });
+                                this.openai_provider_delete_confirm = false;
+                                cx.notify();
+                            }),
+                        ),
+                )
+                .child(
+                    div()
+                        .px_3()
+                        .py_1p5()
+                        .rounded(px(radius.min(8.0)))
+                        .bg(delete_bg)
+                        .border_1()
+                        .border_color(delete_border)
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(delete_fg)
+                        .cursor_pointer()
+                        .child(if is_delete_confirm { "Confirm Delete" } else { "Delete" })
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                if this.openai_provider_delete_confirm {
+                                    this.openai_provider_delete(cx);
+                                } else {
+                                    this.openai_provider_delete_confirm = true;
+                                    cx.notify();
+                                }
+                            }),
+                        ),
+                ),
+        );
+
+        detail
+    }
+
+    fn openai_provider_edit_form(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        provider: arcadia_core::config::openai::OpenAiProvider,
+    ) -> impl IntoElement {
+        let _ = provider;
+        self.openai_provider_form_inner(window, cx, is_dark, false)
+    }
+
+    fn openai_provider_create_form(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        _draft: crate::gui::app::OpenAiProviderDraft,
+    ) -> impl IntoElement {
+        self.openai_provider_form_inner(window, cx, is_dark, true)
+    }
+
+    fn openai_provider_form_inner(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        is_create: bool,
+    ) -> impl IntoElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let g_snap = theme::glyph_snapshot(cx);
+        let is_glyph = g_snap.is_some();
+        let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
+        let blink = self.text_caret_blink_visible;
+
+        let (draft_ref, name_fh, api_key_fh, base_url_fh) = if is_create {
+            (
+                self.openai_create_draft.as_ref(),
+                self.openai_create_name_focus.clone(),
+                self.openai_create_api_key_focus.clone(),
+                self.openai_create_base_url_focus.clone(),
+            )
+        } else {
+            (
+                self.openai_provider_edit_draft.as_ref(),
+                self.openai_edit_name_focus.clone(),
+                self.openai_edit_api_key_focus.clone(),
+                self.openai_edit_base_url_focus.clone(),
+            )
+        };
+
+        let name_val = draft_ref.map(|d| d.name.clone()).unwrap_or_default();
+        let api_key_val = draft_ref.map(|d| d.api_key.clone()).unwrap_or_default();
+        let base_url_val = draft_ref
+            .map(|d| d.base_url.clone())
+            .unwrap_or_else(|| "https://api.openai.com".to_string());
+        let error_msg = draft_ref.and_then(|d| d.error.clone());
+
+        let name_focused = name_fh.is_focused(window);
+        let api_key_focused = api_key_fh.is_focused(window);
+        let base_url_focused = base_url_fh.is_focused(window);
+
+        let api_key_display = if api_key_val.is_empty() {
+            text_with_trailing_caret("", api_key_focused, blink)
+        } else {
+            text_with_trailing_caret(&api_key_val, api_key_focused, blink)
+        };
+
+        let title = if is_create { "Add Provider" } else { "Edit Provider" };
+        let save_label = if is_create { "Create" } else { "Save" };
+
+        let name_fh2 = name_fh.clone();
+        let api_key_fh2 = api_key_fh.clone();
+        let base_url_fh2 = base_url_fh.clone();
+
+        let mut form = div()
+            .w_full()
+            .when(is_glyph, |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
+            .flex()
+            .flex_col()
+            .gap_6()
+            .child(
+                div()
+                    .text_2xl()
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(p.content_title)
+                    .child(title),
+            )
+            .child(
+                div()
+                    .rounded(px(radius.min(12.0)))
+                    .border_1()
+                    .border_color(p.panel_border)
+                    .bg(p.panel_bg)
+                    .p_4()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    // Name field
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(p.ui_subtext)
+                                    .child("NAME"),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded(px(radius.min(8.0)))
+                                    .bg(p.surface_elevated)
+                                    .border_1()
+                                    .border_color(if name_focused { p.accent } else { p.border })
+                                    .text_sm()
+                                    .text_color(p.content_title)
+                                    .track_focus(&name_fh2)
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, window, cx| {
+                                            if is_create {
+                                                if let Some(ref mut d) = this.openai_create_draft {
+                                                    let _ = d;
+                                                }
+                                            } else if let Some(ref mut d) =
+                                                this.openai_provider_edit_draft
+                                            {
+                                                let _ = d;
+                                            }
+                                            name_fh.focus(window);
+                                            cx.notify();
+                                        }),
+                                    )
+                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                        let draft = if is_create {
+                                            this.openai_create_draft.as_mut()
+                                        } else {
+                                            this.openai_provider_edit_draft.as_mut()
+                                        };
+                                        let Some(d) = draft else { return };
+                                        let key = event.keystroke.key.as_str();
+                                        let mods = event.keystroke.modifiers;
+                                        if key == "escape" {
+                                            if is_create { this.openai_create_draft = None; }
+                                            else { this.openai_provider_edit_draft = None; }
+                                        } else if key == "backspace" {
+                                            d.name.pop();
+                                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                                            if let Some(kc) = &event.keystroke.key_char {
+                                                d.name.push_str(kc);
+                                            }
+                                        }
+                                        cx.notify();
+                                    }))
+                                    .child(text_with_trailing_caret(&name_val, name_focused, blink)),
+                            ),
+                    )
+                    // API Key field
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(p.ui_subtext)
+                                    .child("API KEY"),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded(px(radius.min(8.0)))
+                                    .bg(p.surface_elevated)
+                                    .border_1()
+                                    .border_color(if api_key_focused { p.accent } else { p.border })
+                                    .text_sm()
+                                    .text_color(p.content_title)
+                                    .track_focus(&api_key_fh2)
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |_, _, window, cx| {
+                                            api_key_fh.focus(window);
+                                            cx.notify();
+                                        }),
+                                    )
+                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                        let draft = if is_create {
+                                            this.openai_create_draft.as_mut()
+                                        } else {
+                                            this.openai_provider_edit_draft.as_mut()
+                                        };
+                                        let Some(d) = draft else { return };
+                                        let key = event.keystroke.key.as_str();
+                                        let mods = event.keystroke.modifiers;
+                                        if key == "escape" {
+                                            if is_create { this.openai_create_draft = None; }
+                                            else { this.openai_provider_edit_draft = None; }
+                                        } else if key == "backspace" {
+                                            d.api_key.pop();
+                                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                                            if let Some(kc) = &event.keystroke.key_char {
+                                                d.api_key.push_str(kc);
+                                            }
+                                        }
+                                        cx.notify();
+                                    }))
+                                    .child(api_key_display),
+                            ),
+                    )
+                    // Base URL field
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(p.ui_subtext)
+                                    .child("BASE URL"),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded(px(radius.min(8.0)))
+                                    .bg(p.surface_elevated)
+                                    .border_1()
+                                    .border_color(if base_url_focused { p.accent } else { p.border })
+                                    .text_sm()
+                                    .text_color(p.content_title)
+                                    .track_focus(&base_url_fh2)
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |_, _, window, cx| {
+                                            base_url_fh.focus(window);
+                                            cx.notify();
+                                        }),
+                                    )
+                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                        let draft = if is_create {
+                                            this.openai_create_draft.as_mut()
+                                        } else {
+                                            this.openai_provider_edit_draft.as_mut()
+                                        };
+                                        let Some(d) = draft else { return };
+                                        let key = event.keystroke.key.as_str();
+                                        let mods = event.keystroke.modifiers;
+                                        if key == "escape" {
+                                            if is_create { this.openai_create_draft = None; }
+                                            else { this.openai_provider_edit_draft = None; }
+                                        } else if key == "enter" {
+                                            if is_create { this.openai_provider_save_create(cx); }
+                                            else { this.openai_provider_save_edit(cx); }
+                                            return;
+                                        } else if key == "backspace" {
+                                            d.base_url.pop();
+                                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                                            if let Some(kc) = &event.keystroke.key_char {
+                                                d.base_url.push_str(kc);
+                                            }
+                                        }
+                                        cx.notify();
+                                    }))
+                                    .child(text_with_trailing_caret(
+                                        &base_url_val,
+                                        base_url_focused,
+                                        blink,
+                                    )),
+                            ),
+                    ),
+            );
+
+        if let Some(err) = error_msg {
+            form = form.child(
+                div()
+                    .text_sm()
+                    .text_color(p.danger)
+                    .child(err),
+            );
+        }
+
+        form = form.child(
+            div()
+                .flex()
+                .gap_2()
+                .child(
+                    div()
+                        .px_3()
+                        .py_1p5()
+                        .rounded(px(radius.min(8.0)))
+                        .bg(p.accent)
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(p.on_accent)
+                        .cursor_pointer()
+                        .child(save_label)
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                if is_create {
+                                    this.openai_provider_save_create(cx);
+                                } else {
+                                    this.openai_provider_save_edit(cx);
+                                }
+                            }),
+                        ),
+                )
+                .child(
+                    div()
+                        .px_3()
+                        .py_1p5()
+                        .rounded(px(radius.min(8.0)))
+                        .bg(p.surface_elevated)
+                        .border_1()
+                        .border_color(p.border)
+                        .text_sm()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(p.content_title)
+                        .cursor_pointer()
+                        .child("Cancel")
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                if is_create {
+                                    this.openai_create_draft = None;
+                                } else {
+                                    this.openai_provider_edit_draft = None;
+                                }
+                                cx.notify();
+                            }),
+                        ),
+                ),
+        );
+
+        form
     }
 }

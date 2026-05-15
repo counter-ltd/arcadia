@@ -49,9 +49,11 @@ impl OpenAiModelKind {
     }
 }
 
+/// A single OpenAI-compatible provider instance (distinct URL + API key + model list).
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct OpenAiConfig {
-    // Stored as plaintext in openai.toml. Future: migrate to OS keychain.
+pub struct OpenAiProvider {
+    pub id: String,
+    pub name: String,
     #[serde(default)]
     pub api_key: String,
     #[serde(default)]
@@ -60,12 +62,27 @@ pub struct OpenAiConfig {
     pub models: Vec<OpenAiModel>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OpenAiConfig {
+    #[serde(default)]
+    pub providers: Vec<OpenAiProvider>,
+    // Legacy fields from the old flat format (single api_key + base_url + models at top level).
+    // Read-only for migration — never written back (skip_serializing).
+    #[serde(default, skip_serializing, rename = "api_key")]
+    legacy_api_key: String,
+    #[serde(default, skip_serializing, rename = "base_url")]
+    legacy_base_url: String,
+    #[serde(default, skip_serializing, rename = "models")]
+    legacy_models: Vec<OpenAiModel>,
+}
+
 impl Default for OpenAiConfig {
     fn default() -> Self {
         Self {
-            api_key: String::new(),
-            base_url: "https://api.openai.com".to_string(),
-            models: Vec::new(),
+            providers: Vec::new(),
+            legacy_api_key: String::new(),
+            legacy_base_url: String::new(),
+            legacy_models: Vec::new(),
         }
     }
 }
@@ -76,6 +93,29 @@ impl ConfigFile for OpenAiConfig {
     }
 
     fn merge_defaults(&mut self) -> bool {
+        // Migrate old flat config (single api_key + base_url + models) to first provider entry.
+        if self.providers.is_empty()
+            && (!self.legacy_api_key.is_empty() || !self.legacy_models.is_empty())
+        {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let ms = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            let base_url = if self.legacy_base_url.is_empty() {
+                "https://api.openai.com".to_string()
+            } else {
+                self.legacy_base_url.clone()
+            };
+            self.providers.push(OpenAiProvider {
+                id: format!("p_{ms}"),
+                name: "OpenAI".to_string(),
+                api_key: self.legacy_api_key.clone(),
+                base_url,
+                models: self.legacy_models.clone(),
+            });
+            return true;
+        }
         false
     }
 }

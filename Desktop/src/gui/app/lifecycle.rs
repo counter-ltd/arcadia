@@ -254,8 +254,12 @@ impl ArcadiaRoot {
         let llama_cpp_edit_name_focus = cx.focus_handle();
         let llama_cpp_edit_path_focus = cx.focus_handle();
         let llama_cpp_edit_mmproj_focus = cx.focus_handle();
-        let openai_api_key_focus = cx.focus_handle();
-        let openai_base_url_focus = cx.focus_handle();
+        let openai_edit_name_focus = cx.focus_handle();
+        let openai_edit_api_key_focus = cx.focus_handle();
+        let openai_edit_base_url_focus = cx.focus_handle();
+        let openai_create_name_focus = cx.focus_handle();
+        let openai_create_api_key_focus = cx.focus_handle();
+        let openai_create_base_url_focus = cx.focus_handle();
         let command_bar_focus = cx.focus_handle();
         let notification_max_count_focus = cx.focus_handle();
         let notification_unread_count =
@@ -458,16 +462,21 @@ impl ArcadiaRoot {
             ollama_endpoint: ollama_cfg.endpoint,
             ollama_models: ollama_cfg.models,
             ollama_discovering: false,
-            openai_api_key: openai_cfg.api_key,
-            openai_base_url: openai_cfg.base_url,
-            openai_api_key_draft: None,
-            openai_base_url_draft: None,
-            openai_api_key_focus,
-            openai_base_url_focus,
-            openai_models: openai_cfg.models,
+            openai_providers: openai_cfg.providers,
+            active_openai_provider_id: None,
+            openai_provider_edit_draft: None,
+            openai_edit_name_focus,
+            openai_edit_api_key_focus,
+            openai_edit_base_url_focus,
+            openai_provider_delete_confirm: false,
+            openai_create_draft: None,
+            openai_create_name_focus,
+            openai_create_api_key_focus,
+            openai_create_base_url_focus,
             workspace_entries,
             active_llama_cpp_model_id: None,
             llama_cpp_provider_menu: None,
+            ollama_provider_menu: None,
             llama_cpp_create_draft: None,
             llama_cpp_create_name_focus,
             llama_cpp_create_path_focus,
@@ -482,6 +491,7 @@ impl ArcadiaRoot {
             workspace_create_path_focus,
             module_rows,
             python_extension_rows: Vec::new(),
+            python_host_started: false,
             active_style,
             available_styles,
             pending_module_enable: None,
@@ -598,6 +608,9 @@ impl ArcadiaRoot {
             notification_max_count_draft: String::new(),
             notification_max_count_focus,
             notification_dest_open: false,
+            notification_preview_text: String::new(),
+            notification_content_alpha: 1.0,
+            notification_preview_anim: None,
             pinned_settings_pages: ui_prefs_cfg.pinned_settings_pages,
             settings_pin_context_menu: None,
         };
@@ -636,6 +649,7 @@ impl ArcadiaRoot {
             if let Err(e) = arcadia_python::PythonExtensionHost::start(ext_dir) {
                 eprintln!("python-host: {e}");
             }
+            root.python_host_started = true;
             // Startup may co-enable native modules (e.g. `overlay` for HUD extensions).
             root.reload_modules();
             root.python_extension_rows = {
@@ -653,6 +667,9 @@ impl ArcadiaRoot {
         // Apply persisted style (may activate a glyph config from an extension).
         let active = root.active_style.clone();
         root.apply_style(active, true, cx);
+
+        // Sync hub/pill expansion state for the initial page (e.g. global.settings on first launch).
+        root.sync_settings_hub_expanded_from_active_page();
 
         #[cfg(all(feature = "gui", not(target_os = "ios")))]
         super::shortcuts::sync_os_global_hotkeys();
@@ -739,6 +756,9 @@ impl ArcadiaRoot {
         self.available_styles = styles;
         self.refresh_extension_token_cache();
         self.refresh_local_navigation_registry();
+        for tab in &mut self.code_editor_tabs {
+            tab.highlight_dirty = true;
+        }
         self.apply_style(active, self.current_color_scheme_dark(), cx);
     }
 
@@ -847,6 +867,25 @@ impl ArcadiaRoot {
                 r
             };
         }
+        // If python-host was just enabled at runtime (wasn't running at startup), start it now
+        // so extensions are discovered and the Extensions settings page shows them immediately.
+        #[cfg(feature = "python-extensions")]
+        if !self.python_host_started && self.is_module_enabled(PYTHON_HOST_MODULE_NAME) {
+            let ext_dir = arcadia_core::config::config_root_dir()
+                .ok()
+                .and_then(|d| d.parent().map(|p| p.join("Extensions")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Extensions"));
+            if let Err(e) = arcadia_python::PythonExtensionHost::start(ext_dir) {
+                eprintln!("python-host: {e}");
+            }
+            self.python_host_started = true;
+            self.python_extension_rows = {
+                let mut rows = arcadia_core::modules::python_registry::list_modules();
+                rows.sort_by(|a, b| a.0.cmp(&b.0));
+                rows
+            };
+            self.available_styles = merged_available_styles();
+        }
         self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();
         for tab in &mut self.code_editor_tabs {
@@ -933,7 +972,7 @@ impl ArcadiaRoot {
     /// Drain the inference event channel. Returns `true` if any event was processed.
     pub fn poll_ai_events(&mut self, cx: &mut Context<Self>) -> bool {
         use crate::gui::app::ai_runtime::RuntimeEvent;
-        use crate::gui::app::{AiMessage, AiMessageRole, AiPendingEdit, DiffHunk, DiffHunkKind};
+        use crate::gui::app::{AiMessage, AiMessageRole, AiPendingEdit};
 
         let mut any = false;
         let mut pending_autosave: Option<usize> = None;
@@ -1276,29 +1315,106 @@ impl ArcadiaRoot {
         .detach();
     }
 
-    /// Save the OpenAI API key and base URL drafts to openai.toml.
-    pub fn openai_save_settings(&mut self, cx: &mut Context<Self>) {
-        let api_key = self
-            .openai_api_key_draft
-            .take()
-            .unwrap_or_else(|| self.openai_api_key.clone());
-        let base_url = self
-            .openai_base_url_draft
-            .take()
-            .unwrap_or_else(|| self.openai_base_url.clone());
-
+    /// Save edits to the active OpenAI provider.
+    pub fn openai_provider_save_edit(&mut self, cx: &mut Context<Self>) {
+        let Some(provider_id) = self.active_openai_provider_id.clone() else {
+            return;
+        };
+        let Some(draft) = self.openai_provider_edit_draft.clone() else {
+            return;
+        };
+        let name = draft.name.trim().to_string();
+        if name.is_empty() {
+            if let Some(ref mut d) = self.openai_provider_edit_draft {
+                d.error = Some("Name is required.".to_string());
+            }
+            cx.notify();
+            return;
+        }
         let mut cfg =
             arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
-        cfg.api_key = api_key.clone();
-        cfg.base_url = base_url.clone();
-
+        if let Some(p) = cfg.providers.iter_mut().find(|p| p.id == provider_id) {
+            p.name = name.clone();
+            p.api_key = draft.api_key.clone();
+            p.base_url = draft.base_url.clone();
+        }
         match cfg.save() {
             Ok(()) => {
-                self.openai_api_key = api_key;
-                self.openai_base_url = base_url;
+                if let Some(p) = self.openai_providers.iter_mut().find(|p| p.id == provider_id) {
+                    p.name = name;
+                    p.api_key = draft.api_key;
+                    p.base_url = draft.base_url;
+                }
+                self.openai_provider_edit_draft = None;
             }
             Err(e) => {
                 eprintln!("openai config save failed: {e}");
+            }
+        }
+        cx.notify();
+    }
+
+    /// Delete the active OpenAI provider.
+    pub fn openai_provider_delete(&mut self, cx: &mut Context<Self>) {
+        let Some(provider_id) = self.active_openai_provider_id.clone() else {
+            return;
+        };
+        let mut cfg =
+            arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
+        cfg.providers.retain(|p| p.id != provider_id);
+        if cfg.save().is_err() {
+            return;
+        }
+        self.openai_providers.retain(|p| p.id != provider_id);
+        self.active_openai_provider_id = None;
+        self.openai_provider_delete_confirm = false;
+        cx.notify();
+    }
+
+    /// Save a new OpenAI provider from the create draft.
+    pub fn openai_provider_save_create(&mut self, cx: &mut Context<Self>) {
+        let Some(draft) = self.openai_create_draft.clone() else {
+            return;
+        };
+        let name = draft.name.trim().to_string();
+        if name.is_empty() {
+            if let Some(ref mut d) = self.openai_create_draft {
+                d.error = Some("Name is required.".to_string());
+            }
+            cx.notify();
+            return;
+        }
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let id = format!("p_{ms}");
+        let base_url = if draft.base_url.trim().is_empty() {
+            "https://api.openai.com".to_string()
+        } else {
+            draft.base_url.trim().to_string()
+        };
+        let provider = arcadia_core::config::openai::OpenAiProvider {
+            id: id.clone(),
+            name,
+            api_key: draft.api_key.trim().to_string(),
+            base_url,
+            models: Vec::new(),
+        };
+        let mut cfg =
+            arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
+        cfg.providers.push(provider.clone());
+        match cfg.save() {
+            Ok(()) => {
+                self.openai_providers.push(provider);
+                self.active_openai_provider_id = Some(id);
+                self.openai_create_draft = None;
+            }
+            Err(e) => {
+                if let Some(ref mut d) = self.openai_create_draft {
+                    d.error = Some(format!("Save failed: {e}"));
+                }
             }
         }
         cx.notify();
@@ -1374,8 +1490,12 @@ impl ArcadiaRoot {
             || self
                 .code_editor_char_width_focus
                 .contains_focused(window, cx)
-            || self.openai_api_key_focus.contains_focused(window, cx)
-            || self.openai_base_url_focus.contains_focused(window, cx)
+            || self.openai_edit_name_focus.contains_focused(window, cx)
+            || self.openai_edit_api_key_focus.contains_focused(window, cx)
+            || self.openai_edit_base_url_focus.contains_focused(window, cx)
+            || self.openai_create_name_focus.contains_focused(window, cx)
+            || self.openai_create_api_key_focus.contains_focused(window, cx)
+            || self.openai_create_base_url_focus.contains_focused(window, cx)
             || self
                 .llama_cpp_create_name_focus
                 .contains_focused(window, cx)
@@ -1583,6 +1703,11 @@ impl ArcadiaRoot {
             }
         }
 
+        // Tick notification badge preview animation.
+        if self.tick_notification_preview(now) {
+            running = true;
+        }
+
         running
     }
 
@@ -1601,6 +1726,142 @@ impl ArcadiaRoot {
             page_id.to_string(),
             super::CaretAnim { start: Instant::now(), from, to },
         );
+    }
+
+    /// Tick the notification badge preview animation. Returns true while still running.
+    pub fn tick_notification_preview(&mut self, now: std::time::Instant) -> bool {
+        use arcadia_core::modules::animation::{apply_easing, Easing};
+        use super::{NotificationPreviewAnim, NotificationPreviewPhase};
+
+        const PILL_FADE_S: f32 = 0.30;
+        const TEXT_FADE_S: f32 = 0.20;
+        const HOLD_S: f32 = 2.0;
+
+        let Some(anim) = self.notification_preview_anim.clone() else {
+            return false;
+        };
+        let elapsed = (now - anim.phase_start).as_secs_f32();
+
+        match anim.phase {
+            NotificationPreviewPhase::PillEnter => {
+                let t = apply_easing(Easing::EaseOutCubic, (elapsed / PILL_FADE_S).min(1.0));
+                self.pill_expand_alphas.insert("notification.main".to_string(), t);
+                if elapsed >= PILL_FADE_S {
+                    self.pill_expand_alphas.insert("notification.main".to_string(), 1.0);
+                    self.notification_preview_anim = Some(NotificationPreviewAnim {
+                        phase_start: now,
+                        phase: NotificationPreviewPhase::PillHold,
+                    });
+                }
+                true
+            }
+            NotificationPreviewPhase::PillHold => {
+                if elapsed >= HOLD_S {
+                    self.notification_preview_anim = Some(NotificationPreviewAnim {
+                        phase_start: now,
+                        phase: NotificationPreviewPhase::PillExit,
+                    });
+                }
+                true
+            }
+            NotificationPreviewPhase::PillExit => {
+                let t = apply_easing(Easing::EaseInCubic, (elapsed / PILL_FADE_S).min(1.0));
+                self.pill_expand_alphas.insert("notification.main".to_string(), 1.0 - t);
+                if elapsed >= PILL_FADE_S {
+                    self.notification_preview_anim = None;
+                    self.notification_preview_text.clear();
+                    self.pill_expand_alphas.remove("notification.main");
+                    // Restore pill expand state from current active page.
+                    self.sync_pill_expand_from_active_page();
+                    return false;
+                }
+                true
+            }
+            NotificationPreviewPhase::TextFadeOut => {
+                let t = apply_easing(Easing::EaseInCubic, (elapsed / TEXT_FADE_S).min(1.0));
+                self.notification_content_alpha = 1.0 - t;
+                if elapsed >= TEXT_FADE_S {
+                    // Label is now invisible — preview text will be shown on next fade-in.
+                    self.notification_content_alpha = 0.0;
+                    self.notification_preview_anim = Some(NotificationPreviewAnim {
+                        phase_start: now,
+                        phase: NotificationPreviewPhase::TextFadeInPreview,
+                    });
+                }
+                true
+            }
+            NotificationPreviewPhase::TextFadeInPreview => {
+                let t = apply_easing(Easing::EaseOutCubic, (elapsed / TEXT_FADE_S).min(1.0));
+                self.notification_content_alpha = t;
+                if elapsed >= TEXT_FADE_S {
+                    self.notification_content_alpha = 1.0;
+                    self.notification_preview_anim = Some(NotificationPreviewAnim {
+                        phase_start: now,
+                        phase: NotificationPreviewPhase::TextHold,
+                    });
+                }
+                true
+            }
+            NotificationPreviewPhase::TextHold => {
+                if elapsed >= HOLD_S {
+                    self.notification_preview_anim = Some(NotificationPreviewAnim {
+                        phase_start: now,
+                        phase: NotificationPreviewPhase::TextFadeOutPreview,
+                    });
+                }
+                true
+            }
+            NotificationPreviewPhase::TextFadeOutPreview => {
+                let t = apply_easing(Easing::EaseInCubic, (elapsed / TEXT_FADE_S).min(1.0));
+                self.notification_content_alpha = 1.0 - t;
+                if elapsed >= TEXT_FADE_S {
+                    // Invisible — clear preview text so original label is shown on fade-in.
+                    self.notification_preview_text.clear();
+                    self.notification_content_alpha = 0.0;
+                    self.notification_preview_anim = Some(NotificationPreviewAnim {
+                        phase_start: now,
+                        phase: NotificationPreviewPhase::TextFadeInLabel,
+                    });
+                }
+                true
+            }
+            NotificationPreviewPhase::TextFadeInLabel => {
+                let t = apply_easing(Easing::EaseOutCubic, (elapsed / TEXT_FADE_S).min(1.0));
+                self.notification_content_alpha = t;
+                if elapsed >= TEXT_FADE_S {
+                    self.notification_content_alpha = 1.0;
+                    self.notification_preview_anim = None;
+                    return false;
+                }
+                true
+            }
+        }
+    }
+
+    /// Trigger a notification preview on the badge pill.
+    /// If the pill is already expanded (user is on the notifications page or a settings page),
+    /// cross-fades the label text to `title` and back. Otherwise expands the pill, shows the
+    /// preview, then collapses it again.
+    pub fn start_notification_preview(&mut self, title: String) {
+        use std::time::Instant;
+        use super::{NotificationPreviewAnim, NotificationPreviewPhase};
+        if self.notification_preview_anim.is_some() {
+            return;
+        }
+        self.notification_preview_text = title;
+        let pill_is_expanded = *self.pill_expanded.get("notification.main").unwrap_or(&false);
+        if pill_is_expanded {
+            self.notification_content_alpha = 1.0;
+            self.notification_preview_anim = Some(NotificationPreviewAnim {
+                phase_start: Instant::now(),
+                phase: NotificationPreviewPhase::TextFadeOut,
+            });
+        } else {
+            self.notification_preview_anim = Some(NotificationPreviewAnim {
+                phase_start: Instant::now(),
+                phase: NotificationPreviewPhase::PillEnter,
+            });
+        }
     }
 
     /// Start or reverse a hover fade for a tab group item.
@@ -1636,7 +1897,6 @@ impl ArcadiaRoot {
     /// Compute the minimal scroll offset to bring tab `ix` fully into view, then animate to it.
     /// Falls back to `scroll_to_item` snap if child bounds are not yet available.
     pub fn start_tab_scroll_anim(&mut self, ix: usize) {
-        use std::time::Instant;
         let viewport = self.group_tabs_scroll.bounds();
         let cur_x = self.group_tabs_scroll.offset().x;
 

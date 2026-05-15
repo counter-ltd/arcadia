@@ -57,14 +57,16 @@ pub const AI_PROVIDER_REGISTRY: &[AiProviderManifest] = &[
 ];
 
 pub fn enabled_ai_providers(module_rows: &[(String, bool)]) -> Vec<&'static AiProviderManifest> {
-    AI_PROVIDER_REGISTRY
+    let mut providers: Vec<&'static AiProviderManifest> = AI_PROVIDER_REGISTRY
         .iter()
         .filter(|p| {
             module_rows
                 .iter()
                 .any(|(name, enabled)| name == p.module_name && *enabled)
         })
-        .collect()
+        .collect();
+    providers.sort_by(|a, b| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()));
+    providers
 }
 
 pub fn any_ai_provider_enabled(module_rows: &[(String, bool)]) -> bool {

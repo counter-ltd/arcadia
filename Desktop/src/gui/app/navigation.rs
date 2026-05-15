@@ -699,7 +699,7 @@ impl ArcadiaRoot {
                         .cursor_pointer()
                         .p_4()
                         .rounded(px(r))
-                        .bg(p.surface_elevated)
+                        .bg(p.panel_bg)
                         .border_1()
                         .border_color(pal.icon_idle)
                         .hover(move |s| s.bg(p.row_bg).border_color(pal.icon_active))

@@ -5,7 +5,7 @@ use openframe::{
     ParentElement, StatefulInteractiveElement, Styled,
 };
 
-use crate::gui::app::{AiPendingEdit, ArcadiaRoot, DiffHunkKind};
+use crate::gui::app::{AiPendingEdit, ArcadiaRoot};
 use crate::gui::theme;
 
 impl ArcadiaRoot {
@@ -27,7 +27,7 @@ impl ArcadiaRoot {
 
         for (edit_idx, edit) in self.ai_pending_edits.iter().enumerate() {
             let path = edit.path.clone();
-            let all_resolved = edit
+            let _all_resolved = edit
                 .hunks
                 .iter()
                 .all(|h| edit.accepted.contains(&h.index) || edit.rejected.contains(&h.index));

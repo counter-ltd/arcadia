@@ -33,6 +33,7 @@ pub struct GlyphStyleConfig {
     pub accent: Rgba,
     pub border_radius: f32,
     /// `[top_left, top, top_right, side, bottom_left, bottom, bottom_right]`
+    #[allow(dead_code)]
     pub border_chars: [char; 7],
 }
 

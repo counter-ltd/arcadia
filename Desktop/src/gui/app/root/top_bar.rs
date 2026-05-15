@@ -37,8 +37,8 @@ impl ArcadiaRoot {
         let action_pill_bg = theme::action_pill_bg(cx, is_dark);
         let action_pill_tc = theme::action_pill_text(cx, is_dark);
         let action_pill_hover = theme::action_pill_hover_bg(cx, is_dark);
-        let shell_mode_generic_bg = theme::ui_surface(cx, is_dark);
-        let shell_mode_alt_bg = theme::ui_surface2(cx, is_dark);
+        let _shell_mode_generic_bg = theme::ui_surface(cx, is_dark);
+        let _shell_mode_alt_bg = theme::ui_surface2(cx, is_dark);
         let shell_mode_generic_fg = theme::ui_accent(cx);
         let shell_mode_alt_fg = theme::ui_subtext(cx, is_dark);
         let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(6.0);
@@ -103,7 +103,7 @@ impl ArcadiaRoot {
                                             mid.and_then(|id| {
                                                 self.llama_cpp_models.iter().find(|m| m.id == id).map(|m| m.name.clone())
                                                     .or_else(|| self.ollama_models.iter().find(|m| m.id == id).map(|m| m.name.clone()))
-                                                    .or_else(|| self.openai_models.iter().find(|m| m.id == id).map(|m| m.name.clone()))
+                                                    .or_else(|| self.openai_providers.iter().flat_map(|p| p.models.iter()).find(|m| m.id == id).map(|m| m.name.clone()))
                                             })
                                             .unwrap_or_else(|| "No Model".to_string())
                                         }
@@ -713,8 +713,19 @@ impl ArcadiaRoot {
                                             .get(page.id())
                                             .unwrap_or(&0.0)
                                     });
-                                    // Always pass the title; animated pills clip/fade via alpha.
-                                    let label = page.title().to_string();
+                                    // For the notification pill, show preview text when active.
+                                    let label = if page.id() == "notification.main"
+                                        && !self.notification_preview_text.is_empty()
+                                    {
+                                        self.notification_preview_text.clone()
+                                    } else {
+                                        page.title().to_string()
+                                    };
+                                    let content_alpha = if page.id() == "notification.main" {
+                                        self.notification_content_alpha
+                                    } else {
+                                        1.0
+                                    };
                                     let resolved_glyph = if page.id() == "notification.main"
                                         && self.notification_unread_count > 0
                                     {
@@ -732,6 +743,7 @@ impl ArcadiaRoot {
                                         page.accent().to_string(),
                                         glyph,
                                         pill_expand_alpha,
+                                        content_alpha,
                                     ))
                                 },
                             )),

@@ -108,11 +108,7 @@ fn extension_enable(args: &[&str], _context: &ExecutionContext) -> String {
     // First-enable / re-enable after a restart: the body has never executed (because the
     // loader skips disabled extensions at startup), so the registry entry is still a stub.
     // Drive the host loader to actually run `main.py` now that the user has opted in.
-    let needs_body_load = python_registry::list_modules()
-        .iter()
-        .find(|(n, _, _, _, _, _)| n == name)
-        .map(|(_, _, description, _, _, _)| description == "(not loaded)")
-        .unwrap_or(false);
+    let needs_body_load = !python_registry::extension_body_loaded(name);
 
     if needs_body_load {
         let Some(path) = python_registry::extension_path(name) else {

@@ -873,7 +873,7 @@ impl ArcadiaRoot {
                                                 item = item
                                                     .track_focus(&rename_focus)
                                                     .on_key_down(cx.listener(move |this, ev: &openframe::KeyDownEvent, _, cx| {
-                                                        let Some((ref id, ref mut draft)) = this.ai_session_rename else { return; };
+                                                        let Some((ref id, ref mut _draft)) = this.ai_session_rename else { return; };
                                                         if id != &session_id_rc { return; }
                                                         match ev.keystroke.key.as_str() {
                                                             "escape" => {

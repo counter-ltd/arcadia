@@ -6,7 +6,7 @@ use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::python_registry;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, Styled, Window,
 };
 
@@ -465,6 +465,9 @@ impl ArcadiaRoot {
                                             this.notification_unread_count = NotificationsConfig::load_or_create()
                                                 .map(|c| c.unread_count())
                                                 .unwrap_or(this.notification_unread_count + 1);
+                                            this.start_notification_preview(
+                                                "Test Notification".to_string(),
+                                            );
                                             this.notification_settings_feedback =
                                                 "Test notification sent.".to_string();
                                         }

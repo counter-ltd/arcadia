@@ -41,9 +41,10 @@ pub enum ProviderRouting {
         endpoint: String,
         model_name: String,
     },
-    /// API key is NOT carried here — the inference thread loads it from config
-    /// on demand so it never travels through the mpsc channel.
+    /// API key and base URL are NOT carried here — the inference thread loads
+    /// them from config on demand so credentials never travel through the channel.
     OpenAi {
+        provider_id: String,
         model_id: String,
     },
     /// Spawn an installed AI CLI binary (claude, codex, gemini, aider, …).
@@ -132,8 +133,11 @@ fn ai_thread_impl(rx: Receiver<AiRuntimeRequest>, tx: SyncSender<RuntimeEvent>) 
                 } => {
                     run_ollama(&endpoint, &model_name, request, &tx);
                 }
-                ProviderRouting::OpenAi { model_id } => {
-                    run_openai(&model_id, request, &tx);
+                ProviderRouting::OpenAi {
+                    provider_id,
+                    model_id,
+                } => {
+                    run_openai(&provider_id, &model_id, request, &tx);
                 }
                 ProviderRouting::ExecCli {
                     binary,
@@ -449,16 +453,34 @@ fn run_ollama(
 
 // ── OpenAI HTTP provider ──────────────────────────────────────────────────────
 
-fn run_openai(model_id: &str, request: TextGenerationRequest, tx: &SyncSender<RuntimeEvent>) {
-    let api_key = OpenAiConfig::load_or_create()
-        .map(|c| c.api_key)
-        .unwrap_or_default();
-    if api_key.is_empty() {
+fn run_openai(
+    provider_id: &str,
+    model_id: &str,
+    request: TextGenerationRequest,
+    tx: &SyncSender<RuntimeEvent>,
+) {
+    let cfg = OpenAiConfig::load_or_create().unwrap_or_default();
+    let provider = match cfg.providers.iter().find(|p| p.id == provider_id) {
+        Some(p) => p.clone(),
+        None => {
+            let _ = tx.send(RuntimeEvent::Error(format!(
+                "OpenAI provider '{provider_id}' not found in config."
+            )));
+            return;
+        }
+    };
+    if provider.api_key.is_empty() {
         let _ = tx.send(RuntimeEvent::Error(
-            "OpenAI API key not configured. Add it in Settings → AI.".to_string(),
+            "OpenAI API key not configured. Edit the provider in Settings → Models.".to_string(),
         ));
         return;
     }
+    let api_key = provider.api_key.clone();
+    let base_url = if provider.base_url.is_empty() {
+        "https://api.openai.com".to_string()
+    } else {
+        provider.base_url.trim_end_matches('/').to_string()
+    };
     let model_id = model_id.to_string();
     let agent = ureq::AgentBuilder::new().timeout(HTTP_TIMEOUT).build();
 
@@ -480,8 +502,9 @@ fn run_openai(model_id: &str, request: TextGenerationRequest, tx: &SyncSender<Ru
             "max_tokens": max_tokens,
         });
 
+        let url = format!("{base_url}/v1/chat/completions");
         let response = match agent
-            .post("https://api.openai.com/v1/chat/completions")
+            .post(&url)
             .set("Authorization", &format!("Bearer {api_key}"))
             .set("Content-Type", "application/json")
             .send_json(&body)
@@ -532,6 +555,7 @@ fn run_llama_cpp(
     request: TextGenerationRequest,
     tx: &SyncSender<RuntimeEvent>,
 ) {
+    #[allow(deprecated)]
     use llama_cpp_2::{
         context::params::LlamaContextParams,
         llama_batch::LlamaBatch,
