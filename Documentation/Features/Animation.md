@@ -31,9 +31,45 @@ lerp_f32(a: f32, b: f32, t: f32) -> f32   // linear interpolate scalars
 lerp_u8 (a: u8,  b: u8,  t: f32) -> u8    // same for byte channels
 lerp_rgba(a: [u8;4], b: [u8;4], t: f32) -> [u8;4]  // RGBA array lerp
 apply_easing(easing: Easing, t: f32) -> f32  // bend raw t through a curve
+shake_offset(t: f32, amplitude: f32, cycles: f32) -> f32  // decaying shake displacement
 ```
 
 These are pure functions — no allocation, no engine interaction.
+
+#### `shake_offset`
+
+Produces a signed horizontal (or rotational) displacement that decays to zero — models a brief physical shake:
+
+```rust
+pub fn shake_offset(t: f32, amplitude: f32, cycles: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    (t * cycles * 2.0 * std::f32::consts::PI).sin() * amplitude * (1.0 - t)
+}
+```
+
+- **`t`** — raw elapsed ratio (0 → 1), **not** eased. Easing would distort the sine wave.
+- **`amplitude`** — peak displacement in pixels (e.g. `3.0`).
+- **`cycles`** — number of full oscillations over the duration (e.g. `3.0`).
+- Returns a value centered on 0, decaying to 0 at `t = 1.0`.
+
+Typical usage — bell icon shake on notification arrival (duration 500 ms):
+
+```rust
+// In tick_caret_anims:
+const SHAKE_DURATION_S: f32 = 0.5;
+if let Some(anim) = &self.notification_shake_anim.clone() {
+    let raw_t = (now - anim.start).as_secs_f32() / SHAKE_DURATION_S;
+    self.notification_shake_t = raw_t.min(1.0);
+    if raw_t >= 1.0 {
+        self.notification_shake_anim = None;
+        self.notification_shake_t = 0.0;
+    } else { running = true; }
+}
+
+// In render:
+let offset = shake_offset(self.notification_shake_t, 3.0, 3.0);
+icon.when(offset.abs() > 0.01, |d| d.ml(px(offset)))
+```
 
 ---
 

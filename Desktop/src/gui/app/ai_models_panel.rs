@@ -6,8 +6,8 @@ use arcadia_core::modules::ai::{
 };
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, Styled, Window,
+    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, Styled, Window,
 };
 
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
@@ -303,9 +303,27 @@ impl ArcadiaRoot {
             .filter(|p| is_cli_provider(p.module_name))
             .collect();
 
+        let mut cli_card_inserted = false;
+
         for provider in &providers {
             if is_cli_provider(provider.module_name) {
                 continue;
+            }
+
+            // Insert CLI card before the first provider that sorts after it alphabetically.
+            if !cli_card_inserted
+                && !cli_providers.is_empty()
+                && provider.display_name.to_lowercase().as_str() > "cli providers"
+            {
+                cli_card_inserted = true;
+                root = root.child(self.build_cli_card_element(
+                    &cli_providers,
+                    &active_module,
+                    &p,
+                    radius,
+                    is_dark,
+                    cx,
+                ));
             }
 
             let module_name = provider.module_name.to_string();
@@ -750,164 +768,181 @@ impl ArcadiaRoot {
             root = root.child(card);
         }
 
-        // Single CLI card grouping all enabled exec-CLI providers.
-        if !cli_providers.is_empty() {
-            let any_cli_active =
-                is_cli_provider(&active_module) && self.active_llama_cpp_model_id.is_none();
-            // Use the active provider's accent for the card border, else neutral.
-            let cli_card_pal = if any_cli_active {
-                theme::nav_accent_palette(provider_accent(&active_module), is_dark)
-            } else {
-                theme::nav_accent_palette("violet", is_dark)
-            };
-            let card_border = cli_card_pal.icon_idle;
-
-            let mut cli_rows = div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .pt_2()
-                .border_t_1()
-                .border_color(p.panel_border);
-
-            for cli_provider in &cli_providers {
-                let mn = cli_provider.module_name.to_string();
-                let binary = cli_binary_for_module(cli_provider.module_name).unwrap_or("");
-                let name = cli_display_name(cli_provider.module_name);
-                let detected = self
-                    .detected_cli_providers
-                    .iter()
-                    .find(|c| c.binary == binary)
-                    .cloned();
-                let is_row_active = active_module == cli_provider.module_name;
-                let row_pal =
-                    theme::nav_accent_palette(provider_accent(cli_provider.module_name), is_dark);
-                let row_bg = if is_row_active {
-                    row_pal.row_selected
-                } else {
-                    p.panel_bg
-                };
-                let row_hover = row_pal.row_hover;
-                let name_col = if is_row_active {
-                    row_pal.icon_active
-                } else {
-                    p.content_title
-                };
-                let icon_col = row_pal.icon_active;
-                let glyph = provider_glyph(cli_provider.module_name);
-                let mn_click = mn.clone();
-
-                let row = if let Some(ref cli) = detected {
-                    let version = cli.version.clone();
-                    div()
-                        .px_2()
-                        .py_1p5()
-                        .rounded(px(radius.min(6.0)))
-                        .bg(row_bg)
-                        .hover(move |s| s.bg(row_hover))
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .cursor_pointer()
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(move |this, _, _, cx| {
-                                this.active_ai_provider_module = mn_click.clone();
-                                this.ai_chat_model_id = None;
-                                cx.notify();
-                            }),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .child(render_icon(glyph).size_4().text_color(icon_col))
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .text_color(name_col)
-                                        .child(name),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .px_2()
-                                .py_0p5()
-                                .rounded(px(4.0))
-                                .bg(p.badge_muted_bg)
-                                .text_xs()
-                                .text_color(p.badge_muted_fg)
-                                .child(version),
-                        )
-                        .into_any_element()
-                } else {
-                    div()
-                        .px_2()
-                        .py_1p5()
-                        .rounded(px(radius.min(6.0)))
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .child(render_icon(glyph).size_4().text_color(p.ui_subtext))
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .text_color(p.ui_subtext)
-                                        .child(name),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .px_2()
-                                .py_0p5()
-                                .rounded(px(4.0))
-                                .bg(p.badge_muted_bg)
-                                .text_xs()
-                                .text_color(p.badge_muted_fg)
-                                .child("Not installed"),
-                        )
-                        .into_any_element()
-                };
-
-                cli_rows = cli_rows.child(row);
-            }
-
-            let cli_card = div()
-                .rounded(px(radius.min(12.0)))
-                .border_1()
-                .border_color(card_border)
-                .bg(p.panel_bg)
-                .p_4()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(
-                    div()
-                        .text_base()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(p.content_title)
-                        .child("CLI Providers"),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(p.content_meta)
-                        .child("Subscription-based CLI tools. No API key required."),
-                )
-                .child(cli_rows);
-
-            root = root.child(cli_card);
+        // Insert CLI card in alphabetical position among provider cards.
+        if !cli_providers.is_empty() && !cli_card_inserted {
+            root = root.child(self.build_cli_card_element(
+                &cli_providers,
+                &active_module,
+                &p,
+                radius,
+                is_dark,
+                cx,
+            ));
         }
 
         root.into_any_element()
+    }
+
+    fn build_cli_card_element(
+        &mut self,
+        cli_providers: &[&arcadia_core::modules::ai::AiProviderManifest],
+        active_module: &str,
+        p: &crate::gui::theme::palette::ThemePalette,
+        radius: f32,
+        is_dark: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let any_cli_active =
+            is_cli_provider(active_module) && self.active_llama_cpp_model_id.is_none();
+        let cli_card_pal = if any_cli_active {
+            theme::nav_accent_palette(provider_accent(active_module), is_dark)
+        } else {
+            theme::nav_accent_palette("violet", is_dark)
+        };
+        let card_border = cli_card_pal.icon_idle;
+
+        let mut cli_rows = div()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .pt_2()
+            .border_t_1()
+            .border_color(p.panel_border);
+
+        for cli_provider in cli_providers {
+            let mn = cli_provider.module_name.to_string();
+            let binary = cli_binary_for_module(cli_provider.module_name).unwrap_or("");
+            let name = cli_display_name(cli_provider.module_name);
+            let detected = self
+                .detected_cli_providers
+                .iter()
+                .find(|c| c.binary == binary)
+                .cloned();
+            let is_row_active = active_module == cli_provider.module_name;
+            let row_pal =
+                theme::nav_accent_palette(provider_accent(cli_provider.module_name), is_dark);
+            let row_bg = if is_row_active {
+                row_pal.row_selected
+            } else {
+                p.panel_bg
+            };
+            let row_hover = row_pal.row_hover;
+            let name_col = if is_row_active {
+                row_pal.icon_active
+            } else {
+                p.content_title
+            };
+            let icon_col = row_pal.icon_active;
+            let glyph = provider_glyph(cli_provider.module_name);
+            let mn_click = mn.clone();
+
+            let row = if let Some(ref cli) = detected {
+                let version = cli.version.clone();
+                div()
+                    .px_2()
+                    .py_1p5()
+                    .rounded(px(radius.min(6.0)))
+                    .bg(row_bg)
+                    .hover(move |s| s.bg(row_hover))
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.active_ai_provider_module = mn_click.clone();
+                            this.ai_chat_model_id = None;
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(render_icon(glyph).size_4().text_color(icon_col))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(name_col)
+                                    .child(name),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .px_2()
+                            .py_0p5()
+                            .rounded(px(4.0))
+                            .bg(p.badge_muted_bg)
+                            .text_xs()
+                            .text_color(p.badge_muted_fg)
+                            .child(version),
+                    )
+                    .into_any_element()
+            } else {
+                div()
+                    .px_2()
+                    .py_1p5()
+                    .rounded(px(radius.min(6.0)))
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(render_icon(glyph).size_4().text_color(p.ui_subtext))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(p.ui_subtext)
+                                    .child(name),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .px_2()
+                            .py_0p5()
+                            .rounded(px(4.0))
+                            .bg(p.badge_muted_bg)
+                            .text_xs()
+                            .text_color(p.badge_muted_fg)
+                            .child("Not installed"),
+                    )
+                    .into_any_element()
+            };
+
+            cli_rows = cli_rows.child(row);
+        }
+
+        div()
+            .rounded(px(radius.min(12.0)))
+            .border_1()
+            .border_color(card_border)
+            .bg(p.panel_bg)
+            .p_4()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(
+                div()
+                    .text_base()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(p.content_title)
+                    .child("CLI Providers"),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(p.content_meta)
+                    .child("Subscription-based CLI tools. No API key required."),
+            )
+            .child(cli_rows)
+            .into_any_element()
     }
 
     fn openai_provider_detail(

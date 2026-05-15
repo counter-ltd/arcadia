@@ -523,7 +523,7 @@ impl ArcadiaRoot {
                         } else {
                             entry_row
                                 .child(div().size_3()) // spacer aligns with dir chevron
-                                .child(theme::render_icon(file_icon).size_3().text_color(row_text))
+                                .child(theme::render_icon(&file_icon).size_3().text_color(row_text))
                                 .child(name)
                                 .on_mouse_down(
                                     MouseButton::Left,
@@ -946,14 +946,18 @@ fn collect_explorer_entries(
     }
 }
 
-fn file_icon_for(name: &str) -> &'static str {
+fn file_icon_for(name: &str) -> String {
+    use arcadia_core::modules::python_registry;
+    if let Some(icon) = python_registry::call_file_icon_providers(name) {
+        return icon;
+    }
     let ext = name.rsplit('.').next().unwrap_or("");
     match ext {
         "rs" | "js" | "ts" | "jsx" | "tsx" | "py" | "go" | "java" | "c" | "cpp" | "h" | "hpp"
         | "cs" | "rb" | "php" | "swift" | "kt" | "sh" | "bash" | "zsh" | "html" | "css"
         | "scss" | "sass" | "json" | "toml" | "yaml" | "yml" | "xml" | "sql" | "lua" | "r"
-        | "dart" | "ex" | "exs" => "file-code",
-        "md" | "txt" | "rst" | "org" | "tex" | "log" => "file-text",
-        _ => "file",
+        | "dart" | "ex" | "exs" => "file-code".to_string(),
+        "md" | "txt" | "rst" | "org" | "tex" | "log" => "file-text".to_string(),
+        _ => "file".to_string(),
     }
 }

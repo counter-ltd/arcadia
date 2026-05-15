@@ -249,6 +249,8 @@ impl ArcadiaRoot {
         glyph: Option<GlyphStyleConfig>,
         pill_expand_alpha: Option<f32>,
         content_alpha: f32,
+        preview_bg_alpha: f32,
+        shake_offset: f32,
     ) -> impl IntoElement {
         let pal = theme::nav_accent_palette(accent.as_str(), is_dark);
         let icon_col = if is_active {
@@ -256,13 +258,18 @@ impl ArcadiaRoot {
         } else {
             nav_idle_text(glyph, is_dark)
         };
+        let idle_bg = glyph
+            .as_ref()
+            .map(|g| g.surface)
+            .unwrap_or_else(|| theme::top_bar_pill_bg(is_dark));
+        let active_bg = nav_active_bg(glyph, pal.row_selected);
         let bg = if is_active {
-            nav_active_bg(glyph, pal.row_selected)
+            active_bg
+        } else if preview_bg_alpha > 0.0 {
+            // Tint toward active bg during preview; border stays transparent (unlike active).
+            lerp_color(idle_bg, active_bg, preview_bg_alpha)
         } else {
-            glyph
-                .as_ref()
-                .map(|g| g.surface)
-                .unwrap_or_else(|| theme::top_bar_pill_bg(is_dark))
+            idle_bg
         };
         let hover_bg = if is_active {
             pal.row_hover
@@ -278,8 +285,10 @@ impl ArcadiaRoot {
         } else {
             openframe::Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }
         };
+        // Horizontal padding expands slightly during preview (8→10 px); height unchanged.
+        let pill_px = px(8.0 + preview_bg_alpha * 2.0);
         div()
-            .px_2()
+            .px(pill_px)
             .h_8()
             .flex()
             .items_center()
@@ -301,7 +310,8 @@ impl ArcadiaRoot {
                     .child(
                         render_icon(system_image.as_ref())
                             .size_4()
-                            .text_color(icon_col),
+                            .text_color(icon_col)
+                            .when(shake_offset.abs() > 0.01, |d| d.ml(px(shake_offset))),
                     )
                     .when(!label.is_empty(), |d| {
                         if let Some(alpha) = pill_expand_alpha {

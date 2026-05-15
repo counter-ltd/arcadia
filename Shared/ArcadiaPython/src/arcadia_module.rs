@@ -823,6 +823,42 @@ fn register_highlight_provider(extension_id: String, language: String, handler: 
 /// `col_start` (int), `col_width` (int), `r` (int 0-255), `g`, `b`, `a`.
 /// Multiple decoration providers can coexist (one per extension).
 #[pyfunction]
+fn list_highlight_providers() -> Vec<(String, String)> {
+    python_registry::list_highlight_providers()
+}
+
+/// Register a file icon provider for the explorer.
+///
+/// `handler(filename: str) -> str | None` — return an icon key (e.g. `"extension-icon/rust-syntax"`)
+/// or `None` to defer to the next provider / built-in fallback.
+#[pyfunction]
+fn register_file_icon_provider(extension_id: String, handler: PyObject) {
+    let handler = Arc::new(handler);
+    python_registry::register_file_icon_provider(
+        extension_id,
+        Arc::new(move |filename: &str| {
+            let filename = filename.to_string();
+            let h = Arc::clone(&handler);
+            Python::with_gil(|py| -> Option<String> {
+                match h.call1(py, (&filename,)) {
+                    Ok(r) => {
+                        if r.is_none(py) {
+                            None
+                        } else {
+                            r.extract::<String>(py).ok()
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("file_icon_provider error: {e}");
+                        None
+                    }
+                }
+            })
+        }),
+    );
+}
+
+#[pyfunction]
 fn register_decoration_provider(extension_id: String, handler: PyObject) {
     let handler = Arc::new(handler);
     python_registry::register_decoration_provider(
@@ -971,6 +1007,8 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_editor_token_module, m)?)?;
     m.add_function(wrap_pyfunction!(register_highlight_provider, m)?)?;
     m.add_function(wrap_pyfunction!(register_decoration_provider, m)?)?;
+    m.add_function(wrap_pyfunction!(list_highlight_providers, m)?)?;
+    m.add_function(wrap_pyfunction!(register_file_icon_provider, m)?)?;
     m.add_function(wrap_pyfunction!(register_nav_page, m)?)?;
     Ok(())
 }

@@ -726,12 +726,26 @@ impl ArcadiaRoot {
                                     } else {
                                         1.0
                                     };
+                                    let preview_bg_alpha = if page.id() == "notification.main" {
+                                        self.notification_preview_bg_alpha
+                                    } else {
+                                        0.0
+                                    };
                                     let resolved_glyph = if page.id() == "notification.main"
                                         && self.notification_unread_count > 0
                                     {
                                         "notification-on".to_string()
                                     } else {
                                         page.glyph().to_string()
+                                    };
+                                    let shake_off = if page.id() == "notification.main" {
+                                        arcadia_core::modules::animation::shake_offset(
+                                            self.notification_shake_t,
+                                            3.0,
+                                            3.0,
+                                        )
+                                    } else {
+                                        0.0
                                     };
                                     Some(Self::top_bar_global_item(
                                         cx,
@@ -744,6 +758,8 @@ impl ArcadiaRoot {
                                         glyph,
                                         pill_expand_alpha,
                                         content_alpha,
+                                        preview_bg_alpha,
+                                        shake_off,
                                     ))
                                 },
                             )),

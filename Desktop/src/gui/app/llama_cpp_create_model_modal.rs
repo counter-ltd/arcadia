@@ -192,7 +192,7 @@ impl ArcadiaRoot {
         // Model type selector row
         let type_row = {
             let current_type = draft.model_kind.clone();
-            let mut row = div().flex().gap_2();
+            let mut row = div().flex().flex_wrap().gap_2();
             for mt in LlamaCppModelKind::all() {
                 let mt_clone = mt.clone();
                 let is_selected = *mt == current_type;
@@ -611,7 +611,7 @@ impl ArcadiaRoot {
 
         let type_row = {
             let current_type = draft.model_kind.clone();
-            let mut row = div().flex().gap_2();
+            let mut row = div().flex().flex_wrap().gap_2();
             for mt in LlamaCppModelKind::all() {
                 let mt_clone = mt.clone();
                 let is_selected = *mt == current_type;

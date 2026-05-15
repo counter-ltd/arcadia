@@ -307,6 +307,9 @@ pub enum NotificationPreviewPhase {
 pub struct NotificationPreviewAnim {
     pub phase_start: Instant,
     pub phase: NotificationPreviewPhase,
+    /// The preview title held here until alpha=0 transition point (expanded-pill path).
+    /// Moved into `notification_preview_text` when the swap happens invisibly.
+    pub pending_title: String,
 }
 
 #[derive(Clone)]
@@ -643,8 +646,15 @@ pub struct ArcadiaRoot {
     /// Opacity multiplier for the notification pill's text label during a cross-fade on an
     /// already-expanded pill. Normally 1.0; animated 1→0→1 during text swap.
     pub notification_content_alpha: f32,
+    /// 0.0 = idle bg, 1.0 = active bg color. Lerped during preview so the pill shows a
+    /// tinted background without the active border (visually distinct from truly-active state).
+    pub notification_preview_bg_alpha: f32,
     /// Drives the multi-phase notification badge preview animation.
     pub notification_preview_anim: Option<NotificationPreviewAnim>,
+    /// Raw progress 0.0→1.0 for the bell icon shake. Fed into `animation::shake_offset`.
+    pub notification_shake_t: f32,
+    /// CaretAnim that drives `notification_shake_t` from 0→1 over the shake duration.
+    pub notification_shake_anim: Option<CaretAnim>,
     /// Settings pages the user has pinned to the sidebar. Persisted in `ui-prefs.toml`.
     pub pinned_settings_pages: Vec<String>,
     /// Active right-click context menu on a pinned settings sidebar item: (page_id, position).

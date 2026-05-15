@@ -36,6 +36,7 @@ type TrayIconClickFn = Arc<dyn Fn(Vec<String>) + Send + Sync + 'static>;
 type ReloadFn = Arc<dyn Fn() -> Result<(), String> + Send + Sync + 'static>;
 type DynHighlightFn = Arc<dyn Fn(&str) -> Vec<HighlightSpan> + Send + Sync + 'static>;
 type DynDecorationFn = Arc<dyn Fn(&str, usize) -> Vec<DecorationRect> + Send + Sync + 'static>;
+type DynFileIconFn = Arc<dyn Fn(&str) -> Option<String> + Send + Sync + 'static>;
 /// Loader for a single extension: takes the stub id the host knows the file by plus the
 /// on-disk path, and returns the canonical module name the body actually registered (often
 /// the same as the stub id, but may differ when the folder name and `register_module(name=…)`
@@ -87,6 +88,8 @@ struct PythonRegistry {
     highlight_providers: HashMap<String, (String, DynHighlightFn)>,
     /// Ordered list of decoration providers: (ext_id, fn).
     decoration_providers: Vec<(String, DynDecorationFn)>,
+    /// File icon providers: (ext_id, fn). First non-None result wins.
+    file_icon_providers: Vec<(String, DynFileIconFn)>,
     /// Extension ids whose tokens should appear in the editor settings panel instead of as
     /// standalone settings pages.
     editor_token_modules: std::collections::HashSet<String>,
@@ -186,6 +189,7 @@ impl PythonRegistry {
             tray_icon_click_handlers: HashMap::new(),
             highlight_providers: HashMap::new(),
             decoration_providers: Vec::new(),
+            file_icon_providers: Vec::new(),
             editor_token_modules: std::collections::HashSet::new(),
             nav_pages: Vec::new(),
         }
@@ -451,6 +455,7 @@ pub fn unregister_extension_contributions(name: &str) {
         reg.tray_icon_click_handlers.remove(name);
         reg.highlight_providers.retain(|_, (id, _)| id != name);
         reg.decoration_providers.retain(|(id, _)| id != name);
+        reg.file_icon_providers.retain(|(id, _)| id != name);
         reg.editor_token_modules.remove(name);
         reg.nav_pages.retain(|p| p.extension_id != name);
     }
@@ -629,6 +634,39 @@ pub fn call_decoration_providers(line: &str, line_idx: usize) -> Vec<DecorationR
         .into_iter()
         .flat_map(|f| f(line, line_idx))
         .collect()
+}
+
+/// Returns `(language, ext_id)` for every currently registered highlight provider.
+pub fn list_highlight_providers() -> Vec<(String, String)> {
+    let Ok(reg) = registry().lock() else {
+        return Vec::new();
+    };
+    reg.highlight_providers
+        .iter()
+        .map(|(lang, (ext_id, _))| (lang.clone(), ext_id.clone()))
+        .collect()
+}
+
+pub fn register_file_icon_provider(ext_id: String, f: DynFileIconFn) {
+    let Ok(mut reg) = registry().lock() else {
+        return;
+    };
+    reg.file_icon_providers.retain(|(id, _)| id != &ext_id);
+    reg.file_icon_providers.push((ext_id, f));
+}
+
+/// Ask registered file icon providers for an icon key for `filename`. First non-None wins.
+pub fn call_file_icon_providers(filename: &str) -> Option<String> {
+    let handlers: Vec<DynFileIconFn> = {
+        let Ok(reg) = registry().lock() else {
+            return None;
+        };
+        reg.file_icon_providers
+            .iter()
+            .map(|(_, f)| Arc::clone(f))
+            .collect()
+    };
+    handlers.into_iter().find_map(|f| f(filename))
 }
 
 /// Tray-icon primary click (from desktop `tray-icon`); forwards to the owning Python extension

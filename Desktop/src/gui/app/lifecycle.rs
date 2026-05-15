@@ -610,7 +610,10 @@ impl ArcadiaRoot {
             notification_dest_open: false,
             notification_preview_text: String::new(),
             notification_content_alpha: 1.0,
+            notification_preview_bg_alpha: 0.0,
             notification_preview_anim: None,
+            notification_shake_t: 0.0,
+            notification_shake_anim: None,
             pinned_settings_pages: ui_prefs_cfg.pinned_settings_pages,
             settings_pin_context_menu: None,
         };
@@ -1708,6 +1711,19 @@ impl ArcadiaRoot {
             running = true;
         }
 
+        // Tick bell-icon shake animation (raw t — no easing, shake_offset does its own math).
+        const SHAKE_DURATION_S: f32 = 0.5;
+        if let Some(anim) = &self.notification_shake_anim.clone() {
+            let raw_t = (now - anim.start).as_secs_f32() / SHAKE_DURATION_S;
+            self.notification_shake_t = raw_t.min(1.0);
+            if raw_t >= 1.0 {
+                self.notification_shake_anim = None;
+                self.notification_shake_t = 0.0;
+            } else {
+                running = true;
+            }
+        }
+
         running
     }
 
@@ -1746,11 +1762,14 @@ impl ArcadiaRoot {
             NotificationPreviewPhase::PillEnter => {
                 let t = apply_easing(Easing::EaseOutCubic, (elapsed / PILL_FADE_S).min(1.0));
                 self.pill_expand_alphas.insert("notification.main".to_string(), t);
+                self.notification_preview_bg_alpha = t;
                 if elapsed >= PILL_FADE_S {
                     self.pill_expand_alphas.insert("notification.main".to_string(), 1.0);
+                    self.notification_preview_bg_alpha = 1.0;
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
                         phase: NotificationPreviewPhase::PillHold,
+                        pending_title: anim.pending_title,
                     });
                 }
                 true
@@ -1760,6 +1779,7 @@ impl ArcadiaRoot {
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
                         phase: NotificationPreviewPhase::PillExit,
+                        pending_title: anim.pending_title,
                     });
                 }
                 true
@@ -1767,9 +1787,11 @@ impl ArcadiaRoot {
             NotificationPreviewPhase::PillExit => {
                 let t = apply_easing(Easing::EaseInCubic, (elapsed / PILL_FADE_S).min(1.0));
                 self.pill_expand_alphas.insert("notification.main".to_string(), 1.0 - t);
+                self.notification_preview_bg_alpha = 1.0 - t;
                 if elapsed >= PILL_FADE_S {
                     self.notification_preview_anim = None;
                     self.notification_preview_text.clear();
+                    self.notification_preview_bg_alpha = 0.0;
                     self.pill_expand_alphas.remove("notification.main");
                     // Restore pill expand state from current active page.
                     self.sync_pill_expand_from_active_page();
@@ -1778,14 +1800,21 @@ impl ArcadiaRoot {
                 true
             }
             NotificationPreviewPhase::TextFadeOut => {
+                // Fades the *original* label out. notification_preview_text is still empty
+                // so the render shows the real page title during this phase.
+                // bg fades in as label fades out (complementary).
                 let t = apply_easing(Easing::EaseInCubic, (elapsed / TEXT_FADE_S).min(1.0));
                 self.notification_content_alpha = 1.0 - t;
+                self.notification_preview_bg_alpha = t;
                 if elapsed >= TEXT_FADE_S {
-                    // Label is now invisible — preview text will be shown on next fade-in.
+                    // Alpha is 0 — invisible. Swap text now so the change is seamless.
                     self.notification_content_alpha = 0.0;
+                    self.notification_preview_bg_alpha = 1.0;
+                    self.notification_preview_text = anim.pending_title.clone();
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
                         phase: NotificationPreviewPhase::TextFadeInPreview,
+                        pending_title: anim.pending_title,
                     });
                 }
                 true
@@ -1793,20 +1822,24 @@ impl ArcadiaRoot {
             NotificationPreviewPhase::TextFadeInPreview => {
                 let t = apply_easing(Easing::EaseOutCubic, (elapsed / TEXT_FADE_S).min(1.0));
                 self.notification_content_alpha = t;
+                // bg stays at 1.0
                 if elapsed >= TEXT_FADE_S {
                     self.notification_content_alpha = 1.0;
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
                         phase: NotificationPreviewPhase::TextHold,
+                        pending_title: anim.pending_title,
                     });
                 }
                 true
             }
             NotificationPreviewPhase::TextHold => {
+                // bg stays at 1.0
                 if elapsed >= HOLD_S {
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
                         phase: NotificationPreviewPhase::TextFadeOutPreview,
+                        pending_title: anim.pending_title,
                     });
                 }
                 true
@@ -1814,13 +1847,15 @@ impl ArcadiaRoot {
             NotificationPreviewPhase::TextFadeOutPreview => {
                 let t = apply_easing(Easing::EaseInCubic, (elapsed / TEXT_FADE_S).min(1.0));
                 self.notification_content_alpha = 1.0 - t;
+                // bg stays at 1.0 until label starts fading back in
                 if elapsed >= TEXT_FADE_S {
-                    // Invisible — clear preview text so original label is shown on fade-in.
+                    // Alpha is 0 — invisible. Clear preview text; render reverts to page title.
                     self.notification_preview_text.clear();
                     self.notification_content_alpha = 0.0;
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
                         phase: NotificationPreviewPhase::TextFadeInLabel,
+                        pending_title: anim.pending_title,
                     });
                 }
                 true
@@ -1828,8 +1863,11 @@ impl ArcadiaRoot {
             NotificationPreviewPhase::TextFadeInLabel => {
                 let t = apply_easing(Easing::EaseOutCubic, (elapsed / TEXT_FADE_S).min(1.0));
                 self.notification_content_alpha = t;
+                // bg fades out as label fades back in (complementary).
+                self.notification_preview_bg_alpha = 1.0 - t;
                 if elapsed >= TEXT_FADE_S {
                     self.notification_content_alpha = 1.0;
+                    self.notification_preview_bg_alpha = 0.0;
                     self.notification_preview_anim = None;
                     return false;
                 }
@@ -1848,18 +1886,32 @@ impl ArcadiaRoot {
         if self.notification_preview_anim.is_some() {
             return;
         }
-        self.notification_preview_text = title;
+        // Always shake the bell icon regardless of pill state.
+        self.notification_shake_t = 0.0;
+        self.notification_shake_anim = Some(super::CaretAnim {
+            start: Instant::now(),
+            from: 0.0,
+            to: 1.0,
+        });
+
         let pill_is_expanded = *self.pill_expanded.get("notification.main").unwrap_or(&false);
         if pill_is_expanded {
+            // Don't set notification_preview_text yet — the TextFadeOut phase fades the
+            // *original* label out. The swap to preview text happens at the invisible
+            // alpha=0 transition into TextFadeInPreview.
             self.notification_content_alpha = 1.0;
             self.notification_preview_anim = Some(NotificationPreviewAnim {
                 phase_start: Instant::now(),
                 phase: NotificationPreviewPhase::TextFadeOut,
+                pending_title: title,
             });
         } else {
+            // Collapsed pill: set text immediately — pill starts invisible so no flash.
+            self.notification_preview_text = title.clone();
             self.notification_preview_anim = Some(NotificationPreviewAnim {
                 phase_start: Instant::now(),
                 phase: NotificationPreviewPhase::PillEnter,
+                pending_title: title,
             });
         }
     }

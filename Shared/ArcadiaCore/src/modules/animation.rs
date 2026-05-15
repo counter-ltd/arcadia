@@ -207,6 +207,28 @@ fn tick() {
     }
 }
 
+// ─── Shake helper ─────────────────────────────────────────────────────────────
+
+/// Compute a pixel offset for a decaying oscillation ("shake") effect.
+///
+/// - `t`: progress `0.0 → 1.0` over the shake duration (raw, not eased).
+/// - `amplitude`: peak displacement in pixels (e.g. `3.0`).
+/// - `cycles`: number of full oscillations over the duration (e.g. `3.0`).
+///
+/// Returns a signed pixel offset. Apply to `ml()` / `mt()` on the element being shaken.
+/// The amplitude decays linearly to zero at `t = 1.0` so the element settles cleanly.
+///
+/// # Example
+/// ```
+/// // In tick_caret_anims, drive shake_t 0→1 over 500 ms (no easing — raw time ratio):
+/// let offset = animation::shake_offset(self.bell_shake_t, 3.0, 3.0);
+/// // Then pass offset to the render function and apply as .ml(px(offset))
+/// ```
+pub fn shake_offset(t: f32, amplitude: f32, cycles: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    (t * cycles * 2.0 * std::f32::consts::PI).sin() * amplitude * (1.0 - t)
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /// Start a tween. `on_tick` receives eased `t ∈ [0.0, 1.0]` every ~16 ms until completion.
