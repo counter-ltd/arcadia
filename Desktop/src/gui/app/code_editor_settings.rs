@@ -28,7 +28,9 @@ impl ArcadiaRoot {
 
         let mut root = div()
             .w_full()
-            .when(g_snap.is_some(), |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
+            .when(g_snap.is_some(), |d| {
+                d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+            })
             .flex()
             .flex_col()
             .gap_6()
@@ -59,12 +61,7 @@ impl ArcadiaRoot {
                     .bg(p.panel_bg)
                     .overflow_hidden()
                     .child(self.indentation_marks_row(cx, is_dark, show_marks, panel_radius))
-                    .child(
-                        div()
-                            .w_full()
-                            .h(px(1.))
-                            .bg(p.panel_border),
-                    )
+                    .child(div().w_full().h(px(1.)).bg(p.panel_border))
                     .child(self.char_width_row(window, cx, is_dark, panel_radius)),
             );
 
@@ -246,12 +243,14 @@ impl ArcadiaRoot {
                         let parsed = if this.code_editor_char_width_draft.is_empty() {
                             None
                         } else {
-                            this.code_editor_char_width_draft.parse::<f32>().ok().map(|v| v.max(1.0))
+                            this.code_editor_char_width_draft
+                                .parse::<f32>()
+                                .ok()
+                                .map(|v| v.max(1.0))
                         };
                         this.code_editor_char_width_override = parsed;
-                        this.code_editor_char_width_draft = parsed
-                            .map(|v| format!("{:.2}", v))
-                            .unwrap_or_default();
+                        this.code_editor_char_width_draft =
+                            parsed.map(|v| format!("{:.2}", v)).unwrap_or_default();
                         this.code_editor_char_width_editing = false;
                         let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
                         cfg.char_width_override = parsed;
@@ -276,7 +275,8 @@ impl ArcadiaRoot {
                                 // Only allow digits and one decimal point
                                 let c = kc.chars().next().unwrap_or('\0');
                                 if c.is_ascii_digit()
-                                    || (c == '.' && !this.code_editor_char_width_draft.contains('.'))
+                                    || (c == '.'
+                                        && !this.code_editor_char_width_draft.contains('.'))
                                 {
                                     this.code_editor_char_width_draft.push(c);
                                     cx.notify();

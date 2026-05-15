@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex, OnceLock};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +10,19 @@ use crate::config::ConfigFile;
 use crate::modules::{ExecutionContext, ModuleCommand};
 
 pub const NAME: &str = "late";
+
+const HTTP_TIMEOUT: Duration = Duration::from_secs(120);
+
+fn http_agent() -> ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT
+        .get_or_init(|| {
+            ureq::AgentBuilder::new()
+                .timeout(HTTP_TIMEOUT)
+                .build()
+        })
+        .clone()
+}
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
@@ -374,7 +388,7 @@ fn parse_ws_message(raw: &serde_json::Value) -> Option<LateMessage> {
 
 pub fn http_get_challenge(server_url: &str) -> Result<String, String> {
     let url = format!("{server_url}/api/native/challenge");
-    let resp = ureq::get(&url)
+    let resp = http_agent().get(&url)
         .call()
         .map_err(|e| e.to_string())?
         .into_json::<serde_json::Value>()
@@ -399,7 +413,7 @@ pub fn http_post_token(
         "nonce": nonce,
         "signature_pem": signature_pem,
     });
-    let resp = match ureq::post(&url).send_json(body) {
+    let resp = match http_agent().post(&url).send_json(body) {
         Ok(resp) => resp,
         Err(ureq::Error::Status(code, response)) => {
             let body = response
@@ -419,7 +433,7 @@ pub fn http_post_token(
 
 pub fn http_get_now_playing(server_url: &str, token: &str) -> Result<LateNowPlaying, String> {
     let url = format!("{server_url}/api/native/now-playing");
-    ureq::get(&url)
+    http_agent().get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .call()
         .map_err(|e| e.to_string())?
@@ -429,7 +443,7 @@ pub fn http_get_now_playing(server_url: &str, token: &str) -> Result<LateNowPlay
 
 pub fn http_post_vote(server_url: &str, token: &str, genre: &str) -> Result<LateVotes, String> {
     let url = format!("{server_url}/api/native/vote");
-    ureq::post(&url)
+    http_agent().post(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .send_json(serde_json::json!({"genre": genre}))
         .map_err(|e| e.to_string())?
@@ -444,7 +458,7 @@ pub fn http_get_history(
     limit: usize,
 ) -> Result<Vec<LateMessage>, String> {
     let url = format!("{server_url}/api/native/rooms/{room_id}/history?limit={limit}");
-    ureq::get(&url)
+    http_agent().get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .call()
         .map_err(|e| e.to_string())?
@@ -459,7 +473,7 @@ pub fn http_post_send(
     body: &str,
 ) -> Result<(), String> {
     let url = format!("{server_url}/api/native/rooms/{room_id}/messages");
-    ureq::post(&url)
+    http_agent().post(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .send_json(serde_json::json!({"body": body}))
         .map_err(|e| e.to_string())?;
@@ -468,7 +482,7 @@ pub fn http_post_send(
 
 pub fn http_post_water_bonsai(server_url: &str, token: &str) -> Result<Vec<String>, String> {
     let url = format!("{server_url}/api/native/bonsai/water");
-    let resp = ureq::post(&url)
+    let resp = http_agent().post(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .call()
         .map_err(|e| e.to_string())?
@@ -486,7 +500,7 @@ pub fn http_post_water_bonsai(server_url: &str, token: &str) -> Result<Vec<Strin
 
 pub fn http_get_bonsai(server_url: &str, token: &str) -> Result<Vec<String>, String> {
     let url = format!("{server_url}/api/native/bonsai");
-    let resp = ureq::get(&url)
+    let resp = http_agent().get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .call()
         .map_err(|e| e.to_string())?
@@ -504,7 +518,7 @@ pub fn http_get_bonsai(server_url: &str, token: &str) -> Result<Vec<String>, Str
 
 pub fn http_get_ws_ticket(server_url: &str, token: &str) -> Result<String, String> {
     let url = format!("{server_url}/api/native/ws-ticket");
-    let resp = ureq::get(&url)
+    let resp = http_agent().get(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .call()
         .map_err(|e| e.to_string())?
@@ -518,7 +532,7 @@ pub fn http_get_ws_ticket(server_url: &str, token: &str) -> Result<String, Strin
 
 pub fn http_delete_token(server_url: &str, token: &str) -> Result<(), String> {
     let url = format!("{server_url}/api/native/logout");
-    match ureq::delete(&url)
+    match http_agent().delete(&url)
         .set("Authorization", &format!("Bearer {token}"))
         .call()
     {
@@ -754,7 +768,7 @@ fn bearer(token: &str) -> String {
 }
 
 pub fn http_get_profile(server_url: &str, token: &str) -> Result<LateProfile, String> {
-    ureq::get(&format!("{server_url}/api/native/profile"))
+    http_agent().get(&format!("{server_url}/api/native/profile"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -771,7 +785,7 @@ pub fn http_get_notifications(
     server_url: &str,
     token: &str,
 ) -> Result<Vec<LateNotification>, String> {
-    ureq::get(&format!("{server_url}/api/native/notifications"))
+    http_agent().get(&format!("{server_url}/api/native/notifications"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -789,7 +803,7 @@ pub fn http_get_notifications(
 }
 
 pub fn http_get_notifications_unread(server_url: &str, token: &str) -> Result<i64, String> {
-    ureq::get(&format!("{server_url}/api/native/notifications/unread"))
+    http_agent().get(&format!("{server_url}/api/native/notifications/unread"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -799,7 +813,7 @@ pub fn http_get_notifications_unread(server_url: &str, token: &str) -> Result<i6
 }
 
 pub fn http_get_articles(server_url: &str, token: &str) -> Result<Vec<LateArticle>, String> {
-    ureq::get(&format!("{server_url}/api/native/articles?limit=10"))
+    http_agent().get(&format!("{server_url}/api/native/articles?limit=10"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -826,7 +840,7 @@ pub fn http_get_work_profiles(
     server_url: &str,
     token: &str,
 ) -> Result<Vec<LateWorkProfile>, String> {
-    ureq::get(&format!("{server_url}/api/native/work-profiles?limit=20"))
+    http_agent().get(&format!("{server_url}/api/native/work-profiles?limit=20"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -851,7 +865,7 @@ pub fn http_get_work_profiles(
 }
 
 pub fn http_get_rss_feeds(server_url: &str, token: &str) -> Result<Vec<LateRssFeed>, String> {
-    ureq::get(&format!("{server_url}/api/native/rss/feeds"))
+    http_agent().get(&format!("{server_url}/api/native/rss/feeds"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -874,7 +888,7 @@ pub fn http_get_rss_feeds(server_url: &str, token: &str) -> Result<Vec<LateRssFe
 }
 
 pub fn http_get_rss_unread(server_url: &str, token: &str) -> Result<i64, String> {
-    ureq::get(&format!("{server_url}/api/native/rss/unread"))
+    http_agent().get(&format!("{server_url}/api/native/rss/unread"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -884,7 +898,7 @@ pub fn http_get_rss_unread(server_url: &str, token: &str) -> Result<i64, String>
 }
 
 pub fn http_get_rss_entries(server_url: &str, token: &str) -> Result<Vec<LateRssEntry>, String> {
-    ureq::get(&format!("{server_url}/api/native/rss/entries?limit=20"))
+    http_agent().get(&format!("{server_url}/api/native/rss/entries?limit=20"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -908,7 +922,7 @@ pub fn http_get_rss_entries(server_url: &str, token: &str) -> Result<Vec<LateRss
 }
 
 pub fn http_get_showcase(server_url: &str, token: &str) -> Result<Vec<LateShowcaseItem>, String> {
-    ureq::get(&format!("{server_url}/api/native/showcase?limit=20"))
+    http_agent().get(&format!("{server_url}/api/native/showcase?limit=20"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -939,7 +953,7 @@ pub fn http_get_showcase(server_url: &str, token: &str) -> Result<Vec<LateShowca
 }
 
 pub fn http_get_leaderboard(server_url: &str, token: &str) -> Result<Vec<LateLeaderEntry>, String> {
-    ureq::get(&format!("{server_url}/api/native/games/leaderboard"))
+    http_agent().get(&format!("{server_url}/api/native/games/leaderboard"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -961,7 +975,7 @@ pub fn http_get_leaderboard(server_url: &str, token: &str) -> Result<Vec<LateLea
 }
 
 pub fn http_get_chips(server_url: &str, token: &str) -> Result<Vec<LateChip>, String> {
-    ureq::get(&format!("{server_url}/api/native/chips"))
+    http_agent().get(&format!("{server_url}/api/native/chips"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?
@@ -984,7 +998,7 @@ pub fn http_get_chips(server_url: &str, token: &str) -> Result<Vec<LateChip>, St
 }
 
 pub fn http_get_artboard_size(server_url: &str, token: &str) -> Result<Option<(u32, u32)>, String> {
-    let val = ureq::get(&format!("{server_url}/api/native/artboard"))
+    let val = http_agent().get(&format!("{server_url}/api/native/artboard"))
         .set("Authorization", &bearer(token))
         .call()
         .map_err(|e| e.to_string())?

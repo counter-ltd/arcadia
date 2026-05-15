@@ -13,14 +13,12 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use arcadia_core::modules::{python_registry, tray};
 use arcadia_core::modules::tray::{TrayBackend, TrayItem, TrayMenuItem};
+use arcadia_core::modules::{python_registry, tray};
 
 use display_info::DisplayInfo;
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
-use tray_icon::{
-    Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent,
-};
+use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 struct ItemState {
     tray: TrayIcon,

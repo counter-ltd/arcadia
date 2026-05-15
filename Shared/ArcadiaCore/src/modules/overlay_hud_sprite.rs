@@ -33,10 +33,7 @@ static STATE: Mutex<Inner> = Mutex::new(Inner::new());
 
 /// Monotonic counter bumped on every [`set_sprite`] / [`clear_sprite`].
 pub fn version() -> u64 {
-    STATE
-        .lock()
-        .map(|g| g.version)
-        .unwrap_or(0)
+    STATE.lock().map(|g| g.version).unwrap_or(0)
 }
 
 pub fn set_sprite(payload: OverlayHudSpritePayload) -> Result<(), String> {

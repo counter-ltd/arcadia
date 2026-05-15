@@ -113,6 +113,18 @@ pub const PERMISSION_REGISTRY: &[PermissionDefinition] = &[
         description: "Allow overlay.set-stacking system_ui (higher stacking tier; best-effort per OS).",
         default_global: false,
     },
+    PermissionDefinition {
+        id: "notifications.receive",
+        title: "Receive notifications",
+        description: "Allow the notification module to store and display in-app notifications.",
+        default_global: true,
+    },
+    PermissionDefinition {
+        id: "notifications.send",
+        title: "Send notifications",
+        description: "Allow a module or extension to post notifications via notification.post. Grant per-source in the Notifications settings.",
+        default_global: false,
+    },
 ];
 
 pub fn permission_definition(id: &str) -> Option<&'static PermissionDefinition> {
@@ -270,6 +282,17 @@ impl PermissionsConfig {
     /// Global on and subject explicitly granted.
     pub fn effective_allowed(&self, subject: &PermissionSubject, permission_id: &str) -> bool {
         self.global_allowed(permission_id) && self.subject_grants(subject, permission_id)
+    }
+
+    /// Returns true only when the subject has an explicit `false` grant stored.
+    /// Missing entry = neutral (not an explicit denial).
+    pub fn subject_explicitly_denied(&self, subject: &PermissionSubject, permission_id: &str) -> bool {
+        let key = subject.storage_key();
+        self.subjects
+            .get(&key)
+            .and_then(|m| m.get(permission_id))
+            .copied()
+            == Some(false)
     }
 
     /// Any declared permission missing subject grant or globally off.

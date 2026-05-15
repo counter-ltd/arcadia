@@ -33,15 +33,21 @@ impl AiWorkspaceContext {
     }
 
     pub fn can_read(&self) -> bool {
-        self.granted_permissions.iter().any(|p| p == "workspace.read")
+        self.granted_permissions
+            .iter()
+            .any(|p| p == "workspace.ai_read")
     }
 
     pub fn can_write(&self) -> bool {
-        self.granted_permissions.iter().any(|p| p == "workspace.write")
+        self.granted_permissions
+            .iter()
+            .any(|p| p == "workspace.ai_write")
     }
 
     pub fn can_execute(&self) -> bool {
-        self.granted_permissions.iter().any(|p| p == "workspace.execute")
+        self.granted_permissions
+            .iter()
+            .any(|p| p == "workspace.ai_execute")
     }
 
     pub fn is_path_in_scope(&self, path: &str) -> bool {

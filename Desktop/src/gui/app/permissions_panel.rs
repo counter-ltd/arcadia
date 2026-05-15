@@ -6,15 +6,20 @@ use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, IntoElement, InteractiveElement, MouseButton, ParentElement,
-    Styled, Window, div, px,
+    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Styled, Window,
 };
 
-use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
+use crate::gui::app::list_panel_search::{list_panel_row_matches, ListPanelSearchKind};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
-fn perm_toggle_switch(on: bool, is_glyph: bool, r_track: f32, p: &theme::palette::ThemePalette) -> AnyElement {
+fn perm_toggle_switch(
+    on: bool,
+    is_glyph: bool,
+    r_track: f32,
+    p: &theme::palette::ThemePalette,
+) -> AnyElement {
     if on {
         div()
             .w_10()
@@ -122,19 +127,9 @@ impl ArcadiaRoot {
                                 .text_color(p.content_title)
                                 .child(title),
                         )
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(p.content_meta)
-                                .child(id.clone()),
-                        )
+                        .child(div().text_xs().text_color(p.content_meta).child(id.clone()))
                         .when(!desc.is_empty(), |d| {
-                            d.child(
-                                div()
-                                    .text_xs()
-                                    .text_color(p.content_body)
-                                    .child(desc),
-                            )
+                            d.child(div().text_xs().text_color(p.content_body).child(desc))
                         }),
                 )
                 .child(
@@ -340,11 +335,11 @@ impl ArcadiaRoot {
         let py_catalog_nonempty = self
             .python_extension_rows
             .iter()
-            .any(|(_, _, _, _, perms, _)| !perms.is_empty());
+            .any(|(_, _, _, enabled, perms, _)| *enabled && !perms.is_empty());
 
         let mut py_children: Vec<AnyElement> = Vec::new();
-        for (name, _ver, _desc, _en, perms, _platforms) in &self.python_extension_rows {
-            if perms.is_empty() {
+        for (name, _ver, _desc, enabled, perms, _platforms) in &self.python_extension_rows {
+            if !enabled || perms.is_empty() {
                 continue;
             }
             let ext = name.clone();
@@ -489,32 +484,35 @@ impl ArcadiaRoot {
         }
 
         // ── Assemble sections ───────────────────────────────────────────────
-        let global_block = div()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .child(
-                div()
-                    .text_lg()
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(p.content_title)
-                    .child("Global"),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(p.content_meta)
-                    .child("Kill switches for capability classes. Per-module grants still required."),
-            )
-            .child(if global_children.is_empty() && !q.is_empty() {
-                div()
-                    .text_xs()
-                    .text_color(p.content_meta)
-                    .child("No matching global permissions.")
-                    .into_any_element()
-            } else {
-                div().flex().flex_col().gap_2().children(global_children).into_any_element()
-            });
+        let global_block =
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(p.content_title)
+                        .child("Global"),
+                )
+                .child(div().text_xs().text_color(p.content_meta).child(
+                    "Kill switches for capability classes. Per-module grants still required.",
+                ))
+                .child(if global_children.is_empty() && !q.is_empty() {
+                    div()
+                        .text_xs()
+                        .text_color(p.content_meta)
+                        .child("No matching global permissions.")
+                        .into_any_element()
+                } else {
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .children(global_children)
+                        .into_any_element()
+                });
 
         let native_empty_msg = if !native_catalog_nonempty || module_children.is_empty() {
             if !q.is_empty() {
@@ -550,7 +548,12 @@ impl ArcadiaRoot {
                     .child(native_empty_msg)
                     .into_any_element()
             } else {
-                div().flex().flex_col().gap_2().children(module_children).into_any_element()
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .children(module_children)
+                    .into_any_element()
             });
 
         let py_empty_msg = if !py_catalog_nonempty || py_children.is_empty() {
@@ -581,7 +584,12 @@ impl ArcadiaRoot {
                     .child(py_empty_msg)
                     .into_any_element()
             } else {
-                div().flex().flex_col().gap_2().children(py_children).into_any_element()
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .children(py_children)
+                    .into_any_element()
             });
 
         let body = div()

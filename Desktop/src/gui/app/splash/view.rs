@@ -21,7 +21,8 @@ impl ArcadiaRoot {
         self.splash_tick_started = true;
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {

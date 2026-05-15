@@ -1,14 +1,20 @@
-use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
+use openframe::{
+    div, px, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
+};
 
+use crate::gui::app::{ArcadiaRoot, PendingPermissionGrant};
+use crate::gui::theme;
 use arcadia_core::config::modules::ModulesConfig;
 use arcadia_core::config::permissions::{PermissionSubject, PermissionsConfig};
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
-use crate::gui::app::{ArcadiaRoot, PendingPermissionGrant};
-use crate::gui::theme;
 
 impl ArcadiaRoot {
-    pub fn permission_grant_modal(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
+    pub fn permission_grant_modal(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
         let Some(grant) = &self.pending_permission_grant else {
             return div();
         };
@@ -118,52 +124,54 @@ impl ArcadiaRoot {
                                                         return;
                                                     };
                                                     match g {
-                                                        PendingPermissionGrant::NativeModule {
-                                                            module,
-                                                            missing,
-                                                        } => {
-                                                            if let Ok(mut pc) =
-                                                                PermissionsConfig::load_or_create()
-                                                            {
-                                                                let subj =
-                                                                    PermissionSubject::module(module.clone());
-                                                                let _ = pc.ensure_effective_grants(
-                                                                    &subj, &missing,
-                                                                );
-                                                                let _ = pc.save();
-                                                            }
-                                                            if let Ok(mut cfg) =
-                                                                ModulesConfig::load_or_create()
-                                                            {
-                                                                let _ = cfg.enable_with_requirements(&module);
-                                                                let _ = cfg.save();
-                                                            }
-                                                            this.reload_modules();
-                                                        }
-                                                        PendingPermissionGrant::PythonExtension {
-                                                            extension,
-                                                            missing,
-                                                        } => {
-                                                            if let Ok(mut pc) =
-                                                                PermissionsConfig::load_or_create()
-                                                            {
-                                                                let subj = PermissionSubject::python(
-                                                                    extension.clone(),
-                                                                );
-                                                                let _ = pc.ensure_effective_grants(
-                                                                    &subj, &missing,
-                                                                );
-                                                                let _ = pc.save();
-                                                            }
-                                                            let ctx = this.execution_context();
-                                                            let _ = modules::execute_command(
-                                                                "python-host.extension-enable",
-                                                                &[extension.as_str()],
-                                                                &ctx,
+                                                    PendingPermissionGrant::NativeModule {
+                                                        module,
+                                                        missing,
+                                                    } => {
+                                                        if let Ok(mut pc) =
+                                                            PermissionsConfig::load_or_create()
+                                                        {
+                                                            let subj = PermissionSubject::module(
+                                                                module.clone(),
                                                             );
-                                                            this.reload_python_extensions(cx);
+                                                            let _ = pc.ensure_effective_grants(
+                                                                &subj, &missing,
+                                                            );
+                                                            let _ = pc.save();
                                                         }
+                                                        if let Ok(mut cfg) =
+                                                            ModulesConfig::load_or_create()
+                                                        {
+                                                            let _ = cfg
+                                                                .enable_with_requirements(&module);
+                                                            let _ = cfg.save();
+                                                        }
+                                                        this.reload_modules();
                                                     }
+                                                    PendingPermissionGrant::PythonExtension {
+                                                        extension,
+                                                        missing,
+                                                    } => {
+                                                        if let Ok(mut pc) =
+                                                            PermissionsConfig::load_or_create()
+                                                        {
+                                                            let subj = PermissionSubject::python(
+                                                                extension.clone(),
+                                                            );
+                                                            let _ = pc.ensure_effective_grants(
+                                                                &subj, &missing,
+                                                            );
+                                                            let _ = pc.save();
+                                                        }
+                                                        let ctx = this.execution_context();
+                                                        let _ = modules::execute_command(
+                                                            "python-host.extension-enable",
+                                                            &[extension.as_str()],
+                                                            &ctx,
+                                                        );
+                                                        this.reload_python_extensions(cx);
+                                                    }
+                                                }
                                                     this.pending_permission_grant = None;
                                                     cx.notify();
                                                 }),

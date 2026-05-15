@@ -51,7 +51,8 @@ pub const AI_PROVIDER_REGISTRY: &[AiProviderManifest] = &[
     AiProviderManifest {
         module_name: "ai-provider-apfel",
         display_name: "Apple Intelligence",
-        description: "On-device inference via macOS Foundation Models. No API key or network required.",
+        description:
+            "On-device inference via macOS Foundation Models. No API key or network required.",
     },
 ];
 
@@ -92,9 +93,9 @@ pub fn is_cli_provider(module_name: &str) -> bool {
 pub fn cli_binary_for_module(module_name: &str) -> Option<&'static str> {
     match module_name {
         "ai-provider-exec-claude" => Some("claude"),
-        "ai-provider-exec-codex"  => Some("codex"),
+        "ai-provider-exec-codex" => Some("codex"),
         "ai-provider-exec-gemini" => Some("gemini"),
-        "ai-provider-exec-aider"  => Some("aider"),
+        "ai-provider-exec-aider" => Some("aider"),
         _ => None,
     }
 }
@@ -102,9 +103,9 @@ pub fn cli_binary_for_module(module_name: &str) -> Option<&'static str> {
 pub fn cli_display_name(module_name: &str) -> &'static str {
     match module_name {
         "ai-provider-exec-claude" => "Claude Code",
-        "ai-provider-exec-codex"  => "Codex",
+        "ai-provider-exec-codex" => "Codex",
         "ai-provider-exec-gemini" => "Gemini",
-        "ai-provider-exec-aider"  => "Aider",
+        "ai-provider-exec-aider" => "Aider",
         _ => "CLI",
     }
 }

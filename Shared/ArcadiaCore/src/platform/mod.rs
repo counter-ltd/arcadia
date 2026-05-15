@@ -5,22 +5,22 @@ pub trait PlatformInfo {
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
-pub use windows::current;
+pub use windows::{current, send_system_notification};
 
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub use macos::current;
+pub use macos::{current, send_system_notification};
 
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
-pub use linux::current;
+pub use linux::{current, send_system_notification};
 
 #[cfg(target_os = "ios")]
 mod ios;
 #[cfg(target_os = "ios")]
-pub use ios::current;
+pub use ios::{current, send_system_notification};
 
 #[cfg(not(any(
     target_os = "windows",
@@ -35,4 +35,4 @@ mod unknown;
     target_os = "linux",
     target_os = "ios"
 )))]
-pub use unknown::current;
+pub use unknown::{current, send_system_notification};

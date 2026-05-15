@@ -21,7 +21,9 @@ use std::sync::Mutex;
 
 use arcadia_core::config::permissions::PermissionsConfig;
 use arcadia_core::config::ConfigFile;
-use arcadia_core::modules::cursor::{self, CursorBackend, CursorPosition, CursorSnapshot, ScreenSize};
+use arcadia_core::modules::cursor::{
+    self, CursorBackend, CursorPosition, CursorSnapshot, ScreenSize,
+};
 use device_query::{DeviceQuery, DeviceState};
 
 const CURSOR_GLOBAL_POSITION_PERMISSION: &str = "cursor.global_position";
@@ -68,8 +70,7 @@ impl DesktopCursorBackend {
 
 impl CursorBackend for DesktopCursorBackend {
     fn position(&self) -> Option<CursorPosition> {
-        self.snapshot()
-            .map(|s| CursorPosition { x: s.x, y: s.y })
+        self.snapshot().map(|s| CursorPosition { x: s.x, y: s.y })
     }
 
     fn snapshot(&self) -> Option<CursorSnapshot> {

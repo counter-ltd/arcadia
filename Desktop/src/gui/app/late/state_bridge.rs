@@ -17,7 +17,8 @@ impl ArcadiaRoot {
         self.late_poll_task_started = true;
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {
@@ -30,10 +31,8 @@ impl ArcadiaRoot {
                                         return true;
                                     }
                                     let arc = arcadia_core::modules::late::state();
-                                    let rev = arc
-                                        .lock()
-                                        .unwrap_or_else(|e| e.into_inner())
-                                        .revision;
+                                    let rev =
+                                        arc.lock().unwrap_or_else(|e| e.into_inner()).revision;
                                     if rev != this.late_last_revision {
                                         this.late_last_revision = rev;
                                         cx.notify();

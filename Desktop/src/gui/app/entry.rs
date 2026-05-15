@@ -3,8 +3,7 @@ use openframe::{
     WindowOptions, WindowStacking,
 };
 
-static QUIT_REQUESTED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+static QUIT_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 use super::super::assets::EmbeddedAssets;
 use super::super::overlay_hud::OverlayHudRoot;
@@ -53,7 +52,9 @@ pub fn run() {
                 }) {
                     overlay_backend::register_overlay_window(handle);
                 } else {
-                    eprintln!("arcadia: failed to open HUD overlay window (continuing without overlay)");
+                    eprintln!(
+                        "arcadia: failed to open HUD overlay window (continuing without overlay)"
+                    );
                 }
                 app.new(|cx| ArcadiaRoot::new(cx))
             },
@@ -74,17 +75,15 @@ fn spawn_main_thread_pump(app: &mut openframe::App) {
     use std::sync::atomic::Ordering;
     use std::time::Duration;
 
-    app.spawn(async |cx| {
-        loop {
-            Timer::after(Duration::from_millis(50)).await;
-            if QUIT_REQUESTED.load(Ordering::Acquire) {
-                cx.update(|app| app.quit()).ok();
-                return;
-            }
-            scheduling::drain_main_queue();
-            tray_backend::poll_menu_events();
-            overlay_backend::poll_overlay(cx);
+    app.spawn(async |cx| loop {
+        Timer::after(Duration::from_millis(50)).await;
+        if QUIT_REQUESTED.load(Ordering::Acquire) {
+            cx.update(|app| app.quit()).ok();
+            return;
         }
+        scheduling::drain_main_queue();
+        tray_backend::poll_menu_events();
+        overlay_backend::poll_overlay(cx);
     })
     .detach();
 }

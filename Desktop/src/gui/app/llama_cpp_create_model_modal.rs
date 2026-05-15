@@ -4,14 +4,14 @@ use arcadia_core::config::llama_cpp::{LlamaCppConfig, LlamaCppModel, LlamaCppMod
 use arcadia_core::config::ConfigFile;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, PathPromptOptions, Styled, Window, div, px, rgb,
+    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, PathPromptOptions, Styled, Window,
 };
 
 use super::ArcadiaRoot;
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
-use crate::gui::theme::{self, render_icon};
 use crate::gui::theme::palette::ThemePalette;
+use crate::gui::theme::{self, render_icon};
 
 fn text_field(
     value: &str,
@@ -21,12 +21,8 @@ fn text_field(
     focus_handle: openframe::FocusHandle,
     p: ThemePalette,
     radius: f32,
-    on_key_down: impl Fn(
-            &mut ArcadiaRoot,
-            &KeyDownEvent,
-            &mut openframe::Window,
-            &mut Context<ArcadiaRoot>,
-        ) + 'static,
+    on_key_down: impl Fn(&mut ArcadiaRoot, &KeyDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>)
+        + 'static,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
     let fh = focus_handle.clone();
@@ -51,9 +47,12 @@ fn text_field(
         .text_sm()
         .text_color(text_color)
         .track_focus(&focus_handle)
-        .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
-            fh.focus(window);
-        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |_, _, window, _| {
+                fh.focus(window);
+            }),
+        )
         .on_key_down(cx.listener(on_key_down))
         .child(content)
         .into_any_element()
@@ -197,8 +196,16 @@ impl ArcadiaRoot {
             for mt in LlamaCppModelKind::all() {
                 let mt_clone = mt.clone();
                 let is_selected = *mt == current_type;
-                let bg = if is_selected { p.accent } else { p.surface_elevated };
-                let fg = if is_selected { p.on_accent } else { p.content_title };
+                let bg = if is_selected {
+                    p.accent
+                } else {
+                    p.surface_elevated
+                };
+                let fg = if is_selected {
+                    p.on_accent
+                } else {
+                    p.content_title
+                };
                 let border = if is_selected { p.accent } else { p.border };
                 let icon_key = mt.icon_key();
                 row = row.child(
@@ -218,12 +225,15 @@ impl ArcadiaRoot {
                         .gap_1p5()
                         .child(render_icon(icon_key).size(px(11.)).text_color(fg))
                         .child(mt.label())
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                            if let Some(ref mut d) = this.llama_cpp_create_draft {
-                                d.model_kind = mt_clone.clone();
-                            }
-                            cx.notify();
-                        })),
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                                    d.model_kind = mt_clone.clone();
+                                }
+                                cx.notify();
+                            }),
+                        ),
                 );
             }
             row
@@ -515,9 +525,14 @@ impl ArcadiaRoot {
                     return;
                 }
                 if let Some(ref mut d) = this.llama_cpp_edit_draft {
-                    if key == "backspace" { d.name.pop(); cx.notify(); }
-                    else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char { d.name.push_str(kc); cx.notify(); }
+                    if key == "backspace" {
+                        d.name.pop();
+                        cx.notify();
+                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                        if let Some(kc) = &event.keystroke.key_char {
+                            d.name.push_str(kc);
+                            cx.notify();
+                        }
                     }
                 }
             },
@@ -541,9 +556,14 @@ impl ArcadiaRoot {
                     return;
                 }
                 if let Some(ref mut d) = this.llama_cpp_edit_draft {
-                    if key == "backspace" { d.path.pop(); cx.notify(); }
-                    else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char { d.path.push_str(kc); cx.notify(); }
+                    if key == "backspace" {
+                        d.path.pop();
+                        cx.notify();
+                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                        if let Some(kc) = &event.keystroke.key_char {
+                            d.path.push_str(kc);
+                            cx.notify();
+                        }
                     }
                 }
             },
@@ -567,9 +587,14 @@ impl ArcadiaRoot {
                     return;
                 }
                 if let Some(ref mut d) = this.llama_cpp_edit_draft {
-                    if key == "backspace" { d.mmproj_path.pop(); cx.notify(); }
-                    else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char { d.mmproj_path.push_str(kc); cx.notify(); }
+                    if key == "backspace" {
+                        d.mmproj_path.pop();
+                        cx.notify();
+                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                        if let Some(kc) = &event.keystroke.key_char {
+                            d.mmproj_path.push_str(kc);
+                            cx.notify();
+                        }
                     }
                 }
             },
@@ -590,8 +615,16 @@ impl ArcadiaRoot {
             for mt in LlamaCppModelKind::all() {
                 let mt_clone = mt.clone();
                 let is_selected = *mt == current_type;
-                let bg = if is_selected { p.accent } else { p.surface_elevated };
-                let fg = if is_selected { p.on_accent } else { p.content_title };
+                let bg = if is_selected {
+                    p.accent
+                } else {
+                    p.surface_elevated
+                };
+                let fg = if is_selected {
+                    p.on_accent
+                } else {
+                    p.content_title
+                };
                 let border = if is_selected { p.accent } else { p.border };
                 let icon_key = mt.icon_key();
                 row = row.child(
@@ -611,12 +644,15 @@ impl ArcadiaRoot {
                         .gap_1p5()
                         .child(render_icon(icon_key).size(px(11.)).text_color(fg))
                         .child(mt.label())
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                            if let Some(ref mut d) = this.llama_cpp_edit_draft {
-                                d.model_kind = mt_clone.clone();
-                            }
-                            cx.notify();
-                        })),
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                                    d.model_kind = mt_clone.clone();
+                                }
+                                cx.notify();
+                            }),
+                        ),
                 );
             }
             row
@@ -827,8 +863,12 @@ impl ArcadiaRoot {
     }
 
     pub fn llama_cpp_edit_model_save(&mut self, cx: &mut Context<Self>) {
-        let Some(model_id) = self.active_llama_cpp_model_id.clone() else { return; };
-        let Some(draft) = self.llama_cpp_edit_draft.clone() else { return; };
+        let Some(model_id) = self.active_llama_cpp_model_id.clone() else {
+            return;
+        };
+        let Some(draft) = self.llama_cpp_edit_draft.clone() else {
+            return;
+        };
 
         let name = draft.name.trim().to_string();
         if name.is_empty() {
@@ -910,11 +950,17 @@ impl ArcadiaRoot {
     }
 
     pub fn llama_cpp_delete_model(&mut self, cx: &mut Context<Self>) {
-        let Some(model_id) = self.active_llama_cpp_model_id.clone() else { return; };
+        let Some(model_id) = self.active_llama_cpp_model_id.clone() else {
+            return;
+        };
 
-        let Ok(mut cfg) = LlamaCppConfig::load_or_create() else { return; };
+        let Ok(mut cfg) = LlamaCppConfig::load_or_create() else {
+            return;
+        };
         cfg.models.retain(|m| m.id != model_id);
-        if cfg.save().is_err() { return; }
+        if cfg.save().is_err() {
+            return;
+        }
 
         self.llama_cpp_models.retain(|m| m.id != model_id);
         self.active_llama_cpp_model_id = None;
@@ -952,7 +998,9 @@ impl ArcadiaRoot {
             return;
         }
 
-        let mmproj_path = if draft.model_kind == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision {
+        let mmproj_path = if draft.model_kind
+            == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision
+        {
             let p = draft.mmproj_path.trim().to_string();
             if p.is_empty() {
                 if let Some(ref mut d) = self.llama_cpp_create_draft {
@@ -1010,6 +1058,7 @@ impl ArcadiaRoot {
         self.active_ai_provider_module =
             arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME.to_string();
         self.active_page_id = "ai.models".to_string();
+        self.sync_settings_hub_expanded_from_active_page();
         self.llama_cpp_create_draft = None;
         cx.notify();
     }

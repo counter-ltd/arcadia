@@ -3,8 +3,8 @@
 use crate::config::modules::TERMINAL_MODULE_NAME;
 
 use super::model::{
-    ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic,
-    ShortcutTriggerStatic, ShortcutTriggerStaticChord, ShortcutVisibility,
+    ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic, ShortcutTriggerStatic,
+    ShortcutTriggerStaticChord, ShortcutVisibility,
 };
 
 pub static SHORTCUT_DEFINITIONS: &[ShortcutDefinition] = &[

@@ -11,3 +11,5 @@ impl PlatformInfo for UnknownPlatform {
 pub fn current() -> impl PlatformInfo {
     UnknownPlatform
 }
+
+pub fn send_system_notification(_title: &str, _body: &str) {}

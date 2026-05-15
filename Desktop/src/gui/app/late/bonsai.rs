@@ -1,7 +1,7 @@
+use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, rgb, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
 };
-use openframe::prelude::FluentBuilder as _;
 
 use arcadia_core::modules;
 use arcadia_core::modules::late::state;
@@ -19,21 +19,55 @@ impl ArcadiaRoot {
         let glyph = glyph_snapshot(cx);
         let is_glyph = glyph.is_some();
 
-        let panel_bg     = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::module_panel_bg(is_dark));
-        let panel_stroke = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_panel_stroke(is_dark));
+        let panel_bg = glyph
+            .as_ref()
+            .map(|g| g.surface)
+            .unwrap_or_else(|| theme::module_panel_bg(is_dark));
+        let panel_stroke = glyph
+            .as_ref()
+            .map(|g| g.border)
+            .unwrap_or_else(|| theme::module_panel_stroke(is_dark));
         let panel_radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(12.0);
-        let title_c      = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| theme::module_title_text(is_dark));
-        let desc_c       = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_description_text(is_dark));
-        let btn_bg       = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
-        let btn_text     = glyph.as_ref().map(|g| g.bg).unwrap_or_else(|| theme::module_button_enable_text(is_dark));
-        let btn_hover    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_button_enable_hover_bg(is_dark));
-        let well_bg      = glyph.as_ref().map(|g| g.bg).unwrap_or_else(|| theme::late_bonsai_well_bg(is_dark));
-        let well_stroke  = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::late_bonsai_well_stroke(is_dark));
-        let pot_band     = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::late_bonsai_pot_band(is_dark));
-        let foliage_c    = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| theme::late_bonsai_foliage_text(is_dark));
-        let accent_bar   = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| {
-            theme::nav_accent_palette("violet", is_dark).icon_active
-        });
+        let title_c = glyph
+            .as_ref()
+            .map(|g| g.text)
+            .unwrap_or_else(|| theme::module_title_text(is_dark));
+        let desc_c = glyph
+            .as_ref()
+            .map(|g| g.dim)
+            .unwrap_or_else(|| theme::module_description_text(is_dark));
+        let btn_bg = glyph
+            .as_ref()
+            .map(|g| g.accent)
+            .unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
+        let btn_text = glyph
+            .as_ref()
+            .map(|g| g.bg)
+            .unwrap_or_else(|| theme::module_button_enable_text(is_dark));
+        let btn_hover = glyph
+            .as_ref()
+            .map(|g| g.surface2)
+            .unwrap_or_else(|| theme::module_button_enable_hover_bg(is_dark));
+        let well_bg = glyph
+            .as_ref()
+            .map(|g| g.bg)
+            .unwrap_or_else(|| theme::late_bonsai_well_bg(is_dark));
+        let well_stroke = glyph
+            .as_ref()
+            .map(|g| g.border)
+            .unwrap_or_else(|| theme::late_bonsai_well_stroke(is_dark));
+        let pot_band = glyph
+            .as_ref()
+            .map(|g| g.surface2)
+            .unwrap_or_else(|| theme::late_bonsai_pot_band(is_dark));
+        let foliage_c = glyph
+            .as_ref()
+            .map(|g| g.accent)
+            .unwrap_or_else(|| theme::late_bonsai_foliage_text(is_dark));
+        let accent_bar = glyph
+            .as_ref()
+            .map(|g| g.accent)
+            .unwrap_or_else(|| theme::nav_accent_palette("violet", is_dark).icon_active);
 
         div()
             .w_full()
@@ -106,56 +140,39 @@ impl ArcadiaRoot {
                     .overflow_hidden()
                     .border_1()
                     .border_color(well_stroke)
-                    .child(
-                        div()
-                            .w(px(3.))
-                            .min_w(px(3.))
-                            .bg(accent_bar),
-                    )
+                    .child(div().w(px(3.)).min_w(px(3.)).bg(accent_bar))
                     .child(
                         div()
                             .flex_1()
                             .flex()
                             .flex_col()
                             .min_w_0()
-                            .child(
-                                div()
-                                    .w_full()
-                                    .h(px(5.))
-                                    .bg(pot_band),
-                            )
-                            .child(
-                                div()
-                                    .w_full()
-                                    .p_3()
-                                    .bg(well_bg)
-                                    .flex()
-                                    .flex_col()
-                                    .child(if art.is_empty() {
-                                        div()
-                                            .w_full()
-                                            .py_6()
-                                            .flex()
-                                            .justify_center()
-                                            .items_center()
-                                            .text_xs()
-                                            .text_color(desc_c)
-                                            .child("No bonsai yet — connect to late.sh.")
-                                    } else {
-                                        div()
-                                            .w_full()
-                                            .flex()
-                                            .flex_col()
-                                            .font_family("monospace")
-                                            .text_sm()
-                                            .text_color(foliage_c)
-                                            .children(art.into_iter().map(|line| {
-                                                div()
-                                                    .line_height(px(15.))
-                                                    .child(line)
-                                            }))
-                                    }),
-                            ),
+                            .child(div().w_full().h(px(5.)).bg(pot_band))
+                            .child(div().w_full().p_3().bg(well_bg).flex().flex_col().child(
+                                if art.is_empty() {
+                                    div()
+                                        .w_full()
+                                        .py_6()
+                                        .flex()
+                                        .justify_center()
+                                        .items_center()
+                                        .text_xs()
+                                        .text_color(desc_c)
+                                        .child("No bonsai yet — connect to late.sh.")
+                                } else {
+                                    div()
+                                        .w_full()
+                                        .flex()
+                                        .flex_col()
+                                        .font_family("monospace")
+                                        .text_sm()
+                                        .text_color(foliage_c)
+                                        .children(
+                                            art.into_iter()
+                                                .map(|line| div().line_height(px(15.)).child(line)),
+                                        )
+                                },
+                            )),
                     ),
             )
     }

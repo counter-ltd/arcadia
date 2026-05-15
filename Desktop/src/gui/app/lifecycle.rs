@@ -3,35 +3,35 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::gui::theme::{
+    ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle,
+    ActiveGlyphUiFontFamily, GlyphBorderPatterns, GlyphBorderTypography, GlyphStyleConfig,
+};
 use arcadia_core::config::ai::AiConfig;
 use arcadia_core::config::ai_exec_providers::{AiExecProvidersConfig, ExecCliEntry};
-use arcadia_core::config::llama_cpp::LlamaCppConfig;
-use arcadia_core::modules::ai_chat_store::{self, ChatSession, StoredMessage};
 use arcadia_core::config::appearance::AppearanceConfig;
 use arcadia_core::config::code_editor::{CodeEditorConfig, CodeEditorSession};
 use arcadia_core::config::extension_tokens;
 use arcadia_core::config::late::LateConfig;
-use arcadia_core::config::modules::{
-    ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME,
-};
-#[cfg(feature = "gui")]
-use arcadia_core::config::modules::{TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME};
+use arcadia_core::config::llama_cpp::LlamaCppConfig;
 #[cfg(feature = "python-extensions")]
 use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
+use arcadia_core::config::modules::{ModulesConfig, LAN_MODULE_NAME, REMOTE_SESSION_MODULE_NAME};
+#[cfg(feature = "gui")]
+use arcadia_core::config::modules::{TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME};
 use arcadia_core::config::thin_client::ThinClientConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
-use arcadia_core::modules::python_registry::{clamp_numeric_display_for_spec, StyleInfo, StyleTokenKind};
+use arcadia_core::modules::ai_chat_store::{self, ChatSession, StoredMessage};
+use arcadia_core::modules::python_registry::{
+    clamp_numeric_display_for_spec, StyleInfo, StyleTokenKind,
+};
 #[cfg(feature = "gui")]
 use arcadia_core::modules::shell_motd;
 use arcadia_core::modules::surface::{parse_surface_revision, parse_surface_snapshot};
 use arcadia_core::navigation;
-use openframe::{point, px, Context, Rgba, RenderStyle, Timer, UpdateGlobal, Window};
 use openframe::ScrollHandle;
-use crate::gui::theme::{
-    ActiveGlyphBorderPatterns, ActiveGlyphBorderTypography, ActiveGlyphStyle, GlyphBorderPatterns,
-    ActiveGlyphUiFontFamily, GlyphBorderTypography, GlyphStyleConfig,
-};
+use openframe::{point, px, Context, RenderStyle, Rgba, Timer, UpdateGlobal, Window};
 
 #[cfg(feature = "gui")]
 use super::super::tui;
@@ -77,14 +77,12 @@ fn fetch_ollama_tags(
 #[cfg(feature = "gui")]
 impl TerminalInstance {
     pub(crate) fn new(
-        id: usize,
         label: String,
         shell_working_dir: PathBuf,
         shell_display_cwd: String,
         initial_history: Vec<String>,
     ) -> Self {
         Self {
-            id,
             label,
             shell_history: initial_history,
             shell_input: String::new(),
@@ -128,15 +126,8 @@ impl ArcadiaRoot {
         let (working_dir, display_cwd) = Self::current_dir_strings();
         let (history, motd_n) = Self::initial_shell_history(self.current_color_scheme_dark());
         self.shell_motd_prefix_lines = motd_n;
-        self.active_terminal_mut().reset(history, working_dir, display_cwd);
-    }
-
-    #[cfg(feature = "gui")]
-    pub(super) fn sync_shell_display_cwd_from_env(&mut self) {
-        let (working_dir, display_cwd) = Self::current_dir_strings();
-        let term = self.active_terminal_mut();
-        term.shell_working_dir = working_dir;
-        term.shell_display_cwd = display_cwd;
+        self.active_terminal_mut()
+            .reset(history, working_dir, display_cwd);
     }
 
     #[cfg(feature = "gui")]
@@ -150,10 +141,7 @@ impl ArcadiaRoot {
                     .unwrap_or_else(|_| "cwd: unavailable".to_string());
                 (path, display)
             }
-            Err(_) => (
-                PathBuf::from("/"),
-                "cwd: unavailable".to_string(),
-            ),
+            Err(_) => (PathBuf::from("/"), "cwd: unavailable".to_string()),
         }
     }
 
@@ -162,7 +150,11 @@ impl ArcadiaRoot {
         let Ok(cfg) = ModulesConfig::load_or_create() else {
             return (vec!["Arcadia Terminal ready.".to_string()], 0);
         };
-        let shell_on = cfg.modules.get(TERMINAL_MODULE_NAME).copied().unwrap_or(false);
+        let shell_on = cfg
+            .modules
+            .get(TERMINAL_MODULE_NAME)
+            .copied()
+            .unwrap_or(false);
         let motd_on = cfg
             .modules
             .get(TERMINAL_MOTD_MODULE_NAME)
@@ -183,7 +175,11 @@ impl ArcadiaRoot {
         let Ok(cfg) = ModulesConfig::load_or_create() else {
             return;
         };
-        let shell_on = cfg.modules.get(TERMINAL_MODULE_NAME).copied().unwrap_or(false);
+        let shell_on = cfg
+            .modules
+            .get(TERMINAL_MODULE_NAME)
+            .copied()
+            .unwrap_or(false);
         let motd_on = cfg
             .modules
             .get(TERMINAL_MOTD_MODULE_NAME)
@@ -261,41 +257,51 @@ impl ArcadiaRoot {
         let openai_api_key_focus = cx.focus_handle();
         let openai_base_url_focus = cx.focus_handle();
         let command_bar_focus = cx.focus_handle();
-        let ui_prefs_cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
+        let notification_max_count_focus = cx.focus_handle();
+        let notification_unread_count =
+            arcadia_core::config::notifications::NotificationsConfig::load_or_create()
+                .map(|c| c.unread_count())
+                .unwrap_or(0);
+        let ui_prefs_cfg =
+            arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
         let late_cfg = LateConfig::load_or_create().unwrap_or_default();
         let code_editor_cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
         let editor_session = CodeEditorSession::load_or_create().unwrap_or_default();
         let session_active_tab = editor_session.active_tab;
         let session_next_id = editor_session.next_id.max(1);
-        let restored_tabs: Vec<CodeEditorTab> = editor_session.tabs.into_iter().filter_map(|pt| {
-            let (content, saved_content) = if let Some(ref path) = pt.file_path {
-                match std::fs::read_to_string(path) {
-                    Ok(text) => (text.clone(), text),
-                    Err(_) => return None,
-                }
-            } else {
-                let c = pt.unsaved_content.unwrap_or_default();
-                (c.clone(), String::new())
-            };
-            let lang = crate::gui::app::code_editor_panel::detect_language(&pt.title);
-            let cursor = pt.cursor.min(content.len());
-            Some(CodeEditorTab {
-                id: pt.id,
-                title: pt.title,
-                content,
-                cursor,
-                selection_anchor: None,
-                language: lang,
-                hl_spans: vec![],
-                decorations: vec![],
-                highlight_dirty: true,
-                workspace_path: pt.workspace_path,
-                file_path: pt.file_path,
-                saved_content,
-                cached_lines: vec![],
-                cached_line_byte_starts: vec![],
+        let restored_tabs: Vec<CodeEditorTab> = editor_session
+            .tabs
+            .into_iter()
+            .filter_map(|pt| {
+                let (content, saved_content) = if let Some(ref path) = pt.file_path {
+                    match std::fs::read_to_string(path) {
+                        Ok(text) => (text.clone(), text),
+                        Err(_) => return None,
+                    }
+                } else {
+                    let c = pt.unsaved_content.unwrap_or_default();
+                    (c.clone(), String::new())
+                };
+                let lang = crate::gui::app::code_editor_panel::detect_language(&pt.title);
+                let cursor = pt.cursor.min(content.len());
+                Some(CodeEditorTab {
+                    id: pt.id,
+                    title: pt.title,
+                    content,
+                    cursor,
+                    selection_anchor: None,
+                    language: lang,
+                    hl_spans: vec![],
+                    decorations: vec![],
+                    highlight_dirty: true,
+                    workspace_path: pt.workspace_path,
+                    file_path: pt.file_path,
+                    saved_content,
+                    cached_lines: vec![],
+                    cached_line_byte_starts: vec![],
+                })
             })
-        }).collect();
+            .collect();
         let restored_active = if !restored_tabs.is_empty() {
             session_active_tab.min(restored_tabs.len() - 1)
         } else {
@@ -304,8 +310,10 @@ impl ArcadiaRoot {
         let restored_show_dashboard = !restored_tabs.is_empty();
         let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
         let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
-        let ollama_cfg = arcadia_core::config::ollama::OllamaConfig::load_or_create().unwrap_or_default();
-        let openai_cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
+        let ollama_cfg =
+            arcadia_core::config::ollama::OllamaConfig::load_or_create().unwrap_or_default();
+        let openai_cfg =
+            arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
         let workspace_entries = arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
             .map(|c| c.workspaces)
             .unwrap_or_default();
@@ -328,7 +336,6 @@ impl ArcadiaRoot {
         let first_terminal = {
             let (shell_working_dir, shell_display_cwd) = Self::current_dir_strings();
             TerminalInstance::new(
-                0,
                 "Terminal 1".to_string(),
                 shell_working_dir,
                 shell_display_cwd,
@@ -406,15 +413,18 @@ impl ArcadiaRoot {
             ai_active_skill_ids: Vec::new(),
             ai_rule_picker_open: false,
             ai_skill_picker_open: false,
-            ai_session_sidebar_open: false,
-            ai_sessions: ai_chat_store::list_sessions().unwrap_or_default().into_iter().map(|s| crate::gui::app::AiSessionSummary {
-                id: s.id,
-                title: s.title,
-                updated_at: s.updated_at,
-                provider: s.provider,
-                workspace_id: s.workspace_id,
-                last_messages: s.last_messages,
-            }).collect(),
+            ai_sessions: ai_chat_store::list_sessions()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|s| crate::gui::app::AiSessionSummary {
+                    id: s.id,
+                    title: s.title,
+                    updated_at: s.updated_at,
+                    provider: s.provider,
+                    workspace_id: s.workspace_id,
+                    last_messages: s.last_messages,
+                })
+                .collect(),
             ai_pending_edits: Vec::new(),
             ai_diff_panel_open: false,
             ai_stage_writes: false,
@@ -520,6 +530,11 @@ impl ArcadiaRoot {
             item_hover_alphas: std::collections::HashMap::new(),
             item_hover_anims: std::collections::HashMap::new(),
             settings_hub_expanded: false,
+            settings_expand_alpha: 0.0,
+            settings_expand_anim: None,
+            pill_expanded: std::collections::HashMap::new(),
+            pill_expand_alphas: std::collections::HashMap::new(),
+            pill_expand_anims: std::collections::HashMap::new(),
             app_menu_open: false,
             session_route_menu_open: false,
             remote_route: None,
@@ -578,6 +593,11 @@ impl ArcadiaRoot {
             command_bar_open: false,
             command_bar_input: String::new(),
             command_bar_focus,
+            notification_unread_count,
+            notification_settings_feedback: String::new(),
+            notification_max_count_draft: String::new(),
+            notification_max_count_focus,
+            notification_dest_open: false,
             pinned_settings_pages: ui_prefs_cfg.pinned_settings_pages,
             settings_pin_context_menu: None,
         };
@@ -650,18 +670,20 @@ impl ArcadiaRoot {
         for (module, specs) in arcadia_core::modules::python_registry::list_style_tokens() {
             let file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
             for spec in specs {
-                let v = extension_tokens::merged_display_for_key(
-                    &spec.key,
-                    &spec.default_value,
-                    &file,
-                );
+                let v =
+                    extension_tokens::merged_display_for_key(&spec.key, &spec.default_value, &file);
                 self.extension_token_values
                     .insert((module.clone(), spec.key), v);
             }
         }
     }
 
-    pub(crate) fn flush_extension_token_edit(&mut self, module: String, key: String, cx: &mut Context<Self>) {
+    pub(crate) fn flush_extension_token_edit(
+        &mut self,
+        module: String,
+        key: String,
+        cx: &mut Context<Self>,
+    ) {
         let spec = arcadia_core::modules::python_registry::list_style_tokens()
             .into_iter()
             .find(|(m, _)| m == &module)
@@ -685,7 +707,11 @@ impl ArcadiaRoot {
                 if extension_tokens::save_module_tokens(&module, &file).is_ok() {
                     let disp = extension_tokens::value_to_display_string(&val);
                     self.extension_token_values.insert(pair, disp);
-                    self.apply_style(self.active_style.clone(), self.current_color_scheme_dark(), cx);
+                    self.apply_style(
+                        self.active_style.clone(),
+                        self.current_color_scheme_dark(),
+                        cx,
+                    );
                     let reload_cmd = format!("{module}.reload");
                     let ctx = arcadia_core::modules::ExecutionContext::default();
                     let _ = modules::execute_command(&reload_cmd, &[], &ctx);
@@ -747,9 +773,7 @@ impl ArcadiaRoot {
             Some(g)
         });
 
-        let glyph_cfg = merged_glyph
-            .as_ref()
-            .map(|p| build_glyph_style_config(p));
+        let glyph_cfg = merged_glyph.as_ref().map(|p| build_glyph_style_config(p));
 
         let border_typography = merged_glyph.as_ref().map(|p| GlyphBorderTypography {
             font_family: p.border_font_family.clone(),
@@ -795,7 +819,11 @@ impl ArcadiaRoot {
             match modules::execute_command("surface.snapshot", &[], &ctx) {
                 Ok(Some(json)) => {
                     let parsed = parse_surface_snapshot(&json);
-                    self.module_rows = { let mut r = parsed.modules; r.sort_by(|a, b| a.0.cmp(&b.0)); r };
+                    self.module_rows = {
+                        let mut r = parsed.modules;
+                        r.sort_by(|a, b| a.0.cmp(&b.0));
+                        r
+                    };
                     self.remote_nav = parsed.navigation_registry;
                     self.last_surface_revision = Some(parsed.revision);
                     self.remote_surface_stale = false;
@@ -836,7 +864,6 @@ impl ArcadiaRoot {
         let (working_dir, display_cwd) = Self::current_dir_strings();
         let (hist, _) = Self::initial_shell_history(self.current_color_scheme_dark());
         let new_term = TerminalInstance::new(
-            new_id,
             format!("Terminal {serial}"),
             working_dir,
             display_cwd,
@@ -845,6 +872,7 @@ impl ArcadiaRoot {
         self.terminals.push(new_term);
         self.active_terminal_id = new_id;
         self.active_page_id = "utility.shell".to_string();
+        self.sync_settings_hub_expanded_from_active_page();
         self.terminal_context_menu_open = false;
     }
 
@@ -872,7 +900,8 @@ impl ArcadiaRoot {
         self.ai_poll_task_started = true;
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {
@@ -904,7 +933,7 @@ impl ArcadiaRoot {
     /// Drain the inference event channel. Returns `true` if any event was processed.
     pub fn poll_ai_events(&mut self, cx: &mut Context<Self>) -> bool {
         use crate::gui::app::ai_runtime::RuntimeEvent;
-        use crate::gui::app::{AiMessage, AiMessageRole, DiffHunk, DiffHunkKind, AiPendingEdit};
+        use crate::gui::app::{AiMessage, AiMessageRole, AiPendingEdit, DiffHunk, DiffHunkKind};
 
         let mut any = false;
         let mut pending_autosave: Option<usize> = None;
@@ -946,7 +975,8 @@ impl ArcadiaRoot {
                             chat.is_loading = false;
                             let chat_provider = chat.session_provider.clone();
                             if let Some(last) = chat.messages.last_mut() {
-                                if last.role == AiMessageRole::Assistant && last.content.is_empty() {
+                                if last.role == AiMessageRole::Assistant && last.content.is_empty()
+                                {
                                     last.content = format!("Error: {e}");
                                 } else {
                                     chat.messages.push(AiMessage {
@@ -961,7 +991,11 @@ impl ArcadiaRoot {
                     }
                     self.ai_stream_chat_id = None;
                 }
-                Ok(RuntimeEvent::PendingEdit { path, original, proposed }) => {
+                Ok(RuntimeEvent::PendingEdit {
+                    path,
+                    original,
+                    proposed,
+                }) => {
                     any = true;
                     let hunks = compute_diff_hunks(&original, &proposed);
                     self.ai_pending_edits.push(AiPendingEdit {
@@ -1018,7 +1052,8 @@ impl ArcadiaRoot {
             session.title = chat.title.clone();
         } else if is_default {
             if let Some(first_user) = session.messages.iter().find(|m| m.role == "user") {
-                let derived: String = first_user.content
+                let derived: String = first_user
+                    .content
                     .split_whitespace()
                     .take(6)
                     .collect::<Vec<_>>()
@@ -1033,17 +1068,21 @@ impl ArcadiaRoot {
         session.workspace_id = self.ai_chat_workspace_id.clone();
 
         // Rebuild messages from chat (source of truth for in-memory state).
-        session.messages = chat.messages.iter().map(|m| {
-            let role = match m.role {
-                AiMessageRole::User => "user",
-                AiMessageRole::Assistant => "assistant",
-            };
-            StoredMessage {
-                role: role.to_string(),
-                content: m.content.clone(),
-                token_count: ai_chat_store::estimate_tokens(&m.content),
-            }
-        }).collect();
+        session.messages = chat
+            .messages
+            .iter()
+            .map(|m| {
+                let role = match m.role {
+                    AiMessageRole::User => "user",
+                    AiMessageRole::Assistant => "assistant",
+                };
+                StoredMessage {
+                    role: role.to_string(),
+                    content: m.content.clone(),
+                    token_count: ai_chat_store::estimate_tokens(&m.content),
+                }
+            })
+            .collect();
 
         // Truncate at 80% of 8192-token default budget.
         session.truncate_to_token_budget(6553);
@@ -1061,14 +1100,17 @@ impl ArcadiaRoot {
 
         // Refresh session summary list.
         if let Ok(summaries) = ai_chat_store::list_sessions() {
-            self.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
-                id: s.id,
-                title: s.title,
-                updated_at: s.updated_at,
-                provider: s.provider,
-                workspace_id: s.workspace_id,
-                last_messages: s.last_messages,
-            }).collect();
+            self.ai_sessions = summaries
+                .into_iter()
+                .map(|s| crate::gui::app::AiSessionSummary {
+                    id: s.id,
+                    title: s.title,
+                    updated_at: s.updated_at,
+                    provider: s.provider,
+                    workspace_id: s.workspace_id,
+                    last_messages: s.last_messages,
+                })
+                .collect();
         }
     }
 }
@@ -1187,7 +1229,8 @@ impl ArcadiaRoot {
         let endpoint = self.ollama_endpoint.clone();
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     let (tx, rx) = std::sync::mpsc::sync_channel::<
@@ -1244,8 +1287,8 @@ impl ArcadiaRoot {
             .take()
             .unwrap_or_else(|| self.openai_base_url.clone());
 
-        let mut cfg = arcadia_core::config::openai::OpenAiConfig::load_or_create()
-            .unwrap_or_default();
+        let mut cfg =
+            arcadia_core::config::openai::OpenAiConfig::load_or_create().unwrap_or_default();
         cfg.api_key = api_key.clone();
         cfg.base_url = base_url.clone();
 
@@ -1271,7 +1314,8 @@ impl ArcadiaRoot {
         self.lan_poll_task_started = true;
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {
@@ -1304,30 +1348,54 @@ impl ArcadiaRoot {
         self.shell_focus.contains_focused(window, cx)
             || self.ai_input_focus.contains_focused(window, cx)
             || self.late_compose_focus.contains_focused(window, cx)
-            || self.late_settings_server_url_focus.contains_focused(window, cx)
-            || self.late_settings_username_focus.contains_focused(window, cx)
-            || self.late_settings_default_room_focus.contains_focused(window, cx)
+            || self
+                .late_settings_server_url_focus
+                .contains_focused(window, cx)
+            || self
+                .late_settings_username_focus
+                .contains_focused(window, cx)
+            || self
+                .late_settings_default_room_focus
+                .contains_focused(window, cx)
             || self.extension_token_focus.contains_focused(window, cx)
             || self.modules_search_focus.contains_focused(window, cx)
             || self.extensions_search_focus.contains_focused(window, cx)
             || self.permissions_search_focus.contains_focused(window, cx)
             || self.shortcuts_search_focus.contains_focused(window, cx)
             || self.workspace_search_focus.contains_focused(window, cx)
-            || self.shortcut_create_label_focus.contains_focused(window, cx)
-            || self.shortcut_create_token_focus.contains_focused(window, cx)
+            || self
+                .shortcut_create_label_focus
+                .contains_focused(window, cx)
+            || self
+                .shortcut_create_token_focus
+                .contains_focused(window, cx)
             || self.shortcut_create_args_focus.contains_focused(window, cx)
             || self.code_editor_focus.contains_focused(window, cx)
-            || self.code_editor_char_width_focus.contains_focused(window, cx)
+            || self
+                .code_editor_char_width_focus
+                .contains_focused(window, cx)
             || self.openai_api_key_focus.contains_focused(window, cx)
             || self.openai_base_url_focus.contains_focused(window, cx)
-            || self.llama_cpp_create_name_focus.contains_focused(window, cx)
-            || self.llama_cpp_create_path_focus.contains_focused(window, cx)
-            || self.llama_cpp_create_mmproj_focus.contains_focused(window, cx)
+            || self
+                .llama_cpp_create_name_focus
+                .contains_focused(window, cx)
+            || self
+                .llama_cpp_create_path_focus
+                .contains_focused(window, cx)
+            || self
+                .llama_cpp_create_mmproj_focus
+                .contains_focused(window, cx)
             || self.llama_cpp_edit_name_focus.contains_focused(window, cx)
             || self.llama_cpp_edit_path_focus.contains_focused(window, cx)
-            || self.llama_cpp_edit_mmproj_focus.contains_focused(window, cx)
-            || self.workspace_create_label_focus.contains_focused(window, cx)
-            || self.workspace_create_path_focus.contains_focused(window, cx)
+            || self
+                .llama_cpp_edit_mmproj_focus
+                .contains_focused(window, cx)
+            || self
+                .workspace_create_label_focus
+                .contains_focused(window, cx)
+            || self
+                .workspace_create_path_focus
+                .contains_focused(window, cx)
     }
 
     /// Tick the nav caret fade-in/out animations using the arcadia animation engine's easing
@@ -1343,9 +1411,9 @@ impl ArcadiaRoot {
         // Detect scroll direction from frame-to-frame offset delta.
         let cur_x = f32::from(self.group_tabs_scroll.offset().x);
         let dx = cur_x - self.tab_scroll_prev_x;
-        self.tab_scrolling_left  = dx >  0.5;
+        self.tab_scrolling_left = dx > 0.5;
         self.tab_scrolling_right = dx < -0.5;
-        self.tab_scroll_prev_x   = cur_x;
+        self.tab_scroll_prev_x = cur_x;
 
         if can_left != self.caret_prev_left {
             self.caret_prev_left = can_left;
@@ -1354,7 +1422,9 @@ impl ArcadiaRoot {
                 from: self.caret_left_alpha,
                 to: if can_left { 1.0 } else { 0.0 },
             });
-            if !can_left { self.tab_scrolling_left = false; }
+            if !can_left {
+                self.tab_scrolling_left = false;
+            }
         }
         if can_right != self.caret_prev_right {
             self.caret_prev_right = can_right;
@@ -1363,7 +1433,9 @@ impl ArcadiaRoot {
                 from: self.caret_right_alpha,
                 to: if can_right { 1.0 } else { 0.0 },
             });
-            if !can_right { self.tab_scrolling_right = false; }
+            if !can_right {
+                self.tab_scrolling_right = false;
+            }
         }
 
         let mut running = false;
@@ -1412,10 +1484,24 @@ impl ArcadiaRoot {
             let new_id = self.active_group_id.clone();
             if !old_id.is_empty() {
                 let from = *self.tab_active_alphas.get(&old_id).unwrap_or(&1.0);
-                self.tab_active_anims.insert(old_id, super::CaretAnim { start: now, from, to: 0.0 });
+                self.tab_active_anims.insert(
+                    old_id,
+                    super::CaretAnim {
+                        start: now,
+                        from,
+                        to: 0.0,
+                    },
+                );
             }
             let from = *self.tab_active_alphas.get(&new_id).unwrap_or(&0.0);
-            self.tab_active_anims.insert(new_id.clone(), super::CaretAnim { start: now, from, to: 1.0 });
+            self.tab_active_anims.insert(
+                new_id.clone(),
+                super::CaretAnim {
+                    start: now,
+                    from,
+                    to: 1.0,
+                },
+            );
             self.tab_prev_active_id = self.active_group_id.clone();
         }
 
@@ -1426,7 +1512,8 @@ impl ArcadiaRoot {
             if let Some(anim) = self.tab_hover_anims.get(&gid).cloned() {
                 let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
                 let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
-                self.tab_hover_alphas.insert(gid.clone(), anim.from + (anim.to - anim.from) * t);
+                self.tab_hover_alphas
+                    .insert(gid.clone(), anim.from + (anim.to - anim.from) * t);
                 if raw_t >= 1.0 {
                     self.tab_hover_anims.remove(&gid);
                 } else {
@@ -1441,7 +1528,8 @@ impl ArcadiaRoot {
             if let Some(anim) = self.tab_active_anims.get(&gid).cloned() {
                 let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
                 let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
-                self.tab_active_alphas.insert(gid.clone(), anim.from + (anim.to - anim.from) * t);
+                self.tab_active_alphas
+                    .insert(gid.clone(), anim.from + (anim.to - anim.from) * t);
                 if raw_t >= 1.0 {
                     self.tab_active_anims.remove(&gid);
                 } else {
@@ -1456,9 +1544,39 @@ impl ArcadiaRoot {
             if let Some(anim) = self.item_hover_anims.get(&key).cloned() {
                 let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
                 let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
-                self.item_hover_alphas.insert(key.clone(), anim.from + (anim.to - anim.from) * t);
+                self.item_hover_alphas
+                    .insert(key.clone(), anim.from + (anim.to - anim.from) * t);
                 if raw_t >= 1.0 {
                     self.item_hover_anims.remove(&key);
+                } else {
+                    running = true;
+                }
+            }
+        }
+
+        // Tick settings hub expand/collapse animation.
+        if let Some(anim) = self.settings_expand_anim.clone() {
+            let raw_t = (now - anim.start).as_secs_f32() / HOVER_DURATION_S;
+            let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+            self.settings_expand_alpha = anim.from + (anim.to - anim.from) * t;
+            if raw_t >= 1.0 {
+                self.settings_expand_anim = None;
+            } else {
+                running = true;
+            }
+        }
+
+        // Tick top-bar pill expand/collapse animations.
+        const PILL_DURATION_S: f32 = 0.18;
+        let pill_keys: Vec<String> = self.pill_expand_anims.keys().cloned().collect();
+        for key in pill_keys {
+            if let Some(anim) = self.pill_expand_anims.get(&key).cloned() {
+                let raw_t = (now - anim.start).as_secs_f32() / PILL_DURATION_S;
+                let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+                self.pill_expand_alphas
+                    .insert(key.clone(), anim.from + (anim.to - anim.from) * t);
+                if raw_t >= 1.0 {
+                    self.pill_expand_anims.remove(&key);
                 } else {
                     running = true;
                 }
@@ -1468,12 +1586,36 @@ impl ArcadiaRoot {
         running
     }
 
+    pub fn start_settings_expand_anim(&mut self, expanding: bool) {
+        use std::time::Instant;
+        let from = self.settings_expand_alpha;
+        let to   = if expanding { 1.0_f32 } else { 0.0_f32 };
+        self.settings_expand_anim = Some(super::CaretAnim { start: Instant::now(), from, to });
+    }
+
+    pub fn start_pill_expand_anim(&mut self, page_id: &str, expand: bool) {
+        use std::time::Instant;
+        let from = *self.pill_expand_alphas.get(page_id).unwrap_or(&0.0);
+        let to = if expand { 1.0_f32 } else { 0.0_f32 };
+        self.pill_expand_anims.insert(
+            page_id.to_string(),
+            super::CaretAnim { start: Instant::now(), from, to },
+        );
+    }
+
     /// Start or reverse a hover fade for a tab group item.
     pub fn start_tab_hover_anim(&mut self, group_id: String, hovered: bool) {
         use std::time::Instant;
         let from = *self.tab_hover_alphas.get(&group_id).unwrap_or(&0.0);
         let to = if hovered { 1.0_f32 } else { 0.0_f32 };
-        self.tab_hover_anims.insert(group_id, super::CaretAnim { start: Instant::now(), from, to });
+        self.tab_hover_anims.insert(
+            group_id,
+            super::CaretAnim {
+                start: Instant::now(),
+                from,
+                to,
+            },
+        );
     }
 
     /// Start or reverse a hover fade for a sidebar sub-item (chat, model, provider, etc.).
@@ -1481,7 +1623,14 @@ impl ArcadiaRoot {
         use std::time::Instant;
         let from = *self.item_hover_alphas.get(&key).unwrap_or(&0.0);
         let to = if hovered { 1.0_f32 } else { 0.0_f32 };
-        self.item_hover_anims.insert(key, super::CaretAnim { start: Instant::now(), from, to });
+        self.item_hover_anims.insert(
+            key,
+            super::CaretAnim {
+                start: Instant::now(),
+                from,
+                to,
+            },
+        );
     }
 
     /// Compute the minimal scroll offset to bring tab `ix` fully into view, then animate to it.
@@ -1497,7 +1646,7 @@ impl ArcadiaRoot {
             } else if item.right() + cur_x > viewport.right() {
                 viewport.right() - item.right()
             } else {
-                cur_x  // already fully in view
+                cur_x // already fully in view
             }
         } else {
             self.group_tabs_scroll.scroll_to_item(ix);
@@ -1533,7 +1682,8 @@ impl ArcadiaRoot {
         self.text_caret_blink_task_started = true;
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {
@@ -1575,7 +1725,8 @@ impl ArcadiaRoot {
         self.remote_revision_poll_started = true;
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     loop {
@@ -1629,7 +1780,8 @@ impl ArcadiaRoot {
         } else {
             self.pinned_settings_pages.push(page_id.to_string());
         }
-        let mut cfg = arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
+        let mut cfg =
+            arcadia_core::config::ui_prefs::UiPrefsConfig::load_or_create().unwrap_or_default();
         cfg.pinned_settings_pages = self.pinned_settings_pages.clone();
         if let Err(e) = cfg.save() {
             eprintln!("ui-prefs save failed: {e}");
@@ -1671,24 +1823,82 @@ pub(crate) fn build_glyph_style_config(
     let hex = |s: &Option<String>, default: Rgba| -> Rgba {
         s.as_deref().and_then(parse_hex_color).unwrap_or(default)
     };
-    let fallback_dark = Rgba { r: 0.067, g: 0.067, b: 0.067, a: 1.0 };
+    let fallback_dark = Rgba {
+        r: 0.067,
+        g: 0.067,
+        b: 0.067,
+        a: 1.0,
+    };
 
-    let chars: [char; 7] = p.border_chars.as_deref()
+    let chars: [char; 7] = p
+        .border_chars
+        .as_deref()
         .map(|s| {
             let v: Vec<char> = s.chars().collect();
-            if v.len() >= 7 { [v[0], v[1], v[2], v[3], v[4], v[5], v[6]] }
-            else { ['┌', '─', '┐', '│', '└', '─', '┘'] }
+            if v.len() >= 7 {
+                [v[0], v[1], v[2], v[3], v[4], v[5], v[6]]
+            } else {
+                ['┌', '─', '┐', '│', '└', '─', '┘']
+            }
         })
         .unwrap_or(['┌', '─', '┐', '│', '└', '─', '┘']);
 
     GlyphStyleConfig {
-        bg:      hex(&p.bg,      Rgba { r: 0.047, g: 0.047, b: 0.047, a: 1.0 }),
+        bg: hex(
+            &p.bg,
+            Rgba {
+                r: 0.047,
+                g: 0.047,
+                b: 0.047,
+                a: 1.0,
+            },
+        ),
         surface: hex(&p.surface, fallback_dark),
-        surface2: hex(&p.surface2, Rgba { r: 0.102, g: 0.102, b: 0.102, a: 1.0 }),
-        text:    hex(&p.text,    Rgba { r: 0.831, g: 0.831, b: 0.831, a: 1.0 }),
-        dim:     hex(&p.dim,     Rgba { r: 0.333, g: 0.333, b: 0.333, a: 1.0 }),
-        border:  hex(&p.border,  Rgba { r: 0.200, g: 0.200, b: 0.200, a: 1.0 }),
-        accent:  hex(&p.accent,  Rgba { r: 0.0, g: 0.800, b: 0.533, a: 1.0 }),
+        surface2: hex(
+            &p.surface2,
+            Rgba {
+                r: 0.102,
+                g: 0.102,
+                b: 0.102,
+                a: 1.0,
+            },
+        ),
+        text: hex(
+            &p.text,
+            Rgba {
+                r: 0.831,
+                g: 0.831,
+                b: 0.831,
+                a: 1.0,
+            },
+        ),
+        dim: hex(
+            &p.dim,
+            Rgba {
+                r: 0.333,
+                g: 0.333,
+                b: 0.333,
+                a: 1.0,
+            },
+        ),
+        border: hex(
+            &p.border,
+            Rgba {
+                r: 0.200,
+                g: 0.200,
+                b: 0.200,
+                a: 1.0,
+            },
+        ),
+        accent: hex(
+            &p.accent,
+            Rgba {
+                r: 0.0,
+                g: 0.800,
+                b: 0.533,
+                a: 1.0,
+            },
+        ),
         border_radius: p.border_radius,
         border_chars: chars,
     }
@@ -1696,7 +1906,9 @@ pub(crate) fn build_glyph_style_config(
 
 pub(crate) fn parse_hex_color(hex: &str) -> Option<Rgba> {
     let hex = hex.trim_start_matches('#');
-    if hex.len() < 6 { return None; }
+    if hex.len() < 6 {
+        return None;
+    }
     let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
     let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
     let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;

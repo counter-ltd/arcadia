@@ -14,3 +14,19 @@ build/
 
 # SwiftPM / local launcher build output (not source)
 Launchers/Development/OSX/.build/
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Env files (defensive — none currently in repo)
+.env
+.env.local
+.env.*.local
+
+# Tmp / OS
+*.tmp
+Thumbs.db

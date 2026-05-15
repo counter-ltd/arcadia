@@ -68,11 +68,14 @@ impl ArcadiaRoot {
             Ok(None) => "Unknown shell command token.".to_string(),
             Err(err) => err,
         };
-        self.terminals[terminal_id].shell_output_scroll.scroll_to_bottom();
+        self.terminals[terminal_id]
+            .shell_output_scroll
+            .scroll_to_bottom();
         let lines: Vec<String> = output.lines().map(str::to_string).collect();
         cx.spawn_in(
             window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
+            move |view: openframe::WeakEntity<ArcadiaRoot>,
+                  cx: &mut openframe::AsyncWindowContext| {
                 let mut cx = cx.clone();
                 async move {
                     for line in lines {
@@ -83,7 +86,9 @@ impl ArcadiaRoot {
                                     return;
                                 }
                                 this.terminals[terminal_id].shell_history.push(line);
-                                this.terminals[terminal_id].shell_output_scroll.scroll_to_bottom();
+                                this.terminals[terminal_id]
+                                    .shell_output_scroll
+                                    .scroll_to_bottom();
                                 cx.notify();
                             });
                         });
@@ -91,7 +96,9 @@ impl ArcadiaRoot {
                     let _ = cx.update(|_, app| {
                         let _ = view.update(app, |this, cx| {
                             if this.terminals[terminal_id].shell_stream_nonce == stream_nonce {
-                                this.terminals[terminal_id].shell_output_scroll.scroll_to_bottom();
+                                this.terminals[terminal_id]
+                                    .shell_output_scroll
+                                    .scroll_to_bottom();
                                 cx.notify();
                             }
                         });
@@ -148,14 +155,7 @@ impl ArcadiaRoot {
             return;
         }
         let command_token = self.active_terminal().shell_mode.command_token();
-        self.stream_shell_command_output(
-            window,
-            cx,
-            command,
-            command_token,
-            &[command],
-            &ctx,
-        );
+        self.stream_shell_command_output(window, cx, command, command_token, &[command], &ctx);
     }
 
     fn spawn_tui_command(&mut self, command: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -180,8 +180,12 @@ impl ArcadiaRoot {
 
         match TuiSession::spawn(command, rows, cols, &cwd_at_spawn) {
             Err(e) => {
-                self.terminals[terminal_id].shell_history.push(format!("error: {e}"));
-                self.terminals[terminal_id].shell_output_scroll.scroll_to_bottom();
+                self.terminals[terminal_id]
+                    .shell_history
+                    .push(format!("error: {e}"));
+                self.terminals[terminal_id]
+                    .shell_output_scroll
+                    .scroll_to_bottom();
                 cx.notify();
             }
             Ok(session) => {
@@ -224,12 +228,20 @@ impl ArcadiaRoot {
                                         if this.terminals[terminal_id].tui_nonce != nonce {
                                             return;
                                         }
-                                        if let Some(ref sess) = this.terminals[terminal_id].tui_session {
+                                        if let Some(ref sess) =
+                                            this.terminals[terminal_id].tui_session
+                                        {
                                             if let Some(cwd) = sess.foreground_cwd() {
-                                                if cwd != this.terminals[terminal_id].shell_display_cwd {
-                                                    this.terminals[terminal_id].shell_display_cwd = cwd.clone();
-                                                    this.terminals[terminal_id].shell_working_dir = PathBuf::from(cwd);
-                                                    this.terminals[terminal_id].tui_scroll.scroll_to_bottom();
+                                                if cwd
+                                                    != this.terminals[terminal_id].shell_display_cwd
+                                                {
+                                                    this.terminals[terminal_id].shell_display_cwd =
+                                                        cwd.clone();
+                                                    this.terminals[terminal_id].shell_working_dir =
+                                                        PathBuf::from(cwd);
+                                                    this.terminals[terminal_id]
+                                                        .tui_scroll
+                                                        .scroll_to_bottom();
                                                     cx.notify();
                                                 }
                                             }
@@ -243,7 +255,9 @@ impl ArcadiaRoot {
                                         let _ = view.update(app, |this, cx| {
                                             if this.terminals[terminal_id].tui_nonce == nonce {
                                                 this.terminals[terminal_id].tui_ready = true;
-                                                this.terminals[terminal_id].tui_scroll.scroll_to_bottom();
+                                                this.terminals[terminal_id]
+                                                    .tui_scroll
+                                                    .scroll_to_bottom();
                                                 cx.notify();
                                             }
                                         });
@@ -258,7 +272,9 @@ impl ArcadiaRoot {
                                     }
                                     let _ = cx.update(|_, app| {
                                         let _ = view.update(app, |this, cx| {
-                                            this.terminals[terminal_id].tui_scroll.scroll_to_bottom();
+                                            this.terminals[terminal_id]
+                                                .tui_scroll
+                                                .scroll_to_bottom();
                                             cx.notify();
                                         });
                                     });
@@ -283,9 +299,13 @@ impl ArcadiaRoot {
                                         let _ = view.update(app, |this, cx| {
                                             if this.terminals[terminal_id].tui_nonce == nonce {
                                                 for line in screen_lines {
-                                                    this.terminals[terminal_id].shell_history.push(line);
+                                                    this.terminals[terminal_id]
+                                                        .shell_history
+                                                        .push(line);
                                                 }
-                                                if let Some(ref sess) = this.terminals[terminal_id].tui_session {
+                                                if let Some(ref sess) =
+                                                    this.terminals[terminal_id].tui_session
+                                                {
                                                     let from_fg =
                                                         sess.foreground_cwd().map(PathBuf::from);
                                                     let from_cd =
@@ -294,13 +314,17 @@ impl ArcadiaRoot {
                                                             &command_owned,
                                                         );
                                                     if let Some(p) = from_fg.or(from_cd) {
-                                                        this.terminals[terminal_id].shell_working_dir = p.clone();
-                                                        this.terminals[terminal_id].shell_display_cwd =
+                                                        this.terminals[terminal_id]
+                                                            .shell_working_dir = p.clone();
+                                                        this.terminals[terminal_id]
+                                                            .shell_display_cwd =
                                                             p.to_string_lossy().into_owned();
                                                     }
                                                 }
                                                 this.terminals[terminal_id].tui_session = None;
-                                                this.terminals[terminal_id].shell_output_scroll.scroll_to_bottom();
+                                                this.terminals[terminal_id]
+                                                    .shell_output_scroll
+                                                    .scroll_to_bottom();
                                                 cx.notify();
                                             }
                                         });

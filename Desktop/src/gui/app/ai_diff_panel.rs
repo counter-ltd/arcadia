@@ -23,18 +23,17 @@ impl ArcadiaRoot {
         let pending_count = self.ai_pending_edits.len();
 
         // Outer panel: fixed right side or bottom bar.
-        let mut edit_list = div()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .p_4();
+        let mut edit_list = div().flex().flex_col().gap_4().p_4();
 
         for (edit_idx, edit) in self.ai_pending_edits.iter().enumerate() {
             let path = edit.path.clone();
-            let all_resolved = edit.hunks.iter().all(|h| {
-                edit.accepted.contains(&h.index) || edit.rejected.contains(&h.index)
-            });
-            let pending_hunk_count = edit.hunks.iter()
+            let all_resolved = edit
+                .hunks
+                .iter()
+                .all(|h| edit.accepted.contains(&h.index) || edit.rejected.contains(&h.index));
+            let pending_hunk_count = edit
+                .hunks
+                .iter()
                 .filter(|h| !edit.accepted.contains(&h.index) && !edit.rejected.contains(&h.index))
                 .count();
 
@@ -63,16 +62,13 @@ impl ArcadiaRoot {
                             .text_color(p.content_title)
                             .child(path.clone()),
                     )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(p.content_meta)
-                            .child(if pending_hunk_count == 0 {
-                                "All resolved".to_string()
-                            } else {
-                                format!("{pending_hunk_count} hunks")
-                            }),
-                    )
+                    .child(div().text_xs().text_color(p.content_meta).child(
+                        if pending_hunk_count == 0 {
+                            "All resolved".to_string()
+                        } else {
+                            format!("{pending_hunk_count} hunks")
+                        },
+                    ))
                     .child(
                         div()
                             .px_2()
@@ -83,15 +79,18 @@ impl ArcadiaRoot {
                             .text_color(accent_fg)
                             .cursor_pointer()
                             .child("Accept All")
-                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
-                                    for h in &edit.hunks {
-                                        edit.accepted.insert(h.index);
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _, cx| {
+                                    if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
+                                        for h in &edit.hunks {
+                                            edit.accepted.insert(h.index);
+                                        }
                                     }
-                                }
-                                this.apply_edit_if_resolved(edit_idx, cx);
-                                cx.notify();
-                            })),
+                                    this.apply_edit_if_resolved(edit_idx, cx);
+                                    cx.notify();
+                                }),
+                            ),
                     )
                     .child(
                         div()
@@ -105,15 +104,18 @@ impl ArcadiaRoot {
                             .text_color(p.content_meta)
                             .cursor_pointer()
                             .child("Reject All")
-                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
-                                    for h in &edit.hunks {
-                                        edit.rejected.insert(h.index);
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _, cx| {
+                                    if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
+                                        for h in &edit.hunks {
+                                            edit.rejected.insert(h.index);
+                                        }
                                     }
-                                }
-                                this.apply_edit_if_resolved(edit_idx, cx);
-                                cx.notify();
-                            })),
+                                    this.apply_edit_if_resolved(edit_idx, cx);
+                                    cx.notify();
+                                }),
+                            ),
                     ),
             );
 
@@ -197,13 +199,17 @@ impl ArcadiaRoot {
                                 .text_color(accent_fg)
                                 .cursor_pointer()
                                 .child("Accept")
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                    if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
-                                        edit.accepted.insert(hunk_idx);
-                                    }
-                                    this.apply_edit_if_resolved(edit_idx, cx);
-                                    cx.notify();
-                                })),
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx)
+                                        {
+                                            edit.accepted.insert(hunk_idx);
+                                        }
+                                        this.apply_edit_if_resolved(edit_idx, cx);
+                                        cx.notify();
+                                    }),
+                                ),
                         )
                         .child(
                             div()
@@ -217,13 +223,17 @@ impl ArcadiaRoot {
                                 .text_color(p.content_meta)
                                 .cursor_pointer()
                                 .child("Reject")
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                    if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
-                                        edit.rejected.insert(hunk_idx);
-                                    }
-                                    this.apply_edit_if_resolved(edit_idx, cx);
-                                    cx.notify();
-                                })),
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx)
+                                        {
+                                            edit.rejected.insert(hunk_idx);
+                                        }
+                                        this.apply_edit_if_resolved(edit_idx, cx);
+                                        cx.notify();
+                                    }),
+                                ),
                         )
                 };
 
@@ -268,10 +278,13 @@ impl ArcadiaRoot {
                             .text_color(p.content_meta)
                             .cursor_pointer()
                             .child("✕")
-                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                this.ai_diff_panel_open = false;
-                                cx.notify();
-                            })),
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, cx| {
+                                    this.ai_diff_panel_open = false;
+                                    cx.notify();
+                                }),
+                            ),
                     ),
             )
             .child(
@@ -285,18 +298,15 @@ impl ArcadiaRoot {
     }
 
     /// Apply accepted hunks to disk if all hunks in an edit are resolved, then remove it.
-    pub(crate) fn apply_edit_if_resolved(
-        &mut self,
-        edit_idx: usize,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn apply_edit_if_resolved(&mut self, edit_idx: usize, cx: &mut Context<Self>) {
         let Some(edit) = self.ai_pending_edits.get(edit_idx) else {
             return;
         };
         let all_resolved = edit.hunks.is_empty()
-            || edit.hunks.iter().all(|h| {
-                edit.accepted.contains(&h.index) || edit.rejected.contains(&h.index)
-            });
+            || edit
+                .hunks
+                .iter()
+                .all(|h| edit.accepted.contains(&h.index) || edit.rejected.contains(&h.index));
         if !all_resolved {
             return;
         }
@@ -375,9 +385,17 @@ fn find_lines_start(haystack: &[String], needle: &[String]) -> Option<usize> {
 }
 
 fn removed_color(is_dark: bool) -> openframe::Rgba {
-    if is_dark { rgba(0x3d1515ff) } else { rgba(0xfff0f0ff) }
+    if is_dark {
+        rgba(0x3d1515ff)
+    } else {
+        rgba(0xfff0f0ff)
+    }
 }
 
 fn added_color(is_dark: bool) -> openframe::Rgba {
-    if is_dark { rgba(0x143d14ff) } else { rgba(0xf0fff0ff) }
+    if is_dark {
+        rgba(0x143d14ff)
+    } else {
+        rgba(0xf0fff0ff)
+    }
 }

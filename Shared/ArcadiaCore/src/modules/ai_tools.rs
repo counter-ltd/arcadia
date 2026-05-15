@@ -21,13 +21,18 @@ pub const TOOL_LIST_FILES: AiToolDefinition = AiToolDefinition {
 
 pub const TOOL_RUN_COMMAND: AiToolDefinition = AiToolDefinition {
     name: "run_command",
-    description: "Run a shell command scoped to the workspace root. Requires workspace.execute permission.",
+    description:
+        "Run a shell command scoped to the workspace root. Requires workspace.execute permission.",
     parameters: r#"{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}"#,
 };
 
 /// All workspace-aware tools. Populated into requests when a workspace is active.
-pub const WORKSPACE_TOOLS: &[AiToolDefinition] =
-    &[TOOL_READ_FILE, TOOL_WRITE_FILE, TOOL_LIST_FILES, TOOL_RUN_COMMAND];
+pub const WORKSPACE_TOOLS: &[AiToolDefinition] = &[
+    TOOL_READ_FILE,
+    TOOL_WRITE_FILE,
+    TOOL_LIST_FILES,
+    TOOL_RUN_COMMAND,
+];
 
 /// Dispatch a parsed tool call through the sandbox layer.
 /// When `stage_writes` is true, `write_file` reads the original file and returns
@@ -40,7 +45,12 @@ pub fn execute_tool(
 ) -> AiToolResult {
     let result: Result<String, String> = match call.name.as_str() {
         "read_file" => {
-            match call.arguments.get("path").and_then(|v| v.as_str()).filter(|p| !p.is_empty()) {
+            match call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .filter(|p| !p.is_empty())
+            {
                 None => Err("Missing or empty 'path' argument".to_string()),
                 Some(path) => {
                     let full = resolve_path(path, workspace);
@@ -49,7 +59,11 @@ pub fn execute_tool(
             }
         }
         "write_file" => {
-            let path = call.arguments.get("path").and_then(|v| v.as_str()).filter(|p| !p.is_empty());
+            let path = call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .filter(|p| !p.is_empty());
             let content = call.arguments.get("content").and_then(|v| v.as_str());
             match (path, content) {
                 (None, _) => Err("Missing or empty 'path' argument".to_string()),
@@ -58,24 +72,38 @@ pub fn execute_tool(
                     let full = resolve_path(path, workspace);
                     if stage_writes {
                         // Read original (empty string if file doesn't exist yet).
-                        let original = ai_sandbox::sandboxed_read(workspace, &full)
-                            .unwrap_or_default();
+                        let original =
+                            ai_sandbox::sandboxed_read(workspace, &full).unwrap_or_default();
                         Ok(format!("STAGED\n{original}\n---\n{proposed}"))
                     } else {
-                        ai_sandbox::sandboxed_write(workspace, &full, proposed).map(|_| "ok".to_string())
+                        ai_sandbox::sandboxed_write(workspace, &full, proposed)
+                            .map(|_| "ok".to_string())
                     }
                 }
             }
         }
         "list_files" => {
-            let full = match call.arguments.get("path").and_then(|v| v.as_str()).filter(|p| !p.is_empty()) {
+            let full = match call
+                .arguments
+                .get("path")
+                .and_then(|v| v.as_str())
+                .filter(|p| !p.is_empty())
+            {
                 Some(path) => resolve_path(path, workspace),
-                None => workspace.map(|w| w.workspace_path.as_str()).unwrap_or(".").to_string(),
+                None => workspace
+                    .map(|w| w.workspace_path.as_str())
+                    .unwrap_or(".")
+                    .to_string(),
             };
             ai_sandbox::sandboxed_list(workspace, &full).map(|entries| entries.join("\n"))
         }
         "run_command" => {
-            match call.arguments.get("command").and_then(|v| v.as_str()).filter(|c| !c.is_empty()) {
+            match call
+                .arguments
+                .get("command")
+                .and_then(|v| v.as_str())
+                .filter(|c| !c.is_empty())
+            {
                 None => Err("Missing or empty 'command' argument".to_string()),
                 Some(cmd) => ai_sandbox::sandboxed_exec(workspace, cmd),
             }
@@ -83,8 +111,16 @@ pub fn execute_tool(
         name => Err(format!("Unknown tool: {name}")),
     };
     match result {
-        Ok(output) => AiToolResult { name: call.name.clone(), output, is_error: false },
-        Err(e) => AiToolResult { name: call.name.clone(), output: e, is_error: true },
+        Ok(output) => AiToolResult {
+            name: call.name.clone(),
+            output,
+            is_error: false,
+        },
+        Err(e) => AiToolResult {
+            name: call.name.clone(),
+            output: e,
+            is_error: true,
+        },
     }
 }
 

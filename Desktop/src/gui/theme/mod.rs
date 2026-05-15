@@ -93,7 +93,10 @@ pub fn active_ui_font_family(cx: &App) -> Option<&str> {
 /// Applies extension-provided border typography and repeating glyph patterns when set.
 /// Used whenever UI renders [`openframe::GlyphBorder`]; panel chrome uses rounded rects + `border` token instead.
 #[allow(dead_code)]
-pub fn apply_glyph_border_typography(cx: &App, mut b: openframe::GlyphBorder) -> openframe::GlyphBorder {
+pub fn apply_glyph_border_typography(
+    cx: &App,
+    mut b: openframe::GlyphBorder,
+) -> openframe::GlyphBorder {
     if let Some(extra) = cx
         .try_global::<ActiveGlyphBorderTypography>()
         .and_then(|x| x.0.as_ref())
@@ -124,11 +127,6 @@ pub fn apply_glyph_border_typography(cx: &App, mut b: openframe::GlyphBorder) ->
         }
     }
     b
-}
-
-/// Returns true when a custom glyph style is active.
-pub fn is_glyph_active(cx: &App) -> bool {
-    active_glyph(cx).is_some()
 }
 
 // ---------------------------------------------------------------------------

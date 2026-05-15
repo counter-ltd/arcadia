@@ -1,17 +1,17 @@
 use arcadia_core::config::shortcuts::{
-    ShortcutsConfig, has_system_wide_consent, record_system_wide_consent,
-    revoke_system_wide_consent,
+    has_system_wide_consent, record_system_wide_consent, revoke_system_wide_consent,
+    ShortcutsConfig,
 };
 use arcadia_core::config::ConfigFile;
 use arcadia_core::shortcuts::{EffectiveMergedShortcut, KeyChordSpec, ShortcutTrigger};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FocusHandle, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, Styled, div, px,
+    div, px, AnyElement, Context, FocusHandle, FontWeight, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Styled,
 };
 
-use crate::gui::app::ArcadiaRoot;
 use crate::gui::app::shortcuts::sync_os_global_hotkeys;
+use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 use crate::gui::theme::palette::ThemePalette;
 
@@ -37,8 +37,12 @@ impl ArcadiaRoot {
         let sw = sc.system_wide;
         let triggers = sc.triggers.clone();
 
-        let has_chord_trigger = triggers.iter().any(|t| matches!(t, ShortcutTrigger::Chord(_)));
-        let has_seq_trigger = triggers.iter().any(|t| matches!(t, ShortcutTrigger::Sequence(_)));
+        let has_chord_trigger = triggers
+            .iter()
+            .any(|t| matches!(t, ShortcutTrigger::Chord(_)));
+        let has_seq_trigger = triggers
+            .iter()
+            .any(|t| matches!(t, ShortcutTrigger::Sequence(_)));
         let has_chord_override = override_chord.is_some();
         let has_seq_override = override_sequence.is_some();
         let consented = has_system_wide_consent(&id);
@@ -150,8 +154,7 @@ impl ArcadiaRoot {
                                 MouseButton::Left,
                                 cx.listener(move |_, _, _, cx| {
                                     if let Ok(mut cfg) = ShortcutsConfig::load_or_create() {
-                                        if let Some(entry) =
-                                            cfg.overrides.get_mut(&id_reset_chord)
+                                        if let Some(entry) = cfg.overrides.get_mut(&id_reset_chord)
                                         {
                                             entry.chord = None;
                                         }
@@ -196,13 +199,11 @@ impl ArcadiaRoot {
                                 cx.notify();
                             }),
                         )
-                        .children(
-                            sequence_step_elements(
-                                seq_to_show.as_deref().unwrap_or(&[]),
-                                chip_radius,
-                                p,
-                            ),
-                        ),
+                        .children(sequence_step_elements(
+                            seq_to_show.as_deref().unwrap_or(&[]),
+                            chip_radius,
+                            p,
+                        )),
                 )
                 .when(has_seq_override, |d| {
                     d.child(
@@ -218,9 +219,7 @@ impl ArcadiaRoot {
                                 MouseButton::Left,
                                 cx.listener(move |_, _, _, cx| {
                                     if let Ok(mut cfg) = ShortcutsConfig::load_or_create() {
-                                        if let Some(entry) =
-                                            cfg.overrides.get_mut(&id_reset_seq)
-                                        {
+                                        if let Some(entry) = cfg.overrides.get_mut(&id_reset_seq) {
                                             entry.sequence = None;
                                         }
                                         let _ = cfg.save();
@@ -310,21 +309,12 @@ impl ArcadiaRoot {
                                 .flex()
                                 .items_center()
                                 .gap_2()
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(p.ui_subtext)
-                                        .child("OS-global"),
-                                )
+                                .child(div().text_xs().text_color(p.ui_subtext).child("OS-global"))
                                 .child(
                                     div()
                                         .text_xs()
                                         .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(if consented {
-                                            p.accent
-                                        } else {
-                                            p.ui_subtext
-                                        })
+                                        .text_color(if consented { p.accent } else { p.ui_subtext })
                                         .cursor_pointer()
                                         .child(if consented {
                                             "Consented — tap to revoke"

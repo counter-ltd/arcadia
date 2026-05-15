@@ -1,18 +1,19 @@
 //! Shared extension token editor (persisted under `extension_tokens/`).
 
+use crate::gui::app::text_input_caret::text_with_trailing_caret;
+use crate::gui::app::ArcadiaRoot;
+use crate::gui::theme;
 use arcadia_core::modules::python_registry::{
     format_slider_value, resolve_slider_numeric, snap_slider_value, style_token_row_visible,
     StyleTokenKind, StyleTokenNumericGranularity, StyleTokenSpec,
 };
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, AppContext, Bounds, Context, DragMoveEvent, FontWeight, Hitbox, InteractiveElement,
-    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Render,
-    Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div, px, relative, rgb,
+    div, px, relative, rgb, AnyElement, AppContext, Bounds, Context, DragMoveEvent, FontWeight,
+    Hitbox, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent,
+    ParentElement, Pixels, Point, Render, Rgba, SharedString, StatefulInteractiveElement, Styled,
+    Window,
 };
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
-use crate::gui::app::ArcadiaRoot;
-use crate::gui::theme;
 
 fn token_edit_rgba(display: &str, default_s: &str) -> Rgba {
     crate::gui::app::lifecycle::parse_hex_color(display.trim())
@@ -80,8 +81,12 @@ impl ArcadiaRoot {
         let (panel_bg, panel_stroke, panel_radius, header_color, subtext_color, is_glyph) = {
             let g = theme::active_glyph(cx);
             (
-                g.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::module_panel_bg(is_dark)),
-                g.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_panel_stroke(is_dark)),
+                g.as_ref()
+                    .map(|g| g.surface)
+                    .unwrap_or_else(|| theme::module_panel_bg(is_dark)),
+                g.as_ref()
+                    .map(|g| g.border)
+                    .unwrap_or_else(|| theme::module_panel_stroke(is_dark)),
                 g.as_ref().map(|g| g.border_radius).unwrap_or(8.0),
                 g.as_ref()
                     .map(|g| g.text)

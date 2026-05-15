@@ -137,7 +137,10 @@ fn ensure_driver() {
         Duration::from_millis(16),
         tick,
     );
-    engine().lock().unwrap_or_else(|e| e.into_inner()).driver_task_id = Some(id);
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .driver_task_id = Some(id);
 }
 
 fn tick() {
@@ -323,7 +326,8 @@ pub fn commands() -> &'static [ModuleCommand] {
     &[
         ModuleCommand {
             name: "list",
-            description: "JSON array of running tweens (id, elapsed_ms, duration_ms, easing, owner)",
+            description:
+                "JSON array of running tweens (id, elapsed_ms, duration_ms, easing, owner)",
             required_permissions: &[],
             run: cmd_list,
         },
@@ -425,8 +429,14 @@ mod tests {
                 c2.fetch_add(1, Ordering::Relaxed);
             });
             tick();
-            assert!(!is_running(id), "tween must complete after elapsed > duration");
-            assert!(counter.load(Ordering::Relaxed) > 0, "on_tick must have fired");
+            assert!(
+                !is_running(id),
+                "tween must complete after elapsed > duration"
+            );
+            assert!(
+                counter.load(Ordering::Relaxed) > 0,
+                "on_tick must have fired"
+            );
         });
     }
 
@@ -473,7 +483,11 @@ mod tests {
                 None,
             );
             tick();
-            assert_eq!(fired.load(Ordering::Relaxed), 1, "on_complete must fire once");
+            assert_eq!(
+                fired.load(Ordering::Relaxed),
+                1,
+                "on_complete must fire once"
+            );
             tick();
             assert_eq!(
                 fired.load(Ordering::Relaxed),

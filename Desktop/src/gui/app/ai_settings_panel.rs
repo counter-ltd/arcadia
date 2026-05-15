@@ -27,7 +27,9 @@ impl ArcadiaRoot {
 
         let mut root = div()
             .w_full()
-            .when(g_snap.is_some(), |d| d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX)))
+            .when(g_snap.is_some(), |d| {
+                d.max_w(px(GLYPH_PANEL_CONTENT_MAX_W_PX))
+            })
             .flex()
             .flex_col()
             .gap_6()
@@ -52,57 +54,56 @@ impl ArcadiaRoot {
             );
 
         if !provider_available {
-            root = root.child(
-                div()
-                    .rounded(px(radius.min(12.0)))
-                    .border_1()
-                    .border_color(p.panel_border)
-                    .bg(p.panel_bg)
-                    .p_4()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .gap_3()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(p.content_title)
-                                    .child("No AI provider configured"),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(p.content_meta)
-                                    .child("Enable an AI provider module to use the chat interface."),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .px_3()
-                            .py_1p5()
-                            .rounded(px(radius.min(8.0)))
-                            .border_1()
-                            .border_color(p.panel_border)
-                            .text_sm()
-                            .text_color(p.content_body)
-                            .cursor_pointer()
-                            .child("Open Modules")
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(|this, _, _, cx| {
-                                    this.active_page_id = "global.modules".to_string();
-                                    cx.notify();
-                                }),
-                            ),
-                    ),
-            );
+            root =
+                root.child(
+                    div()
+                        .rounded(px(radius.min(12.0)))
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .bg(p.panel_bg)
+                        .p_4()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .gap_3()
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap_1()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(p.content_title)
+                                        .child("No AI provider configured"),
+                                )
+                                .child(div().text_xs().text_color(p.content_meta).child(
+                                    "Enable an AI provider module to use the chat interface.",
+                                )),
+                        )
+                        .child(
+                            div()
+                                .px_3()
+                                .py_1p5()
+                                .rounded(px(radius.min(8.0)))
+                                .border_1()
+                                .border_color(p.panel_border)
+                                .text_sm()
+                                .text_color(p.content_body)
+                                .cursor_pointer()
+                                .child("Open Modules")
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|this, _, _, cx| {
+                                        this.active_page_id = "global.modules".to_string();
+                                        this.sync_settings_hub_expanded_from_active_page();
+                                        cx.notify();
+                                    }),
+                                ),
+                        ),
+                );
         }
 
         root.child(

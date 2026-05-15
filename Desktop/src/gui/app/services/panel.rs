@@ -26,13 +26,10 @@ impl ArcadiaRoot {
         let radius = p.radius_md;
 
         let mut container = div().w_full().flex().flex_col().gap_3().child(
-            div()
-                .text_sm()
-                .text_color(meta_c)
-                .child(
-                    "Modules that expose long-running services register here. Disable the \
+            div().text_sm().text_color(meta_c).child(
+                "Modules that expose long-running services register here. Disable the \
                     underlying module to hide a service.",
-                ),
+            ),
         );
 
         if services.is_empty() {
@@ -46,8 +43,10 @@ impl ArcadiaRoot {
         }
 
         for service in services {
-            container =
-                container.child(self.service_row(cx, service, is_dark, text_c, meta_c, desc_c, bg_c, border_c, row_bg, row_str, radius));
+            container = container.child(self.service_row(
+                cx, service, is_dark, text_c, meta_c, desc_c, bg_c, border_c, row_bg, row_str,
+                radius,
+            ));
         }
         container.child(self.services_feedback_row(cx, is_dark))
     }
@@ -107,12 +106,7 @@ impl ArcadiaRoot {
                             .text_color(meta_c)
                             .child(service.description),
                     )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(desc_c)
-                            .child(detail_line),
-                    ),
+                    .child(div().text_xs().text_color(desc_c).child(detail_line)),
             )
             .child(
                 div()
@@ -148,51 +142,82 @@ impl ArcadiaRoot {
         if !module_enabled {
             return row;
         }
-        let running = service.controls.status_detail.map(|f| f().running).flatten();
+        let running = service
+            .controls
+            .status_detail
+            .map(|f| f().running)
+            .flatten();
         if let Some(stop) = service.controls.stop {
             if running == Some(true) {
-                row = row.child(self.service_button(cx, "Stop", is_dark, text_c, row_bg, row_str, radius, move |this, cx| {
-                    stop();
-                    this.lan_service_feedback = format!("{} stopped.", service.title);
-                    cx.notify();
-                }));
+                row = row.child(self.service_button(
+                    cx,
+                    "Stop",
+                    is_dark,
+                    text_c,
+                    row_bg,
+                    row_str,
+                    radius,
+                    move |this, cx| {
+                        stop();
+                        this.lan_service_feedback = format!("{} stopped.", service.title);
+                        cx.notify();
+                    },
+                ));
             }
         }
         if let Some(start) = service.controls.start {
             if running != Some(true) {
-                row = row.child(self.service_button(cx, "Start", is_dark, text_c, row_bg, row_str, radius, move |this, cx| {
-                    match start() {
-                        Ok(()) => {
-                            this.lan_service_feedback = format!("{} started.", service.title);
-                            this.pending_port_kill_prompt = None;
-                        }
-                        Err(err) => {
-                            this.lan_service_feedback =
-                                format!("Failed to start {}: {err}", service.title);
-                            // Generic port-collision recovery: services that advertise a port
-                            // (`controls.port_for_collision`) get the Kill Existing modal
-                            // automatically — no per-service GUI code.
-                            if is_port_collision_error(&err) {
-                                if let Some(port_fn) = service.controls.port_for_collision {
-                                    this.pending_port_kill_prompt = Some(PendingPortKill {
-                                        service_id: service.id,
-                                        service_title: service.title,
-                                        port: port_fn(),
-                                        error: err,
-                                    });
+                row = row.child(self.service_button(
+                    cx,
+                    "Start",
+                    is_dark,
+                    text_c,
+                    row_bg,
+                    row_str,
+                    radius,
+                    move |this, cx| {
+                        match start() {
+                            Ok(()) => {
+                                this.lan_service_feedback = format!("{} started.", service.title);
+                                this.pending_port_kill_prompt = None;
+                            }
+                            Err(err) => {
+                                this.lan_service_feedback =
+                                    format!("Failed to start {}: {err}", service.title);
+                                // Generic port-collision recovery: services that advertise a port
+                                // (`controls.port_for_collision`) get the Kill Existing modal
+                                // automatically — no per-service GUI code.
+                                if is_port_collision_error(&err) {
+                                    if let Some(port_fn) = service.controls.port_for_collision {
+                                        this.pending_port_kill_prompt = Some(PendingPortKill {
+                                            service_id: service.id,
+                                            service_title: service.title,
+                                            port: port_fn(),
+                                            error: err,
+                                        });
+                                    }
                                 }
                             }
                         }
-                    }
-                    cx.notify();
-                }));
+                        cx.notify();
+                    },
+                ));
             }
         }
         if service.controls.status_detail.is_some() {
-            row = row.child(self.service_button(cx, "Refresh", is_dark, text_c, row_bg, row_str, radius, move |this, cx| {
-                this.lan_service_feedback = format!("{} status refreshed.", service.title);
-                cx.notify();
-            }));
+            row = row.child(self.service_button(
+                cx,
+                "Refresh",
+                is_dark,
+                text_c,
+                row_bg,
+                row_str,
+                radius,
+                move |this, cx| {
+                    this.lan_service_feedback = format!("{} status refreshed.", service.title);
+                    cx.notify();
+                },
+            ));
         }
         row
     }

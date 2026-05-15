@@ -16,7 +16,10 @@ fn session_path(id: &str) -> io::Result<std::path::PathBuf> {
     let mut p = chats_dir()?;
     // Reject ids that would escape the chats dir.
     if id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid session id"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid session id",
+        ));
     }
     p.push(format!("{id}.json"));
     Ok(p)
@@ -156,10 +159,21 @@ pub fn list_sessions() -> io::Result<Vec<SessionSummary>> {
             Err(_) => continue,
         };
         if let Ok(session) = serde_json::from_str::<ChatSession>(&json) {
-            let last_messages = session.messages.iter().rev().take(4)
-                .map(|m| (m.role == "user", m.content.chars().take(44).collect::<String>()))
+            let last_messages = session
+                .messages
+                .iter()
+                .rev()
+                .take(4)
+                .map(|m| {
+                    (
+                        m.role == "user",
+                        m.content.chars().take(44).collect::<String>(),
+                    )
+                })
                 .collect::<Vec<_>>()
-                .into_iter().rev().collect();
+                .into_iter()
+                .rev()
+                .collect();
             summaries.push(SessionSummary {
                 id: session.id,
                 title: session.title,

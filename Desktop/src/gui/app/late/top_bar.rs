@@ -1,7 +1,7 @@
 use openframe::{div, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
-use arcadia_core::modules::late::state;
 use arcadia_core::modules;
+use arcadia_core::modules::late::state;
 
 use super::visualizer::late_visualizer_inline;
 use super::vote_panel::late_vote_pills;
@@ -10,12 +10,7 @@ use crate::gui::theme;
 use crate::gui::app::ArcadiaRoot;
 
 fn track_bar_vertical_rule(border_c: openframe::Rgba) -> openframe::Div {
-    div()
-        .w_px()
-        .h_6()
-        .flex_shrink_0()
-        .mx_2()
-        .bg(border_c)
+    div().w_px().h_6().flex_shrink_0().mx_2().bg(border_c)
 }
 
 pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl IntoElement {
@@ -42,9 +37,7 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
         .text_xs()
         .bg(reconnect_bg)
         .text_color(reconnect_tc)
-        .hover(move |style| {
-            style.bg(reconnect_hover)
-        })
+        .hover(move |style| style.bg(reconnect_hover))
         .child(if connected { "Reconnect" } else { "Connect" })
         .on_mouse_down(
             openframe::MouseButton::Left,
@@ -81,12 +74,7 @@ pub(super) fn late_top_bar(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl
                         .flex_shrink_0()
                         .items_center()
                         .gap_2()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(track_note)
-                                .child("♫"),
-                        )
+                        .child(div().text_xs().text_color(track_note).child("♫"))
                         .child(if track.is_empty() {
                             div()
                                 .text_xs()

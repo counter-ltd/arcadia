@@ -65,6 +65,7 @@ pub const AI_EXEC_CODEX_MODULE_NAME: &str = "ai-provider-exec-codex";
 pub const AI_EXEC_GEMINI_MODULE_NAME: &str = "ai-provider-exec-gemini";
 pub const AI_EXEC_AIDER_MODULE_NAME: &str = "ai-provider-exec-aider";
 pub const AI_APFEL_MODULE_NAME: &str = "ai-provider-apfel";
+pub const NOTIFICATION_MODULE_NAME: &str = "notification";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -217,7 +218,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
     },
     ModuleManifest {
         name: WORKSPACE_MODULE_NAME,
-        glyph: "folder",
+        glyph: "workspaces",
         version: "0.1.0",
         description: "Workspace directory registry with scoped file and execution permissions.",
         required_modules: &[],
@@ -263,19 +264,19 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_permissions: &[],
         workspace_permissions: &[
             WorkspacePermissionDef {
-                id: "workspace.read",
+                id: "workspace.ai_read",
                 title: "File read (AI)",
                 description: "Allow the AI to read files via @mention and read_file tool.",
                 default_granted: false,
             },
             WorkspacePermissionDef {
-                id: "workspace.write",
+                id: "workspace.ai_write",
                 title: "File write (AI)",
                 description: "Allow the AI to create and modify files via write_file tool.",
                 default_granted: false,
             },
             WorkspacePermissionDef {
-                id: "workspace.execute",
+                id: "workspace.ai_execute",
                 title: "Command execution (AI)",
                 description: "Allow the AI to run allowlisted commands via run_command tool.",
                 default_granted: false,
@@ -382,6 +383,16 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_permissions: &[],
         workspace_permissions: &[],
         supported_platforms: &["macos"],
+    },
+    ModuleManifest {
+        name: NOTIFICATION_MODULE_NAME,
+        glyph: "notification",
+        version: "0.1.0",
+        description: "In-app notification centre. Modules and extensions can post alerts; each source requires an explicit notifications.send grant.",
+        required_modules: &[],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
     },
 ];
 
@@ -790,7 +801,9 @@ mod tests {
         assert!(supports_runtime_platform_owned(&[]));
         let cur = runtime_platform_id().to_string();
         assert!(supports_runtime_platform_owned(&[cur]));
-        assert!(!supports_runtime_platform_owned(&["__no_such_os__".to_string()]));
+        assert!(!supports_runtime_platform_owned(&[
+            "__no_such_os__".to_string()
+        ]));
     }
 
     #[test]

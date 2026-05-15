@@ -15,3 +15,6 @@ toml   = "0.8"
 ureq   = { version = "2", features = ["json"] }
 tungstenite = { version = "0.24", features = ["native-tls"] }
 uuid   = { version = "1", features = ["v4"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+notify-rust = "4"

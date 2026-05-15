@@ -8,7 +8,7 @@
 
 use arcadia_core::services::{is_port_collision_error, service_by_id};
 use openframe::{
-    div, rgb, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Styled,
 };
 
@@ -31,7 +31,12 @@ impl ArcadiaRoot {
         };
         let current_pid = std::process::id();
         let output = Command::new("lsof")
-            .args(["-nP", "-t", &format!("-iUDP:{port}"), &format!("-iTCP:{port}")])
+            .args([
+                "-nP",
+                "-t",
+                &format!("-iUDP:{port}"),
+                &format!("-iTCP:{port}"),
+            ])
             .output()
             .map_err(|err| format!("Failed to inspect port {port} usage: {err}"))?;
 
@@ -51,8 +56,7 @@ impl ArcadiaRoot {
                 .args(["-p", &pid.to_string(), "-o", "command="])
                 .output()
                 .map_err(|err| format!("Failed to inspect process {pid}: {err}"))?;
-            let command_text =
-                String::from_utf8_lossy(&command_output.stdout).to_ascii_lowercase();
+            let command_text = String::from_utf8_lossy(&command_output.stdout).to_ascii_lowercase();
             if !command_text.contains("arcadia") {
                 continue;
             }
@@ -82,8 +86,7 @@ impl ArcadiaRoot {
                     self.lan_service_feedback = format!("{} started.", service.title);
                 }
                 Err(err) => {
-                    self.lan_service_feedback =
-                        format!("Failed to start {}: {err}", service.title);
+                    self.lan_service_feedback = format!("Failed to start {}: {err}", service.title);
                     if is_port_collision_error(&err) {
                         self.pending_port_kill_prompt = Some(PendingPortKill {
                             service_id: service.id,
@@ -217,7 +220,9 @@ impl ArcadiaRoot {
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
                             this.pending_port_kill_prompt = None;
-                            if let Err(err) = this.kill_existing_port_owner_and_retry(service_id, port) {
+                            if let Err(err) =
+                                this.kill_existing_port_owner_and_retry(service_id, port)
+                            {
                                 this.lan_service_feedback = err;
                             }
                             cx.notify();

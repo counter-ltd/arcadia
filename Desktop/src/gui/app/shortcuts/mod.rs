@@ -30,9 +30,7 @@ use arcadia_core::shortcuts::{
     self, EffectiveMergedShortcut, KeyChordSpec, ShortcutAction, ShortcutScope, ShortcutTrigger,
     ShortcutVisibility,
 };
-use openframe::{
-    Context, KeyDownEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Window,
-};
+use openframe::{Context, KeyDownEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Window};
 
 use super::ArcadiaRoot;
 
@@ -81,13 +79,22 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
     if this.late_compose_focus.contains_focused(window, cx) {
         return true;
     }
-    if this.late_settings_server_url_focus.contains_focused(window, cx) {
+    if this
+        .late_settings_server_url_focus
+        .contains_focused(window, cx)
+    {
         return true;
     }
-    if this.late_settings_username_focus.contains_focused(window, cx) {
+    if this
+        .late_settings_username_focus
+        .contains_focused(window, cx)
+    {
         return true;
     }
-    if this.late_settings_default_room_focus.contains_focused(window, cx) {
+    if this
+        .late_settings_default_room_focus
+        .contains_focused(window, cx)
+    {
         return true;
     }
     if this.extension_token_focus.contains_focused(window, cx) {
@@ -108,10 +115,16 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
     if this.command_bar_focus.contains_focused(window, cx) {
         return true;
     }
-    if this.shortcut_create_label_focus.contains_focused(window, cx) {
+    if this
+        .shortcut_create_label_focus
+        .contains_focused(window, cx)
+    {
         return true;
     }
-    if this.shortcut_create_token_focus.contains_focused(window, cx) {
+    if this
+        .shortcut_create_token_focus
+        .contains_focused(window, cx)
+    {
         return true;
     }
     if this.shortcut_create_args_focus.contains_focused(window, cx) {
@@ -209,10 +222,7 @@ impl ArcadiaRoot {
         }
 
         if let Some((ref id, step)) = self.shortcut_sequence_pending.clone() {
-            if let Some(sc) = applicable_shortcuts(self)
-                .into_iter()
-                .find(|s| s.id == *id)
-            {
+            if let Some(sc) = applicable_shortcuts(self).into_iter().find(|s| s.id == *id) {
                 for t in &sc.triggers {
                     if let ShortcutTrigger::Sequence(seq) = t {
                         if step < seq.len() && shortcuts::chords_match(&seq[step], &incoming) {
@@ -282,6 +292,7 @@ impl ArcadiaRoot {
                 ShortcutAction::Navigate { page_id } => {
                     if navigation::page_by_id(page_id).is_some() && self.is_page_visible(page_id) {
                         self.active_page_id = page_id.clone();
+                        self.sync_settings_hub_expanded_from_active_page();
                         self.ensure_valid_navigation_selection();
                     }
                 }
@@ -364,7 +375,11 @@ impl ArcadiaRoot {
                 {
                     if shortcuts::pointer_in_hot_corner(*quadrant, *margin_fraction, px, py, vw, vh)
                     {
-                        let prev = self.shortcut_hot_corner_dwell.get(&sc.id).copied().unwrap_or(0);
+                        let prev = self
+                            .shortcut_hot_corner_dwell
+                            .get(&sc.id)
+                            .copied()
+                            .unwrap_or(0);
                         let n = prev.saturating_add(1);
                         next_dwell.insert(sc.id.clone(), n);
                         if n >= *dwell_frames {
@@ -385,10 +400,8 @@ impl ArcadiaRoot {
         _cx: &mut Context<Self>,
     ) {
         if event.button == openframe::MouseButton::Left {
-            self.shortcut_edge_drag_start = Some((
-                f32::from(event.position.x),
-                f32::from(event.position.y),
-            ));
+            self.shortcut_edge_drag_start =
+                Some((f32::from(event.position.x), f32::from(event.position.y)));
         }
     }
 
@@ -423,7 +436,6 @@ impl ArcadiaRoot {
             }
         }
     }
-
 }
 
 pub(crate) fn global_shortcuts_for_settings() -> Vec<EffectiveMergedShortcut> {

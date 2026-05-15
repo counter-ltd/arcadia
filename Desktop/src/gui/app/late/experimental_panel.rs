@@ -4,9 +4,9 @@ use openframe::{
     StatefulInteractiveElement, Styled, Window,
 };
 
-use arcadia_core::modules::late::{experimental_refresh, experimental_state};
-use arcadia_core::config::ConfigFile;
 use arcadia_core::config::late::LateConfig;
+use arcadia_core::config::ConfigFile;
+use arcadia_core::modules::late::{experimental_refresh, experimental_state};
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
@@ -34,18 +34,11 @@ fn pill(text: String, bg: openframe::Rgba, tc: openframe::Rgba) -> openframe::Di
 }
 
 fn row_label(text: String, desc_c: openframe::Rgba) -> openframe::Div {
-    div()
-        .text_sm()
-        .text_color(desc_c)
-        .child(text)
+    div().text_sm().text_color(desc_c).child(text)
 }
 
 fn divider(line_c: openframe::Rgba) -> openframe::Div {
-    div()
-        .mx_4()
-        .my_1()
-        .h_px()
-        .bg(line_c)
+    div().mx_4().my_1().h_px().bg(line_c)
 }
 
 pub fn late_experimental_panel(
@@ -60,9 +53,21 @@ pub fn late_experimental_panel(
     let last_error = st.last_error.clone();
 
     // Profile
-    let profile_username = st.profile.as_ref().map(|p| p.username.clone()).unwrap_or_default();
-    let profile_bio = st.profile.as_ref().map(|p| p.bio.clone()).unwrap_or_default();
-    let profile_notify = st.profile.as_ref().map(|p| p.notify_format.clone()).unwrap_or_default();
+    let profile_username = st
+        .profile
+        .as_ref()
+        .map(|p| p.username.clone())
+        .unwrap_or_default();
+    let profile_bio = st
+        .profile
+        .as_ref()
+        .map(|p| p.bio.clone())
+        .unwrap_or_default();
+    let profile_notify = st
+        .profile
+        .as_ref()
+        .map(|p| p.notify_format.clone())
+        .unwrap_or_default();
 
     // Notifications
     let unread_notif = st.unread_notifications;
@@ -107,7 +112,13 @@ pub fn late_experimental_panel(
         .rss_entries
         .iter()
         .take(5)
-        .map(|e| format!("[{}] {}", truncate(&e.feed_title, 20), truncate(&e.title, 50)))
+        .map(|e| {
+            format!(
+                "[{}] {}",
+                truncate(&e.feed_title, 20),
+                truncate(&e.title, 50)
+            )
+        })
         .collect();
 
     // Showcase
@@ -227,10 +238,7 @@ pub fn late_experimental_panel(
                         .flex()
                         .flex_col()
                         .gap_1()
-                        .child(row_label(
-                            format!("@{profile_username}"),
-                            exp_row_desc,
-                        ))
+                        .child(row_label(format!("@{profile_username}"), exp_row_desc))
                         .child(row_label(
                             if profile_bio.is_empty() {
                                 "No bio".to_string()
@@ -239,10 +247,7 @@ pub fn late_experimental_panel(
                             },
                             exp_row_desc,
                         ))
-                        .child(row_label(
-                            format!("notify: {profile_notify}"),
-                            exp_row_desc,
-                        )),
+                        .child(row_label(format!("notify: {profile_notify}"), exp_row_desc)),
                 )
                 .child(divider(exp_border))
                 // ── Notifications ──────────────────────────────────────────
@@ -269,37 +274,25 @@ pub fn late_experimental_panel(
                 // ── Articles ───────────────────────────────────────────────
                 .child(section_header("Articles", exp_section_meta))
                 .child(
-                    div()
-                        .px_4()
-                        .pb_2()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .children(
-                            articles
-                                .into_iter()
-                                .map(|(title, _url)| row_label(title, exp_row_desc)),
-                        ),
+                    div().px_4().pb_2().flex().flex_col().gap_1().children(
+                        articles
+                            .into_iter()
+                            .map(|(title, _url)| row_label(title, exp_row_desc)),
+                    ),
                 )
                 .child(divider(exp_border))
                 // ── Work Profiles ──────────────────────────────────────────
                 .child(section_header("Work Profiles", exp_section_meta))
-                .child(
-                    div()
-                        .px_4()
-                        .pb_2()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .children(if work_profiles.is_empty() {
-                            vec![row_label("No profiles yet".to_string(), exp_row_desc)]
-                        } else {
-                            work_profiles
-                                .into_iter()
-                                .map(|p| row_label(p, exp_row_desc))
-                                .collect()
-                        }),
-                )
+                .child(div().px_4().pb_2().flex().flex_col().gap_1().children(
+                    if work_profiles.is_empty() {
+                        vec![row_label("No profiles yet".to_string(), exp_row_desc)]
+                    } else {
+                        work_profiles
+                            .into_iter()
+                            .map(|p| row_label(p, exp_row_desc))
+                            .collect()
+                    },
+                ))
                 .child(divider(exp_border))
                 // ── RSS ────────────────────────────────────────────────────
                 .child(section_header("RSS", exp_section_meta))
@@ -337,47 +330,35 @@ pub fn late_experimental_panel(
                 .child(divider(exp_border))
                 // ── Showcase ───────────────────────────────────────────────
                 .child(section_header("Showcase", exp_section_meta))
-                .child(
-                    div()
-                        .px_4()
-                        .pb_2()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .children(if showcase.is_empty() {
-                            vec![row_label("No items yet".to_string(), exp_row_desc)]
-                        } else {
-                            showcase
-                                .into_iter()
-                                .map(|s| row_label(s, exp_row_desc))
-                                .collect()
-                        }),
-                )
+                .child(div().px_4().pb_2().flex().flex_col().gap_1().children(
+                    if showcase.is_empty() {
+                        vec![row_label("No items yet".to_string(), exp_row_desc)]
+                    } else {
+                        showcase
+                            .into_iter()
+                            .map(|s| row_label(s, exp_row_desc))
+                            .collect()
+                    },
+                ))
                 .child(divider(exp_border))
                 // ── Leaderboard ────────────────────────────────────────────
                 .child(section_header("Game Leaderboard", exp_section_meta))
-                .child(
-                    div()
-                        .px_4()
-                        .pb_2()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .children(if leaderboard.is_empty() {
-                            vec![row_label("No scores yet".to_string(), exp_row_desc)]
-                        } else {
-                            leaderboard
-                                .into_iter()
-                                .map(|e| {
-                                    div()
-                                        .text_xs()
-                                        .font_family("monospace")
-                                        .text_color(exp_row_desc)
-                                        .child(e)
-                                })
-                                .collect()
-                        }),
-                )
+                .child(div().px_4().pb_2().flex().flex_col().gap_1().children(
+                    if leaderboard.is_empty() {
+                        vec![row_label("No scores yet".to_string(), exp_row_desc)]
+                    } else {
+                        leaderboard
+                            .into_iter()
+                            .map(|e| {
+                                div()
+                                    .text_xs()
+                                    .font_family("monospace")
+                                    .text_color(exp_row_desc)
+                                    .child(e)
+                            })
+                            .collect()
+                    },
+                ))
                 .child(divider(exp_border))
                 // ── Artboard ───────────────────────────────────────────────
                 .child(section_header("Artboard", exp_section_meta))

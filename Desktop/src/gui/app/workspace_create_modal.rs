@@ -5,8 +5,8 @@ use arcadia_core::config::workspace::{WorkspaceEntry, WorkspacesConfig};
 use arcadia_core::config::ConfigFile;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, PathPromptOptions, Styled, Window, div, px, rgb,
+    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, PathPromptOptions, Styled, Window,
 };
 
 use super::ArcadiaRoot;
@@ -22,12 +22,8 @@ fn text_field(
     focus_handle: openframe::FocusHandle,
     p: ThemePalette,
     radius: f32,
-    on_key_down: impl Fn(
-            &mut ArcadiaRoot,
-            &KeyDownEvent,
-            &mut openframe::Window,
-            &mut Context<ArcadiaRoot>,
-        ) + 'static,
+    on_key_down: impl Fn(&mut ArcadiaRoot, &KeyDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>)
+        + 'static,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
     let fh = focus_handle.clone();
@@ -52,9 +48,12 @@ fn text_field(
         .text_sm()
         .text_color(text_color)
         .track_focus(&focus_handle)
-        .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
-            fh.focus(window);
-        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |_, _, window, _| {
+                fh.focus(window);
+            }),
+        )
         .on_key_down(cx.listener(on_key_down))
         .child(content)
         .into_any_element()

@@ -14,7 +14,12 @@ fn main() {
         use arcadia_core::config::modules::PYTHON_HOST_MODULE_NAME;
         use arcadia_core::config::{modules::ModulesConfig, ConfigFile};
         let python_host_on = ModulesConfig::load_or_create()
-            .map(|cfg| cfg.modules.get(PYTHON_HOST_MODULE_NAME).copied().unwrap_or(false))
+            .map(|cfg| {
+                cfg.modules
+                    .get(PYTHON_HOST_MODULE_NAME)
+                    .copied()
+                    .unwrap_or(false)
+            })
             .unwrap_or(false);
         if python_host_on {
             let ext_dir = arcadia_core::config::config_root_dir()

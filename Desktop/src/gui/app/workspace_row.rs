@@ -3,8 +3,8 @@ use arcadia_core::config::workspace::WorkspaceEntry;
 use arcadia_core::modules;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Styled, div, px,
+    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Styled,
 };
 
 use crate::gui::app::ArcadiaRoot;
@@ -46,7 +46,11 @@ impl ArcadiaRoot {
                 let granted = ws.granted_permissions.iter().any(|p| p == def.id);
                 let perm_id = def.id.to_string();
                 let ws_id_c = ws_id.clone();
-                let verb = if granted { "workspace.revoke" } else { "workspace.grant" };
+                let verb = if granted {
+                    "workspace.revoke"
+                } else {
+                    "workspace.grant"
+                };
                 perm_rows.push(
                     div()
                         .w_full()
@@ -129,15 +133,18 @@ impl ArcadiaRoot {
                                                 .bg(p.toggle_knob_off),
                                         )
                                 })
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                    let ctx = this.execution_context();
-                                    let _ = modules::execute_command(
-                                        verb,
-                                        &[ws_id_c.as_str(), perm_id.as_str()],
-                                        &ctx,
-                                    );
-                                    cx.notify();
-                                })),
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        let ctx = this.execution_context();
+                                        let _ = modules::execute_command(
+                                            verb,
+                                            &[ws_id_c.as_str(), perm_id.as_str()],
+                                            &ctx,
+                                        );
+                                        cx.notify();
+                                    }),
+                                ),
                         )
                         .into_any_element(),
                 );
@@ -191,26 +198,22 @@ impl ArcadiaRoot {
                             .py_1()
                             .rounded(px(panel_radius.min(6.0)))
                             .child("Remove")
-                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                let ctx = this.execution_context();
-                                let _ = modules::execute_command(
-                                    "workspace.remove",
-                                    &[ws_id_remove.as_str()],
-                                    &ctx,
-                                );
-                                cx.notify();
-                            })),
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _, cx| {
+                                    let ctx = this.execution_context();
+                                    let _ = modules::execute_command(
+                                        "workspace.remove",
+                                        &[ws_id_remove.as_str()],
+                                        &ctx,
+                                    );
+                                    cx.notify();
+                                }),
+                            ),
                     ),
             )
             // Permission rows
-            .child(
-                div()
-                    .w_full()
-                    .px_4()
-                    .flex()
-                    .flex_col()
-                    .children(perm_rows),
-            )
+            .child(div().w_full().px_4().flex().flex_col().children(perm_rows))
             .into_any_element()
     }
 }

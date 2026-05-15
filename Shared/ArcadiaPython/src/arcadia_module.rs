@@ -1,10 +1,11 @@
+use crate::python_scope;
 use arcadia_core::config::extension_tokens;
 use arcadia_core::config::permissions::{PermissionSubject, PermissionsConfig};
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::python_registry::StyleTokenKind;
 use arcadia_core::modules::style_tokens::{
-    merge_token_numeric_bounds, parse_granularity_str, StyleTokenCompareOp, StyleTokenNumericPartial,
-    StyleTokenSpec, StyleTokenVisibility,
+    merge_token_numeric_bounds, parse_granularity_str, StyleTokenCompareOp,
+    StyleTokenNumericPartial, StyleTokenSpec, StyleTokenVisibility,
 };
 use arcadia_core::modules::{
     animation, cursor as core_cursor, overlay_hud_sprite, python_registry, tray as core_tray,
@@ -12,7 +13,6 @@ use arcadia_core::modules::{
 };
 use arcadia_core::scheduling;
 use arcadia_core::shortcuts::ShortcutRegistrationOwned;
-use crate::python_scope;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
 use std::sync::Arc;
@@ -100,9 +100,7 @@ fn register_command(
     permissions: Option<Vec<String>>,
 ) -> PyResult<()> {
     let token_err = token.clone();
-    let scope_ext = token
-        .split_once('.')
-        .map(|(prefix, _)| prefix.to_string());
+    let scope_ext = token.split_once('.').map(|(prefix, _)| prefix.to_string());
     let handler_fn: Arc<dyn Fn(Vec<String>) -> String + Send + Sync> =
         Arc::new(move |args: Vec<String>| {
             let _scope = scope_ext
@@ -357,14 +355,12 @@ fn register_tokens(module: String, tokens: Bound<'_, PyAny>) -> PyResult<()> {
             if let Some(gv) = d.get_item("granularity")? {
                 let gs: String = gv.extract()?;
                 partial.granularity = Some(
-                    parse_granularity_str(&gs).map_err(|e| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(e)
-                    })?,
+                    parse_granularity_str(&gs)
+                        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?,
                 );
             }
-            merge_token_numeric_bounds(kind, &default_value, partial).map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(e)
-            })?
+            merge_token_numeric_bounds(kind, &default_value, partial)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?
         } else {
             for nk in ["min", "max", "granularity"] {
                 if d.get_item(nk)?.is_some() {
@@ -378,9 +374,9 @@ fn register_tokens(module: String, tokens: Bound<'_, PyAny>) -> PyResult<()> {
         let options: Vec<String> = match d.get_item("options")? {
             Some(v) => {
                 let list = v.downcast::<PyList>().map_err(|_| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        format!("token {key}: 'options' must be a list of strings"),
-                    )
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "token {key}: 'options' must be a list of strings"
+                    ))
                 })?;
                 list.iter()
                     .map(|x| x.extract::<String>())
@@ -548,10 +544,7 @@ fn tray_set_show_menu_on_left_click(
 }
 
 #[pyfunction]
-fn register_tray_icon_click_handler(
-    extension_id: String,
-    handler: PyObject,
-) -> PyResult<()> {
+fn register_tray_icon_click_handler(extension_id: String, handler: PyObject) -> PyResult<()> {
     ensure_python_permission(&extension_id, "tray.create")?;
     let ext_err = extension_id.clone();
     let scope_id = extension_id.clone();
@@ -636,9 +629,8 @@ fn overlay_hud_set_sprite(
         display_width,
         display_height,
     };
-    overlay_hud_sprite::set_sprite(payload).map_err(|e| {
-        PyErr::new::<pyo3::exceptions::PyValueError, _>(e)
-    })
+    overlay_hud_sprite::set_sprite(payload)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
 }
 
 #[pyfunction]
@@ -786,11 +778,7 @@ fn register_editor_token_module(extension_id: String) {
 /// tuples covering the document. Overlapping spans are not defined; non-overlapping and ordered
 /// is simplest. The editor calls this once per render cycle for the active tab.
 #[pyfunction]
-fn register_highlight_provider(
-    extension_id: String,
-    language: String,
-    handler: PyObject,
-) {
+fn register_highlight_provider(extension_id: String, language: String, handler: PyObject) {
     let handler = Arc::new(handler);
     python_registry::register_highlight_provider(
         language,
@@ -856,7 +844,14 @@ fn register_decoration_provider(extension_id: String, handler: PyObject) {
                         let g: u8 = d.get_item("g").ok()??.extract().ok()?;
                         let b: u8 = d.get_item("b").ok()??.extract().ok()?;
                         let a: u8 = d.get_item("a").ok()??.extract().ok()?;
-                        Some(python_registry::DecorationRect { col_start, col_width, r, g, b, a })
+                        Some(python_registry::DecorationRect {
+                            col_start,
+                            col_width,
+                            r,
+                            g,
+                            b,
+                            a,
+                        })
                     })
                     .collect()
             })
@@ -915,7 +910,12 @@ fn register_nav_page(
                         _ => NavActionStyle::Secondary,
                     })
                     .unwrap_or(NavActionStyle::Secondary);
-                Some(NavPageAction { label, command, args, style })
+                Some(NavPageAction {
+                    label,
+                    command,
+                    args,
+                    style,
+                })
             })
         })
         .collect();

@@ -1,13 +1,18 @@
-use arcadia_core::config::modules::{ModulesConfig, supports_runtime_platform};
-use openframe::{AnyElement, Window, div, px};
+use arcadia_core::config::modules::{supports_runtime_platform, ModulesConfig};
+use openframe::{div, px, AnyElement, Window};
 use openframe::{Context, FontWeight, IntoElement, ParentElement, Styled};
 
-use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
+use crate::gui::app::list_panel_search::{list_panel_row_matches, ListPanelSearchKind};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
-    pub fn modules_panel(&mut self, window: &Window, cx: &mut Context<Self>, is_dark: bool) -> AnyElement {
+    pub fn modules_panel(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> AnyElement {
         if self.active_page_id.as_str() != "global.modules" {
             return div().into_any_element();
         }
@@ -24,7 +29,8 @@ impl ArcadiaRoot {
             })
             .collect();
 
-        let search_bar = self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Modules);
+        let search_bar =
+            self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Modules);
 
         let rows: Vec<_> = rows_src
             .into_iter()
@@ -65,7 +71,12 @@ impl ArcadiaRoot {
                 )
                 .into_any_element()
         } else {
-            div().flex().flex_col().gap_3().children(rows).into_any_element()
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .children(rows)
+                .into_any_element()
         };
 
         if let Some(ref g) = glyph_cfg {

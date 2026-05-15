@@ -1,11 +1,11 @@
 use openframe::{
-    Window, div, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, StatefulInteractiveElement, Styled, px,
+    div, px, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement, StatefulInteractiveElement, Styled, Window,
 };
 
 use arcadia_core::modules::late::{send_ws, state, LateMessage};
 
-use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
+use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 

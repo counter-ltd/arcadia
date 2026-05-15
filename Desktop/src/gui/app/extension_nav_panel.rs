@@ -1,5 +1,5 @@
-use arcadia_core::modules::{self, python_registry};
 use arcadia_core::modules::python_registry::NavActionStyle;
+use arcadia_core::modules::{self, python_registry};
 use openframe::{
     div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
     Styled, Window,
@@ -45,17 +45,23 @@ impl ArcadiaRoot {
         let decl = decl.unwrap();
 
         // Query status if declared.
-        let status: Option<(String, bool, Option<Vec<String>>)> = decl.status_command.as_ref().and_then(|cmd| {
-            let ctx = self.execution_context();
-            let raw = modules::execute_command(cmd, &[], &ctx).ok()??;
-            let obj: serde_json::Value = serde_json::from_str(&raw).ok()?;
-            let text = obj.get("text")?.as_str()?.to_string();
-            let active = obj.get("active").and_then(|v| v.as_bool()).unwrap_or(false);
-            let active_args = obj.get("active_args")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|x| x.as_str().map(str::to_string)).collect());
-            Some((text, active, active_args))
-        });
+        let status: Option<(String, bool, Option<Vec<String>>)> =
+            decl.status_command.as_ref().and_then(|cmd| {
+                let ctx = self.execution_context();
+                let raw = modules::execute_command(cmd, &[], &ctx).ok()??;
+                let obj: serde_json::Value = serde_json::from_str(&raw).ok()?;
+                let text = obj.get("text")?.as_str()?.to_string();
+                let active = obj.get("active").and_then(|v| v.as_bool()).unwrap_or(false);
+                let active_args = obj
+                    .get("active_args")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|x| x.as_str().map(str::to_string))
+                            .collect()
+                    });
+                Some((text, active, active_args))
+            });
 
         let mut container = div().w_full().flex().flex_col().gap_4();
 
@@ -81,9 +87,20 @@ impl ArcadiaRoot {
         );
 
         // Status badge.
-        if let Some((text, active, _)) = status.as_ref().map(|(t, a, aa)| (t.clone(), *a, aa.clone())) {
-            let badge_bg = if active { p.badge_info_bg } else { p.badge_muted_bg };
-            let badge_text = if active { p.badge_info_fg } else { p.badge_muted_fg };
+        if let Some((text, active, _)) = status
+            .as_ref()
+            .map(|(t, a, aa)| (t.clone(), *a, aa.clone()))
+        {
+            let badge_bg = if active {
+                p.badge_info_bg
+            } else {
+                p.badge_muted_bg
+            };
+            let badge_text = if active {
+                p.badge_info_fg
+            } else {
+                p.badge_muted_fg
+            };
             container = container.child(
                 div()
                     .px_3()
@@ -100,13 +117,17 @@ impl ArcadiaRoot {
 
         // Action buttons.
         if !decl.actions.is_empty() {
-            let active_args: Option<Vec<String>> = status.as_ref().and_then(|(_, _, aa)| aa.clone());
+            let active_args: Option<Vec<String>> =
+                status.as_ref().and_then(|(_, _, aa)| aa.clone());
             let mut row = div().flex().flex_row().flex_wrap().gap_2();
             for action in &decl.actions {
                 let cmd = action.command.clone();
                 let args: Vec<String> = action.args.clone();
                 let style = action.style.clone();
-                let is_active = active_args.as_ref().map(|aa| aa == &action.args).unwrap_or(false);
+                let is_active = active_args
+                    .as_ref()
+                    .map(|aa| aa == &action.args)
+                    .unwrap_or(false);
                 let (btn_bg, btn_text) = if is_active {
                     (p.accent, p.on_accent)
                 } else {
@@ -128,12 +149,15 @@ impl ArcadiaRoot {
                         .text_color(btn_text)
                         .cursor_pointer()
                         .child(label)
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                            let ctx = this.execution_context();
-                            let arg_strs: Vec<&str> = args.iter().map(String::as_str).collect();
-                            let _ = modules::execute_command(&cmd, &arg_strs, &ctx);
-                            cx.notify();
-                        })),
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                let ctx = this.execution_context();
+                                let arg_strs: Vec<&str> = args.iter().map(String::as_str).collect();
+                                let _ = modules::execute_command(&cmd, &arg_strs, &ctx);
+                                cx.notify();
+                            }),
+                        ),
                 );
             }
             container = container.child(row);

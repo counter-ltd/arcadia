@@ -25,28 +25,28 @@ pub enum OllamaModelKind {
 impl OllamaModelKind {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::TextGeneration  => "Text Generation",
+            Self::TextGeneration => "Text Generation",
             Self::ImageGeneration => "Image Generation",
-            Self::Vision          => "Vision",
-            Self::Embedding       => "Embedding",
+            Self::Vision => "Vision",
+            Self::Embedding => "Embedding",
         }
     }
 
     pub fn icon_key(&self) -> &'static str {
         match self {
-            Self::TextGeneration  => "type-text",
+            Self::TextGeneration => "type-text",
             Self::ImageGeneration => "type-image",
-            Self::Vision          => "type-vision",
-            Self::Embedding       => "type-embedding",
+            Self::Vision => "type-vision",
+            Self::Embedding => "type-embedding",
         }
     }
 
     pub fn as_ai_model_kind(&self) -> AiModelKind {
         match self {
-            Self::TextGeneration  => AiModelKind::TextGeneration,
+            Self::TextGeneration => AiModelKind::TextGeneration,
             Self::ImageGeneration => AiModelKind::ImageGeneration,
-            Self::Vision          => AiModelKind::Vision,
-            Self::Embedding       => AiModelKind::Embedding,
+            Self::Vision => AiModelKind::Vision,
+            Self::Embedding => AiModelKind::Embedding,
         }
     }
 }

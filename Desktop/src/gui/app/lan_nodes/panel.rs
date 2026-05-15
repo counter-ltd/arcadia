@@ -1,4 +1,4 @@
-use arcadia_core::modules::lan::{discover_lan_peers, list_known_lan_peers};
+use arcadia_core::modules::lan::list_known_lan_peers;
 use arcadia_core::modules::{execute_command, ExecutionContext};
 use openframe::{
     div, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
@@ -20,14 +20,35 @@ impl ArcadiaRoot {
 
     pub fn lan_nodes_panel(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
         let glyph = theme::glyph_snapshot(cx);
-        let text_c    = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| theme::module_title_text(is_dark));
-        let subtext_c = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_meta_text(is_dark));
-        let desc_c    = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_description_text(is_dark));
-        let bg_c      = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::module_panel_bg(is_dark));
-        let border_c  = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_panel_stroke(is_dark));
-        let row_bg    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_row_bg(is_dark));
-        let row_str   = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_row_stroke(is_dark));
-        let radius    = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
+        let text_c = glyph
+            .as_ref()
+            .map(|g| g.text)
+            .unwrap_or_else(|| theme::module_title_text(is_dark));
+        let subtext_c = glyph
+            .as_ref()
+            .map(|g| g.dim)
+            .unwrap_or_else(|| theme::module_meta_text(is_dark));
+        let desc_c = glyph
+            .as_ref()
+            .map(|g| g.dim)
+            .unwrap_or_else(|| theme::module_description_text(is_dark));
+        let bg_c = glyph
+            .as_ref()
+            .map(|g| g.surface)
+            .unwrap_or_else(|| theme::module_panel_bg(is_dark));
+        let border_c = glyph
+            .as_ref()
+            .map(|g| g.border)
+            .unwrap_or_else(|| theme::module_panel_stroke(is_dark));
+        let row_bg = glyph
+            .as_ref()
+            .map(|g| g.surface2)
+            .unwrap_or_else(|| theme::module_row_bg(is_dark));
+        let row_str = glyph
+            .as_ref()
+            .map(|g| g.border)
+            .unwrap_or_else(|| theme::module_row_stroke(is_dark));
+        let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
         // Keep feedback tuple for the output box
         let glyph_feedback = glyph.as_ref().map(|g| (g.surface, g.border, g.dim));
         let known = list_known_lan_peers();
@@ -36,7 +57,6 @@ impl ArcadiaRoot {
             .flex()
             .flex_col()
             .gap_4()
-            .child(self.lan_nodes_toolbar(cx, is_dark, text_c, row_bg, row_str, radius))
             .child(
                 div()
                     .text_sm()
@@ -96,68 +116,6 @@ impl ArcadiaRoot {
             .child(label)
     }
 
-    fn lan_nodes_toolbar(&self, cx: &mut Context<Self>, is_dark: bool, text_c: openframe::Rgba, row_bg: openframe::Rgba, row_str: openframe::Rgba, radius: f32) -> impl IntoElement {
-        div()
-            .flex()
-            .gap_2()
-            .child(self.lan_primary_button(cx, "Refresh", is_dark, text_c, row_bg, row_str, radius, |this, cx| {
-                this.lan_command_feedback = "LAN nodes status refreshed.".to_string();
-                cx.notify();
-            }))
-            .child(self.lan_primary_button(cx, "Scan", is_dark, text_c, row_bg, row_str, radius, |this, cx| {
-                match discover_lan_peers(None) {
-                    Ok(peers) => {
-                        let n = peers.len();
-                        this.lan_discovered_peers = peers;
-                        this.lan_command_feedback = format!("Scan finished — {n} peer(s).");
-                    }
-                    Err(err) => {
-                        this.lan_discovered_peers.clear();
-                        this.lan_command_feedback = err;
-                    }
-                }
-                cx.notify();
-            }))
-            .child(
-                self.lan_primary_button(cx, "Save connected (all)", is_dark, text_c, row_bg, row_str, radius, |this, cx| {
-                    this.lan_execute_feedback("lan.node", vec!["save".into()]);
-                    cx.notify();
-                }),
-            )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn lan_primary_button(
-        &self,
-        cx: &mut Context<Self>,
-        label: &'static str,
-        _is_dark: bool,
-        text_c: openframe::Rgba,
-        row_bg: openframe::Rgba,
-        row_str: openframe::Rgba,
-        radius: f32,
-        on_click: fn(&mut ArcadiaRoot, &mut Context<Self>),
-    ) -> impl IntoElement {
-        div()
-            .cursor_pointer()
-            .px_3()
-            .py_1()
-            .rounded(openframe::px(radius.min(6.0)))
-            .bg(row_bg)
-            .border_1()
-            .border_color(row_str)
-            .text_sm()
-            .font_weight(openframe::FontWeight::SEMIBOLD)
-            .text_color(text_c)
-            .child(label)
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, _, _, cx| {
-                    on_click(this, cx);
-                }),
-            )
-    }
-
     #[allow(clippy::too_many_arguments)]
     fn lan_discovered_row(
         &self,
@@ -198,12 +156,7 @@ impl ArcadiaRoot {
                             .text_color(text_c)
                             .child(hostname.to_string()),
                     )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(subtext_c)
-                            .child(ip.to_string()),
-                    ),
+                    .child(div().text_xs().text_color(subtext_c).child(ip.to_string())),
             )
             .child(
                 div().flex().gap_2().child(
@@ -256,18 +209,32 @@ impl ArcadiaRoot {
                 div()
                     .flex()
                     .gap_2()
-                    .child(
-                        self.lan_small_button(cx, "Accept", text_c, row_bg, row_str, radius, ip_a, |this, ip, cx| {
+                    .child(self.lan_small_button(
+                        cx,
+                        "Accept",
+                        text_c,
+                        row_bg,
+                        row_str,
+                        radius,
+                        ip_a,
+                        |this, ip, cx| {
                             this.lan_execute_feedback("lan.node", vec!["accept".into(), ip]);
                             cx.notify();
-                        }),
-                    )
-                    .child(
-                        self.lan_small_button(cx, "Reject", text_c, row_bg, row_str, radius, ip_r, |this, ip, cx| {
+                        },
+                    ))
+                    .child(self.lan_small_button(
+                        cx,
+                        "Reject",
+                        text_c,
+                        row_bg,
+                        row_str,
+                        radius,
+                        ip_r,
+                        |this, ip, cx| {
                             this.lan_execute_feedback("lan.node", vec!["reject".into(), ip]);
                             cx.notify();
-                        }),
-                    )
+                        },
+                    ))
             }
             "pending-outbound" => {
                 let ip_c = ip.clone();
@@ -276,24 +243,45 @@ impl ArcadiaRoot {
                 div()
                     .flex()
                     .gap_2()
-                    .child(
-                        self.lan_small_button(cx, "Connect", text_c, row_bg, row_str, radius, ip_c, |this, ip, cx| {
+                    .child(self.lan_small_button(
+                        cx,
+                        "Connect",
+                        text_c,
+                        row_bg,
+                        row_str,
+                        radius,
+                        ip_c,
+                        |this, ip, cx| {
                             this.lan_execute_feedback("lan.node", vec!["connect".into(), ip]);
                             cx.notify();
-                        }),
-                    )
-                    .child(
-                        self.lan_small_button(cx, "Accept", text_c, row_bg, row_str, radius, ip_a, |this, ip, cx| {
+                        },
+                    ))
+                    .child(self.lan_small_button(
+                        cx,
+                        "Accept",
+                        text_c,
+                        row_bg,
+                        row_str,
+                        radius,
+                        ip_a,
+                        |this, ip, cx| {
                             this.lan_execute_feedback("lan.node", vec!["accept".into(), ip]);
                             cx.notify();
-                        }),
-                    )
-                    .child(
-                        self.lan_small_button(cx, "Reject", text_c, row_bg, row_str, radius, ip_r, |this, ip, cx| {
+                        },
+                    ))
+                    .child(self.lan_small_button(
+                        cx,
+                        "Reject",
+                        text_c,
+                        row_bg,
+                        row_str,
+                        radius,
+                        ip_r,
+                        |this, ip, cx| {
                             this.lan_execute_feedback("lan.node", vec!["reject".into(), ip]);
                             cx.notify();
-                        }),
-                    )
+                        },
+                    ))
             }
             "connected" => {
                 let ip_s = ip.clone();

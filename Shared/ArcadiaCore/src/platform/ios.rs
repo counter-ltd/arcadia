@@ -11,3 +11,5 @@ impl PlatformInfo for IosPlatform {
 pub fn current() -> impl PlatformInfo {
     IosPlatform
 }
+
+pub fn send_system_notification(_title: &str, _body: &str) {}

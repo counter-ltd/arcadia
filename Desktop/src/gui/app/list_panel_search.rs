@@ -1,11 +1,11 @@
 //! Search field shared by Modules and Extensions list panels.
 
 use openframe::{
-    Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Styled,
-    Window, div, px,
+    div, px, Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement,
+    Styled, Window,
 };
 
-use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
+use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -24,9 +24,7 @@ pub(crate) fn list_panel_row_matches(q_lower: &str, primary: &str, extras: &[&st
     if q_lower.is_empty() {
         return true;
     }
-    primary
-        .to_ascii_lowercase()
-        .contains(q_lower)
+    primary.to_ascii_lowercase().contains(q_lower)
         || extras
             .iter()
             .any(|s| s.to_ascii_lowercase().contains(q_lower))
@@ -41,25 +39,24 @@ impl ArcadiaRoot {
         kind: ListPanelSearchKind,
     ) -> impl IntoElement {
         let (text, focus) = match kind {
-            ListPanelSearchKind::Modules => (&self.modules_search_query, &self.modules_search_focus),
+            ListPanelSearchKind::Modules => {
+                (&self.modules_search_query, &self.modules_search_focus)
+            }
             ListPanelSearchKind::Extensions => {
                 (&self.extensions_search_query, &self.extensions_search_focus)
             }
-            ListPanelSearchKind::Permissions => {
-                (&self.permissions_search_query, &self.permissions_search_focus)
-            }
+            ListPanelSearchKind::Permissions => (
+                &self.permissions_search_query,
+                &self.permissions_search_focus,
+            ),
             ListPanelSearchKind::Shortcuts => {
                 (&self.shortcuts_search_query, &self.shortcuts_search_focus)
             }
             ListPanelSearchKind::Workspaces => {
                 (&self.workspace_search_query, &self.workspace_search_focus)
             }
-            ListPanelSearchKind::Rules => {
-                (&self.rules_search_query, &self.rules_search_focus)
-            }
-            ListPanelSearchKind::Skills => {
-                (&self.skills_search_query, &self.skills_search_focus)
-            }
+            ListPanelSearchKind::Rules => (&self.rules_search_query, &self.rules_search_focus),
+            ListPanelSearchKind::Skills => (&self.skills_search_query, &self.skills_search_focus),
         };
         let placeholder = match kind {
             ListPanelSearchKind::Modules => "Search modules…",
@@ -96,9 +93,12 @@ impl ArcadiaRoot {
             .text_sm()
             .text_color(title_c)
             .track_focus(focus)
-            .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
-                fh.focus(window);
-            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |_, _, window, _| {
+                    fh.focus(window);
+                }),
+            )
             .child(if text.is_empty() {
                 if focused && blink {
                     div()

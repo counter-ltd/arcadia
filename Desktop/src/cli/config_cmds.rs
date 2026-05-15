@@ -185,7 +185,9 @@ fn modules_set(key: &str, value: &str) -> Result<(), String> {
 fn modules_reset(target: Option<&str>) -> Result<(), String> {
     match target {
         None => {
-            ModulesConfig::default().save().map_err(|err| err.to_string())?;
+            ModulesConfig::default()
+                .save()
+                .map_err(|err| err.to_string())?;
             Ok(())
         }
         Some(key) => {
@@ -351,7 +353,10 @@ pub fn open_config(config_name: &str) {
         }
         #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
         {
-            Err::<std::process::ExitStatus, _>(std::io::Error::new(std::io::ErrorKind::Unsupported, "open not supported on this platform"))
+            Err::<std::process::ExitStatus, _>(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "open not supported on this platform",
+            ))
         }
     };
 

@@ -1,21 +1,27 @@
 use openframe::{
-    AnyElement, Bounds, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, StatefulInteractiveElement,
-    Styled, Window, div, font, px, rgb, rgba,
+    div, font, px, rgb, rgba, AnyElement, Bounds, Context, FontWeight, InteractiveElement,
+    IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, Pixels,
+    StatefulInteractiveElement, Styled, Window,
 };
 
-use arcadia_core::config::ConfigFile;
-use arcadia_core::config::workspace::WorkspacesConfig;
-use arcadia_core::modules::python_registry::{self, HighlightSpan};
 use crate::gui::app::{ArcadiaRoot, CodeEditorTab};
 use crate::gui::theme;
+use arcadia_core::config::workspace::WorkspacesConfig;
+use arcadia_core::config::ConfigFile;
+use arcadia_core::modules::python_registry::{self, HighlightSpan};
 
 /// Expand `\t` to 4 spaces for visual rendering.
 fn expand_tabs(s: &str) -> String {
-    if !s.contains('\t') { return s.to_string(); }
+    if !s.contains('\t') {
+        return s.to_string();
+    }
     let mut out = String::with_capacity(s.len() + 8);
     for c in s.chars() {
-        if c == '\t' { out.push_str("    "); } else { out.push(c); }
+        if c == '\t' {
+            out.push_str("    ");
+        } else {
+            out.push(c);
+        }
     }
     out
 }
@@ -24,7 +30,9 @@ fn expand_tabs(s: &str) -> String {
 fn vis_col_to_orig_byte(line: &str, vis_col: usize) -> usize {
     let mut col = 0;
     for (i, c) in line.char_indices() {
-        if col >= vis_col { return i; }
+        if col >= vis_col {
+            return i;
+        }
         col += if c == '\t' { 4 } else { 1 };
     }
     line.len()
@@ -83,7 +91,11 @@ fn word_bounds(content: &str, pos: usize) -> (usize, usize) {
 
 fn delete_selection(content: &mut String, cursor: &mut usize, anchor: &mut Option<usize>) -> bool {
     if let Some(a) = *anchor {
-        let (sel_start, sel_end) = if a <= *cursor { (a, *cursor) } else { (*cursor, a) };
+        let (sel_start, sel_end) = if a <= *cursor {
+            (a, *cursor)
+        } else {
+            (*cursor, a)
+        };
         content.drain(sel_start..sel_end);
         *cursor = sel_start;
         *anchor = None;
@@ -187,7 +199,11 @@ fn line_segments(
             let ls = s.start.saturating_sub(line_byte_start).min(line.len());
             let le = s.end.saturating_sub(line_byte_start).min(line.len());
             let color = parse_highlight_color(&s.token)?;
-            if ls < le { Some((ls, le, color)) } else { None }
+            if ls < le {
+                Some((ls, le, color))
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -219,10 +235,8 @@ fn line_segments(
         if s >= e {
             continue;
         }
-        let is_cursor_seg = !eol_cursor
-            && cursor_byte.map_or(false, |c| {
-                s >= c && e <= cursor_end.unwrap_or(c)
-            });
+        let is_cursor_seg =
+            !eol_cursor && cursor_byte.map_or(false, |c| s >= c && e <= cursor_end.unwrap_or(c));
         let is_sel = sel.map_or(false, |(ss, se)| s >= ss && e <= se);
         let kind = if is_cursor_seg {
             SegKind::Cursor
@@ -269,87 +283,90 @@ impl ArcadiaRoot {
             let pal = theme::nav_accent_palette("emerald", is_dark);
             let r = p.radius_md.min(12.0);
 
-            let workspace_cards: Vec<AnyElement> =
-                WorkspacesConfig::load_or_create()
-                    .map(|cfg| cfg.workspaces)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|ws| {
-                        let ws_path_clone = ws.path.clone();
-                        div()
-                            .flex_1()
-                            .min_w(px(220.))
-                            .cursor_pointer()
-                            .p_4()
-                            .rounded(px(r))
-                            .bg(p.panel_bg)
-                            .border_1()
-                            .border_color(p.panel_border)
-                            .hover(move |s| s.bg(p.row_bg).border_color(pal.row_hover))
-                            .flex()
-                            .flex_col()
-                            .gap_3()
-                            .child(
-                                div()
-                                    .flex()
-                                    .gap_3()
-                                    .items_center()
-                                    .child(
-                                        theme::render_icon("folder-open")
-                                            .size_6()
-                                            .text_color(pal.icon_active),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_base()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(p.content_title)
-                                            .flex_1()
-                                            .child(ws.label.clone()),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(p.content_meta)
-                                    .max_w(px(248.))
-                                    .child(ws.path.clone()),
-                            )
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(move |this, _, window, cx| {
-                                    let id = this.code_editor_next_id;
-                                    this.code_editor_tabs.push(CodeEditorTab {
-                                        id,
-                                        title: format!("untitled-{id}"),
-                                        content: String::new(),
-                                        cursor: 0,
-                                        selection_anchor: None,
-                                        language: None,
-                                        hl_spans: vec![],
-                                        decorations: vec![],
-                                        highlight_dirty: true,
-                                        workspace_path: Some(ws_path_clone.clone()),
-                                        file_path: None,
-                                        saved_content: String::new(),
-                                        cached_lines: vec![],
-                                        cached_line_byte_starts: vec![],
-                                    });
-                                    this.active_code_editor_tab =
-                                        this.code_editor_tabs.len() - 1;
-                                    this.code_editor_next_id += 1;
-                                    this.active_page_id = "editor.main".to_string();
-                                    this.code_editor_show_dashboard = false;
-                                    this.save_editor_session();
-                                    this.code_editor_focus.focus(window);
-                                    cx.notify();
-                                }),
-                            )
-                            .into_any_element()
-                    })
-                    .collect();
+            let workspace_cards: Vec<AnyElement> = WorkspacesConfig::load_or_create()
+                .map(|cfg| cfg.workspaces)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|ws| {
+                    let ws_path_clone = ws.path.clone();
+                    div()
+                        .flex_1()
+                        .min_w(px(220.))
+                        .cursor_pointer()
+                        .p_4()
+                        .rounded(px(r))
+                        .bg(p.panel_bg)
+                        .border_1()
+                        .border_color(p.panel_border)
+                        .hover(move |s| s.bg(p.row_bg).border_color(pal.row_hover))
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .child(
+                            div()
+                                .flex()
+                                .gap_3()
+                                .items_center()
+                                .child(
+                                    theme::render_icon("folder-open")
+                                        .size_6()
+                                        .text_color(pal.icon_active),
+                                )
+                                .child(
+                                    div()
+                                        .text_base()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(p.content_title)
+                                        .flex_1()
+                                        .child(ws.label.clone()),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(p.content_meta)
+                                .max_w(px(248.))
+                                .child(ws.path.clone()),
+                        )
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, window, cx| {
+                                let id = this.code_editor_next_id;
+                                this.code_editor_tabs.push(CodeEditorTab {
+                                    id,
+                                    title: format!("untitled-{id}"),
+                                    content: String::new(),
+                                    cursor: 0,
+                                    selection_anchor: None,
+                                    language: None,
+                                    hl_spans: vec![],
+                                    decorations: vec![],
+                                    highlight_dirty: true,
+                                    workspace_path: Some(ws_path_clone.clone()),
+                                    file_path: None,
+                                    saved_content: String::new(),
+                                    cached_lines: vec![],
+                                    cached_line_byte_starts: vec![],
+                                });
+                                this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
+                                this.code_editor_next_id += 1;
+                                this.active_page_id = "editor.main".to_string();
+                                this.sync_settings_hub_expanded_from_active_page();
+                                this.code_editor_show_dashboard = false;
+                                this.save_editor_session();
+                                this.code_editor_focus.focus(window);
+                                cx.notify();
+                            }),
+                        )
+                        .into_any_element()
+                })
+                .collect();
 
-            let editor_bg_preview = if is_dark { rgb(0x141820) } else { rgb(0xf0f2f5) };
+            let editor_bg_preview = if is_dark {
+                rgb(0x141820)
+            } else {
+                rgb(0xf0f2f5)
+            };
             let editor_cards: Vec<AnyElement> = self
                 .code_editor_tabs
                 .iter()
@@ -391,6 +408,7 @@ impl ArcadiaRoot {
                                 this.active_code_editor_tab = tab_idx;
                                 this.code_editor_show_dashboard = false;
                                 this.active_page_id = "editor.main".to_string();
+                                this.sync_settings_hub_expanded_from_active_page();
                                 fh_card.focus(window);
                                 cx.notify();
                             }),
@@ -411,7 +429,11 @@ impl ArcadiaRoot {
                                         .font_family("monospace")
                                         .text_color(p.content_meta)
                                         .flex_shrink_0()
-                                        .child(if line.is_empty() { " ".to_string() } else { line })
+                                        .child(if line.is_empty() {
+                                            " ".to_string()
+                                        } else {
+                                            line
+                                        })
                                         .into_any_element()
                                 })),
                         )
@@ -448,12 +470,7 @@ impl ArcadiaRoot {
                                             div().into_any_element()
                                         }),
                                 )
-                                .child(
-                                    div()
-                                        .text_xs()
-                                        .text_color(p.content_meta)
-                                        .child(subtitle),
-                                ),
+                                .child(div().text_xs().text_color(p.content_meta).child(subtitle)),
                         )
                         .into_any_element()
                 })
@@ -504,7 +521,11 @@ impl ArcadiaRoot {
                 .w_full()
                 .h_full()
                 .overflow_y_scroll()
-                .bg(if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) })
+                .bg(if is_dark {
+                    rgb(0x1a1f29)
+                } else {
+                    rgb(0xfafafa)
+                })
                 .p_8()
                 .flex()
                 .flex_col()
@@ -593,7 +614,9 @@ impl ArcadiaRoot {
         let cursor_line_col: Option<(usize, usize)> = if focused && blink {
             let starts = &self.code_editor_tabs[idx].cached_line_byte_starts;
             let cursor_clamped = cursor.min(self.code_editor_tabs[idx].content.len());
-            let line_idx = starts.partition_point(|&s| s <= cursor_clamped).saturating_sub(1);
+            let line_idx = starts
+                .partition_point(|&s| s <= cursor_clamped)
+                .saturating_sub(1);
             let line_start = starts.get(line_idx).copied().unwrap_or(0);
             Some((line_idx, cursor_clamped - line_start))
         } else {
@@ -602,7 +625,11 @@ impl ArcadiaRoot {
 
         // Selection range as (start, end) byte offsets, or None
         let sel_range: Option<(usize, usize)> = selection_anchor.map(|a| {
-            if a <= cursor { (a, cursor) } else { (cursor, a) }
+            if a <= cursor {
+                (a, cursor)
+            } else {
+                (cursor, a)
+            }
         });
 
         let line_count = self.code_editor_tabs[idx].cached_lines.len();
@@ -614,15 +641,43 @@ impl ArcadiaRoot {
             px(40.)
         };
 
-        let editor_bg = if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) };
-        let gutter_bg = if is_dark { rgb(0x141820) } else { rgb(0xf0f0f2) };
-        let gutter_fg = if is_dark { rgb(0x4a5568) } else { rgb(0xadb5bd) };
+        let editor_bg = if is_dark {
+            rgb(0x1a1f29)
+        } else {
+            rgb(0xfafafa)
+        };
+        let gutter_bg = if is_dark {
+            rgb(0x141820)
+        } else {
+            rgb(0xf0f0f2)
+        };
+        let gutter_fg = if is_dark {
+            rgb(0x4a5568)
+        } else {
+            rgb(0xadb5bd)
+        };
         let line_fg = p.content_title;
-        let cursor_bg = if is_dark { rgb(0xe2e8f0) } else { rgb(0x1a202c) };
-        let cursor_fg = if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) };
-        let sel_bg = if is_dark { rgb(0x2d4a7a) } else { rgb(0xbfdbfe) };
+        let cursor_bg = if is_dark {
+            rgb(0xe2e8f0)
+        } else {
+            rgb(0x1a202c)
+        };
+        let cursor_fg = if is_dark {
+            rgb(0x1a1f29)
+        } else {
+            rgb(0xfafafa)
+        };
+        let sel_bg = if is_dark {
+            rgb(0x2d4a7a)
+        } else {
+            rgb(0xbfdbfe)
+        };
         let show_marks = self.code_editor_show_indentation_marks;
-        let indent_guide_color = if is_dark { rgb(0x2d3748) } else { rgb(0xd1d5db) };
+        let indent_guide_color = if is_dark {
+            rgb(0x2d3748)
+        } else {
+            rgb(0xd1d5db)
+        };
 
         let char_width = self.code_editor_char_width_override.unwrap_or_else(|| {
             let font_size = window.rem_size() * 0.875;
@@ -665,12 +720,22 @@ impl ArcadiaRoot {
                     } else {
                         let s = ss.saturating_sub(line_start_byte).min(line.len());
                         let e = se.saturating_sub(line_start_byte).min(line.len());
-                        if s < e { Some((s, e)) } else { None }
+                        if s < e {
+                            Some((s, e))
+                        } else {
+                            None
+                        }
                     }
                 });
 
                 let display_line = expand_tabs(&line);
-                let segs = line_segments(&line, line_start_byte, cursor_in_line, sel_in_line, &hl_spans);
+                let segs = line_segments(
+                    &line,
+                    line_start_byte,
+                    cursor_in_line,
+                    sel_in_line,
+                    &hl_spans,
+                );
 
                 let decorations = cached_decorations.get(i).cloned().unwrap_or_default();
 
@@ -723,25 +788,25 @@ impl ArcadiaRoot {
                             .bg(rgba(color_u32)),
                     )
                 });
-                let content_div = base_div.children(segs.into_iter().map(|(text, kind, hl_color)| {
-                    let text_color = match (kind, hl_color) {
-                        (SegKind::Normal, Some(c)) => rgb(c),
-                        _ => line_fg,
-                    };
-                    let seg = div()
-                        .text_sm()
-                        .font_family("monospace")
-                        .text_color(text_color)
-                        .child(expand_tabs(&text));
-                    match kind {
-                        SegKind::Normal => seg.into_any_element(),
-                        SegKind::Selected => seg.bg(sel_bg).into_any_element(),
-                        SegKind::Cursor => seg
-                            .bg(cursor_bg)
-                            .text_color(cursor_fg)
-                            .into_any_element(),
-                    }
-                }));
+                let content_div =
+                    base_div.children(segs.into_iter().map(|(text, kind, hl_color)| {
+                        let text_color = match (kind, hl_color) {
+                            (SegKind::Normal, Some(c)) => rgb(c),
+                            _ => line_fg,
+                        };
+                        let seg = div()
+                            .text_sm()
+                            .font_family("monospace")
+                            .text_color(text_color)
+                            .child(expand_tabs(&text));
+                        match kind {
+                            SegKind::Normal => seg.into_any_element(),
+                            SegKind::Selected => seg.bg(sel_bg).into_any_element(),
+                            SegKind::Cursor => {
+                                seg.bg(cursor_bg).text_color(cursor_fg).into_any_element()
+                            }
+                        }
+                    }));
 
                 div()
                     .flex()
@@ -772,9 +837,12 @@ impl ArcadiaRoot {
             .flex_col()
             .bg(editor_bg)
             .track_focus(&fh)
-            .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
-                fh_click.focus(window);
-            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |_, _, window, _| {
+                    fh_click.focus(window);
+                }),
+            )
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                 if this.code_editor_tabs.is_empty() {
                     return;
@@ -797,7 +865,11 @@ impl ArcadiaRoot {
 
                 match key {
                     "backspace" => {
-                        if !delete_selection(&mut tab.content, &mut tab.cursor, &mut tab.selection_anchor) {
+                        if !delete_selection(
+                            &mut tab.content,
+                            &mut tab.cursor,
+                            &mut tab.selection_anchor,
+                        ) {
                             if tab.cursor > 0 {
                                 let prev = prev_char_boundary(&tab.content, tab.cursor);
                                 tab.content.drain(prev..tab.cursor);
@@ -806,7 +878,11 @@ impl ArcadiaRoot {
                         }
                     }
                     "delete" => {
-                        if !delete_selection(&mut tab.content, &mut tab.cursor, &mut tab.selection_anchor) {
+                        if !delete_selection(
+                            &mut tab.content,
+                            &mut tab.cursor,
+                            &mut tab.selection_anchor,
+                        ) {
                             if tab.cursor < tab.content.len() {
                                 let next = next_char_boundary(&tab.content, tab.cursor);
                                 tab.content.drain(tab.cursor..next);
@@ -814,12 +890,20 @@ impl ArcadiaRoot {
                         }
                     }
                     "enter" => {
-                        delete_selection(&mut tab.content, &mut tab.cursor, &mut tab.selection_anchor);
+                        delete_selection(
+                            &mut tab.content,
+                            &mut tab.cursor,
+                            &mut tab.selection_anchor,
+                        );
                         tab.content.insert(tab.cursor, '\n');
                         tab.cursor += 1;
                     }
                     "tab" => {
-                        delete_selection(&mut tab.content, &mut tab.cursor, &mut tab.selection_anchor);
+                        delete_selection(
+                            &mut tab.content,
+                            &mut tab.cursor,
+                            &mut tab.selection_anchor,
+                        );
                         tab.content.insert_str(tab.cursor, "    ");
                         tab.cursor += 4;
                     }
@@ -949,74 +1033,87 @@ impl ArcadiaRoot {
                     .id("code-editor-content")
                     .overflow_y_scroll()
                     .child(
-                div()
-                    .w_full()
-                    .flex()
-                    .flex_col()
-                    .py_2()
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, event: &MouseDownEvent, window, cx| {
-                        let idx = this.active_code_editor_tab
-                            .min(this.code_editor_tabs.len().saturating_sub(1));
-                        let bounds = this.code_editor_line_bounds.borrow();
-                        let byte_pos = pos_to_byte_offset(
-                            &this.code_editor_tabs[idx].content,
-                            &bounds,
-                            event.position,
-                            gutter_w,
-                            char_width,
-                        );
-                        drop(bounds);
+                        div()
+                            .w_full()
+                            .flex()
+                            .flex_col()
+                            .py_2()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                                    let idx = this
+                                        .active_code_editor_tab
+                                        .min(this.code_editor_tabs.len().saturating_sub(1));
+                                    let bounds = this.code_editor_line_bounds.borrow();
+                                    let byte_pos = pos_to_byte_offset(
+                                        &this.code_editor_tabs[idx].content,
+                                        &bounds,
+                                        event.position,
+                                        gutter_w,
+                                        char_width,
+                                    );
+                                    drop(bounds);
 
-                        if event.click_count == 2 {
-                            let (ws, we) = word_bounds(&this.code_editor_tabs[idx].content, byte_pos);
-                            this.code_editor_tabs[idx].selection_anchor = Some(ws);
-                            this.code_editor_tabs[idx].cursor = we;
-                        } else if event.modifiers.shift {
-                            if this.code_editor_tabs[idx].selection_anchor.is_none() {
-                                this.code_editor_tabs[idx].selection_anchor =
-                                    Some(this.code_editor_tabs[idx].cursor);
-                            }
-                            this.code_editor_tabs[idx].cursor = byte_pos;
-                        } else {
-                            this.code_editor_tabs[idx].cursor = byte_pos;
-                            this.code_editor_tabs[idx].selection_anchor = None;
-                            this.code_editor_is_dragging = true;
-                        }
-                        fh_click2.focus(window);
-                        cx.notify();
-                    }))
-                    .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
-                        if !this.code_editor_is_dragging || !event.dragging() {
-                            return;
-                        }
-                        let idx = this.active_code_editor_tab
-                            .min(this.code_editor_tabs.len().saturating_sub(1));
-                        if this.code_editor_tabs[idx].selection_anchor.is_none() {
-                            this.code_editor_tabs[idx].selection_anchor =
-                                Some(this.code_editor_tabs[idx].cursor);
-                        }
-                        let bounds = this.code_editor_line_bounds.borrow();
-                        let byte_pos = pos_to_byte_offset(
-                            &this.code_editor_tabs[idx].content,
-                            &bounds,
-                            event.position,
-                            gutter_w,
-                            char_width,
-                        );
-                        drop(bounds);
-                        this.code_editor_tabs[idx].cursor = byte_pos;
-                        cx.notify();
-                    }))
-                    .on_mouse_up(MouseButton::Left, cx.listener(|this, _, _, _| {
-                        this.code_editor_is_dragging = false;
-                    }))
-                    .on_children_prepainted({
-                        let bounds_cell = bounds_cell.clone();
-                        move |child_bounds, _window, _cx| {
-                            *bounds_cell.borrow_mut() = child_bounds;
-                        }
-                    })
-                    .children(line_els),
+                                    if event.click_count == 2 {
+                                        let (ws, we) = word_bounds(
+                                            &this.code_editor_tabs[idx].content,
+                                            byte_pos,
+                                        );
+                                        this.code_editor_tabs[idx].selection_anchor = Some(ws);
+                                        this.code_editor_tabs[idx].cursor = we;
+                                    } else if event.modifiers.shift {
+                                        if this.code_editor_tabs[idx].selection_anchor.is_none() {
+                                            this.code_editor_tabs[idx].selection_anchor =
+                                                Some(this.code_editor_tabs[idx].cursor);
+                                        }
+                                        this.code_editor_tabs[idx].cursor = byte_pos;
+                                    } else {
+                                        this.code_editor_tabs[idx].cursor = byte_pos;
+                                        this.code_editor_tabs[idx].selection_anchor = None;
+                                        this.code_editor_is_dragging = true;
+                                    }
+                                    fh_click2.focus(window);
+                                    cx.notify();
+                                }),
+                            )
+                            .on_mouse_move(cx.listener(
+                                move |this, event: &MouseMoveEvent, _, cx| {
+                                    if !this.code_editor_is_dragging || !event.dragging() {
+                                        return;
+                                    }
+                                    let idx = this
+                                        .active_code_editor_tab
+                                        .min(this.code_editor_tabs.len().saturating_sub(1));
+                                    if this.code_editor_tabs[idx].selection_anchor.is_none() {
+                                        this.code_editor_tabs[idx].selection_anchor =
+                                            Some(this.code_editor_tabs[idx].cursor);
+                                    }
+                                    let bounds = this.code_editor_line_bounds.borrow();
+                                    let byte_pos = pos_to_byte_offset(
+                                        &this.code_editor_tabs[idx].content,
+                                        &bounds,
+                                        event.position,
+                                        gutter_w,
+                                        char_width,
+                                    );
+                                    drop(bounds);
+                                    this.code_editor_tabs[idx].cursor = byte_pos;
+                                    cx.notify();
+                                },
+                            ))
+                            .on_mouse_up(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, _| {
+                                    this.code_editor_is_dragging = false;
+                                }),
+                            )
+                            .on_children_prepainted({
+                                let bounds_cell = bounds_cell.clone();
+                                move |child_bounds, _window, _cx| {
+                                    *bounds_cell.borrow_mut() = child_bounds;
+                                }
+                            })
+                            .children(line_els),
                     ),
             )
             .into_any_element()

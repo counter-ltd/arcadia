@@ -127,8 +127,10 @@ pub fn completion_candidates(line: &str, pos: usize) -> (usize, Vec<String>) {
         },
         "permit" => match active_index {
             1 => {
-                let mut v: Vec<String> =
-                    PERMISSION_REGISTRY.iter().map(|p| p.id.to_string()).collect();
+                let mut v: Vec<String> = PERMISSION_REGISTRY
+                    .iter()
+                    .map(|p| p.id.to_string())
+                    .collect();
                 if let Ok(mk) = modules_keys() {
                     v.extend(mk.into_iter().map(|k| format!("module:{k}")));
                 }
@@ -140,7 +142,10 @@ pub fn completion_candidates(line: &str, pos: usize) -> (usize, Vec<String>) {
                         return (start, vec!["true".to_string(), "false".to_string()]);
                     }
                 }
-                PERMISSION_REGISTRY.iter().map(|p| p.id.to_string()).collect()
+                PERMISSION_REGISTRY
+                    .iter()
+                    .map(|p| p.id.to_string())
+                    .collect()
             }
             3 => vec!["true".to_string(), "false".to_string()],
             _ => Vec::new(),

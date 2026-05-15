@@ -17,15 +17,17 @@ fn require_ctx(ctx: Option<&AiWorkspaceContext>) -> Result<&AiWorkspaceContext, 
 pub fn check(ctx: Option<&AiWorkspaceContext>, op: &SandboxOp) -> Result<(), String> {
     let ctx = require_ctx(ctx)?;
     let (path, permitted, perm_name) = match op {
-        SandboxOp::Read(p) | SandboxOp::List(p) => (*p, ctx.can_read(), "workspace.read"),
-        SandboxOp::Write(p) => (*p, ctx.can_write(), "workspace.write"),
-        SandboxOp::Execute(p) => (*p, ctx.can_execute(), "workspace.execute"),
+        SandboxOp::Read(p) | SandboxOp::List(p) => (*p, ctx.can_read(), "workspace.ai_read"),
+        SandboxOp::Write(p) => (*p, ctx.can_write(), "workspace.ai_write"),
+        SandboxOp::Execute(p) => (*p, ctx.can_execute(), "workspace.ai_execute"),
     };
     if !ctx.is_path_in_scope(path) {
         return Err(format!("Path out of workspace scope: {path}"));
     }
     if !permitted {
-        return Err(format!("Permission denied: {perm_name} not granted for this workspace"));
+        return Err(format!(
+            "Permission denied: {perm_name} not granted for this workspace"
+        ));
     }
     Ok(())
 }
@@ -64,20 +66,53 @@ pub fn sandboxed_list(ctx: Option<&AiWorkspaceContext>, path: &str) -> Result<Ve
 /// destructive tools (`rm`, `curl`, `dd`). Do NOT add shells or network tools to
 /// this list without also adding a secondary confirmation gate at the call site.
 const EXEC_ALLOWLIST: &[&str] = &[
-    "cargo", "rustc", "rustfmt", "clippy-driver",
-    "npm", "npx", "node", "yarn", "pnpm",
-    "python", "python3", "pip", "pip3", "uv",
-    "git", "gh",
-    "make", "cmake", "ninja",
-    "ls", "find", "grep", "rg", "cat", "head", "tail", "wc",
-    "echo", "printf",
-    "mkdir", "cp", "mv",
-    "swift", "swiftc",
+    "cargo",
+    "rustc",
+    "rustfmt",
+    "clippy-driver",
+    "npm",
+    "npx",
+    "node",
+    "yarn",
+    "pnpm",
+    "python",
+    "python3",
+    "pip",
+    "pip3",
+    "uv",
+    "git",
+    "gh",
+    "make",
+    "cmake",
+    "ninja",
+    "ls",
+    "find",
+    "grep",
+    "rg",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "echo",
+    "printf",
+    "mkdir",
+    "cp",
+    "mv",
+    "swift",
+    "swiftc",
     "go",
-    "java", "javac", "mvn", "gradle",
-    "ruby", "gem", "bundle",
+    "java",
+    "javac",
+    "mvn",
+    "gradle",
+    "ruby",
+    "gem",
+    "bundle",
     // AI CLI exec providers (subscription-based; no API key)
-    "claude", "codex", "gemini", "aider",
+    "claude",
+    "codex",
+    "gemini",
+    "aider",
 ];
 
 fn exec_binary(cmd: &str) -> Option<&str> {

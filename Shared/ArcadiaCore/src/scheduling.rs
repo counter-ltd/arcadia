@@ -365,6 +365,13 @@ impl WorkPool {
         st.blocking_q.retain(|j| j.id != id);
         st.python_q.retain(|j| j.id != id);
     }
+
+    /// Drain all queued (not yet started) Python-timer jobs. Called from `cancel_all_recurring`
+    /// so that ticks already enqueued before the heap purge cannot fire after tray teardown.
+    fn drain_python_queue(&self) {
+        let mut st = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        st.python_q.clear();
+    }
 }
 
 /// Peak number of pool jobs executing at once since process start (test / diagnostics).
@@ -587,8 +594,11 @@ pub fn try_cancel_task(id: TaskId) {
 /// Remove all **recurring** (`spawn_interval`) tasks. One-shot `spawn_delay` tasks stay scheduled.
 ///
 /// Used when reloading Python extensions so old interval handlers stop before tray teardown.
+/// Also drains any Python-timer jobs already enqueued in the pool so they cannot fire after
+/// tray items are removed in the same reload pass.
 pub fn cancel_all_recurring() {
     let _ = scheduler().timer_tx.send(TimerMsg::PurgeRecurring);
+    scheduler().pool.drain_python_queue();
 }
 
 /// Queue work to run on the main UI thread. In headless mode runs inline immediately.

@@ -1,15 +1,15 @@
 use arcadia_core::config::modules::REMOTE_SESSION_MODULE_NAME;
-use arcadia_core::config::ConfigFile as _;
-use arcadia_core::navigation;
 #[cfg(not(feature = "gui"))]
 use arcadia_core::config::thin_client::ThinClientConfig;
+use arcadia_core::config::ConfigFile as _;
 #[cfg(not(feature = "gui"))]
 use arcadia_core::modules::lan::connected_approved_session_peers;
-use openframe::{
-    div, img, px, rgb, AnyElement, Context, Div, IntoElement, InteractiveElement,
-    ParentElement, StatefulInteractiveElement, Styled, Window,
-};
+use arcadia_core::navigation;
 use openframe::prelude::FluentBuilder as _;
+use openframe::{
+    div, img, px, rgb, AnyElement, Context, Div, InteractiveElement, IntoElement, ParentElement,
+    StatefulInteractiveElement, Styled, Window,
+};
 
 use crate::gui::app::navigation::NavGroupRef;
 use crate::gui::app::{window_controls_top_padding, ArcadiaRoot};
@@ -28,11 +28,29 @@ impl ArcadiaRoot {
         // Pad content below traffic lights; outer column keeps full-height bg + border into titlebar.
         let content_top_pad = top_inset + px(12.);
         let glyph = theme::glyph_snapshot(cx);
-        let sidebar_bg   = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| if is_dark { rgb(0x171b22) } else { rgb(0xf6f7fb) });
-        let sidebar_border = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| if is_dark { rgb(0x2a3340) } else { rgb(0xe6e8ef) });
-        let title_text   = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| if is_dark { rgb(0xe5e7eb) } else { rgb(0x111827) });
-        let is_glyph     = glyph.is_some();
-        let radius       = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
+        let sidebar_bg = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| {
+            if is_dark {
+                rgb(0x171b22)
+            } else {
+                rgb(0xf6f7fb)
+            }
+        });
+        let sidebar_border = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| {
+            if is_dark {
+                rgb(0x2a3340)
+            } else {
+                rgb(0xe6e8ef)
+            }
+        });
+        let title_text = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| {
+            if is_dark {
+                rgb(0xe5e7eb)
+            } else {
+                rgb(0x111827)
+            }
+        });
+        let is_glyph = glyph.is_some();
+        let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
         div()
             .h_full()
             .w_64()
@@ -333,6 +351,7 @@ impl ArcadiaRoot {
                                                     this.active_page_id =
                                                         arcadia_core::navigation::LOGS_PAGE_ID
                                                             .to_string();
+                                                    this.sync_settings_hub_expanded_from_active_page();
                                                     this.app_menu_open = false;
                                                     cx.notify();
                                                 }),
@@ -612,6 +631,7 @@ impl ArcadiaRoot {
                                                     this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
                                                     this.code_editor_next_id += 1;
                                                     this.active_page_id = "editor.main".to_string();
+                                                    this.sync_settings_hub_expanded_from_active_page();
                                                     this.code_editor_focus.focus(window);
                                                     cx.notify();
                                                 }))
@@ -906,6 +926,7 @@ impl ArcadiaRoot {
                                                         if let Some(existing) = this.ai_chats.iter().find(|c| c.session_id.as_deref() == Some(session_id_left.as_str())) {
                                                             this.active_ai_chat_id = existing.id;
                                                             this.active_page_id = "ai.chat".to_string();
+                                                            this.sync_settings_hub_expanded_from_active_page();
                                                             this.ai_chat_show_dashboard = false;
                                                             cx.notify();
                                                             return;
@@ -934,6 +955,7 @@ impl ArcadiaRoot {
                                                             });
                                                             this.active_ai_chat_id = id;
                                                             this.active_page_id = "ai.chat".to_string();
+                                                            this.sync_settings_hub_expanded_from_active_page();
                                                             this.ai_chat_show_dashboard = false;
                                                             this.ai_active_rule_ids = stored.active_rule_ids.clone();
                                                             this.ai_active_skill_ids = stored.active_skill_ids.clone();
@@ -978,6 +1000,7 @@ impl ArcadiaRoot {
                                                     this.active_ai_chat_id = id;
                                                     this.ai_next_id += 1;
                                                     this.active_page_id = "ai.chat".to_string();
+                                                    this.sync_settings_hub_expanded_from_active_page();
                                                     this.ai_chat_show_dashboard = false;
                                                     cx.notify();
                                                 }))

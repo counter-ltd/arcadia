@@ -10,6 +10,7 @@ pub(super) fn splash_draw_stars(bounds: Bounds<openframe::Pixels>, t: f32, windo
     let ox = f32::from(bounds.origin.x);
     let oy = f32::from(bounds.origin.y);
 
+    #[allow(clippy::approx_constant)]
     let stars: &[(f32, f32, f32, f32, bool)] = &[
         (0.500, 0.380, 5.0, 0.00, true),
         (0.460, 0.295, 1.8, 0.15, false),

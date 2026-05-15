@@ -1,9 +1,9 @@
 use arcadia_core::modules::python_registry::{self, list_style_tokens};
-use openframe::{
-    Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
-    Window, div, px,
-};
 use openframe::prelude::FluentBuilder as _;
+use openframe::{
+    div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Styled, Window,
+};
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
@@ -45,14 +45,11 @@ impl ArcadiaRoot {
                     ),
             )
             .child(
-                div()
-                    .text_sm()
-                    .text_color(p.content_body)
-                    .child(
-                        self.page_ref(self.active_page_id.as_str())
-                            .map(|pg| pg.description().to_string())
-                            .unwrap_or_default(),
-                    ),
+                div().text_sm().text_color(p.content_body).child(
+                    self.page_ref(self.active_page_id.as_str())
+                        .map(|pg| pg.description().to_string())
+                        .unwrap_or_default(),
+                ),
             );
 
         let body: openframe::Div = if wrong_surface {
@@ -96,6 +93,7 @@ impl ArcadiaRoot {
                             MouseButton::Left,
                             cx.listener(|this, _, _, cx| {
                                 this.active_page_id = "python.settings".into();
+                                this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
                             }),
                         ),
@@ -118,6 +116,7 @@ impl ArcadiaRoot {
                                 MouseButton::Left,
                                 cx.listener(|this, _, _, cx| {
                                     this.active_page_id = "global.appearance".into();
+                                    this.sync_settings_hub_expanded_from_active_page();
                                     cx.notify();
                                 }),
                             ),
@@ -131,7 +130,8 @@ impl ArcadiaRoot {
                 module_id,
                 &token_specs,
                 "Token overrides".to_string(),
-                "Saved under ~/Arcadia/Configuration/extension_tokens/. Press Enter to save.".to_string(),
+                "Saved under ~/Arcadia/Configuration/extension_tokens/. Press Enter to save."
+                    .to_string(),
                 None,
             )
         };

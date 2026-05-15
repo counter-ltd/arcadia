@@ -6,8 +6,8 @@ use arcadia_core::navigation;
 use arcadia_core::shortcuts::{KeyChordSpec, ShortcutAction, ShortcutTrigger};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, Styled, Window, div, px, rgb,
+    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, Styled, Window,
 };
 
 use super::shortcuts::sync_os_global_hotkeys;
@@ -18,27 +18,37 @@ use crate::gui::theme::palette::ThemePalette;
 
 fn chord_chips_modal(chord: &KeyChordSpec) -> Vec<String> {
     let mut chips = Vec::new();
-    if chord.platform { chips.push("Cmd".to_string()); }
-    if chord.control  { chips.push("Ctrl".to_string()); }
-    if chord.alt      { chips.push("Alt".to_string()); }
-    if chord.shift    { chips.push("Shift".to_string()); }
-    if chord.function { chips.push("Fn".to_string()); }
+    if chord.platform {
+        chips.push("Cmd".to_string());
+    }
+    if chord.control {
+        chips.push("Ctrl".to_string());
+    }
+    if chord.alt {
+        chips.push("Alt".to_string());
+    }
+    if chord.shift {
+        chips.push("Shift".to_string());
+    }
+    if chord.function {
+        chips.push("Fn".to_string());
+    }
     chips.push(key_display_modal(&chord.key));
     chips
 }
 
 fn key_display_modal(key: &str) -> String {
     match key {
-        "escape"    => "Esc".to_string(),
-        "tab"       => "Tab".to_string(),
-        "space"     => "Space".to_string(),
-        "enter"     => "Return".to_string(),
+        "escape" => "Esc".to_string(),
+        "tab" => "Tab".to_string(),
+        "space" => "Space".to_string(),
+        "enter" => "Return".to_string(),
         "backspace" => "⌫".to_string(),
-        "delete"    => "Del".to_string(),
-        "up"        => "↑".to_string(),
-        "down"      => "↓".to_string(),
-        "left"      => "←".to_string(),
-        "right"     => "→".to_string(),
+        "delete" => "Del".to_string(),
+        "up" => "↑".to_string(),
+        "down" => "↓".to_string(),
+        "left" => "←".to_string(),
+        "right" => "→".to_string(),
         k if k.len() == 1 => k.to_ascii_uppercase(),
         k => {
             let mut s = k.to_string();
@@ -70,14 +80,23 @@ fn toggle_btn(
     selected: bool,
     p: ThemePalette,
     radius: f32,
-    on_click: impl Fn(&mut ArcadiaRoot, &openframe::MouseDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>) + 'static,
+    on_click: impl Fn(
+            &mut ArcadiaRoot,
+            &openframe::MouseDownEvent,
+            &mut openframe::Window,
+            &mut Context<ArcadiaRoot>,
+        ) + 'static,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
     div()
         .px_3()
         .py_1()
         .rounded(px(radius.min(8.0)))
-        .bg(if selected { p.accent } else { p.surface_elevated })
+        .bg(if selected {
+            p.accent
+        } else {
+            p.surface_elevated
+        })
         .border_1()
         .border_color(if selected { p.accent } else { p.border })
         .text_xs()
@@ -97,7 +116,8 @@ fn text_field(
     focus_handle: openframe::FocusHandle,
     p: ThemePalette,
     radius: f32,
-    on_key_down: impl Fn(&mut ArcadiaRoot, &KeyDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>) + 'static,
+    on_key_down: impl Fn(&mut ArcadiaRoot, &KeyDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>)
+        + 'static,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
     let fh = focus_handle.clone();
@@ -106,7 +126,11 @@ fn text_field(
     } else {
         text_with_trailing_caret(value, focused, blink)
     };
-    let text_color = if value.is_empty() && !focused { p.ui_subtext } else { p.content_title };
+    let text_color = if value.is_empty() && !focused {
+        p.ui_subtext
+    } else {
+        p.content_title
+    };
     div()
         .w_full()
         .px_3()
@@ -118,9 +142,12 @@ fn text_field(
         .text_sm()
         .text_color(text_color)
         .track_focus(&focus_handle)
-        .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
-            fh.focus(window);
-        }))
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |_, _, window, _| {
+                fh.focus(window);
+            }),
+        )
         .on_key_down(cx.listener(on_key_down))
         .child(content)
         .into_any_element()
@@ -165,7 +192,10 @@ impl ArcadiaRoot {
 
         // --- Trigger type toggles ---
         let chord_toggle = toggle_btn(
-            "Chord", trigger_kind == ShortcutCreateTriggerKind::Chord, p, radius,
+            "Chord",
+            trigger_kind == ShortcutCreateTriggerKind::Chord,
+            p,
+            radius,
             |this, _, _, cx| {
                 if let Some(ref mut d) = this.shortcut_create_draft {
                     d.trigger_kind = ShortcutCreateTriggerKind::Chord;
@@ -176,7 +206,10 @@ impl ArcadiaRoot {
             cx,
         );
         let seq_toggle = toggle_btn(
-            "Sequence", trigger_kind == ShortcutCreateTriggerKind::Sequence, p, radius,
+            "Sequence",
+            trigger_kind == ShortcutCreateTriggerKind::Sequence,
+            p,
+            radius,
             |this, _, _, cx| {
                 if let Some(ref mut d) = this.shortcut_create_draft {
                     d.trigger_kind = ShortcutCreateTriggerKind::Sequence;
@@ -188,7 +221,8 @@ impl ArcadiaRoot {
         );
 
         // --- Sequence step counter (shown when Sequence selected) ---
-        let seq_counter: Option<AnyElement> = if trigger_kind == ShortcutCreateTriggerKind::Sequence {
+        let seq_counter: Option<AnyElement> = if trigger_kind == ShortcutCreateTriggerKind::Sequence
+        {
             Some(
                 div()
                     .flex()
@@ -213,13 +247,16 @@ impl ArcadiaRoot {
                             .text_color(p.content_title)
                             .cursor_pointer()
                             .child("+")
-                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                if let Some(ref mut d) = this.shortcut_create_draft {
-                                    d.sequence_total = (d.sequence_total + 1).min(8);
-                                    d.sequence.clear();
-                                }
-                                cx.notify();
-                            })),
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, cx| {
+                                    if let Some(ref mut d) = this.shortcut_create_draft {
+                                        d.sequence_total = (d.sequence_total + 1).min(8);
+                                        d.sequence.clear();
+                                    }
+                                    cx.notify();
+                                }),
+                            ),
                     )
                     .child(
                         div()
@@ -234,13 +271,16 @@ impl ArcadiaRoot {
                             .text_color(p.content_title)
                             .cursor_pointer()
                             .child("−")
-                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                if let Some(ref mut d) = this.shortcut_create_draft {
-                                    d.sequence_total = (d.sequence_total - 1).max(2);
-                                    d.sequence.clear();
-                                }
-                                cx.notify();
-                            })),
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, _, _, cx| {
+                                    if let Some(ref mut d) = this.shortcut_create_draft {
+                                        d.sequence_total = (d.sequence_total - 1).max(2);
+                                        d.sequence.clear();
+                                    }
+                                    cx.notify();
+                                }),
+                            ),
                     )
                     .into_any_element(),
             )
@@ -280,7 +320,11 @@ impl ArcadiaRoot {
                             .flex()
                             .items_center()
                             .gap_1()
-                            .children(chord_chips_modal(c).into_iter().map(|ch| chip_el(ch, chip_radius, p)))
+                            .children(
+                                chord_chips_modal(c)
+                                    .into_iter()
+                                    .map(|ch| chip_el(ch, chip_radius, p)),
+                            )
                             .into_any_element()
                     } else {
                         div()
@@ -342,18 +386,21 @@ impl ArcadiaRoot {
                         .text_color(p.content_title)
                         .cursor_pointer()
                         .child(btn_label)
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
-                            if let Some(ref mut d) = this.shortcut_create_draft {
-                                if is_chord {
-                                    this.shortcut_draft_recording_chord = true;
-                                } else {
-                                    d.sequence.clear();
-                                    this.shortcut_draft_recording_seq = true;
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, window, cx| {
+                                if let Some(ref mut d) = this.shortcut_create_draft {
+                                    if is_chord {
+                                        this.shortcut_draft_recording_chord = true;
+                                    } else {
+                                        d.sequence.clear();
+                                        this.shortcut_draft_recording_seq = true;
+                                    }
+                                    listen_fh2.focus(window);
                                 }
-                                listen_fh2.focus(window);
-                            }
-                            cx.notify();
-                        })),
+                                cx.notify();
+                            }),
+                        ),
                 )
                 .child(recorded_display)
                 .into_any_element()
@@ -361,7 +408,10 @@ impl ArcadiaRoot {
 
         // --- Action type toggles ---
         let navigate_toggle = toggle_btn(
-            "Navigate", action_kind == ShortcutCreateActionKind::Navigate, p, radius,
+            "Navigate",
+            action_kind == ShortcutCreateActionKind::Navigate,
+            p,
+            radius,
             |this, _, _, cx| {
                 if let Some(ref mut d) = this.shortcut_create_draft {
                     d.action_kind = ShortcutCreateActionKind::Navigate;
@@ -372,7 +422,10 @@ impl ArcadiaRoot {
             cx,
         );
         let exec_toggle = toggle_btn(
-            "Execute Command", action_kind == ShortcutCreateActionKind::ExecuteCommand, p, radius,
+            "Execute Command",
+            action_kind == ShortcutCreateActionKind::ExecuteCommand,
+            p,
+            radius,
             |this, _, _, cx| {
                 if let Some(ref mut d) = this.shortcut_create_draft {
                     d.action_kind = ShortcutCreateActionKind::ExecuteCommand;
@@ -396,21 +449,36 @@ impl ArcadiaRoot {
                         .px_2()
                         .py_1()
                         .rounded(px(chip_radius))
-                        .bg(if selected { p.accent } else { p.surface_elevated })
+                        .bg(if selected {
+                            p.accent
+                        } else {
+                            p.surface_elevated
+                        })
                         .border_1()
                         .border_color(if selected { p.accent } else { p.border })
                         .text_xs()
-                        .font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
-                        .text_color(if selected { p.on_accent } else { p.content_title })
+                        .font_weight(if selected {
+                            FontWeight::SEMIBOLD
+                        } else {
+                            FontWeight::NORMAL
+                        })
+                        .text_color(if selected {
+                            p.on_accent
+                        } else {
+                            p.content_title
+                        })
                         .cursor_pointer()
                         .child(format!("{} ({})", page.title, page.id))
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                            if let Some(ref mut d) = this.shortcut_create_draft {
-                                d.action_page_id = pid2.clone();
-                                d.error = None;
-                            }
-                            cx.notify();
-                        }))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                if let Some(ref mut d) = this.shortcut_create_draft {
+                                    d.action_page_id = pid2.clone();
+                                    d.error = None;
+                                }
+                                cx.notify();
+                            }),
+                        )
                         .into_any_element()
                 })
                 .collect();
@@ -424,13 +492,7 @@ impl ArcadiaRoot {
                         .text_color(p.ui_subtext)
                         .child("Select a page:"),
                 )
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap_1()
-                        .children(page_chips),
-                )
+                .child(div().flex().flex_wrap().gap_1().children(page_chips))
                 .into_any_element()
         } else {
             // Execute Command
@@ -466,7 +528,11 @@ impl ArcadiaRoot {
                                     if key == "backspace" {
                                         d.action_command_token.pop();
                                         cx.notify();
-                                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                                    } else if !mods.control
+                                        && !mods.alt
+                                        && !mods.platform
+                                        && !mods.function
+                                    {
                                         if let Some(kc) = &event.keystroke.key_char {
                                             d.action_command_token.push_str(kc);
                                             cx.notify();
@@ -506,7 +572,11 @@ impl ArcadiaRoot {
                                     } else if key == "space" {
                                         d.action_command_args.push(' ');
                                         cx.notify();
-                                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
+                                    } else if !mods.control
+                                        && !mods.alt
+                                        && !mods.platform
+                                        && !mods.function
+                                    {
                                         if let Some(kc) = &event.keystroke.key_char {
                                             d.action_command_args.push_str(kc);
                                             cx.notify();
@@ -580,12 +650,15 @@ impl ArcadiaRoot {
                     .bottom_0()
                     .bg(rgb(0x000000))
                     .opacity(0.3)
-                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                        this.shortcut_create_draft = None;
-                        this.shortcut_draft_recording_chord = false;
-                        this.shortcut_draft_recording_seq = false;
-                        cx.notify();
-                    })),
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.shortcut_create_draft = None;
+                            this.shortcut_draft_recording_chord = false;
+                            this.shortcut_draft_recording_seq = false;
+                            cx.notify();
+                        }),
+                    ),
             )
             .child(
                 // Centered modal
@@ -605,9 +678,12 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_4()
-                            .on_mouse_down(MouseButton::Left, cx.listener(|_, _, _, cx| {
-                                cx.stop_propagation();
-                            }))
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|_, _, _, cx| {
+                                    cx.stop_propagation();
+                                }),
+                            )
                             // Header
                             .child(
                                 div()
@@ -629,12 +705,15 @@ impl ArcadiaRoot {
                                             .text_color(p.ui_subtext)
                                             .cursor_pointer()
                                             .child("×")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.shortcut_create_draft = None;
-                                                this.shortcut_draft_recording_chord = false;
-                                                this.shortcut_draft_recording_seq = false;
-                                                cx.notify();
-                                            })),
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.shortcut_create_draft = None;
+                                                    this.shortcut_draft_recording_chord = false;
+                                                    this.shortcut_draft_recording_seq = false;
+                                                    cx.notify();
+                                                }),
+                                            ),
                                     ),
                             )
                             // Label
@@ -720,12 +799,15 @@ impl ArcadiaRoot {
                                             .text_color(p.ui_subtext)
                                             .cursor_pointer()
                                             .child("Cancel")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.shortcut_create_draft = None;
-                                                this.shortcut_draft_recording_chord = false;
-                                                this.shortcut_draft_recording_seq = false;
-                                                cx.notify();
-                                            })),
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.shortcut_create_draft = None;
+                                                    this.shortcut_draft_recording_chord = false;
+                                                    this.shortcut_draft_recording_seq = false;
+                                                    cx.notify();
+                                                }),
+                                            ),
                                     )
                                     .child(
                                         div()
@@ -738,9 +820,12 @@ impl ArcadiaRoot {
                                             .text_color(p.on_accent)
                                             .cursor_pointer()
                                             .child("Save")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.shortcut_create_save(cx);
-                                            })),
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.shortcut_create_save(cx);
+                                                }),
+                                            ),
                                     ),
                             ),
                     ),
@@ -749,7 +834,9 @@ impl ArcadiaRoot {
     }
 
     pub fn shortcut_create_save(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.shortcut_create_draft.clone() else { return; };
+        let Some(draft) = self.shortcut_create_draft.clone() else {
+            return;
+        };
 
         let label = draft.label.trim().to_string();
         if label.is_empty() {
@@ -830,7 +917,12 @@ impl ArcadiaRoot {
             .unwrap_or_default()
             .as_millis();
         let id = format!("user:{ts}");
-        let custom = CustomShortcut { id, label, trigger, actions };
+        let custom = CustomShortcut {
+            id,
+            label,
+            trigger,
+            actions,
+        };
 
         if let Ok(mut cfg) = ShortcutsConfig::load_or_create() {
             cfg.custom.push(custom);

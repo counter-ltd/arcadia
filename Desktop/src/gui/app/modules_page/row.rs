@@ -2,8 +2,10 @@ use arcadia_core::config::modules::{ModuleManifest, ModulesConfig};
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use openframe::prelude::FluentBuilder as _;
-use openframe::{AnyElement, div, px};
-use openframe::{Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
+use openframe::{div, px, AnyElement};
+use openframe::{
+    Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
+};
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
@@ -27,10 +29,7 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
         let is_glyph = g_snap.is_some();
-        let radius = g_snap
-            .map(|g| g.border_radius)
-            .unwrap_or(p.radius_md);
-
+        let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
         let title_c = p.content_title;
         let meta_c = p.content_meta;
@@ -97,12 +96,7 @@ impl ArcadiaRoot {
                                             .child(state),
                                     ),
                             )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(desc_c)
-                                    .child(description),
-                            )
+                            .child(div().text_xs().text_color(desc_c).child(description))
                             .when(!runtime_supported, |col| {
                                 col.child(
                                     div()
@@ -169,132 +163,134 @@ impl ArcadiaRoot {
                 div()
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(if enabled {
-                        p.accent
-                    } else {
-                        p.ui_subtext
-                    })
+                    .text_color(if enabled { p.accent } else { p.ui_subtext })
                     .child(if enabled { "ON" } else { "OFF" }),
             )
-            .child(
-                if enabled {
-                    div()
-                        .w_10()
-                        .h_6()
-                        .px_0p5()
-                        .when(!is_glyph, |d| d.rounded_full())
-                        .rounded(px(r_track))
-                        .border_1()
-                        .border_color(p.border)
-                        .bg(p.accent)
-                        .flex()
-                        .items_center()
-                        .justify_end()
-                        .child(
-                            div()
-                                .w_4()
-                                .h_4()
-                                .when(!is_glyph, |d| d.rounded_full())
-                                .rounded(px(r_track))
-                                .bg(p.on_accent),
-                        )
-                } else {
-                    div()
-                        .w_10()
-                        .h_6()
-                        .px_0p5()
-                        .when(!is_glyph, |d| d.rounded_full())
-                        .rounded(px(r_track))
-                        .border_1()
-                        .border_color(p.border)
-                        .bg(p.surface_elevated)
-                        .flex()
-                        .items_center()
-                        .justify_start()
-                        .child(
-                            div()
-                                .w_4()
-                                .h_4()
-                                .when(!is_glyph, |d| d.rounded_full())
-                                .rounded(px(r_track))
-                                .bg(p.toggle_knob_off),
-                        )
-                },
-            )
+            .child(if enabled {
+                div()
+                    .w_10()
+                    .h_6()
+                    .px_0p5()
+                    .when(!is_glyph, |d| d.rounded_full())
+                    .rounded(px(r_track))
+                    .border_1()
+                    .border_color(p.border)
+                    .bg(p.accent)
+                    .flex()
+                    .items_center()
+                    .justify_end()
+                    .child(
+                        div()
+                            .w_4()
+                            .h_4()
+                            .when(!is_glyph, |d| d.rounded_full())
+                            .rounded(px(r_track))
+                            .bg(p.on_accent),
+                    )
+            } else {
+                div()
+                    .w_10()
+                    .h_6()
+                    .px_0p5()
+                    .when(!is_glyph, |d| d.rounded_full())
+                    .rounded(px(r_track))
+                    .border_1()
+                    .border_color(p.border)
+                    .bg(p.surface_elevated)
+                    .flex()
+                    .items_center()
+                    .justify_start()
+                    .child(
+                        div()
+                            .w_4()
+                            .h_4()
+                            .when(!is_glyph, |d| d.rounded_full())
+                            .rounded(px(r_track))
+                            .bg(p.toggle_knob_off),
+                    )
+            })
             .when(allow_enable || enabled, |d| {
-                d.on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                let enabled_next = !enabled;
-                if !allow_enable {
-                    if !enabled {
-                        return;
-                    }
-                    if enabled_next {
-                        return;
-                    }
-                }
-                if this.remote_route.is_some() {
-                    let ctx = this.execution_context();
-                    let name = module_name.clone();
-                    let payload = arcadia_core::modules::surface::patch_json_modules_set(
-                        &name,
-                        enabled_next,
-                        Some(this.surface_client_id.as_str()),
-                    );
-                    match modules::execute_command("surface.patch", &[payload.as_str()], &ctx) {
-                        Err(err) => eprintln!("{err}"),
-                        Ok(Some(msg)) => eprintln!("{msg}"),
-                        Ok(None) => {}
-                    }
-                    this.pending_module_enable = None;
-                    this.reload_modules();
-                    cx.notify();
-                    return;
-                }
-                if enabled {
-                    if let Ok(mut cfg) = ModulesConfig::load_or_create() {
-                        let _ = cfg.set_module_state(&module_name, false);
-                        let _ = cfg.save();
-                    }
-                    this.pending_module_enable = None;
-                    this.reload_modules();
-                    cx.notify();
-                    return;
-                }
-                match ModulesConfig::load_or_create() {
-                    Ok(cfg) => match cfg.missing_requirements_for(&module_name) {
-                        Ok(missing) if !missing.is_empty() => {
-                            this.pending_module_enable = Some((module_name.clone(), missing));
-                        }
-                        Ok(_) => {
-                            use arcadia_core::config::permissions::PermissionsConfig;
-                            use crate::gui::app::PendingPermissionGrant;
-                            if let Ok(pc) = PermissionsConfig::load_or_create() {
-                                let miss = pc.missing_grants_for_module_enable(&module_name);
-                                if !miss.is_empty() {
-                                    this.pending_permission_grant = Some(
-                                        PendingPermissionGrant::NativeModule {
-                                            module: module_name.clone(),
-                                            missing: miss,
-                                        },
-                                    );
-                                    cx.notify();
-                                    return;
-                                }
+                d.on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _, _, cx| {
+                        let enabled_next = !enabled;
+                        if !allow_enable {
+                            if !enabled {
+                                return;
                             }
+                            if enabled_next {
+                                return;
+                            }
+                        }
+                        if this.remote_route.is_some() {
+                            let ctx = this.execution_context();
+                            let name = module_name.clone();
+                            let payload = arcadia_core::modules::surface::patch_json_modules_set(
+                                &name,
+                                enabled_next,
+                                Some(this.surface_client_id.as_str()),
+                            );
+                            match modules::execute_command(
+                                "surface.patch",
+                                &[payload.as_str()],
+                                &ctx,
+                            ) {
+                                Err(err) => eprintln!("{err}"),
+                                Ok(Some(msg)) => eprintln!("{msg}"),
+                                Ok(None) => {}
+                            }
+                            this.pending_module_enable = None;
+                            this.reload_modules();
+                            cx.notify();
+                            return;
+                        }
+                        if enabled {
                             if let Ok(mut cfg) = ModulesConfig::load_or_create() {
-                                let _ = cfg.enable_with_requirements(&module_name);
+                                let _ = cfg.set_module_state(&module_name, false);
                                 let _ = cfg.save();
                             }
                             this.pending_module_enable = None;
-                            this.pending_permission_grant = None;
                             this.reload_modules();
+                            cx.notify();
+                            return;
                         }
-                        Err(err) => eprintln!("{err}"),
-                    },
-                    Err(err) => eprintln!("{err}"),
-                }
-                cx.notify();
-            }))
+                        match ModulesConfig::load_or_create() {
+                            Ok(cfg) => match cfg.missing_requirements_for(&module_name) {
+                                Ok(missing) if !missing.is_empty() => {
+                                    this.pending_module_enable =
+                                        Some((module_name.clone(), missing));
+                                }
+                                Ok(_) => {
+                                    use crate::gui::app::PendingPermissionGrant;
+                                    use arcadia_core::config::permissions::PermissionsConfig;
+                                    if let Ok(pc) = PermissionsConfig::load_or_create() {
+                                        let miss =
+                                            pc.missing_grants_for_module_enable(&module_name);
+                                        if !miss.is_empty() {
+                                            this.pending_permission_grant =
+                                                Some(PendingPermissionGrant::NativeModule {
+                                                    module: module_name.clone(),
+                                                    missing: miss,
+                                                });
+                                            cx.notify();
+                                            return;
+                                        }
+                                    }
+                                    if let Ok(mut cfg) = ModulesConfig::load_or_create() {
+                                        let _ = cfg.enable_with_requirements(&module_name);
+                                        let _ = cfg.save();
+                                    }
+                                    this.pending_module_enable = None;
+                                    this.pending_permission_grant = None;
+                                    this.reload_modules();
+                                }
+                                Err(err) => eprintln!("{err}"),
+                            },
+                            Err(err) => eprintln!("{err}"),
+                        }
+                        cx.notify();
+                    }),
+                )
             })
     }
 }

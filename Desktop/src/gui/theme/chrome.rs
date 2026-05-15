@@ -1,3 +1,5 @@
+#![allow(clippy::approx_constant)]
+
 use openframe::{App, Rgba};
 
 use super::palette::{

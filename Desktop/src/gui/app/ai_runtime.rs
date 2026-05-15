@@ -18,7 +18,11 @@ pub enum RuntimeEvent {
     Done,
     Error(String),
     /// AI proposed a file edit that was staged instead of written to disk.
-    PendingEdit { path: String, original: String, proposed: String },
+    PendingEdit {
+        path: String,
+        original: String,
+        proposed: String,
+    },
 }
 
 pub enum AiRuntimeRequest {
@@ -30,14 +34,25 @@ pub enum AiRuntimeRequest {
 }
 
 pub enum ProviderRouting {
-    LlamaCpp { model_path: String },
-    Ollama   { endpoint: String, model_name: String },
+    LlamaCpp {
+        model_path: String,
+    },
+    Ollama {
+        endpoint: String,
+        model_name: String,
+    },
     /// API key is NOT carried here — the inference thread loads it from config
     /// on demand so it never travels through the mpsc channel.
-    OpenAi   { model_id: String },
+    OpenAi {
+        model_id: String,
+    },
     /// Spawn an installed AI CLI binary (claude, codex, gemini, aider, …).
     /// Prompt is delivered via stdin pipe — no shell interpolation of user content.
-    ExecCli  { binary: String, model_flag: Option<String>, model_value: String },
+    ExecCli {
+        binary: String,
+        model_flag: Option<String>,
+        model_value: String,
+    },
     /// Apple Intelligence via macOS Foundation Models framework (macOS 26+).
     /// No model selection — the system model is used.
     Apfel,
@@ -45,19 +60,23 @@ pub enum ProviderRouting {
 
 pub struct AiRuntimeHandle {
     pub request_tx: SyncSender<AiRuntimeRequest>,
-    pub event_rx:   Receiver<RuntimeEvent>,
-    join_handle:    Option<std::thread::JoinHandle<()>>,
+    pub event_rx: Receiver<RuntimeEvent>,
+    join_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl AiRuntimeHandle {
     pub fn start() -> Self {
         let (request_tx, request_rx) = std::sync::mpsc::sync_channel(4);
-        let (event_tx,   event_rx)   = std::sync::mpsc::sync_channel(512);
+        let (event_tx, event_rx) = std::sync::mpsc::sync_channel(512);
         let join_handle = std::thread::Builder::new()
             .name("ai-inference".to_string())
             .spawn(move || ai_thread_impl(request_rx, event_tx))
             .expect("failed to spawn ai inference thread");
-        AiRuntimeHandle { request_tx, event_rx, join_handle: Some(join_handle) }
+        AiRuntimeHandle {
+            request_tx,
+            event_rx,
+            join_handle: Some(join_handle),
+        }
     }
 }
 
@@ -107,13 +126,20 @@ fn ai_thread_impl(rx: Receiver<AiRuntimeRequest>, tx: SyncSender<RuntimeEvent>) 
                         ));
                     }
                 }
-                ProviderRouting::Ollama { endpoint, model_name } => {
+                ProviderRouting::Ollama {
+                    endpoint,
+                    model_name,
+                } => {
                     run_ollama(&endpoint, &model_name, request, &tx);
                 }
                 ProviderRouting::OpenAi { model_id } => {
                     run_openai(&model_id, request, &tx);
                 }
-                ProviderRouting::ExecCli { binary, model_flag, model_value } => {
+                ProviderRouting::ExecCli {
+                    binary,
+                    model_flag,
+                    model_value,
+                } => {
                     run_exec_cli(&binary, model_flag.as_deref(), &model_value, request, &tx);
                 }
                 ProviderRouting::Apfel => {
@@ -184,7 +210,9 @@ fn prepare_system(request: &TextGenerationRequest) -> Result<PreparedSystem, Str
         // Any tool not in the skill allow-list is effectively forbidden.
         if let Some(ref allowed) = skill_allowed_tools {
             for tool in &request.tools {
-                if !allowed.iter().any(|a| a == tool.name) && !forbidden_tool_names.iter().any(|f| f == tool.name) {
+                if !allowed.iter().any(|a| a == tool.name)
+                    && !forbidden_tool_names.iter().any(|f| f == tool.name)
+                {
                     forbidden_tool_names.push(tool.name.to_string());
                 }
             }
@@ -194,8 +222,8 @@ fn prepare_system(request: &TextGenerationRequest) -> Result<PreparedSystem, Str
     // Workspace context injection.
     if let Some(ctx) = &request.workspace_context {
         let perms: Vec<&str> = [
-            ("workspace.read",    "read"),
-            ("workspace.write",   "write"),
+            ("workspace.read", "read"),
+            ("workspace.write", "write"),
             ("workspace.execute", "execute"),
         ]
         .iter()
@@ -210,7 +238,7 @@ fn prepare_system(request: &TextGenerationRequest) -> Result<PreparedSystem, Str
         system = format!(
             "{system}\n\nWorkspace: {label} ({path})\nGranted permissions: {perm_str}",
             label = ctx.workspace_label,
-            path  = ctx.workspace_path,
+            path = ctx.workspace_path,
         );
 
         // File context injection from @mentions.
@@ -244,7 +272,11 @@ fn prepare_system(request: &TextGenerationRequest) -> Result<PreparedSystem, Str
         );
     }
 
-    Ok(PreparedSystem { system, effective_max_tokens, forbidden_tool_names })
+    Ok(PreparedSystem {
+        system,
+        effective_max_tokens,
+        forbidden_tool_names,
+    })
 }
 
 /// Run a provider's single-shot generate fn in a tool-use loop.
@@ -264,7 +296,12 @@ where
     const MAX_ROUNDS: usize = 8;
 
     for round in 0..MAX_ROUNDS {
-        let Some(output) = generate(&prepared.system, &messages, prepared.effective_max_tokens, tx) else {
+        let Some(output) = generate(
+            &prepared.system,
+            &messages,
+            prepared.effective_max_tokens,
+            tx,
+        ) else {
             return;
         };
 
@@ -283,7 +320,11 @@ where
         let mut results = String::new();
         for call in &calls {
             // Block forbidden tools — model sees an error result without execution.
-            if prepared.forbidden_tool_names.iter().any(|f| f == &call.name) {
+            if prepared
+                .forbidden_tool_names
+                .iter()
+                .any(|f| f == &call.name)
+            {
                 results.push_str(&format!(
                     "Tool `{}` error: this tool is disabled by an active rule.\n\n",
                     call.name
@@ -291,7 +332,11 @@ where
                 continue;
             }
 
-            let result = ai_tools::execute_tool(call, request.workspace_context.as_ref(), request.stage_writes);
+            let result = ai_tools::execute_tool(
+                call,
+                request.workspace_context.as_ref(),
+                request.stage_writes,
+            );
 
             // Detect staged writes and emit PendingEdit events.
             if result.output.starts_with("STAGED\n") {
@@ -313,9 +358,15 @@ where
             }
 
             if result.is_error {
-                results.push_str(&format!("Tool `{}` error: {}\n\n", result.name, result.output));
+                results.push_str(&format!(
+                    "Tool `{}` error: {}\n\n",
+                    result.name, result.output
+                ));
             } else {
-                results.push_str(&format!("Tool `{}` result:\n{}\n\n", result.name, result.output));
+                results.push_str(&format!(
+                    "Tool `{}` result:\n{}\n\n",
+                    result.name, result.output
+                ));
             }
         }
 
@@ -359,7 +410,8 @@ fn run_ollama(
         });
 
         let url = format!("{}/api/chat", endpoint.trim_end_matches('/'));
-        let response = match agent.post(&url)
+        let response = match agent
+            .post(&url)
             .set("Content-Type", "application/json")
             .send_json(&body)
         {
@@ -397,11 +449,7 @@ fn run_ollama(
 
 // ── OpenAI HTTP provider ──────────────────────────────────────────────────────
 
-fn run_openai(
-    model_id: &str,
-    request: TextGenerationRequest,
-    tx: &SyncSender<RuntimeEvent>,
-) {
+fn run_openai(model_id: &str, request: TextGenerationRequest, tx: &SyncSender<RuntimeEvent>) {
     let api_key = OpenAiConfig::load_or_create()
         .map(|c| c.api_key)
         .unwrap_or_default();
@@ -432,7 +480,8 @@ fn run_openai(
             "max_tokens": max_tokens,
         });
 
-        let response = match agent.post("https://api.openai.com/v1/chat/completions")
+        let response = match agent
+            .post("https://api.openai.com/v1/chat/completions")
             .set("Authorization", &format!("Bearer {api_key}"))
             .set("Content-Type", "application/json")
             .send_json(&body)
@@ -565,8 +614,8 @@ fn run_llama_cpp(
         };
 
         let n_ctx = std::cmp::max(tokens.len() + n_predict as usize + 64, 4096);
-        let ctx_params = LlamaContextParams::default()
-            .with_n_ctx(std::num::NonZeroU32::new(n_ctx as u32));
+        let ctx_params =
+            LlamaContextParams::default().with_n_ctx(std::num::NonZeroU32::new(n_ctx as u32));
 
         let mut ctx = match model.new_context(backend_ref, ctx_params) {
             Ok(c) => c,
@@ -683,13 +732,15 @@ fn run_exec_cli(
             }
         }
         cmd.stdin(Stdio::piped())
-           .stdout(Stdio::piped())
-           .stderr(Stdio::null());
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
-                let _ = tx.send(RuntimeEvent::Error(format!("Failed to spawn '{binary}': {e}")));
+                let _ = tx.send(RuntimeEvent::Error(format!(
+                    "Failed to spawn '{binary}': {e}"
+                )));
                 return None;
             }
         };
@@ -718,7 +769,10 @@ fn run_exec_cli(
                     return None;
                 }
                 match line {
-                    Ok(l) => { output.push_str(&l); output.push('\n'); }
+                    Ok(l) => {
+                        output.push_str(&l);
+                        output.push('\n');
+                    }
                     Err(_) => break,
                 }
             }
@@ -761,10 +815,17 @@ Task {
     do {
         let session = LanguageModelSession()
         let stream = try session.streamResponse(to: prompt)
+        var prevLen = 0
         for try await fragment in stream {
-            print(fragment, terminator: "")
-            fflush(stdout)
+            let full = fragment.content
+            let delta = String(full.dropFirst(prevLen))
+            if !delta.isEmpty {
+                print(delta, terminator: "")
+                fflush(stdout)
+            }
+            prevLen = full.count
         }
+        print("")
     } catch {
         fputs("Apfel error: \(error)\n", stderr)
     }
@@ -776,7 +837,9 @@ RunLoop.main.run()
 
     let tmp_path = std::env::temp_dir().join("arcadia_apfel_runner.swift");
     if let Err(e) = std::fs::write(&tmp_path, swift_src) {
-        let _ = tx.send(RuntimeEvent::Error(format!("Failed to write Apfel runner: {e}")));
+        let _ = tx.send(RuntimeEvent::Error(format!(
+            "Failed to write Apfel runner: {e}"
+        )));
         return;
     }
 
@@ -828,7 +891,9 @@ RunLoop.main.run()
             let reader = std::io::BufReader::new(stdout);
             for line in reader.lines() {
                 if std::time::Instant::now() > deadline {
-                    let _ = tx.send(RuntimeEvent::Error("Apfel timed out after 120 s.".to_string()));
+                    let _ = tx.send(RuntimeEvent::Error(
+                        "Apfel timed out after 120 s.".to_string(),
+                    ));
                     let _ = child.kill();
                     return None;
                 }
@@ -850,7 +915,8 @@ RunLoop.main.run()
         if text.is_empty() {
             let _ = tx.send(RuntimeEvent::Error(
                 "Apple Intelligence returned no output. \
-                 Requires macOS 26 or later with Foundation Models available.".to_string()
+                 Requires macOS 26 or later with Foundation Models available."
+                    .to_string(),
             ));
             None
         } else {

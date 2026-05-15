@@ -1,11 +1,11 @@
 use arcadia_core::config::workspace::WorkspacesConfig;
 use arcadia_core::config::ConfigFile;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Styled, Window, div, px,
+    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Styled, Window,
 };
 
-use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
+use crate::gui::app::list_panel_search::{list_panel_row_matches, ListPanelSearchKind};
 use crate::gui::app::{ArcadiaRoot, WorkspaceCreateDraft};
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
@@ -21,7 +21,8 @@ impl ArcadiaRoot {
         let panel_radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
         let q = self.workspace_search_query.trim().to_ascii_lowercase();
-        let search_bar = self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Workspaces);
+        let search_bar =
+            self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Workspaces);
 
         let Ok(cfg) = WorkspacesConfig::load_or_create() else {
             return div()
@@ -55,14 +56,17 @@ impl ArcadiaRoot {
             .text_color(p.on_accent)
             .cursor_pointer()
             .child("+ Add Workspace")
-            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                this.workspace_create_draft = Some(WorkspaceCreateDraft {
-                    label: String::new(),
-                    path: String::new(),
-                    error: None,
-                });
-                cx.notify();
-            }));
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.workspace_create_draft = Some(WorkspaceCreateDraft {
+                        label: String::new(),
+                        path: String::new(),
+                        error: None,
+                    });
+                    cx.notify();
+                }),
+            );
 
         let body = div()
             .w_full()

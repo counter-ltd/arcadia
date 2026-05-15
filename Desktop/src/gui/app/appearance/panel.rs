@@ -1,9 +1,9 @@
 use arcadia_core::modules::python_registry::list_style_tokens;
-use openframe::{
-    Window, div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, Styled,
-};
 use openframe::prelude::FluentBuilder as _;
+use openframe::{
+    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    Styled, Window,
+};
 
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
@@ -15,11 +15,24 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
-        let (panel_bg, panel_stroke, panel_radius, surface2, glyph_accent, glyph_dim, glyph_text, is_glyph) = {
+        let (
+            panel_bg,
+            panel_stroke,
+            panel_radius,
+            surface2,
+            glyph_accent,
+            glyph_dim,
+            glyph_text,
+            is_glyph,
+        ) = {
             let g = theme::active_glyph(cx);
             (
-                g.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::module_panel_bg(is_dark)),
-                g.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_panel_stroke(is_dark)),
+                g.as_ref()
+                    .map(|g| g.surface)
+                    .unwrap_or_else(|| theme::module_panel_bg(is_dark)),
+                g.as_ref()
+                    .map(|g| g.border)
+                    .unwrap_or_else(|| theme::module_panel_stroke(is_dark)),
                 g.as_ref().map(|g| g.border_radius).unwrap_or(8.0),
                 g.as_ref().map(|g| g.surface2),
                 g.as_ref().map(|g| g.accent),
@@ -47,7 +60,13 @@ impl ArcadiaRoot {
             let is_selected = name == active;
 
             let row_bg = if is_selected {
-                surface2.unwrap_or_else(|| if is_dark { rgb(0x1e2433) } else { rgb(0xeef2ff) })
+                surface2.unwrap_or_else(|| {
+                    if is_dark {
+                        rgb(0x1e2433)
+                    } else {
+                        rgb(0xeef2ff)
+                    }
+                })
             } else {
                 panel_bg
             };
@@ -61,7 +80,13 @@ impl ArcadiaRoot {
             let indicator_color = if is_selected {
                 glyph_accent.unwrap_or(rgb(0x6366f1))
             } else {
-                glyph_dim.unwrap_or_else(|| if is_dark { rgb(0x374151) } else { rgb(0xd1d5db) })
+                glyph_dim.unwrap_or_else(|| {
+                    if is_dark {
+                        rgb(0x374151)
+                    } else {
+                        rgb(0xd1d5db)
+                    }
+                })
             };
 
             div()
@@ -76,9 +101,12 @@ impl ArcadiaRoot {
                 .items_center()
                 .gap_3()
                 .cursor_pointer()
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                    this.apply_style(name.clone(), this.current_color_scheme_dark(), cx);
-                }))
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(move |this, _, _, cx| {
+                        this.apply_style(name.clone(), this.current_color_scheme_dark(), cx);
+                    }),
+                )
                 .child(
                     div()
                         .w(px(10.))
@@ -100,12 +128,7 @@ impl ArcadiaRoot {
                                 .text_color(label_color)
                                 .child(label),
                         )
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(desc_color)
-                                .child(description),
-                        ),
+                        .child(div().text_xs().text_color(desc_color).child(description)),
                 )
         });
 

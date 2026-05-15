@@ -18,3 +18,4 @@ Each file covers one feature area in depth: architecture, data types, commands, 
 | [Shortcuts.md](Shortcuts.md) | Keyboard shortcuts, OS-global, overrides, custom | — (shortcut registry) |
 | [CodeEditor.md](CodeEditor.md) | Code editor panel, syntax highlighting, decorations | `code-editor` |
 | [Permissions.md](Permissions.md) | Capability grants, module/extension subjects | `permissions` |
+| [Animation.md](Animation.md) | Tween engine, easing, GUI integration pattern, Python API | `animation` |

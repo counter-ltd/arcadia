@@ -1,9 +1,9 @@
 use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, ParentElement, Styled};
 
-use arcadia_core::config::ConfigFile;
-use arcadia_core::config::modules::ModulesConfig;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
+use arcadia_core::config::modules::ModulesConfig;
+use arcadia_core::config::ConfigFile;
 
 impl ArcadiaRoot {
     pub fn requirements_modal(&self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
@@ -64,8 +64,8 @@ impl ArcadiaRoot {
                                     .text_sm()
                                     .text_color(theme::ui_subtext(cx, is_dark))
                                     .child(format!(
-                                        "To enable {module_name}, Arcadia needs to enable: {requirements}."
-                                    )),
+                                "To enable {module_name}, Arcadia needs to enable: {requirements}."
+                            )),
                             )
                             .child(
                                 div()
@@ -104,8 +104,12 @@ impl ArcadiaRoot {
                                                     if let Some((module_name, _)) =
                                                         this.pending_module_enable.clone()
                                                     {
-                                                        if let Ok(mut cfg) = ModulesConfig::load_or_create() {
-                                                            let _ = cfg.enable_with_requirements(&module_name);
+                                                        if let Ok(mut cfg) =
+                                                            ModulesConfig::load_or_create()
+                                                        {
+                                                            let _ = cfg.enable_with_requirements(
+                                                                &module_name,
+                                                            );
                                                             let _ = cfg.save();
                                                         }
                                                         this.reload_modules();

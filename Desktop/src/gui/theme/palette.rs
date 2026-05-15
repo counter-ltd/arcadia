@@ -29,14 +29,14 @@
 //! | `danger` | Destructive labels |
 //! | `badge_*` | Non-accent status chips |
 
-use openframe::{App, Rgba, rgb};
+use openframe::{rgb, App, Rgba};
 
-use super::GlyphStyleConfig;
 use super::glyph_snapshot;
 use super::modules::{
     module_description_text, module_meta_text, module_panel_bg, module_panel_stroke, module_row_bg,
     module_row_stroke, module_title_text,
 };
+use super::GlyphStyleConfig;
 
 /// Resolved colors and radius — see module-level documentation.
 #[derive(Clone, Copy, Debug)]
@@ -159,20 +159,26 @@ impl ThemePalette {
             .map(|x| x.border)
             .unwrap_or_else(|| fallback_chrome_pill_hover_bg(is_dark));
 
-        let panel_bg = g.map(|x| x.surface).unwrap_or_else(|| module_panel_bg(is_dark));
-        let panel_border = g.map(|x| x.border).unwrap_or_else(|| module_panel_stroke(is_dark));
-        let row_bg = g.map(|x| x.surface2).unwrap_or_else(|| module_row_bg(is_dark));
-        let row_border = g.map(|x| x.border).unwrap_or_else(|| module_row_stroke(is_dark));
+        let panel_bg = g
+            .map(|x| x.surface)
+            .unwrap_or_else(|| module_panel_bg(is_dark));
+        let panel_border = g
+            .map(|x| x.border)
+            .unwrap_or_else(|| module_panel_stroke(is_dark));
+        let row_bg = g
+            .map(|x| x.surface2)
+            .unwrap_or_else(|| module_row_bg(is_dark));
+        let row_border = g
+            .map(|x| x.border)
+            .unwrap_or_else(|| module_row_stroke(is_dark));
 
-        let toggle_knob_off = g
-            .map(|x| x.bg)
-            .unwrap_or_else(|| {
-                if is_dark {
-                    rgb(0xd1d5db)
-                } else {
-                    rgb(0xf8fafc)
-                }
-            });
+        let toggle_knob_off = g.map(|x| x.bg).unwrap_or_else(|| {
+            if is_dark {
+                rgb(0xd1d5db)
+            } else {
+                rgb(0xf8fafc)
+            }
+        });
 
         let danger = if is_dark {
             rgb(0xf87171)
@@ -181,16 +187,32 @@ impl ThemePalette {
         };
 
         let badge_info_bg = g.map(|x| x.surface).unwrap_or_else(|| {
-            if is_dark { rgb(0x1e3a8a) } else { rgb(0xeff6ff) }
+            if is_dark {
+                rgb(0x1e3a8a)
+            } else {
+                rgb(0xeff6ff)
+            }
         });
         let badge_info_fg = g.map(|x| x.accent).unwrap_or_else(|| {
-            if is_dark { rgb(0xbfdbfe) } else { rgb(0x3b82f6) }
+            if is_dark {
+                rgb(0xbfdbfe)
+            } else {
+                rgb(0x3b82f6)
+            }
         });
         let badge_muted_bg = g.map(|x| x.surface2).unwrap_or_else(|| {
-            if is_dark { rgb(0x374151) } else { rgb(0xf1f5f9) }
+            if is_dark {
+                rgb(0x374151)
+            } else {
+                rgb(0xf1f5f9)
+            }
         });
         let badge_muted_fg = g.map(|x| x.dim).unwrap_or_else(|| {
-            if is_dark { rgb(0x9ca3af) } else { rgb(0x64748b) }
+            if is_dark {
+                rgb(0x9ca3af)
+            } else {
+                rgb(0x64748b)
+            }
         });
 
         Self {

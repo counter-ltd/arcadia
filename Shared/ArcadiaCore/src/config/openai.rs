@@ -26,25 +26,25 @@ pub enum OpenAiModelKind {
 impl OpenAiModelKind {
     pub fn label(&self) -> &'static str {
         match self {
-            Self::TextGeneration  => "Text Generation",
+            Self::TextGeneration => "Text Generation",
             Self::ImageGeneration => "Image Generation",
-            Self::Embedding       => "Embedding",
+            Self::Embedding => "Embedding",
         }
     }
 
     pub fn icon_key(&self) -> &'static str {
         match self {
-            Self::TextGeneration  => "type-text",
+            Self::TextGeneration => "type-text",
             Self::ImageGeneration => "type-image",
-            Self::Embedding       => "type-embedding",
+            Self::Embedding => "type-embedding",
         }
     }
 
     pub fn as_ai_model_kind(&self) -> AiModelKind {
         match self {
-            Self::TextGeneration  => AiModelKind::TextGeneration,
+            Self::TextGeneration => AiModelKind::TextGeneration,
             Self::ImageGeneration => AiModelKind::ImageGeneration,
-            Self::Embedding       => AiModelKind::Embedding,
+            Self::Embedding => AiModelKind::Embedding,
         }
     }
 }

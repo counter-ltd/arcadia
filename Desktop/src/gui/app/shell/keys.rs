@@ -46,7 +46,9 @@ impl ArcadiaRoot {
                 let command = self.terminals[terminal_id].shell_input.trim().to_string();
                 if !command.is_empty() {
                     self.run_shell_execute(&command, _window, cx);
-                    self.terminals[terminal_id].shell_command_history.push(command);
+                    self.terminals[terminal_id]
+                        .shell_command_history
+                        .push(command);
                 }
                 self.terminals[terminal_id].shell_input.clear();
                 self.terminals[terminal_id].shell_cursor = 0;

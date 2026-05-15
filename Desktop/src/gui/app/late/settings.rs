@@ -2,11 +2,11 @@ use arcadia_core::config::late::LateConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
 use openframe::{
-    Window, div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, Styled,
+    div, px, Context, Element, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, Styled, Window,
 };
 
-use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
+use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -27,19 +27,55 @@ impl ArcadiaRoot {
         let palette = theme::nav_accent_palette("violet", is_dark);
 
         let glyph = theme::glyph_snapshot(cx);
-        let text_c    = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| theme::module_title_text(is_dark));
-        let subtext_c = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_meta_text(is_dark));
-        let row_bg    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_row_bg(is_dark));
-        let row_str   = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::module_row_stroke(is_dark));
-        let btn_bg    = glyph.as_ref().map(|g| g.accent).unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
-        let btn_text  = glyph.as_ref().map(|g| g.bg).unwrap_or_else(|| theme::module_button_enable_text(is_dark));
-        let dis_bg    = glyph.as_ref().map(|g| g.surface2).unwrap_or_else(|| theme::module_button_disable_bg(is_dark));
-        let dis_text  = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_button_disable_text(is_dark));
-        let conn_bg   = glyph.as_ref().map(|g| g.surface2).unwrap_or(palette.row_selected);
-        let conn_text = glyph.as_ref().map(|g| g.accent).unwrap_or(palette.icon_active);
-        let radius    = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
-        let input_bg = glyph.as_ref().map(|g| g.surface).unwrap_or_else(|| theme::ui_surface(cx, is_dark));
-        let input_border = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::ui_border(cx, is_dark));
+        let text_c = glyph
+            .as_ref()
+            .map(|g| g.text)
+            .unwrap_or_else(|| theme::module_title_text(is_dark));
+        let subtext_c = glyph
+            .as_ref()
+            .map(|g| g.dim)
+            .unwrap_or_else(|| theme::module_meta_text(is_dark));
+        let row_bg = glyph
+            .as_ref()
+            .map(|g| g.surface2)
+            .unwrap_or_else(|| theme::module_row_bg(is_dark));
+        let row_str = glyph
+            .as_ref()
+            .map(|g| g.border)
+            .unwrap_or_else(|| theme::module_row_stroke(is_dark));
+        let btn_bg = glyph
+            .as_ref()
+            .map(|g| g.accent)
+            .unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
+        let btn_text = glyph
+            .as_ref()
+            .map(|g| g.bg)
+            .unwrap_or_else(|| theme::module_button_enable_text(is_dark));
+        let dis_bg = glyph
+            .as_ref()
+            .map(|g| g.surface2)
+            .unwrap_or_else(|| theme::module_button_disable_bg(is_dark));
+        let dis_text = glyph
+            .as_ref()
+            .map(|g| g.dim)
+            .unwrap_or_else(|| theme::module_button_disable_text(is_dark));
+        let conn_bg = glyph
+            .as_ref()
+            .map(|g| g.surface2)
+            .unwrap_or(palette.row_selected);
+        let conn_text = glyph
+            .as_ref()
+            .map(|g| g.accent)
+            .unwrap_or(palette.icon_active);
+        let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
+        let input_bg = glyph
+            .as_ref()
+            .map(|g| g.surface)
+            .unwrap_or_else(|| theme::ui_surface(cx, is_dark));
+        let input_border = glyph
+            .as_ref()
+            .map(|g| g.border)
+            .unwrap_or_else(|| theme::ui_border(cx, is_dark));
         let settings_radius = radius;
 
         div()

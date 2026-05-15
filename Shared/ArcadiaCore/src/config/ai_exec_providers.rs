@@ -26,7 +26,9 @@ pub struct ExecCliEntry {
     pub enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// Persisted config for CLI exec providers.
 /// Auto-detected providers are written here on first detection so the user
@@ -38,5 +40,7 @@ pub struct AiExecProvidersConfig {
 }
 
 impl ConfigFile for AiExecProvidersConfig {
-    fn file_name() -> &'static str { "ai-exec-providers.toml" }
+    fn file_name() -> &'static str {
+        "ai-exec-providers.toml"
+    }
 }

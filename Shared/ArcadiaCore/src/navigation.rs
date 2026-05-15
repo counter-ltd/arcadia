@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::modules::{
     AI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, LAN_MODULE_NAME, LATE_MODULE_NAME,
-    PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    NOTIFICATION_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use crate::modules::python_registry;
 use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
@@ -276,7 +276,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         id: "global.workspaces",
         title: "Workspaces",
         description: "Register project directories and grant scoped file and execution permissions.",
-        glyph: "folder",
+        glyph: "workspaces",
         system_image: "folder",
         accent: "emerald",
         required_module: Some(WORKSPACE_MODULE_NAME),
@@ -366,7 +366,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         id: "ai.models",
         title: "Models",
         description: "Configure and manage AI model providers.",
-        glyph: "modules",
+        glyph: "ai-model",
         system_image: "cpu",
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
@@ -375,7 +375,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         id: "ai.rules",
         title: "Rules",
         description: "Configure AI rules — per-chat constraints, forbidden tools, response format.",
-        glyph: "tools",
+        glyph: "ai-rule",
         system_image: "wrench.and.screwdriver",
         accent: "violet",
         required_module: Some("ai-rules"),
@@ -384,10 +384,28 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         id: "ai.skills",
         title: "Skills",
         description: "Configure AI skills — named behaviours with system prompt fragments and tool allowlists.",
-        glyph: "flask",
+        glyph: "ai-skill",
         system_image: "flask",
         accent: "violet",
         required_module: Some("ai-skills"),
+    },
+    NavigationPageDefinition {
+        id: "notification.main",
+        title: "Notifications",
+        description: "In-app notification centre. View and dismiss alerts from modules and extensions.",
+        glyph: "notification",
+        system_image: "bell",
+        accent: "amber",
+        required_module: Some(NOTIFICATION_MODULE_NAME),
+    },
+    NavigationPageDefinition {
+        id: "notification.settings",
+        title: "Notifications",
+        description: "Configure notification storage, per-source send permissions, and display preferences.",
+        glyph: "notification",
+        system_image: "bell.badge",
+        accent: "amber",
+        required_module: Some(NOTIFICATION_MODULE_NAME),
     },
 ];
 
@@ -436,7 +454,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
 
 pub const GLOBAL_PAGE_IDS: &[&str] = &["global.settings"];
 pub const LOGS_PAGE_ID: &str = "global.logs";
-pub const TOP_BAR_PAGE_IDS: &[&str] = &["python.settings", "global.modules"];
+pub const TOP_BAR_PAGE_IDS: &[&str] = &["python.settings", "global.modules", "notification.main"];
 /// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; these are **nested only**
 /// (not the hub header). Omit [`SETTINGS_HUB_ROOT_PAGE_ID`] — the header row is that page.
 /// Extensions (`python.settings`) and Modules live in [`TOP_BAR_PAGE_IDS`]. Logs is opened from the app-title context menu on Desktop, not the top bar.
@@ -449,6 +467,7 @@ pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
     "late.settings",
     "editor.settings",
     "ai.settings",
+    "notification.settings",
 ];
 pub const DEFAULT_GROUP_ID: &str = "utilities";
 pub const DEFAULT_PAGE_ID: &str = "global.settings";

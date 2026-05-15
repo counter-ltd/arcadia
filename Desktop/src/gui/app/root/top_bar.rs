@@ -1,13 +1,16 @@
-use openframe::{div, px, rgb, Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Styled, Window};
-use openframe::prelude::FluentBuilder as _;
 use arcadia_core::config::ConfigFile as _;
+use openframe::prelude::FluentBuilder as _;
+use openframe::{
+    div, px, rgb, Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement, Styled, Window,
+};
 
 use arcadia_core::modules;
 
+use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use crate::gui::app::ShellMode;
-use crate::gui::app::text_input_caret::{TEXT_INPUT_CARET_CHAR, text_with_trailing_caret};
 use crate::gui::theme::{self};
 
 const LATE_ROOMS: &[(&str, u32)] = &[("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)];
@@ -22,9 +25,15 @@ impl ArcadiaRoot {
         is_dark: bool,
     ) -> impl IntoElement {
         let glyph = theme::glyph_snapshot(cx);
-        let is_glyph    = glyph.is_some();
+        let is_glyph = glyph.is_some();
         let glyph_border = glyph.as_ref().map(|g| g.border);
-        let title_color  = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| if is_dark { rgb(0xe5e7eb) } else { rgb(0x1f2937) });
+        let title_color = glyph.as_ref().map(|g| g.text).unwrap_or_else(|| {
+            if is_dark {
+                rgb(0xe5e7eb)
+            } else {
+                rgb(0x1f2937)
+            }
+        });
         let action_pill_bg = theme::action_pill_bg(cx, is_dark);
         let action_pill_tc = theme::action_pill_text(cx, is_dark);
         let action_pill_hover = theme::action_pill_hover_bg(cx, is_dark);
@@ -54,11 +63,16 @@ impl ArcadiaRoot {
                             .child(Self::sidebar_toggle_button(cx, active_page_glyph.as_ref(), is_dark, glyph))
                             .child(
                                 div()
-                                    .text_sm()
-                                    .font_weight(openframe::FontWeight::SEMIBOLD)
-                                    .text_color(title_color)
-                                    .child(active_page_title),
-                            )
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(openframe::FontWeight::SEMIBOLD)
+                                            .text_color(title_color)
+                                            .child(active_page_title),
+                                    )
                             .child({
                                 if self.active_page_id.as_str() == "ai.chat"
                                     && !self.ai_chat_show_dashboard
@@ -188,6 +202,89 @@ impl ArcadiaRoot {
                                         )
                                 } else {
                                     div()
+                                }
+                            })
+                            .child({
+                                if self.active_page_id.as_str() == "network.nodes" {
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .gap_1()
+                                        .child(
+                                            div()
+                                                .px_2()
+                                                .py_0p5()
+                                                .rounded(px(radius))
+                                                .cursor_pointer()
+                                                .text_xs()
+                                                .bg(action_pill_bg)
+                                                .text_color(action_pill_tc)
+                                                .hover(move |style| style.bg(action_pill_hover))
+                                                .child("Refresh")
+                                                .on_mouse_down(
+                                                    openframe::MouseButton::Left,
+                                                    cx.listener(|this, _, _, cx| {
+                                                        this.lan_command_feedback =
+                                                            "LAN nodes status refreshed.".to_string();
+                                                        cx.notify();
+                                                    }),
+                                                ),
+                                        )
+                                        .child(
+                                            div()
+                                                .px_2()
+                                                .py_0p5()
+                                                .rounded(px(radius))
+                                                .cursor_pointer()
+                                                .text_xs()
+                                                .bg(action_pill_bg)
+                                                .text_color(action_pill_tc)
+                                                .hover(move |style| style.bg(action_pill_hover))
+                                                .child("Scan")
+                                                .on_mouse_down(
+                                                    openframe::MouseButton::Left,
+                                                    cx.listener(|this, _, _, cx| {
+                                                        use arcadia_core::modules::lan::discover_lan_peers;
+                                                        match discover_lan_peers(None) {
+                                                            Ok(peers) => {
+                                                                let n = peers.len();
+                                                                this.lan_discovered_peers = peers;
+                                                                this.lan_command_feedback =
+                                                                    format!("Scan finished — {n} peer(s).");
+                                                            }
+                                                            Err(err) => {
+                                                                this.lan_discovered_peers.clear();
+                                                                this.lan_command_feedback = err;
+                                                            }
+                                                        }
+                                                        cx.notify();
+                                                    }),
+                                                ),
+                                        )
+                                        .child(
+                                            div()
+                                                .px_2()
+                                                .py_0p5()
+                                                .rounded(px(radius))
+                                                .cursor_pointer()
+                                                .text_xs()
+                                                .bg(action_pill_bg)
+                                                .text_color(action_pill_tc)
+                                                .hover(move |style| style.bg(action_pill_hover))
+                                                .child("Save connected (all)")
+                                                .on_mouse_down(
+                                                    openframe::MouseButton::Left,
+                                                    cx.listener(|this, _, _, cx| {
+                                                        this.lan_execute_feedback(
+                                                            "lan.node",
+                                                            vec!["save".into()],
+                                                        );
+                                                        cx.notify();
+                                                    }),
+                                                ),
+                                        )
+                                } else {
+                                    div().flex().flex_row()
                                 }
                             })
                             .child(if self.active_page_id.as_str() == "late.now_playing" {
@@ -493,11 +590,7 @@ impl ArcadiaRoot {
                                             .py_0p5()
                                             .rounded(px(radius))
                                             .text_xs()
-                                            .bg(if self.active_terminal().shell_mode == ShellMode::Generic {
-                                                shell_mode_generic_bg
-                                            } else {
-                                                shell_mode_alt_bg
-                                            })
+                                            .bg(action_pill_bg)
                                             .text_color(if self.active_terminal().shell_mode == ShellMode::Generic {
                                                 shell_mode_generic_fg
                                             } else {
@@ -593,7 +686,8 @@ impl ArcadiaRoot {
                                 }
                                 #[cfg(not(feature = "gui"))]
                                 { div() }
-                            }),
+                            })
+                            ),
                     )
                     .child(
                         div()
@@ -607,15 +701,37 @@ impl ArcadiaRoot {
                                         return None;
                                     }
                                     let page = self.page_ref(page_id)?;
+                                    let is_animated_pill = matches!(
+                                        page.id(),
+                                        "notification.main"
+                                            | "python.settings"
+                                            | "global.modules"
+                                    );
+                                    let pill_expand_alpha = is_animated_pill.then(|| {
+                                        *self
+                                            .pill_expand_alphas
+                                            .get(page.id())
+                                            .unwrap_or(&0.0)
+                                    });
+                                    // Always pass the title; animated pills clip/fade via alpha.
+                                    let label = page.title().to_string();
+                                    let resolved_glyph = if page.id() == "notification.main"
+                                        && self.notification_unread_count > 0
+                                    {
+                                        "notification-on".to_string()
+                                    } else {
+                                        page.glyph().to_string()
+                                    };
                                     Some(Self::top_bar_global_item(
                                         cx,
-                                        openframe::SharedString::from(page.title().to_string()),
-                                        openframe::SharedString::from(page.glyph().to_string()),
+                                        openframe::SharedString::from(label),
+                                        openframe::SharedString::from(resolved_glyph),
                                         page.id().to_string(),
                                         self.active_page_id.as_str() == page.id(),
                                         is_dark,
                                         page.accent().to_string(),
                                         glyph,
+                                        pill_expand_alpha,
                                     ))
                                 },
                             )),
@@ -667,50 +783,57 @@ impl ArcadiaRoot {
             .text_xs()
             .text_color(tc)
             .track_focus(&self.command_bar_focus)
-            .on_mouse_down(MouseButton::Left, cx.listener(move |_, _, window, _| {
-                fh.focus(window);
-            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |_, _, window, _| {
+                    fh.focus(window);
+                }),
+            )
             .child(if text.is_empty() {
                 if focused && blink {
-                    div().text_color(tc).child(TEXT_INPUT_CARET_CHAR.to_string())
+                    div()
+                        .text_color(tc)
+                        .child(TEXT_INPUT_CARET_CHAR.to_string())
                 } else {
                     div().text_color(meta_c).child("Internal command…")
                 }
             } else {
                 div().child(text_with_trailing_caret(&text, focused, blink))
             })
-            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window: &mut Window, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                match key {
-                    "escape" => {
-                        this.command_bar_open = false;
-                        this.command_bar_input.clear();
-                        cx.notify();
-                    }
-                    "enter" => {
-                        let cmd = this.command_bar_input.trim().to_string();
-                        this.command_bar_open = false;
-                        this.command_bar_input.clear();
-                        if !cmd.is_empty() {
-                            let ctx = this.execution_context();
-                            let _ = modules::execute_command("shell.internal", &[&cmd], &ctx);
-                        }
-                        cx.notify();
-                    }
-                    "backspace" => {
-                        this.command_bar_input.pop();
-                        cx.notify();
-                    }
-                    _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
-                        if let Some(ch) = &event.keystroke.key_char {
-                            this.command_bar_input.push_str(ch);
+            .on_key_down(
+                cx.listener(|this, event: &KeyDownEvent, window: &mut Window, cx| {
+                    let key = event.keystroke.key.as_str();
+                    let mods = event.keystroke.modifiers;
+                    match key {
+                        "escape" => {
+                            this.command_bar_open = false;
+                            this.command_bar_input.clear();
                             cx.notify();
                         }
+                        "enter" => {
+                            let cmd = this.command_bar_input.trim().to_string();
+                            this.command_bar_open = false;
+                            this.command_bar_input.clear();
+                            if !cmd.is_empty() {
+                                let ctx = this.execution_context();
+                                let _ = modules::execute_command("shell.internal", &[&cmd], &ctx);
+                            }
+                            cx.notify();
+                        }
+                        "backspace" => {
+                            this.command_bar_input.pop();
+                            cx.notify();
+                        }
+                        _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
+                            if let Some(ch) = &event.keystroke.key_char {
+                                this.command_bar_input.push_str(ch);
+                                cx.notify();
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
-                }
-                let _ = window;
-            }))
+                    let _ = window;
+                }),
+            )
     }
 }

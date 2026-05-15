@@ -14,7 +14,12 @@ fn parse_hex_to_rgba(hex: &str) -> Option<Rgba> {
         let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
         let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
         let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
-        Some(Rgba { r: r as f32 / 255., g: g as f32 / 255., b: b as f32 / 255., a: 1. })
+        Some(Rgba {
+            r: r as f32 / 255.,
+            g: g as f32 / 255.,
+            b: b as f32 / 255.,
+            a: 1.,
+        })
     } else {
         None
     }
@@ -31,8 +36,13 @@ fn rgba_to_hex(r: Rgba) -> String {
 
 impl ArcadiaRoot {
     /// Renders the color picker modal overlay if active.
-    pub fn color_picker_modal(&mut self, cx: &mut Context<Self>, is_dark: bool) -> impl IntoElement {
-        let Some((ref module, ref key, ref current_hex, ref default_hex)) = self.color_picker_modal else {
+    pub fn color_picker_modal(
+        &mut self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
+        let Some((ref module, ref key, ref current_hex, ref default_hex)) = self.color_picker_modal
+        else {
             return div().into_any_element();
         };
         let module = module.clone();

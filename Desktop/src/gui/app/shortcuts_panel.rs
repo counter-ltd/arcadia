@@ -3,13 +3,15 @@ use arcadia_core::config::ConfigFile;
 use arcadia_core::shortcuts;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Styled, Window, div, px,
+    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Styled, Window,
 };
 
 use super::shortcuts::global_shortcuts_for_settings;
-use super::{ArcadiaRoot, ShortcutCreateActionKind, ShortcutCreateDraft, ShortcutCreateTriggerKind};
-use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
+use super::{
+    ArcadiaRoot, ShortcutCreateActionKind, ShortcutCreateDraft, ShortcutCreateTriggerKind,
+};
+use crate::gui::app::list_panel_search::{list_panel_row_matches, ListPanelSearchKind};
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
@@ -110,17 +112,20 @@ impl ArcadiaRoot {
                     .filter(|(lid, ..)| lid == sc.id.as_str())
                     .map(|(_, captured, total)| (captured.len(), *total));
                 Self::shortcut_row_item(
-                    cx, sc, is_dark,
-                    override_chord, override_sequence,
-                    seq_listening, listening,
+                    cx,
+                    sc,
+                    is_dark,
+                    override_chord,
+                    override_sequence,
+                    seq_listening,
+                    listening,
                     listen_focus.clone(),
                 )
             })
             .collect();
 
-        let empty_filtered = rows.is_empty()
-            && !list.is_empty()
-            && !self.shortcuts_search_query.trim().is_empty();
+        let empty_filtered =
+            rows.is_empty() && !list.is_empty() && !self.shortcuts_search_query.trim().is_empty();
 
         let conflict_alert: Option<AnyElement> = if !conflict_lines.is_empty() {
             Some(
@@ -141,14 +146,11 @@ impl ArcadiaRoot {
                             .child("Chord conflicts"),
                     )
                     .child(
-                        div()
-                            .text_xs()
-                            .text_color(p.badge_info_fg)
-                            .children(
-                                conflict_lines
-                                    .into_iter()
-                                    .map(|line| div().child(line).into_any_element()),
-                            ),
+                        div().text_xs().text_color(p.badge_info_fg).children(
+                            conflict_lines
+                                .into_iter()
+                                .map(|line| div().child(line).into_any_element()),
+                        ),
                     )
                     .into_any_element(),
             )

@@ -6,7 +6,7 @@ use std::sync::{Mutex, OnceLock};
 use arcadia_core::config::shortcuts::has_system_wide_consent;
 use arcadia_core::shortcuts::{self, KeyChordSpec, ShortcutTrigger};
 use global_hotkey::hotkey::{Code, HotKey, Modifiers as GhModifiers};
-use global_hotkey::{GlobalHotKeyManager, GlobalHotKeyEvent, HotKeyState};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 
 struct OsHotkeyState {
     manager: Option<GlobalHotKeyManager>,
@@ -156,7 +156,9 @@ pub fn sync_os_global_hotkeys() {
         if !sc.system_wide || !has_system_wide_consent(&sc.id) {
             continue;
         }
-        let Some(t) = sc.triggers.first() else { continue };
+        let Some(t) = sc.triggers.first() else {
+            continue;
+        };
         let ShortcutTrigger::Chord(ch) = t else {
             continue;
         };

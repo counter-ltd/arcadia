@@ -23,13 +23,16 @@ pub fn build_file_context(
         let path = if std::path::Path::new(mention).is_absolute() {
             mention.clone()
         } else {
-            format!("{}/{}", workspace.workspace_path.trim_end_matches('/'), mention)
+            format!(
+                "{}/{}",
+                workspace.workspace_path.trim_end_matches('/'),
+                mention
+            )
         };
         if !workspace.is_path_in_scope(&path) {
             return Err(format!("Path out of workspace scope: {path}"));
         }
-        let content = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Read {path}: {e}"))?;
+        let content = std::fs::read_to_string(&path).map_err(|e| format!("Read {path}: {e}"))?;
         out.push_str(&format!("--- @{mention} ---\n{content}\n"));
     }
     Ok(out)

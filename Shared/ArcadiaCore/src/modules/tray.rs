@@ -245,11 +245,7 @@ pub fn list_items() -> Vec<TrayItem> {
 
 /// Clone a tray item by id for routing (e.g. tray-icon click → extension owner).
 pub fn get_item(id: &str) -> Option<TrayItem> {
-    state()
-        .items
-        .lock()
-        .ok()
-        .and_then(|m| m.get(id).cloned())
+    state().items.lock().ok().and_then(|m| m.get(id).cloned())
 }
 
 /// When `false`, left-click on the tray icon does not open the context menu (macOS/Windows).
@@ -444,7 +440,10 @@ mod tests {
     #[test]
     fn get_item_none_after_remove() {
         let id = register_item("tray-test-get-item", "g");
-        assert_eq!(get_item(&id).as_ref().map(|i| i.owner.as_str()), Some("tray-test-get-item"));
+        assert_eq!(
+            get_item(&id).as_ref().map(|i| i.owner.as_str()),
+            Some("tray-test-get-item")
+        );
         remove_item(&id).unwrap();
         assert!(get_item(&id).is_none());
     }

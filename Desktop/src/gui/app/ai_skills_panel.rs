@@ -1,13 +1,13 @@
 use arcadia_core::config::ai_skills::{all_skills, AiSkillsConfig};
 use arcadia_core::config::ConfigFile;
+use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    AnyElement, div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
     ParentElement, Styled, Window,
 };
-use openframe::prelude::FluentBuilder as _;
 
+use crate::gui::app::list_panel_search::{list_panel_row_matches, ListPanelSearchKind};
 use crate::gui::app::ArcadiaRoot;
-use crate::gui::app::list_panel_search::{ListPanelSearchKind, list_panel_row_matches};
 use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 impl ArcadiaRoot {
@@ -26,7 +26,8 @@ impl ArcadiaRoot {
         let all = all_skills(&cfg);
         let q = self.skills_search_query.trim().to_ascii_lowercase();
 
-        let search_bar = self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Skills);
+        let search_bar =
+            self.list_panel_search_bar(window, cx, is_dark, ListPanelSearchKind::Skills);
 
         let filtered: Vec<_> = all
             .into_iter()
@@ -84,22 +85,22 @@ impl ArcadiaRoot {
                                             .child(skill.name.clone()),
                                     )
                                     .child(
-                                        div()
-                                            .flex()
-                                            .items_center()
-                                            .gap_2()
-                                            .child(
-                                                div()
-                                                    .px_2()
-                                                    .py_0p5()
-                                                    .when(!is_glyph, |d| d.rounded_full())
-                                                    .rounded(px(radius.min(12.0)))
-                                                    .text_xs()
-                                                    .font_weight(FontWeight::SEMIBOLD)
-                                                    .bg(badge_bg)
-                                                    .text_color(badge_fg)
-                                                    .child(if is_active { "Active" } else { "Inactive" }),
-                                            ),
+                                        div().flex().items_center().gap_2().child(
+                                            div()
+                                                .px_2()
+                                                .py_0p5()
+                                                .when(!is_glyph, |d| d.rounded_full())
+                                                .rounded(px(radius.min(12.0)))
+                                                .text_xs()
+                                                .font_weight(FontWeight::SEMIBOLD)
+                                                .bg(badge_bg)
+                                                .text_color(badge_fg)
+                                                .child(if is_active {
+                                                    "Active"
+                                                } else {
+                                                    "Inactive"
+                                                }),
+                                        ),
                                     )
                                     .child(
                                         div()
@@ -147,59 +148,61 @@ impl ArcadiaRoot {
                                     .text_color(if is_active { p.accent } else { p.ui_subtext })
                                     .child(if is_active { "ON" } else { "OFF" }),
                             )
-                            .child(
-                                if is_active {
-                                    div()
-                                        .w_10()
-                                        .h_6()
-                                        .px_0p5()
-                                        .when(!is_glyph, |d| d.rounded_full())
-                                        .rounded(px(r_track))
-                                        .border_1()
-                                        .border_color(p.border)
-                                        .bg(p.accent)
-                                        .flex()
-                                        .items_center()
-                                        .justify_end()
-                                        .child(
-                                            div()
-                                                .w_4()
-                                                .h_4()
-                                                .when(!is_glyph, |d| d.rounded_full())
-                                                .rounded(px(r_track))
-                                                .bg(p.on_accent),
-                                        )
-                                } else {
-                                    div()
-                                        .w_10()
-                                        .h_6()
-                                        .px_0p5()
-                                        .when(!is_glyph, |d| d.rounded_full())
-                                        .rounded(px(r_track))
-                                        .border_1()
-                                        .border_color(p.border)
-                                        .bg(p.surface_elevated)
-                                        .flex()
-                                        .items_center()
-                                        .justify_start()
-                                        .child(
-                                            div()
-                                                .w_4()
-                                                .h_4()
-                                                .when(!is_glyph, |d| d.rounded_full())
-                                                .rounded(px(r_track))
-                                                .bg(p.toggle_knob_off),
-                                        )
-                                },
-                            )
-                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                if this.ai_active_skill_ids.contains(&skill_id_toggle) {
-                                    this.ai_active_skill_ids.retain(|id| id != &skill_id_toggle);
-                                } else {
-                                    this.ai_active_skill_ids.push(skill_id_toggle.clone());
-                                }
-                                cx.notify();
-                            })),
+                            .child(if is_active {
+                                div()
+                                    .w_10()
+                                    .h_6()
+                                    .px_0p5()
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(r_track))
+                                    .border_1()
+                                    .border_color(p.border)
+                                    .bg(p.accent)
+                                    .flex()
+                                    .items_center()
+                                    .justify_end()
+                                    .child(
+                                        div()
+                                            .w_4()
+                                            .h_4()
+                                            .when(!is_glyph, |d| d.rounded_full())
+                                            .rounded(px(r_track))
+                                            .bg(p.on_accent),
+                                    )
+                            } else {
+                                div()
+                                    .w_10()
+                                    .h_6()
+                                    .px_0p5()
+                                    .when(!is_glyph, |d| d.rounded_full())
+                                    .rounded(px(r_track))
+                                    .border_1()
+                                    .border_color(p.border)
+                                    .bg(p.surface_elevated)
+                                    .flex()
+                                    .items_center()
+                                    .justify_start()
+                                    .child(
+                                        div()
+                                            .w_4()
+                                            .h_4()
+                                            .when(!is_glyph, |d| d.rounded_full())
+                                            .rounded(px(r_track))
+                                            .bg(p.toggle_knob_off),
+                                    )
+                            })
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _, cx| {
+                                    if this.ai_active_skill_ids.contains(&skill_id_toggle) {
+                                        this.ai_active_skill_ids
+                                            .retain(|id| id != &skill_id_toggle);
+                                    } else {
+                                        this.ai_active_skill_ids.push(skill_id_toggle.clone());
+                                    }
+                                    cx.notify();
+                                }),
+                            ),
                     );
 
                 let row = if let Some(ref g) = g_snap {
@@ -226,7 +229,12 @@ impl ArcadiaRoot {
             })
             .collect();
 
-        let list_body = div().flex().flex_col().gap_3().children(rows).into_any_element();
+        let list_body = div()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .children(rows)
+            .into_any_element();
 
         if let Some(ref g) = g_snap {
             let r = g.border_radius.min(12.0);

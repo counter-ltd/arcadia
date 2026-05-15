@@ -76,9 +76,7 @@ pub fn heuristic_int_hi(default_i: i64, cur_i: i64) -> i64 {
     if m <= 15 {
         (m * 8).max(20).min(100)
     } else {
-        m.saturating_mul(15)
-            .max(m.saturating_add(1000))
-            .max(100)
+        m.saturating_mul(15).max(m.saturating_add(1000)).max(100)
     }
 }
 
@@ -119,11 +117,13 @@ pub fn merge_token_numeric_bounds(
     }
 
     let default_trim = default_value.trim();
-    let mut gran = partial.granularity.unwrap_or(if matches!(kind, StyleTokenKind::Int) {
-        StyleTokenNumericGranularity::Whole
-    } else {
-        StyleTokenNumericGranularity::Tenth
-    });
+    let mut gran = partial
+        .granularity
+        .unwrap_or(if matches!(kind, StyleTokenKind::Int) {
+            StyleTokenNumericGranularity::Whole
+        } else {
+            StyleTokenNumericGranularity::Tenth
+        });
     if matches!(kind, StyleTokenKind::Int)
         && matches!(
             gran,
@@ -225,7 +225,10 @@ pub struct ResolvedSliderNumeric {
 }
 
 /// Slider geometry + snapping for int/float tokens.
-pub fn resolve_slider_numeric(spec: &StyleTokenSpec, current_display: &str) -> Option<ResolvedSliderNumeric> {
+pub fn resolve_slider_numeric(
+    spec: &StyleTokenSpec,
+    current_display: &str,
+) -> Option<ResolvedSliderNumeric> {
     let kind = match spec.kind {
         StyleTokenKind::Int | StyleTokenKind::Float => spec.kind,
         _ => return None,
@@ -289,7 +292,10 @@ fn parse_numeric_current(kind: StyleTokenKind, s: &str) -> Option<f64> {
 }
 
 /// `(lo, hi)` for clamping a numeric value on save (same policy as slider track).
-pub fn numeric_clamp_lo_hi(spec: &StyleTokenSpec, value_for_heuristic_max: f64) -> Option<(f64, f64)> {
+pub fn numeric_clamp_lo_hi(
+    spec: &StyleTokenSpec,
+    value_for_heuristic_max: f64,
+) -> Option<(f64, f64)> {
     let kind = match spec.kind {
         StyleTokenKind::Int | StyleTokenKind::Float => spec.kind,
         _ => return None,
@@ -316,7 +322,11 @@ pub fn numeric_clamp_lo_hi(spec: &StyleTokenSpec, value_for_heuristic_max: f64) 
 }
 
 /// Snap raw slider position then format for token display.
-pub fn format_slider_value(v: f64, kind: StyleTokenKind, gran: StyleTokenNumericGranularity) -> String {
+pub fn format_slider_value(
+    v: f64,
+    kind: StyleTokenKind,
+    gran: StyleTokenNumericGranularity,
+) -> String {
     if !v.is_finite() {
         return match kind {
             StyleTokenKind::Int => "0".into(),
@@ -499,13 +509,11 @@ fn compare_values(
                 _ => false,
             }
         }
-        StyleTokenKind::String | StyleTokenKind::Color => {
-            match op {
-                StyleTokenCompareOp::Eq => current.trim() == literal.trim(),
-                StyleTokenCompareOp::Ne => current.trim() != literal.trim(),
-                _ => false,
-            }
-        }
+        StyleTokenKind::String | StyleTokenKind::Color => match op {
+            StyleTokenCompareOp::Eq => current.trim() == literal.trim(),
+            StyleTokenCompareOp::Ne => current.trim() != literal.trim(),
+            _ => false,
+        },
     }
 }
 
@@ -545,11 +553,7 @@ fn eval_visibility(
                 .iter()
                 .any(|c| eval_visibility(c, module, specs, memory))
         }
-        StyleTokenVisibility::Compare {
-            token,
-            op,
-            literal,
-        } => {
+        StyleTokenVisibility::Compare { token, op, literal } => {
             let Some(kind) = kind_for_token(specs, token.as_str()) else {
                 return false;
             };
@@ -601,8 +605,18 @@ mod tests {
         ];
         let module = "googly-eyes";
         let v = &specs[1].visibility;
-        assert!(style_token_row_visible(v, module, &specs, &mem(module, "eye_count", "2")));
-        assert!(style_token_row_visible(v, module, &specs, &mem(module, "eye_count", "3")));
+        assert!(style_token_row_visible(
+            v,
+            module,
+            &specs,
+            &mem(module, "eye_count", "2")
+        ));
+        assert!(style_token_row_visible(
+            v,
+            module,
+            &specs,
+            &mem(module, "eye_count", "3")
+        ));
         assert!(!style_token_row_visible(
             v,
             module,
@@ -662,9 +676,13 @@ mod tests {
 
     #[test]
     fn merge_empty_returns_none() {
-        assert!(merge_token_numeric_bounds(StyleTokenKind::Int, "2", StyleTokenNumericPartial::default())
-            .unwrap()
-            .is_none());
+        assert!(merge_token_numeric_bounds(
+            StyleTokenKind::Int,
+            "2",
+            StyleTokenNumericPartial::default()
+        )
+        .unwrap()
+        .is_none());
     }
 
     #[test]

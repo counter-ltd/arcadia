@@ -191,7 +191,8 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
         ModuleCommand {
             name: "set-stacking",
-            description: "Set overlay stacking tier: normal|floating|hud|system_ui (overlay.set-stacking).",
+            description:
+                "Set overlay stacking tier: normal|floating|hud|system_ui (overlay.set-stacking).",
             required_permissions: &["overlay.hud"],
             run: cmd_set_stacking,
         },

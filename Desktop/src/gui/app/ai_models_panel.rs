@@ -1,35 +1,37 @@
 use arcadia_core::config::modules::{
-    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME,
-    AI_OPENAI_MODULE_NAME, MODULE_REGISTRY,
+    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, MODULE_REGISTRY,
 };
-use arcadia_core::modules::ai::{cli_binary_for_module, cli_display_name, enabled_ai_providers, is_cli_provider};
+use arcadia_core::modules::ai::{
+    cli_binary_for_module, cli_display_name, enabled_ai_providers, is_cli_provider,
+};
+use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
     ParentElement, Styled, Window,
 };
-use openframe::prelude::FluentBuilder as _;
 
+use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::app::LlamaCppModelCreateDraft;
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
 pub(crate) fn provider_accent(module_name: &str) -> &'static str {
     use arcadia_core::config::modules::*;
     match module_name {
-        AI_EXEC_CLAUDE_MODULE_NAME                            => "orange",
-        AI_EXEC_GEMINI_MODULE_NAME                           => "sky",
-        AI_EXEC_CODEX_MODULE_NAME | AI_OPENAI_MODULE_NAME    => "emerald",
-        AI_EXEC_AIDER_MODULE_NAME                            => "teal",
-        AI_LLAMA_CPP_MODULE_NAME                             => "amber",
-        AI_OLLAMA_MODULE_NAME                                => "cyan",
-        AI_APFEL_MODULE_NAME                                 => "indigo",
-        _                                                    => "violet",
+        AI_EXEC_CLAUDE_MODULE_NAME => "orange",
+        AI_EXEC_GEMINI_MODULE_NAME => "sky",
+        AI_EXEC_CODEX_MODULE_NAME | AI_OPENAI_MODULE_NAME => "emerald",
+        AI_EXEC_AIDER_MODULE_NAME => "teal",
+        AI_LLAMA_CPP_MODULE_NAME => "amber",
+        AI_OLLAMA_MODULE_NAME => "cyan",
+        AI_APFEL_MODULE_NAME => "indigo",
+        _ => "violet",
     }
 }
 
 fn provider_glyph(module_name: &str) -> &'static str {
-    MODULE_REGISTRY.iter()
+    MODULE_REGISTRY
+        .iter()
         .find(|m| m.name == module_name)
         .map(|m| m.glyph)
         .unwrap_or("ai-provider")
@@ -49,20 +51,37 @@ impl ArcadiaRoot {
 
         // If a specific llama-cpp model is selected, show its detail view.
         if let Some(model_id) = self.active_llama_cpp_model_id.clone() {
-            if let Some(model) = self.llama_cpp_models.iter().find(|m| m.id == model_id).cloned() {
+            if let Some(model) = self
+                .llama_cpp_models
+                .iter()
+                .find(|m| m.id == model_id)
+                .cloned()
+            {
                 // Edit mode — delegate to edit form renderer.
                 if self.llama_cpp_edit_draft.is_some() {
                     return self.llama_cpp_edit_model_form(window, cx, is_dark);
                 }
 
                 let is_delete_confirm = self.llama_cpp_delete_confirm;
-                let is_vision = model.model_kind
-                    == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision;
+                let is_vision =
+                    model.model_kind == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision;
                 let model_for_edit = model.clone();
                 let pal = theme::nav_accent_palette("violet", is_dark);
-                let delete_bg = if is_delete_confirm { p.danger } else { p.surface_elevated };
-                let delete_fg = if is_delete_confirm { p.on_accent } else { p.danger };
-                let delete_border = if is_delete_confirm { p.danger } else { p.border };
+                let delete_bg = if is_delete_confirm {
+                    p.danger
+                } else {
+                    p.surface_elevated
+                };
+                let delete_fg = if is_delete_confirm {
+                    p.on_accent
+                } else {
+                    p.danger
+                };
+                let delete_border = if is_delete_confirm {
+                    p.danger
+                } else {
+                    p.border
+                };
 
                 let mut detail = div()
                     .w_full()
@@ -106,16 +125,13 @@ impl ArcadiaRoot {
                                     .text_color(p.ui_subtext)
                                     .child("MODEL FILE"),
                             )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(p.content_title)
-                                    .child(if model.path.is_empty() {
-                                        "No path configured.".to_string()
-                                    } else {
-                                        model.path.clone()
-                                    }),
-                            ),
+                            .child(div().text_sm().text_color(p.content_title).child(
+                                if model.path.is_empty() {
+                                    "No path configured.".to_string()
+                                } else {
+                                    model.path.clone()
+                                },
+                            )),
                     );
 
                 if is_vision {
@@ -137,15 +153,13 @@ impl ArcadiaRoot {
                                     .child("MMPROJ FILE"),
                             )
                             .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(p.content_title)
-                                    .child(
-                                        model.mmproj_path
-                                            .as_deref()
-                                            .unwrap_or("No path configured.")
-                                            .to_string(),
-                                    ),
+                                div().text_sm().text_color(p.content_title).child(
+                                    model
+                                        .mmproj_path
+                                        .as_deref()
+                                        .unwrap_or("No path configured.")
+                                        .to_string(),
+                                ),
                             ),
                     );
                 }
@@ -168,17 +182,24 @@ impl ArcadiaRoot {
                                 .cursor_pointer()
                                 .hover(move |s| s.border_color(pal.row_hover))
                                 .child("Edit")
-                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                    this.llama_cpp_edit_draft = Some(LlamaCppModelCreateDraft {
-                                        name: model_for_edit.name.clone(),
-                                        path: model_for_edit.path.clone(),
-                                        mmproj_path: model_for_edit.mmproj_path.clone().unwrap_or_default(),
-                                        model_kind: model_for_edit.model_kind.clone(),
-                                        error: None,
-                                    });
-                                    this.llama_cpp_delete_confirm = false;
-                                    cx.notify();
-                                })),
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        this.llama_cpp_edit_draft =
+                                            Some(LlamaCppModelCreateDraft {
+                                                name: model_for_edit.name.clone(),
+                                                path: model_for_edit.path.clone(),
+                                                mmproj_path: model_for_edit
+                                                    .mmproj_path
+                                                    .clone()
+                                                    .unwrap_or_default(),
+                                                model_kind: model_for_edit.model_kind.clone(),
+                                                error: None,
+                                            });
+                                        this.llama_cpp_delete_confirm = false;
+                                        cx.notify();
+                                    }),
+                                ),
                         )
                         .child(
                             div()
@@ -192,15 +213,22 @@ impl ArcadiaRoot {
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(delete_fg)
                                 .cursor_pointer()
-                                .child(if is_delete_confirm { "Confirm Delete" } else { "Delete" })
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                    if this.llama_cpp_delete_confirm {
-                                        this.llama_cpp_delete_model(cx);
-                                    } else {
-                                        this.llama_cpp_delete_confirm = true;
-                                        cx.notify();
-                                    }
-                                })),
+                                .child(if is_delete_confirm {
+                                    "Confirm Delete"
+                                } else {
+                                    "Delete"
+                                })
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|this, _, _, cx| {
+                                        if this.llama_cpp_delete_confirm {
+                                            this.llama_cpp_delete_model(cx);
+                                        } else {
+                                            this.llama_cpp_delete_confirm = true;
+                                            cx.notify();
+                                        }
+                                    }),
+                                ),
                         ),
                 );
 
@@ -265,8 +293,8 @@ impl ArcadiaRoot {
             }
 
             let module_name = provider.module_name.to_string();
-            let is_active = active_module == provider.module_name
-                && self.active_llama_cpp_model_id.is_none();
+            let is_active =
+                active_module == provider.module_name && self.active_llama_cpp_model_id.is_none();
             let pal = theme::nav_accent_palette(provider_accent(provider.module_name), is_dark);
             let card_border = pal.icon_idle;
             let glyph_key = provider_glyph(provider.module_name);
@@ -322,7 +350,8 @@ impl ArcadiaRoot {
                 );
 
             // llama.cpp: show model list
-            if provider.module_name == AI_LLAMA_CPP_MODULE_NAME && !self.llama_cpp_models.is_empty() {
+            if provider.module_name == AI_LLAMA_CPP_MODULE_NAME && !self.llama_cpp_models.is_empty()
+            {
                 let mut model_list = div()
                     .flex()
                     .flex_col()
@@ -337,10 +366,19 @@ impl ArcadiaRoot {
                     let name = model.name.clone();
                     let type_label = model.model_kind.label();
                     let type_icon = model.model_kind.icon_key();
-                    let is_model_active = self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
-                    let row_bg = if is_model_active { pal.row_selected } else { p.panel_bg };
+                    let is_model_active =
+                        self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
+                    let row_bg = if is_model_active {
+                        pal.row_selected
+                    } else {
+                        p.panel_bg
+                    };
                     let row_hover = pal.row_hover;
-                    let name_col = if is_model_active { pal.icon_active } else { p.content_title };
+                    let name_col = if is_model_active {
+                        pal.icon_active
+                    } else {
+                        p.content_title
+                    };
 
                     model_list = model_list.child(
                         div()
@@ -376,8 +414,17 @@ impl ArcadiaRoot {
                                     .flex()
                                     .items_center()
                                     .gap_1()
-                                    .child(render_icon(type_icon).size_3().text_color(p.badge_muted_fg))
-                                    .child(div().text_xs().text_color(p.badge_muted_fg).child(type_label)),
+                                    .child(
+                                        render_icon(type_icon)
+                                            .size_3()
+                                            .text_color(p.badge_muted_fg),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(p.badge_muted_fg)
+                                            .child(type_label),
+                                    ),
                             )
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -403,7 +450,11 @@ impl ArcadiaRoot {
                 let has_models = !self.ollama_models.is_empty();
                 let ollama_models = self.ollama_models.clone();
 
-                let discover_label = if discovering { "Discovering…" } else { "Discover Models" };
+                let discover_label = if discovering {
+                    "Discovering…"
+                } else {
+                    "Discover Models"
+                };
                 let discover_btn = div()
                     .px_3()
                     .py_1()
@@ -413,12 +464,19 @@ impl ArcadiaRoot {
                     .border_color(p.border)
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(if discovering { p.ui_subtext } else { p.content_title })
+                    .text_color(if discovering {
+                        p.ui_subtext
+                    } else {
+                        p.content_title
+                    })
                     .cursor_pointer()
                     .child(discover_label)
-                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                        this.discover_ollama_models(window, cx);
-                    }));
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, window, cx| {
+                            this.discover_ollama_models(window, cx);
+                        }),
+                    );
 
                 let mut section = div()
                     .flex()
@@ -460,12 +518,7 @@ impl ArcadiaRoot {
                                 .flex()
                                 .items_center()
                                 .justify_between()
-                                .child(
-                                    div()
-                                        .text_sm()
-                                        .text_color(p.content_title)
-                                        .child(name),
-                                )
+                                .child(div().text_sm().text_color(p.content_title).child(name))
                                 .child(
                                     div()
                                         .px_1p5()
@@ -475,8 +528,17 @@ impl ArcadiaRoot {
                                         .flex()
                                         .items_center()
                                         .gap_1()
-                                        .child(render_icon(kind_icon).size_3().text_color(p.badge_muted_fg))
-                                        .child(div().text_xs().text_color(p.badge_muted_fg).child(kind_label)),
+                                        .child(
+                                            render_icon(kind_icon)
+                                                .size_3()
+                                                .text_color(p.badge_muted_fg),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(p.badge_muted_fg)
+                                                .child(kind_label),
+                                        ),
                                 ),
                         );
                     }
@@ -550,53 +612,86 @@ impl ArcadiaRoot {
                                             .rounded(px(radius.min(8.0)))
                                             .bg(p.surface_elevated)
                                             .border_1()
-                                            .border_color(if api_key_focused { p.accent } else { p.border })
-                                            .text_sm()
-                                            .text_color(if self.openai_api_key_draft.is_none() && self.openai_api_key.is_empty() {
-                                                p.ui_subtext
+                                            .border_color(if api_key_focused {
+                                                p.accent
                                             } else {
-                                                p.content_title
+                                                p.border
                                             })
+                                            .text_sm()
+                                            .text_color(
+                                                if self.openai_api_key_draft.is_none()
+                                                    && self.openai_api_key.is_empty()
+                                                {
+                                                    p.ui_subtext
+                                                } else {
+                                                    p.content_title
+                                                },
+                                            )
                                             .track_focus(&api_key_fh)
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                                this.openai_api_key_draft.get_or_insert_with(|| this.openai_api_key.clone());
-                                                this.openai_api_key_focus.focus(window);
-                                                cx.notify();
-                                            }))
-                                            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                                                if this.openai_api_key_draft.is_none() { return; }
-                                                let key = event.keystroke.key.as_str();
-                                                let mods = event.keystroke.modifiers;
-                                                if key == "escape" {
-                                                    this.openai_api_key_draft = None;
-                                                } else if key == "enter" {
-                                                    this.openai_save_settings(cx);
-                                                    return;
-                                                } else if let Some(ref mut d) = this.openai_api_key_draft {
-                                                    if key == "backspace" { d.pop(); }
-                                                    else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                                                        if let Some(kc) = &event.keystroke.key_char { d.push_str(kc); }
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, window, cx| {
+                                                    this.openai_api_key_draft.get_or_insert_with(
+                                                        || this.openai_api_key.clone(),
+                                                    );
+                                                    this.openai_api_key_focus.focus(window);
+                                                    cx.notify();
+                                                }),
+                                            )
+                                            .on_key_down(cx.listener(
+                                                |this, event: &KeyDownEvent, _, cx| {
+                                                    if this.openai_api_key_draft.is_none() {
+                                                        return;
                                                     }
-                                                }
-                                                cx.notify();
-                                            }))
+                                                    let key = event.keystroke.key.as_str();
+                                                    let mods = event.keystroke.modifiers;
+                                                    if key == "escape" {
+                                                        this.openai_api_key_draft = None;
+                                                    } else if key == "enter" {
+                                                        this.openai_save_settings(cx);
+                                                        return;
+                                                    } else if let Some(ref mut d) =
+                                                        this.openai_api_key_draft
+                                                    {
+                                                        if key == "backspace" {
+                                                            d.pop();
+                                                        } else if !mods.control
+                                                            && !mods.alt
+                                                            && !mods.platform
+                                                            && !mods.function
+                                                        {
+                                                            if let Some(kc) =
+                                                                &event.keystroke.key_char
+                                                            {
+                                                                d.push_str(kc);
+                                                            }
+                                                        }
+                                                    }
+                                                    cx.notify();
+                                                },
+                                            ))
                                             .child(api_key_display),
                                     )
-                                    .when(editing_api_key, |d| d.child(
-                                        div()
-                                            .px_3()
-                                            .py_2()
-                                            .rounded(px(radius.min(8.0)))
-                                            .bg(p.accent)
-                                            .text_xs()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(p.on_accent)
-                                            .cursor_pointer()
-                                            .child("Save")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.openai_save_settings(cx);
-                                            })),
-                                    )),
+                                    .when(editing_api_key, |d| {
+                                        d.child(
+                                            div()
+                                                .px_3()
+                                                .py_2()
+                                                .rounded(px(radius.min(8.0)))
+                                                .bg(p.accent)
+                                                .text_xs()
+                                                .font_weight(FontWeight::SEMIBOLD)
+                                                .text_color(p.on_accent)
+                                                .cursor_pointer()
+                                                .child("Save")
+                                                .on_mouse_down(
+                                                    MouseButton::Left,
+                                                    cx.listener(|this, _, _, cx| {
+                                                        this.openai_save_settings(cx);
+                                                    }),
+                                                ),
+                                        )
+                                    }),
                             ),
                     )
                     // Base URL row
@@ -625,49 +720,78 @@ impl ArcadiaRoot {
                                             .rounded(px(radius.min(8.0)))
                                             .bg(p.surface_elevated)
                                             .border_1()
-                                            .border_color(if base_url_focused { p.accent } else { p.border })
+                                            .border_color(if base_url_focused {
+                                                p.accent
+                                            } else {
+                                                p.border
+                                            })
                                             .text_sm()
                                             .text_color(p.content_title)
                                             .track_focus(&base_url_fh)
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                                this.openai_base_url_draft.get_or_insert_with(|| this.openai_base_url.clone());
-                                                this.openai_base_url_focus.focus(window);
-                                                cx.notify();
-                                            }))
-                                            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                                                if this.openai_base_url_draft.is_none() { return; }
-                                                let key = event.keystroke.key.as_str();
-                                                let mods = event.keystroke.modifiers;
-                                                if key == "escape" {
-                                                    this.openai_base_url_draft = None;
-                                                } else if key == "enter" {
-                                                    this.openai_save_settings(cx);
-                                                    return;
-                                                } else if let Some(ref mut d) = this.openai_base_url_draft {
-                                                    if key == "backspace" { d.pop(); }
-                                                    else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                                                        if let Some(kc) = &event.keystroke.key_char { d.push_str(kc); }
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(|this, _, window, cx| {
+                                                    this.openai_base_url_draft.get_or_insert_with(
+                                                        || this.openai_base_url.clone(),
+                                                    );
+                                                    this.openai_base_url_focus.focus(window);
+                                                    cx.notify();
+                                                }),
+                                            )
+                                            .on_key_down(cx.listener(
+                                                |this, event: &KeyDownEvent, _, cx| {
+                                                    if this.openai_base_url_draft.is_none() {
+                                                        return;
                                                     }
-                                                }
-                                                cx.notify();
-                                            }))
+                                                    let key = event.keystroke.key.as_str();
+                                                    let mods = event.keystroke.modifiers;
+                                                    if key == "escape" {
+                                                        this.openai_base_url_draft = None;
+                                                    } else if key == "enter" {
+                                                        this.openai_save_settings(cx);
+                                                        return;
+                                                    } else if let Some(ref mut d) =
+                                                        this.openai_base_url_draft
+                                                    {
+                                                        if key == "backspace" {
+                                                            d.pop();
+                                                        } else if !mods.control
+                                                            && !mods.alt
+                                                            && !mods.platform
+                                                            && !mods.function
+                                                        {
+                                                            if let Some(kc) =
+                                                                &event.keystroke.key_char
+                                                            {
+                                                                d.push_str(kc);
+                                                            }
+                                                        }
+                                                    }
+                                                    cx.notify();
+                                                },
+                                            ))
                                             .child(base_url_display),
                                     )
-                                    .when(editing_base_url, |d| d.child(
-                                        div()
-                                            .px_3()
-                                            .py_2()
-                                            .rounded(px(radius.min(8.0)))
-                                            .bg(p.accent)
-                                            .text_xs()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(p.on_accent)
-                                            .cursor_pointer()
-                                            .child("Save")
-                                            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.openai_save_settings(cx);
-                                            })),
-                                    )),
+                                    .when(editing_base_url, |d| {
+                                        d.child(
+                                            div()
+                                                .px_3()
+                                                .py_2()
+                                                .rounded(px(radius.min(8.0)))
+                                                .bg(p.accent)
+                                                .text_xs()
+                                                .font_weight(FontWeight::SEMIBOLD)
+                                                .text_color(p.on_accent)
+                                                .cursor_pointer()
+                                                .child("Save")
+                                                .on_mouse_down(
+                                                    MouseButton::Left,
+                                                    cx.listener(|this, _, _, cx| {
+                                                        this.openai_save_settings(cx);
+                                                    }),
+                                                ),
+                                        )
+                                    }),
                             ),
                     );
 
@@ -702,10 +826,7 @@ impl ArcadiaRoot {
                                         .flex_col()
                                         .gap_0p5()
                                         .child(
-                                            div()
-                                                .text_sm()
-                                                .text_color(p.content_title)
-                                                .child(name),
+                                            div().text_sm().text_color(p.content_title).child(name),
                                         )
                                         .child(
                                             div()
@@ -723,8 +844,17 @@ impl ArcadiaRoot {
                                         .flex()
                                         .items_center()
                                         .gap_1()
-                                        .child(render_icon(kind_icon).size_3().text_color(p.badge_muted_fg))
-                                        .child(div().text_xs().text_color(p.badge_muted_fg).child(kind_label)),
+                                        .child(
+                                            render_icon(kind_icon)
+                                                .size_3()
+                                                .text_color(p.badge_muted_fg),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(p.badge_muted_fg)
+                                                .child(kind_label),
+                                        ),
                                 ),
                         );
                     }
@@ -737,7 +867,8 @@ impl ArcadiaRoot {
 
         // Single CLI card grouping all enabled exec-CLI providers.
         if !cli_providers.is_empty() {
-            let any_cli_active = is_cli_provider(&active_module) && self.active_llama_cpp_model_id.is_none();
+            let any_cli_active =
+                is_cli_provider(&active_module) && self.active_llama_cpp_model_id.is_none();
             // Use the active provider's accent for the card border, else neutral.
             let cli_card_pal = if any_cli_active {
                 theme::nav_accent_palette(provider_accent(&active_module), is_dark)
@@ -758,14 +889,25 @@ impl ArcadiaRoot {
                 let mn = cli_provider.module_name.to_string();
                 let binary = cli_binary_for_module(cli_provider.module_name).unwrap_or("");
                 let name = cli_display_name(cli_provider.module_name);
-                let detected = self.detected_cli_providers.iter()
+                let detected = self
+                    .detected_cli_providers
+                    .iter()
                     .find(|c| c.binary == binary)
                     .cloned();
                 let is_row_active = active_module == cli_provider.module_name;
-                let row_pal = theme::nav_accent_palette(provider_accent(cli_provider.module_name), is_dark);
-                let row_bg = if is_row_active { row_pal.row_selected } else { p.panel_bg };
+                let row_pal =
+                    theme::nav_accent_palette(provider_accent(cli_provider.module_name), is_dark);
+                let row_bg = if is_row_active {
+                    row_pal.row_selected
+                } else {
+                    p.panel_bg
+                };
                 let row_hover = row_pal.row_hover;
-                let name_col = if is_row_active { row_pal.icon_active } else { p.content_title };
+                let name_col = if is_row_active {
+                    row_pal.icon_active
+                } else {
+                    p.content_title
+                };
                 let icon_col = row_pal.icon_active;
                 let glyph = provider_glyph(cli_provider.module_name);
                 let mn_click = mn.clone();
@@ -782,11 +924,14 @@ impl ArcadiaRoot {
                         .items_center()
                         .justify_between()
                         .cursor_pointer()
-                        .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                            this.active_ai_provider_module = mn_click.clone();
-                            this.ai_chat_model_id = None;
-                            cx.notify();
-                        }))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.active_ai_provider_module = mn_click.clone();
+                                this.ai_chat_model_id = None;
+                                cx.notify();
+                            }),
+                        )
                         .child(
                             div()
                                 .flex()

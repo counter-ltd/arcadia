@@ -112,7 +112,11 @@ fn check_cmd(args: &[&str], _ctx: &ExecutionContext) -> String {
         return "Usage: workspace.check <path> <permission_id>".to_string();
     };
     let granted = crate::config::workspace::any_workspace_grants(path, perm);
-    if granted { "true".to_string() } else { "false".to_string() }
+    if granted {
+        "true".to_string()
+    } else {
+        "false".to_string()
+    }
 }
 
 pub fn commands() -> &'static [ModuleCommand] {

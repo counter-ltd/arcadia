@@ -8,4 +8,3 @@ mod state_bridge;
 mod top_bar;
 mod visualizer;
 mod vote_panel;
-

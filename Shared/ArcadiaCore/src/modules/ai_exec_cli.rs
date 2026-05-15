@@ -17,16 +17,41 @@ pub struct DetectedCliProvider {
 
 /// (module_name, binary_name, display_label, model_flag, extra_args_for_non_interactive_mode)
 static KNOWN_CLIS: &[(&str, &str, &str, Option<&str>, &[&str])] = &[
-    ("ai-provider-exec-claude", "claude", "Claude (CLI)", Some("--model"), &["--print"]),
-    ("ai-provider-exec-codex",  "codex",  "Codex (CLI)",  Some("--model"), &[]),
-    ("ai-provider-exec-gemini", "gemini", "Gemini (CLI)", Some("--model"), &[]),
-    ("ai-provider-exec-aider",  "aider",  "Aider (CLI)",  Some("--model"), &["--message"]),
+    (
+        "ai-provider-exec-claude",
+        "claude",
+        "Claude (CLI)",
+        Some("--model"),
+        &["--print"],
+    ),
+    (
+        "ai-provider-exec-codex",
+        "codex",
+        "Codex (CLI)",
+        Some("--model"),
+        &[],
+    ),
+    (
+        "ai-provider-exec-gemini",
+        "gemini",
+        "Gemini (CLI)",
+        Some("--model"),
+        &[],
+    ),
+    (
+        "ai-provider-exec-aider",
+        "aider",
+        "Aider (CLI)",
+        Some("--model"),
+        &["--message"],
+    ),
 ];
 
 /// Given a module name (e.g. `"ai-provider-exec-claude"`), return the binary name and model flag.
 /// Returns `None` for unknown module names.
 pub fn cli_for_module(module_name: &str) -> Option<(&'static str, Option<&'static str>)> {
-    KNOWN_CLIS.iter()
+    KNOWN_CLIS
+        .iter()
         .find(|&&(m, _, _, _, _)| m == module_name)
         .map(|&(_, bin, _, model_flag, _)| (bin, model_flag))
 }
@@ -34,33 +59,39 @@ pub fn cli_for_module(module_name: &str) -> Option<(&'static str, Option<&'stati
 /// Scan PATH for known AI CLIs. Each is probed with `--version`; timeout is OS default
 /// for process spawn (kept short by the 2-second kill via SIGTERM if needed).
 pub fn scan_for_cli_providers() -> Vec<DetectedCliProvider> {
-    KNOWN_CLIS.iter().filter_map(|&(module_name, bin, label, model_flag, extra_args)| {
-        probe_cli(bin).map(|version| DetectedCliProvider {
-            id: module_name.to_string(),
-            binary: bin.to_string(),
-            label: label.to_string(),
-            version,
-            model_flag: model_flag.map(str::to_string),
-            extra_args: extra_args.iter().map(|s| s.to_string()).collect(),
+    KNOWN_CLIS
+        .iter()
+        .filter_map(|&(module_name, bin, label, model_flag, extra_args)| {
+            probe_cli(bin).map(|version| DetectedCliProvider {
+                id: module_name.to_string(),
+                binary: bin.to_string(),
+                label: label.to_string(),
+                version,
+                model_flag: model_flag.map(str::to_string),
+                extra_args: extra_args.iter().map(|s| s.to_string()).collect(),
+            })
         })
-    }).collect()
+        .collect()
 }
 
 fn probe_cli(binary: &str) -> Option<String> {
-    let output = Command::new(binary)
-        .arg("--version")
-        .output()
-        .ok()?;
+    let output = Command::new(binary).arg("--version").output().ok()?;
     // Accept any binary that either exits 0 or writes something to stdout.
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let first_line = stdout.lines().next()
+    let first_line = stdout
+        .lines()
+        .next()
         .or_else(|| stderr.lines().next())
         .unwrap_or("detected")
         .trim()
         .to_string();
     if output.status.success() || !stdout.is_empty() {
-        Some(if first_line.is_empty() { "detected".to_string() } else { first_line })
+        Some(if first_line.is_empty() {
+            "detected".to_string()
+        } else {
+            first_line
+        })
     } else {
         None
     }

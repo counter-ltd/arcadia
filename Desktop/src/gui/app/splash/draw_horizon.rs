@@ -4,7 +4,11 @@ use crate::gui::theme;
 
 use super::math::{alpha_rgba, lerp_f32};
 
-pub(super) fn splash_draw_horizon_glow(bounds: Bounds<openframe::Pixels>, t: f32, window: &mut Window) {
+pub(super) fn splash_draw_horizon_glow(
+    bounds: Bounds<openframe::Pixels>,
+    t: f32,
+    window: &mut Window,
+) {
     let w = f32::from(bounds.size.width);
     let h = f32::from(bounds.size.height);
     let ox = f32::from(bounds.origin.x);

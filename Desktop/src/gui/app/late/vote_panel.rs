@@ -1,4 +1,6 @@
-use openframe::{div, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
+use openframe::{
+    div, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled,
+};
 
 use arcadia_core::modules::late::{send_ws, state};
 
@@ -36,17 +38,12 @@ pub(super) fn late_vote_pills(cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> i
                 .text_xs()
                 .bg(pill_bg)
                 .text_color(pill_tc)
-                .hover(move |style| {
-                    style.bg(pill_hover)
-                })
+                .hover(move |style| style.bg(pill_hover))
                 .child(format!("{label} {count}"))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |_this, _, _, _cx| {
-                        send_ws(format!(
-                            r#"{{"type":"vote","genre":"{}"}}"#,
-                            genre_key
-                        ));
+                        send_ws(format!(r#"{{"type":"vote","genre":"{}"}}"#, genre_key));
                     }),
                 )
         }))

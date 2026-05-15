@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use include_dir::{include_dir, Dir};
 use arcadia_core::modules::python_registry;
+use include_dir::{include_dir, Dir};
 use openframe::{AssetSource, Result, SharedString};
 
 static ASSETS: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets");

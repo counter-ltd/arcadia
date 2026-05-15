@@ -8,7 +8,11 @@ use arcadia_core::modules::late::state;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
-pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is_dark: bool) -> impl IntoElement {
+pub(super) fn late_sidebar(
+    root: &ArcadiaRoot,
+    cx: &mut Context<ArcadiaRoot>,
+    is_dark: bool,
+) -> impl IntoElement {
     let arc = state();
     let st = arc.lock().unwrap_or_else(|e| e.into_inner());
     let users: Vec<String> = st.online_users.iter().map(|u| u.username.clone()).collect();
@@ -22,9 +26,18 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
     drop(st);
 
     let glyph = theme::glyph_snapshot(cx);
-    let subtext_c = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_meta_text(is_dark));
-    let desc_c    = glyph.as_ref().map(|g| g.dim).unwrap_or_else(|| theme::module_description_text(is_dark));
-    let sidebar_border = glyph.as_ref().map(|g| g.border).unwrap_or_else(|| theme::ui_border(cx, is_dark));
+    let subtext_c = glyph
+        .as_ref()
+        .map(|g| g.dim)
+        .unwrap_or_else(|| theme::module_meta_text(is_dark));
+    let desc_c = glyph
+        .as_ref()
+        .map(|g| g.dim)
+        .unwrap_or_else(|| theme::module_description_text(is_dark));
+    let sidebar_border = glyph
+        .as_ref()
+        .map(|g| g.border)
+        .unwrap_or_else(|| theme::ui_border(cx, is_dark));
     div()
         .w_72()
         .h_full()
@@ -61,26 +74,16 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                         .overflow_y_scroll()
                         .child(
                             // Online users list
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .px_3()
-                                .py_2()
-                                .children(users.into_iter().map(|username| {
+                            div().flex().flex_col().gap_1().px_3().py_2().children(
+                                users.into_iter().map(|username| {
                                     div()
                                         .text_xs()
                                         .text_color(desc_c)
                                         .child(format!("@{username}"))
-                                })),
+                                }),
+                            ),
                         )
-                        .child(
-                            div()
-                                .mx_3()
-                                .my_1()
-                                .h_px()
-                                .bg(sidebar_border),
-                        )
+                        .child(div().mx_3().my_1().h_px().bg(sidebar_border))
                         .child(
                             div()
                                 .px_3()
@@ -90,24 +93,15 @@ pub(super) fn late_sidebar(root: &ArcadiaRoot, cx: &mut Context<ArcadiaRoot>, is
                                 .text_color(subtext_c)
                                 .child("Activity"),
                         )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_1()
-                                .px_3()
-                                .pb_2()
-                                .children(activity.into_iter().map(|(kind, username, ts)| {
-                                    let icon = if kind == "join" { "→" } else { "←" };
-                                    div()
-                                        .text_xs()
-                                        .text_color(desc_c)
-                                        .child(format!(
-                                            "{icon} @{username} {}",
-                                            format_relative(&ts)
-                                        ))
-                                })),
-                        ),
+                        .child(div().flex().flex_col().gap_1().px_3().pb_2().children(
+                            activity.into_iter().map(|(kind, username, ts)| {
+                                let icon = if kind == "join" { "→" } else { "←" };
+                                div()
+                                    .text_xs()
+                                    .text_color(desc_c)
+                                    .child(format!("{icon} @{username} {}", format_relative(&ts)))
+                            }),
+                        )),
                 )
                 .child(
                     div()

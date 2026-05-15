@@ -8,9 +8,7 @@ use std::sync::Arc;
 
 use arcadia_core::modules::overlay_hud_sprite;
 use image::{Frame, ImageBuffer, Rgba};
-use openframe::{
-    div, img, prelude::*, px, IntoElement, Render, RenderImage, Window,
-};
+use openframe::{div, img, prelude::*, px, IntoElement, Render, RenderImage, Window};
 
 pub struct OverlayHudRoot {
     last_sprite_version: u64,
@@ -34,7 +32,8 @@ impl OverlayHudRoot {
     }
 
     fn sync_sprite_from_core(&mut self) {
-        let Some((ver, payload)) = overlay_hud_sprite::clone_if_newer_than(self.last_sprite_version)
+        let Some((ver, payload)) =
+            overlay_hud_sprite::clone_if_newer_than(self.last_sprite_version)
         else {
             return;
         };
@@ -55,7 +54,11 @@ impl OverlayHudRoot {
 }
 
 /// Build GPU image from straight RGBA (swaps to BGRA like the asset pipeline).
-pub fn render_image_from_rgba(mut rgba: Vec<u8>, width: u32, height: u32) -> Option<Arc<RenderImage>> {
+pub fn render_image_from_rgba(
+    mut rgba: Vec<u8>,
+    width: u32,
+    height: u32,
+) -> Option<Arc<RenderImage>> {
     for px in rgba.chunks_exact_mut(4) {
         px.swap(0, 2);
     }

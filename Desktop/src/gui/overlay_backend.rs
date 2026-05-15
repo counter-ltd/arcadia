@@ -72,7 +72,9 @@ pub fn init_overlay_module() {
     overlay::set_backend(Box::new(DesktopOverlayBackendThunk));
 }
 
-pub fn register_overlay_window(handle: openframe::WindowHandle<super::overlay_hud::OverlayHudRoot>) {
+pub fn register_overlay_window(
+    handle: openframe::WindowHandle<super::overlay_hud::OverlayHudRoot>,
+) {
     let any: AnyWindowHandle = handle.into();
     if let Ok(mut g) = OVERLAY_HANDLE.lock() {
         *g = Some(any);

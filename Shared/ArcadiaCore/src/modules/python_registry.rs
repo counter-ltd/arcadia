@@ -9,8 +9,8 @@ pub use style_tokens::{
     clamp_numeric_display_for_spec, effective_token_display, format_slider_value,
     merge_token_numeric_bounds, numeric_clamp_lo_hi, parse_granularity_str, resolve_slider_numeric,
     snap_slider_value, style_token_row_visible, StyleTokenCompareOp, StyleTokenKind,
-    StyleTokenNumericBounds, StyleTokenNumericGranularity, StyleTokenNumericPartial, StyleTokenSpec,
-    StyleTokenVisibility,
+    StyleTokenNumericBounds, StyleTokenNumericGranularity, StyleTokenNumericPartial,
+    StyleTokenSpec, StyleTokenVisibility,
 };
 
 pub struct PythonModuleInfo {
@@ -784,7 +784,8 @@ pub fn clear() {
 
 pub fn register_nav_page(decl: NavPageDeclaration) {
     if let Ok(mut reg) = registry().lock() {
-        reg.nav_pages.retain(|p| p.extension_id != decl.extension_id);
+        reg.nav_pages
+            .retain(|p| p.extension_id != decl.extension_id);
         reg.nav_pages.push(decl);
     }
 }
@@ -800,7 +801,10 @@ pub fn nav_page_for(extension_id: &str) -> Option<NavPageDeclaration> {
     let Ok(reg) = registry().lock() else {
         return None;
     };
-    reg.nav_pages.iter().find(|p| p.extension_id == extension_id).cloned()
+    reg.nav_pages
+        .iter()
+        .find(|p| p.extension_id == extension_id)
+        .cloned()
 }
 
 pub fn try_dispatch(token: &str, args: &[&str]) -> Result<Option<String>, String> {

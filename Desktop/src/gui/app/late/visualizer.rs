@@ -11,7 +11,11 @@ pub(super) fn late_visualizer_inline(is_dark: bool) -> impl IntoElement {
     div()
         .font_family("monospace")
         .text_xs()
-        .text_color(if is_dark { rgb(0x5eead4) } else { rgb(0x0d9488) })
+        .text_color(if is_dark {
+            rgb(0x5eead4)
+        } else {
+            rgb(0x0d9488)
+        })
         .child(if frame.is_empty() {
             "· · · · · ·".to_string()
         } else {

@@ -3,20 +3,31 @@
 #[cfg(feature = "gui")]
 use std::path::PathBuf;
 
+mod ai_chat_panel;
+mod ai_diff_panel;
+mod ai_models_panel;
+mod ai_rules_panel;
+pub mod ai_runtime;
+mod ai_settings_panel;
+mod ai_skills_panel;
+mod appearance;
+mod code_editor_panel;
+mod code_editor_settings;
 #[cfg(feature = "gui")]
 mod entry;
 #[cfg(feature = "ios-gui")]
 pub mod entry_ios;
-mod appearance;
 mod extension_nav_panel;
 mod extension_token_settings;
 mod lan_nodes;
 mod late;
 mod lifecycle;
 mod list_panel_search;
-mod text_input_caret;
+mod llama_cpp_create_model_modal;
 mod modules_page;
 mod navigation;
+mod notification_panel;
+mod notification_settings_panel;
 mod permissions_panel;
 mod python_settings;
 mod root;
@@ -25,23 +36,14 @@ mod services;
 mod shell;
 #[cfg(feature = "ios-gui")]
 mod shell_ios;
-mod sidebar;
-mod splash;
 #[cfg(any(feature = "gui", feature = "ios-gui"))]
 mod shortcuts;
 mod shortcuts_create_modal;
 mod shortcuts_panel;
 mod shortcuts_row;
-mod ai_chat_panel;
-mod ai_diff_panel;
-mod ai_models_panel;
-mod ai_rules_panel;
-mod ai_settings_panel;
-mod ai_skills_panel;
-mod llama_cpp_create_model_modal;
-pub mod ai_runtime;
-mod code_editor_panel;
-mod code_editor_settings;
+mod sidebar;
+mod splash;
+mod text_input_caret;
 mod workspace_create_modal;
 mod workspace_panel;
 mod workspace_row;
@@ -53,8 +55,8 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use arcadia_core::modules::python_registry::{DecorationRect, HighlightSpan, StyleInfo};
-use arcadia_core::shortcuts::KeyChordSpec;
 use arcadia_core::navigation::NavigationRegistryOwned;
+use arcadia_core::shortcuts::KeyChordSpec;
 use openframe::{Bounds, FocusHandle, Pixels, ScrollHandle, SharedString, Subscription};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -109,8 +111,8 @@ impl ShellMode {
 
     pub(super) fn label(self) -> &'static str {
         match self {
-            ShellMode::Generic => "system",
-            ShellMode::Internal => "internal",
+            ShellMode::Generic => "System",
+            ShellMode::Internal => "Internal",
         }
     }
 
@@ -282,7 +284,6 @@ pub enum PendingPermissionGrant {
 
 #[cfg(feature = "gui")]
 pub struct TerminalInstance {
-    pub id: usize,
     pub label: String,
     pub shell_history: Vec<String>,
     pub shell_input: String,
@@ -333,7 +334,8 @@ pub struct ArcadiaRoot {
     /// When `Some(id)`, shortcuts panel captures the next keystroke as a new chord override for that shortcut.
     pub shortcut_listening_id: Option<String>,
     /// When `Some((id, captured_steps, total_steps))`, captures successive keystrokes into a sequence override.
-    pub shortcut_listening_sequence: Option<(String, Vec<arcadia_core::shortcuts::KeyChordSpec>, usize)>,
+    pub shortcut_listening_sequence:
+        Option<(String, Vec<arcadia_core::shortcuts::KeyChordSpec>, usize)>,
     /// Focused while listening (chord or sequence) to keep the div in the dispatch path.
     pub shortcut_listen_focus: FocusHandle,
     /// Keeps the app-level keystroke observer alive for the lifetime of this view.
@@ -400,8 +402,6 @@ pub struct ArcadiaRoot {
     pub ai_rule_picker_open: bool,
     /// Whether the skill picker popover is open.
     pub ai_skill_picker_open: bool,
-    /// Whether the session history sidebar is visible.
-    pub ai_session_sidebar_open: bool,
     /// Index of past chat sessions (loaded on startup, refreshed on save).
     pub ai_sessions: Vec<AiSessionSummary>,
     /// Staged file edits awaiting user approval.
@@ -512,6 +512,11 @@ pub struct ArcadiaRoot {
     pub item_hover_anims: HashMap<String, CaretAnim>,
     /// When true, the sidebar Settings hub shows nested rows under the Settings header.
     pub settings_hub_expanded: bool,
+    pub settings_expand_alpha: f32,
+    pub settings_expand_anim: Option<CaretAnim>,
+    pub pill_expanded: HashMap<String, bool>,
+    pub pill_expand_alphas: HashMap<String, f32>,
+    pub pill_expand_anims: HashMap<String, CaretAnim>,
     pub app_menu_open: bool,
     pub session_route_menu_open: bool,
     /// When `Some("lan:<ip-or-alias>")`, module visibility and routed commands use this peer.
@@ -575,6 +580,15 @@ pub struct ArcadiaRoot {
     pub command_bar_open: bool,
     pub command_bar_input: String,
     pub command_bar_focus: FocusHandle,
+    /// Cached unread notification count for badge display on the Notifications pill.
+    pub notification_unread_count: usize,
+    /// Feedback line displayed at the bottom of the notification settings panel.
+    pub notification_settings_feedback: String,
+    /// Draft value for the max-count field in notification settings.
+    pub notification_max_count_draft: String,
+    pub notification_max_count_focus: FocusHandle,
+    /// Whether the notification destination dropdown is expanded.
+    pub notification_dest_open: bool,
     /// Settings pages the user has pinned to the sidebar. Persisted in `ui-prefs.toml`.
     pub pinned_settings_pages: Vec<String>,
     /// Active right-click context menu on a pinned settings sidebar item: (page_id, position).
@@ -604,19 +618,28 @@ impl ArcadiaRoot {
     pub(crate) fn save_editor_session(&self) {
         use arcadia_core::config::code_editor::{CodeEditorSession, PersistedTab};
         use arcadia_core::config::ConfigFile;
-        let tabs = self.code_editor_tabs.iter().map(|t| PersistedTab {
-            id: t.id,
-            title: t.title.clone(),
-            file_path: t.file_path.clone(),
-            workspace_path: t.workspace_path.clone(),
-            cursor: t.cursor,
-            unsaved_content: if t.file_path.is_none() { Some(t.content.clone()) } else { None },
-        }).collect();
+        let tabs = self
+            .code_editor_tabs
+            .iter()
+            .map(|t| PersistedTab {
+                id: t.id,
+                title: t.title.clone(),
+                file_path: t.file_path.clone(),
+                workspace_path: t.workspace_path.clone(),
+                cursor: t.cursor,
+                unsaved_content: if t.file_path.is_none() {
+                    Some(t.content.clone())
+                } else {
+                    None
+                },
+            })
+            .collect();
         let _ = CodeEditorSession {
             active_tab: self.active_code_editor_tab,
             next_id: self.code_editor_next_id,
             tabs,
-        }.save();
+        }
+        .save();
     }
 
     pub(crate) fn is_module_enabled(&self, name: &str) -> bool {
@@ -648,7 +671,11 @@ impl ArcadiaRoot {
         if self.remote_navigation_required() {
             self.remote_nav.as_ref()
         } else {
-            Some(self.remote_nav.as_ref().unwrap_or(&self.local_navigation_registry))
+            Some(
+                self.remote_nav
+                    .as_ref()
+                    .unwrap_or(&self.local_navigation_registry),
+            )
         }
     }
 }

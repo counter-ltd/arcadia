@@ -1,13 +1,13 @@
 use openframe::{
-    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, StatefulInteractiveElement, Styled, Window, WindowAppearance,
+    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
+    StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
 
-use crate::gui::tui::shell_history_line;
 use crate::gui::theme;
+use crate::gui::tui::shell_history_line;
 
-use super::super::ArcadiaRoot;
 use super::super::text_input_caret::TEXT_INPUT_CARET_CHAR;
+use super::super::ArcadiaRoot;
 
 impl ArcadiaRoot {
     pub(crate) fn shell_panel(
@@ -28,9 +28,7 @@ impl ArcadiaRoot {
             return self.terminal_dashboard(cx, is_dark);
         }
         let is_focused = self.shell_focus.is_focused(window);
-        let shell_bg = theme::ui_surface(cx, is_dark);
         let shell_border = theme::ui_border(cx, is_dark);
-        let shell_radius = theme::ui_radius(cx);
         let shell_accent = theme::ui_accent(cx);
         let term = self.active_terminal();
 
@@ -40,11 +38,6 @@ impl ArcadiaRoot {
                 .w_full()
                 .h_full()
                 .overflow_hidden()
-                .p_1()
-                .rounded(px(shell_radius))
-                .bg(shell_bg)
-                .border_1()
-                .border_color(shell_border)
                 .flex()
                 .flex_col()
                 .child(
@@ -60,11 +53,6 @@ impl ArcadiaRoot {
             .w_full()
             .h_full()
             .overflow_hidden()
-            .p_1()
-            .rounded(px(shell_radius))
-            .bg(shell_bg)
-            .border_1()
-            .border_color(shell_border)
             .flex()
             .flex_col()
             .gap_0()
@@ -109,12 +97,7 @@ impl ArcadiaRoot {
                         }),
                     )
                     .on_key_down(cx.listener(Self::handle_shell_key_down))
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(shell_accent)
-                            .child("$"),
-                    )
+                    .child(div().text_sm().text_color(shell_accent).child("$"))
                     .child(
                         div()
                             .text_sm()
@@ -155,13 +138,17 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
         let pal = theme::nav_accent_palette("emerald", is_dark);
         let r = p.radius_md.min(12.0);
-        let term_bg_preview = if is_dark { rgb(0x0d1117) } else { rgb(0xf0f2f5) };
+        let term_bg_preview = if is_dark {
+            rgb(0x0d1117)
+        } else {
+            rgb(0xf0f2f5)
+        };
 
         let terminal_count = self.terminals.len();
         let cards: Vec<openframe::AnyElement> = (0..terminal_count)
             .map(|idx| {
                 let label = self.terminals[idx].label.clone();
-                let cwd   = self.terminals[idx].shell_display_cwd.clone();
+                let cwd = self.terminals[idx].shell_display_cwd.clone();
                 let is_active_term = self.active_terminal_id == idx;
                 let preview_lines: Vec<String> = self.terminals[idx]
                     .shell_history
@@ -193,6 +180,7 @@ impl ArcadiaRoot {
                         cx.listener(move |this, _, _, cx| {
                             this.active_terminal_id = idx;
                             this.active_page_id = "utility.shell".to_string();
+                            this.sync_settings_hub_expanded_from_active_page();
                             this.terminal_show_dashboard = false;
                             cx.notify();
                         }),
@@ -213,7 +201,11 @@ impl ArcadiaRoot {
                                     .font_family("monospace")
                                     .text_color(p.content_meta)
                                     .flex_shrink_0()
-                                    .child(if line.is_empty() { " ".to_string() } else { line })
+                                    .child(if line.is_empty() {
+                                        " ".to_string()
+                                    } else {
+                                        line
+                                    })
                                     .into_any_element()
                             })),
                     )
@@ -232,12 +224,7 @@ impl ArcadiaRoot {
                                     .text_color(p.content_title)
                                     .child(label),
                             )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(p.content_meta)
-                                    .child(cwd),
-                            ),
+                            .child(div().text_xs().text_color(p.content_meta).child(cwd)),
                     )
                     .into_any_element()
             })
@@ -246,7 +233,11 @@ impl ArcadiaRoot {
         div()
             .w_full()
             .h_full()
-            .bg(if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) })
+            .bg(if is_dark {
+                rgb(0x1a1f29)
+            } else {
+                rgb(0xfafafa)
+            })
             .flex()
             .flex_col()
             .child(
@@ -280,7 +271,11 @@ impl ArcadiaRoot {
                                     .gap_4()
                                     .children(cards)
                                     .children(
-                                        (0..5).map(|_| div().flex_1().min_w(px(220.)).into_any_element()).collect::<Vec<_>>()
+                                        (0..5)
+                                            .map(|_| {
+                                                div().flex_1().min_w(px(220.)).into_any_element()
+                                            })
+                                            .collect::<Vec<_>>(),
                                     ),
                             ),
                     ),
@@ -308,12 +303,16 @@ fn strip_ansi(s: &str) -> String {
             if chars.peek() == Some(&'[') {
                 chars.next();
                 for nc in chars.by_ref() {
-                    if nc.is_ascii_alphabetic() { break; }
+                    if nc.is_ascii_alphabetic() {
+                        break;
+                    }
                 }
             } else {
                 // Other escape sequences: consume until letter or ESC
                 for nc in chars.by_ref() {
-                    if nc.is_ascii_alphabetic() || nc == '\x1b' { break; }
+                    if nc.is_ascii_alphabetic() || nc == '\x1b' {
+                        break;
+                    }
                 }
             }
         } else if is_visual_only_char(c) {
@@ -328,7 +327,9 @@ fn strip_ansi(s: &str) -> String {
     let mut prev_space = false;
     for c in out.chars() {
         if c == ' ' {
-            if !prev_space { result.push(' '); }
+            if !prev_space {
+                result.push(' ');
+            }
             prev_space = true;
         } else {
             result.push(c);

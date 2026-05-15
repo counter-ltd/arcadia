@@ -293,7 +293,8 @@ fn help_lines() -> Vec<String> {
             }
             "permit" => {
                 lines.push(
-                    "- permit <permission-id> <true|false>: set a global permission flag".to_string(),
+                    "- permit <permission-id> <true|false>: set a global permission flag"
+                        .to_string(),
                 );
                 lines.push(
                     "- permit <subject> <permission-id> <true|false>: set per-subject grant (module:<name>, python:<id>, or bare id)"

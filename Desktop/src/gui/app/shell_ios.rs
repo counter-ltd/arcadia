@@ -57,13 +57,16 @@ impl ArcadiaRoot {
                     .track_scroll(&self.ios_shell_scroll)
                     .child(
                         div().w_full().p_3().flex().flex_col().gap_1().children(
-                            self.ios_shell_history.iter().filter(|l| !l.is_empty()).map(|line| {
-                                div()
-                                    .text_sm()
-                                    .text_color(theme::ui_text(cx, is_dark))
-                                    .font_family("monospace")
-                                    .child(line.clone())
-                            }),
+                            self.ios_shell_history
+                                .iter()
+                                .filter(|l| !l.is_empty())
+                                .map(|line| {
+                                    div()
+                                        .text_sm()
+                                        .text_color(theme::ui_text(cx, is_dark))
+                                        .font_family("monospace")
+                                        .child(line.clone())
+                                }),
                         ),
                     ),
             )
@@ -143,8 +146,7 @@ impl ArcadiaRoot {
                 if !command.is_empty() {
                     let ctx = self.execution_context();
                     let display = command.clone();
-                    let out =
-                        modules::execute_command("shell.execute", &[display.as_str()], &ctx);
+                    let out = modules::execute_command("shell.execute", &[display.as_str()], &ctx);
                     self.ios_shell_history.push(format!("$ {display}"));
                     match out {
                         Ok(Some(s)) => {
@@ -194,8 +196,7 @@ impl ArcadiaRoot {
                         None => self.ios_shell_command_history.len().saturating_sub(1),
                     };
                     self.ios_shell_history_index = Some(next_index);
-                    self.ios_shell_input =
-                        self.ios_shell_command_history[next_index].clone();
+                    self.ios_shell_input = self.ios_shell_command_history[next_index].clone();
                     self.ios_shell_cursor = self.ios_shell_input.chars().count();
                     cx.notify();
                 }
@@ -205,8 +206,7 @@ impl ArcadiaRoot {
                     let next_index = index + 1;
                     if next_index < self.ios_shell_command_history.len() {
                         self.ios_shell_history_index = Some(next_index);
-                        self.ios_shell_input =
-                            self.ios_shell_command_history[next_index].clone();
+                        self.ios_shell_input = self.ios_shell_command_history[next_index].clone();
                         self.ios_shell_cursor = self.ios_shell_input.chars().count();
                     } else {
                         self.ios_shell_history_index = None;
