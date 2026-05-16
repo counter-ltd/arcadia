@@ -28,16 +28,44 @@ impl EditorUndo {
         self.redo.clear();
     }
 
-    fn step_back(&mut self, current: EditSnapshot) -> Option<EditSnapshot> {
+    pub fn step_back(&mut self, current: EditSnapshot) -> Option<EditSnapshot> {
         let prev = self.undo.pop()?;
         self.redo.push(current);
         Some(prev)
     }
 
-    fn step_forward(&mut self, current: EditSnapshot) -> Option<EditSnapshot> {
+    pub fn step_forward(&mut self, current: EditSnapshot) -> Option<EditSnapshot> {
         let next = self.redo.pop()?;
         self.undo.push(current);
         Some(next)
+    }
+
+    /// One-line previews of past states, newest first (newest = one undo away).
+    pub fn undo_previews(&self) -> Vec<String> {
+        self.undo.iter().rev().map(|s| snapshot_preview(&s.0)).collect()
+    }
+
+    /// One-line previews of future states, next-redo last (closest to current).
+    pub fn redo_previews(&self) -> Vec<String> {
+        self.redo.iter().map(|s| snapshot_preview(&s.0)).collect()
+    }
+}
+
+/// First non-blank line of a snapshot, trimmed and truncated for the history list.
+fn snapshot_preview(content: &str) -> String {
+    let line = content
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    if line.is_empty() {
+        return "(empty)".to_string();
+    }
+    let truncated: String = line.chars().take(40).collect();
+    if truncated.chars().count() < line.chars().count() {
+        format!("{truncated}…")
+    } else {
+        truncated
     }
 }
 
@@ -331,6 +359,45 @@ impl ArcadiaRoot {
                     self.save_editor_session();
                 }
             }
+        }
+    }
+
+    /// Apply `steps` undo (or redo when `redo` is true) operations at once —
+    /// drives the undo-history popup so a click can jump multiple steps.
+    pub(crate) fn editor_undo_jump(&mut self, redo: bool, steps: usize) {
+        if self.code_editor_tabs.is_empty() || steps == 0 || !self.code_editor_undo_enabled {
+            return;
+        }
+        let idx = self
+            .active_code_editor_tab
+            .min(self.code_editor_tabs.len() - 1);
+        let tab_id = self.code_editor_tabs[idx].id;
+        let undo = self.code_editor_undo.entry(tab_id).or_default();
+        let tab = &self.code_editor_tabs[idx];
+        let mut current = (tab.content.clone(), tab.cursor, tab.selection_anchor);
+        let mut restored = None;
+        for _ in 0..steps {
+            let next = if redo {
+                undo.step_forward(current.clone())
+            } else {
+                undo.step_back(current.clone())
+            };
+            match next {
+                Some(s) => {
+                    current = s.clone();
+                    restored = Some(s);
+                }
+                None => break,
+            }
+        }
+        undo.coalescing = false;
+        if let Some((content, cursor, anchor)) = restored {
+            let tab = &mut self.code_editor_tabs[idx];
+            tab.content = content;
+            tab.cursor = cursor.min(tab.content.len());
+            tab.selection_anchor = anchor;
+            tab.highlight_dirty = true;
+            self.save_editor_session();
         }
     }
 }
