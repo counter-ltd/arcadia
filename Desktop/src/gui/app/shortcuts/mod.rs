@@ -346,6 +346,10 @@ impl ArcadiaRoot {
                     self.active_terminal_mut().shell_mode = new_mode;
                 }
             }
+            id if id.starts_with("editor.") => {
+                #[cfg(feature = "gui")]
+                self.editor_run_command(id);
+            }
             _ => {}
         }
     }

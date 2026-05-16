@@ -375,6 +375,12 @@ impl ArcadiaRoot {
             shortcut_create_token_focus,
             shortcut_create_args_focus,
             code_editor_show_indentation_marks: code_editor_cfg.show_indentation_marks,
+            code_editor_auto_indent: code_editor_cfg.auto_indent,
+            code_editor_auto_close: code_editor_cfg.auto_close_brackets,
+            code_editor_undo_enabled: code_editor_cfg.undo_enabled,
+            code_editor_line_commands: code_editor_cfg.line_commands,
+            code_editor_cursor_style: code_editor_cfg.cursor_style,
+            code_editor_undo: std::collections::HashMap::new(),
             code_editor_char_width_override: code_editor_cfg.char_width_override,
             code_editor_char_width_draft: code_editor_cfg
                 .char_width_override

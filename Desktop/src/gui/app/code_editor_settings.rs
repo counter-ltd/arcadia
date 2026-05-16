@@ -1,4 +1,4 @@
-use arcadia_core::config::code_editor::CodeEditorConfig;
+use arcadia_core::config::code_editor::{CodeEditorConfig, CursorStyle};
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::python_registry;
 use openframe::{
@@ -12,6 +12,15 @@ use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme::{self, GLYPH_PANEL_CONTENT_MAX_W_PX};
 
+/// Which editor feature a settings toggle row controls.
+#[derive(Clone, Copy)]
+enum EditorToggle {
+    AutoIndent,
+    AutoClose,
+    Undo,
+    LineCommands,
+}
+
 impl ArcadiaRoot {
     pub(crate) fn code_editor_settings_panel(
         &mut self,
@@ -23,6 +32,11 @@ impl ArcadiaRoot {
         let g_snap = theme::glyph_snapshot(cx);
         let panel_radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
         let show_marks = self.code_editor_show_indentation_marks;
+        let auto_indent = self.code_editor_auto_indent;
+        let auto_close = self.code_editor_auto_close;
+        let undo_on = self.code_editor_undo_enabled;
+        let line_cmds = self.code_editor_line_commands;
+        let cursor_style = self.code_editor_cursor_style;
 
         let editor_token_modules = python_registry::editor_scoped_token_modules();
 
@@ -61,6 +75,44 @@ impl ArcadiaRoot {
                     .bg(p.panel_bg)
                     .overflow_hidden()
                     .child(self.indentation_marks_row(cx, is_dark, show_marks, panel_radius))
+                    .child(div().w_full().h(px(1.)).bg(p.panel_border))
+                    .child(self.cursor_style_row(cx, is_dark, cursor_style))
+                    .child(div().w_full().h(px(1.)).bg(p.panel_border))
+                    .child(self.editor_toggle_row(
+                        cx,
+                        is_dark,
+                        "Auto Indent",
+                        "New lines inherit the previous line's indentation.",
+                        auto_indent,
+                        EditorToggle::AutoIndent,
+                    ))
+                    .child(div().w_full().h(px(1.)).bg(p.panel_border))
+                    .child(self.editor_toggle_row(
+                        cx,
+                        is_dark,
+                        "Auto-Close Brackets",
+                        "Insert the matching closing bracket or quote.",
+                        auto_close,
+                        EditorToggle::AutoClose,
+                    ))
+                    .child(div().w_full().h(px(1.)).bg(p.panel_border))
+                    .child(self.editor_toggle_row(
+                        cx,
+                        is_dark,
+                        "Undo / Redo History",
+                        "Track edits for undo (Cmd+Z) and redo (Cmd+Shift+Z).",
+                        undo_on,
+                        EditorToggle::Undo,
+                    ))
+                    .child(div().w_full().h(px(1.)).bg(p.panel_border))
+                    .child(self.editor_toggle_row(
+                        cx,
+                        is_dark,
+                        "Line Commands",
+                        "Duplicate, move, delete, comment and indent shortcuts.",
+                        line_cmds,
+                        EditorToggle::LineCommands,
+                    ))
                     .child(div().w_full().h(px(1.)).bg(p.panel_border))
                     .child(self.char_width_row(window, cx, is_dark, panel_radius)),
             );
@@ -172,6 +224,170 @@ impl ArcadiaRoot {
                     cx.notify();
                 }),
             )
+    }
+
+    fn editor_toggle_row(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        title: &str,
+        desc: &str,
+        enabled: bool,
+        kind: EditorToggle,
+    ) -> impl IntoElement {
+        let p = theme::theme_palette(cx, is_dark);
+        let toggle = if enabled {
+            div()
+                .w_10()
+                .h_6()
+                .px_0p5()
+                .rounded_full()
+                .border_1()
+                .border_color(p.border)
+                .bg(p.accent)
+                .flex()
+                .items_center()
+                .justify_end()
+                .child(div().w_4().h_4().rounded_full().bg(p.on_accent))
+        } else {
+            div()
+                .w_10()
+                .h_6()
+                .px_0p5()
+                .rounded_full()
+                .border_1()
+                .border_color(p.border)
+                .bg(p.surface_elevated)
+                .flex()
+                .items_center()
+                .justify_start()
+                .child(div().w_4().h_4().rounded_full().bg(p.toggle_knob_off))
+        };
+        let title = title.to_string();
+        let desc = desc.to_string();
+
+        div()
+            .w_full()
+            .px_4()
+            .py_3()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .gap_4()
+            .cursor_pointer()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_0p5()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(p.content_title)
+                            .child(title),
+                    )
+                    .child(div().text_xs().text_color(p.content_meta).child(desc)),
+            )
+            .child(toggle)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _, _, cx| {
+                    let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
+                    match kind {
+                        EditorToggle::AutoIndent => {
+                            this.code_editor_auto_indent = !this.code_editor_auto_indent;
+                            cfg.auto_indent = this.code_editor_auto_indent;
+                        }
+                        EditorToggle::AutoClose => {
+                            this.code_editor_auto_close = !this.code_editor_auto_close;
+                            cfg.auto_close_brackets = this.code_editor_auto_close;
+                        }
+                        EditorToggle::Undo => {
+                            this.code_editor_undo_enabled = !this.code_editor_undo_enabled;
+                            cfg.undo_enabled = this.code_editor_undo_enabled;
+                        }
+                        EditorToggle::LineCommands => {
+                            this.code_editor_line_commands = !this.code_editor_line_commands;
+                            cfg.line_commands = this.code_editor_line_commands;
+                        }
+                    }
+                    let _ = cfg.save();
+                    cx.notify();
+                }),
+            )
+    }
+
+    fn cursor_style_row(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        current: CursorStyle,
+    ) -> impl IntoElement {
+        let p = theme::theme_palette(cx, is_dark);
+
+        let mut buttons = div().flex().flex_row().gap_1();
+        for (label, style) in [
+            ("Block", CursorStyle::Block),
+            ("Bar", CursorStyle::Bar),
+            ("Underline", CursorStyle::Underline),
+        ] {
+            let active = current == style;
+            buttons = buttons.child(
+                div()
+                    .px_3()
+                    .py_1()
+                    .rounded(px(6.))
+                    .cursor_pointer()
+                    .text_xs()
+                    .border_1()
+                    .border_color(if active { p.accent } else { p.border })
+                    .bg(if active { p.accent } else { p.surface_elevated })
+                    .text_color(if active { p.on_accent } else { p.content_meta })
+                    .child(label)
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.code_editor_cursor_style = style;
+                            let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
+                            cfg.cursor_style = style;
+                            let _ = cfg.save();
+                            cx.notify();
+                        }),
+                    ),
+            );
+        }
+
+        div()
+            .w_full()
+            .px_4()
+            .py_3()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .gap_4()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_0p5()
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(p.content_title)
+                            .child("Cursor Style"),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(p.content_meta)
+                            .child("Shape of the text caret."),
+                    ),
+            )
+            .child(buttons)
     }
 
     fn char_width_row(

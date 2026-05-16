@@ -1,5 +1,6 @@
 use openframe::{div, px, rgb, rgba, AnyElement, IntoElement, ParentElement, Rgba, Styled};
 
+use arcadia_core::config::code_editor::CursorStyle;
 use arcadia_core::modules::python_registry::{DecorationRect, HighlightSpan};
 
 use super::segments::{line_segments, SegKind};
@@ -20,6 +21,7 @@ pub(super) struct LineStyle {
     pub show_indent_guides: bool,
     /// `text_xs` (preview) when true, `text_sm` (editor) when false.
     pub small: bool,
+    pub cursor_style: CursorStyle,
 }
 
 /// Build the content portion of a code line: decoration backgrounds, indent
@@ -115,10 +117,38 @@ pub(super) fn code_line_content(
                 match kind {
                     SegKind::Normal => cell.into_any_element(),
                     SegKind::Selected => cell.bg(st.sel_bg).into_any_element(),
-                    SegKind::Cursor => cell
-                        .bg(st.cursor_bg)
-                        .text_color(st.cursor_fg)
-                        .into_any_element(),
+                    SegKind::Cursor => match st.cursor_style {
+                        CursorStyle::Block => cell
+                            .bg(st.cursor_bg)
+                            .text_color(st.cursor_fg)
+                            .into_any_element(),
+                        // Bar/underline are absolute overlays so the caret never
+                        // consumes layout space and shifts the glyph.
+                        CursorStyle::Bar => cell
+                            .relative()
+                            .child(
+                                div()
+                                    .absolute()
+                                    .left(px(0.))
+                                    .top(px(0.))
+                                    .bottom(px(0.))
+                                    .w(px(2.))
+                                    .bg(st.cursor_bg),
+                            )
+                            .into_any_element(),
+                        CursorStyle::Underline => cell
+                            .relative()
+                            .child(
+                                div()
+                                    .absolute()
+                                    .left(px(0.))
+                                    .right(px(0.))
+                                    .bottom(px(0.))
+                                    .h(px(2.))
+                                    .bg(st.cursor_bg),
+                            )
+                            .into_any_element(),
+                    },
                 }
             })
             .collect::<Vec<_>>()

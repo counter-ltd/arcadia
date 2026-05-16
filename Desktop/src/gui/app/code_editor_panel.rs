@@ -1,3 +1,4 @@
+mod commands;
 mod dashboard;
 mod edit;
 mod line_render;
@@ -5,6 +6,7 @@ mod segments;
 mod text;
 mod view;
 
+pub use commands::EditorUndoMap;
 pub use text::detect_language;
 
 use openframe::{AnyElement, Context, Window};

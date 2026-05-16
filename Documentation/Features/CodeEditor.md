@@ -68,11 +68,43 @@ Decorations are rendered behind text as translucent rectangles. Used for inline 
 
 ## Config (`code-editor.toml`)
 
-Managed by `CodeEditorConfig` in `config/code_editor.rs`. Stores editor preferences such as:
-- Tab width
-- Font size
-- Soft-wrap toggle
-- Any persisted editor state
+Managed by `CodeEditorConfig` in `config/code_editor.rs`:
+- `show_indentation_marks` — draw indent guide lines
+- `char_width_override` — manual monospace advance width (`None` = auto-measure)
+- `auto_indent` — new lines inherit the previous line's leading whitespace
+- `auto_close_brackets` — insert the matching closer for `([{"'`
+- `undo_enabled` — per-tab undo/redo history
+- `line_commands` — enable the editor line commands
+- `cursor_style` — `CursorStyle`: `block` / `bar` / `underline`
+
+All settings are exposed on the **Editor** settings page (`editor.settings`).
+
+---
+
+## Commands & shortcuts
+
+Editor commands are registered as static shortcuts (`shortcuts/registry.rs`,
+ids `editor:*`), page-scoped to `editor.main` with `bypass_text_focus: true`.
+They fire `UiControl { control_id: "editor.*" }`, handled by
+`fire_shortcut_ui_control` → `ArcadiaRoot::editor_run_command` in
+`code_editor_panel/commands.rs`.
+
+| Command | Default chord | `control_id` |
+|---------|---------------|--------------|
+| Save file | Cmd+S | `editor.save` |
+| Select line | Cmd+L | `editor.select_line` |
+| Duplicate line | Cmd+Shift+D | `editor.duplicate_line` |
+| Delete line | Cmd+Shift+K | `editor.delete_line` |
+| Move line up/down | Alt+Up / Alt+Down | `editor.move_line_up` / `_down` |
+| Indent / outdent | Cmd+] / Cmd+[ | `editor.indent` / `editor.outdent` |
+| Toggle line comment | Cmd+/ | `editor.toggle_comment` |
+| Undo / redo | Cmd+Z / Cmd+Shift+Z | `editor.undo` / `editor.redo` |
+
+Raw text input (typing, arrows, backspace, enter, tab) stays in
+`code_editor_panel/edit.rs::apply_key` — too high-frequency for the shortcut
+registry. `apply_key` also owns auto-indent, auto-close and undo recording.
+Undo history lives in `ArcadiaRoot.code_editor_undo` (`EditorUndoMap`, keyed by
+tab id), with a coalescing flag so a run of typing folds into one undo step.
 
 ---
 

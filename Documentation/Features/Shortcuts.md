@@ -93,7 +93,15 @@ The merged list is what the GUI and OS shortcut dispatcher consume.
 
 ## Shortcut registry (`shortcuts/registry.rs`)
 
-The registry holds the current merged shortcut set. Modules register static shortcuts at startup; the registry merges with user config and makes the result available to surfaces.
+The registry holds the current merged shortcut set. `SHORTCUT_DEFINITIONS` is the
+compile-time static list; user config merges over it.
+
+The editor command shortcuts (`editor:*`) live here too — page-scoped to
+`editor.main` with `bypass_text_focus: true` so they fire while the editor text
+area holds focus. They dispatch `UiControl { control_id: "editor.*" }`, handled
+by `ArcadiaRoot::editor_run_command`. See `CodeEditor.md` for the full table.
+
+The registry merges with user config and makes the result available to surfaces.
 
 Key functions:
 

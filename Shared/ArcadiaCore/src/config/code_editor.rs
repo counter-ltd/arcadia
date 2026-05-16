@@ -4,6 +4,23 @@ use crate::config::ConfigFile;
 
 const FILE_NAME: &str = "code-editor.toml";
 
+fn default_true() -> bool {
+    true
+}
+
+/// Shape of the text caret in the code editor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CursorStyle {
+    /// Filled block covering the character (inverts it).
+    #[default]
+    Block,
+    /// Thin vertical bar before the character.
+    Bar,
+    /// Line under the character.
+    Underline,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeEditorConfig {
     pub show_indentation_marks: bool,
@@ -11,6 +28,21 @@ pub struct CodeEditorConfig {
     /// `None` = auto-measure from font metrics at render time.
     #[serde(default)]
     pub char_width_override: Option<f32>,
+    /// Copy the previous line's leading whitespace onto a new line.
+    #[serde(default = "default_true")]
+    pub auto_indent: bool,
+    /// Insert the closing partner when an opening bracket/quote is typed.
+    #[serde(default = "default_true")]
+    pub auto_close_brackets: bool,
+    /// Enable the per-tab undo/redo history.
+    #[serde(default = "default_true")]
+    pub undo_enabled: bool,
+    /// Enable the editor line commands (duplicate/move/comment/indent…).
+    #[serde(default = "default_true")]
+    pub line_commands: bool,
+    /// Shape of the text caret.
+    #[serde(default)]
+    pub cursor_style: CursorStyle,
 }
 
 impl Default for CodeEditorConfig {
@@ -18,6 +50,11 @@ impl Default for CodeEditorConfig {
         Self {
             show_indentation_marks: false,
             char_width_override: None,
+            auto_indent: true,
+            auto_close_brackets: true,
+            undo_enabled: true,
+            line_commands: true,
+            cursor_style: CursorStyle::Block,
         }
     }
 }

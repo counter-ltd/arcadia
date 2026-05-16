@@ -43,6 +43,7 @@ impl ArcadiaRoot {
             indent_guide_color: preview_indent_guide,
             show_indent_guides: true,
             small: true,
+            cursor_style: arcadia_core::config::code_editor::CursorStyle::Block,
         };
 
         let pal = theme::nav_accent_palette("emerald", is_dark);

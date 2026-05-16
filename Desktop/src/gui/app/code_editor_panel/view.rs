@@ -163,6 +163,7 @@ impl ArcadiaRoot {
             indent_guide_color,
             show_indent_guides: show_marks,
             small: false,
+            cursor_style: self.code_editor_cursor_style,
         };
 
         let line_els: Vec<AnyElement> = lines
@@ -252,8 +253,15 @@ impl ArcadiaRoot {
                 let idx = this
                     .active_code_editor_tab
                     .min(this.code_editor_tabs.len().saturating_sub(1));
+                let tab_id = this.code_editor_tabs[idx].id;
+                let ctx = super::edit::EditCtx {
+                    auto_indent: this.code_editor_auto_indent,
+                    auto_close: this.code_editor_auto_close,
+                    record_undo: this.code_editor_undo_enabled,
+                };
                 let len_before = this.code_editor_tabs[idx].content.len();
-                super::edit::apply_key(&mut this.code_editor_tabs[idx], &event.keystroke);
+                let undo = this.code_editor_undo.entry(tab_id).or_default();
+                super::edit::apply_key(&mut this.code_editor_tabs[idx], undo, ctx, &event.keystroke);
                 if this.code_editor_tabs[idx].content.len() != len_before {
                     this.code_editor_tabs[idx].highlight_dirty = true;
                     this.save_editor_session();
