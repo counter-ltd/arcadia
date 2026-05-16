@@ -5,7 +5,7 @@ use openframe::{
 
 static QUIT_REQUESTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-use super::super::assets::EmbeddedAssets;
+use super::super::assets::{register_bundled_fonts, EmbeddedAssets};
 use super::super::overlay_hud::OverlayHudRoot;
 use super::ArcadiaRoot;
 
@@ -30,6 +30,10 @@ pub fn run() {
     scheduling::register_main_thread_drainer();
 
     Application::new().with_assets(EmbeddedAssets).run(|app| {
+        // Register the bundled monospace font before any window renders so the
+        // code editor and TUI get uniform glyph advances instead of an OS fallback.
+        register_bundled_fonts(&app.text_system());
+
         // Install desktop backends BEFORE the window opens so items registered by Python
         // extensions during ArcadiaRoot::new() flush onto the platform tray on first frame.
         // tray-icon requires main-thread creation on macOS — the run callback runs there.

@@ -4,6 +4,7 @@ use openframe::{
 };
 
 use crate::gui::app::{ArcadiaRoot, CodeEditorTab};
+use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme;
 use arcadia_core::config::workspace::WorkspacesConfig;
 use arcadia_core::config::ConfigFile;
@@ -163,7 +164,7 @@ impl ArcadiaRoot {
                             .children(preview_lines.into_iter().map(|line| {
                                 div()
                                     .text_xs()
-                                    .font_family("monospace")
+                                    .font_family(MONO_FONT_FAMILY)
                                     .text_color(p.content_meta)
                                     .flex_shrink_0()
                                     .child(if line.is_empty() {

@@ -7,6 +7,7 @@ const MONO_CELL_W: f32 = 8.4;
 const TRANSCRIPT_ROW_H: f32 = 18.0;
 
 use super::colors::{self};
+use crate::gui::assets::MONO_FONT_FAMILY;
 
 #[derive(Clone, Copy)]
 struct StyleState {
@@ -230,7 +231,7 @@ pub(crate) fn shell_history_line(line: &str, is_dark: bool) -> Div {
         .flex_row()
         .items_center()
         .overflow_hidden()
-        .font_family("monospace")
+        .font_family(MONO_FONT_FAMILY)
         .text_sm()
         .children(runs.into_iter().map(|run| {
             let cols = run.text.chars().count().max(1);

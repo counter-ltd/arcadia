@@ -1,12 +1,14 @@
 use openframe::{AppContext, Application, WindowOptions};
 
-use super::super::assets::EmbeddedAssets;
+use super::super::assets::{register_bundled_fonts, EmbeddedAssets};
 use super::ArcadiaRoot;
 
 pub fn run(metal_layer_ptr: usize) {
     Application::new()
         .with_assets(EmbeddedAssets)
         .run(move |app| {
+            register_bundled_fonts(&app.text_system());
+
             app.open_window(
                 WindowOptions {
                     titlebar: None,

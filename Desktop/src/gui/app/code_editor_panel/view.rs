@@ -7,6 +7,7 @@ use openframe::{
 use super::segments::{line_segments, SegKind};
 use super::text::{char_cols, detect_language, expand_tabs, pos_to_byte_offset, word_bounds};
 use crate::gui::app::ArcadiaRoot;
+use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme;
 use arcadia_core::modules::python_registry;
 
@@ -139,7 +140,7 @@ impl ArcadiaRoot {
         let char_width = self.code_editor_char_width_override.unwrap_or_else(|| {
             let font_size = window.rem_size() * 0.875;
             let ts = window.text_system();
-            let fid = ts.resolve_font(&font("monospace"));
+            let fid = ts.resolve_font(&font(MONO_FONT_FAMILY));
             ts.ch_advance(fid, font_size).map(f32::from).unwrap_or(8.4)
         });
         let fh_click = self.code_editor_focus.clone();
@@ -207,7 +208,7 @@ impl ArcadiaRoot {
                     .px_3()
                     .py_0p5()
                     .text_sm()
-                    .font_family("monospace")
+                    .font_family(MONO_FONT_FAMILY)
                     .text_color(line_fg)
                     .relative()
                     .flex()
@@ -268,7 +269,7 @@ impl ArcadiaRoot {
                                     .w(px(char_cols(ch) as f32 * char_width))
                                     .overflow_hidden()
                                     .text_sm()
-                                    .font_family("monospace")
+                                    .font_family(MONO_FONT_FAMILY)
                                     .text_color(text_color)
                                     .child(ch.to_string());
 
@@ -295,7 +296,7 @@ impl ArcadiaRoot {
                             .py_0p5()
                             .text_right()
                             .text_xs()
-                            .font_family("monospace")
+                            .font_family(MONO_FONT_FAMILY)
                             .text_color(gutter_fg)
                             .bg(gutter_bg)
                             .child((i + 1).to_string()),
