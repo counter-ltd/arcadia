@@ -1,5 +1,6 @@
 mod dashboard;
 mod edit;
+mod line_render;
 mod segments;
 mod text;
 mod view;

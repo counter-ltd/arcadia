@@ -2,8 +2,6 @@
 
 use openframe::{div, px, Div, FontWeight, ParentElement, Rgba, Styled};
 
-/// Must match `shell/execute.rs` `CHAR_W` / `CHAR_H` (PTY ↔ transcript cell grid).
-const MONO_CELL_W: f32 = 8.4;
 const TRANSCRIPT_ROW_H: f32 = 18.0;
 
 use super::colors::{self};
@@ -214,7 +212,7 @@ fn parse_ansi_runs(line: &str, default_fg: Rgba, is_dark: bool) -> Vec<Run> {
     runs
 }
 
-pub(crate) fn shell_history_line(line: &str, is_dark: bool) -> Div {
+pub(crate) fn shell_history_line(line: &str, is_dark: bool, cell_w: f32) -> Div {
     let default_fg = colors::default_fg(is_dark);
 
     let runs = parse_ansi_runs(line, default_fg, is_dark);
@@ -233,21 +231,34 @@ pub(crate) fn shell_history_line(line: &str, is_dark: bool) -> Div {
         .overflow_hidden()
         .font_family(MONO_FONT_FAMILY)
         .text_sm()
-        .children(runs.into_iter().map(|run| {
-            let cols = run.text.chars().count().max(1);
-            let mut el = div()
-                .flex_shrink_0()
-                .w(px(MONO_CELL_W * cols as f32))
-                .text_color(run.fg)
-                .font_weight(if run.bold {
-                    FontWeight::BOLD
-                } else {
-                    FontWeight::NORMAL
+        .children(runs.into_iter().flat_map(move |run| {
+            // One fixed-width cell per character. Per-run boxes accumulated
+            // sub-pixel rounding across runs, leaving the right edge ragged on
+            // the multi-coloured pixel-art rows; a per-char grid is exact.
+            let weight = if run.bold {
+                FontWeight::BOLD
+            } else {
+                FontWeight::NORMAL
+            };
+            let fg = run.fg;
+            let bg = run.bg;
+            run.text
+                .chars()
+                .collect::<Vec<char>>()
+                .into_iter()
+                .map(move |ch| {
+                    let mut cell = div()
+                        .flex_shrink_0()
+                        .w(px(cell_w))
+                        .overflow_hidden()
+                        .text_color(fg)
+                        .font_weight(weight)
+                        .child(ch.to_string());
+                    if let Some(b) = bg {
+                        cell = cell.bg(b);
+                    }
+                    cell
                 })
-                .child(run.text);
-            if let Some(bg) = run.bg {
-                el = el.bg(bg);
-            }
-            el
+                .collect::<Vec<_>>()
         }))
 }

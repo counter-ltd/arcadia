@@ -1,11 +1,11 @@
 use openframe::{
-    div, font, px, rgb, rgba, AnyElement, Context, InteractiveElement, IntoElement, KeyDownEvent,
+    div, font, px, rgb, AnyElement, Context, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, StatefulInteractiveElement, Styled,
     Window,
 };
 
-use super::segments::{line_segments, SegKind};
-use super::text::{char_cols, detect_language, expand_tabs, pos_to_byte_offset, word_bounds};
+use super::line_render::{code_line_content, LineStyle};
+use super::text::{detect_language, expand_tabs, pos_to_byte_offset, word_bounds};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme;
@@ -154,6 +154,17 @@ impl ArcadiaRoot {
         let cached_decorations = &self.code_editor_tabs[idx].decorations;
         let lines = &self.code_editor_tabs[idx].cached_lines;
 
+        let line_style = LineStyle {
+            char_width,
+            line_fg,
+            sel_bg,
+            cursor_bg,
+            cursor_fg,
+            indent_guide_color,
+            show_indent_guides: show_marks,
+            small: false,
+        };
+
         let line_els: Vec<AnyElement> = lines
             .iter()
             .enumerate()
@@ -186,103 +197,16 @@ impl ArcadiaRoot {
                     }
                 });
 
-                let display_line = expand_tabs(&line);
-                let segs = line_segments(
-                    &line,
+                let decorations = cached_decorations.get(i).cloned().unwrap_or_default();
+                let content_div = code_line_content(
+                    line,
                     line_start_byte,
+                    &hl_spans,
+                    &decorations,
                     cursor_in_line,
                     sel_in_line,
-                    &hl_spans,
+                    line_style,
                 );
-
-                let decorations = cached_decorations.get(i).cloned().unwrap_or_default();
-
-                let indent_levels = if show_marks {
-                    display_line.chars().take_while(|&c| c == ' ').count() / 4
-                } else {
-                    0
-                };
-
-                let base_div = div()
-                    .flex_1()
-                    .px_3()
-                    .py_0p5()
-                    .text_sm()
-                    .font_family(MONO_FONT_FAMILY)
-                    .text_color(line_fg)
-                    .relative()
-                    .flex()
-                    .flex_row()
-                    .items_start();
-                // Decoration backgrounds: absolute rects on the char grid,
-                // rendered behind text + indent guides. left()/w() are in grid
-                // units (col * char_width) — same coordinate system as the text.
-                let base_div = decorations.iter().fold(base_div, |d, r| {
-                    let color = ((r.r as u32) << 24)
-                        | ((r.g as u32) << 16)
-                        | ((r.b as u32) << 8)
-                        | r.a as u32;
-                    d.child(
-                        div()
-                            .absolute()
-                            .left(px(r.col_start as f32 * char_width))
-                            .top(px(0.))
-                            .bottom(px(0.))
-                            .w(px(r.col_width as f32 * char_width))
-                            .bg(rgba(color)),
-                    )
-                });
-                // Indent guides: 1px absolute lines at each 4-col boundary.
-                // left() is from content-box origin (after px_3 padding), so no 12px offset.
-                let base_div = (0..indent_levels).fold(base_div, |d, level| {
-                    let x = (level as f32) * 4.0 * char_width;
-                    d.child(
-                        div()
-                            .absolute()
-                            .left(px(x))
-                            .top(px(0.))
-                            .bottom(px(0.))
-                            .w(px(1.))
-                            .bg(indent_guide_color),
-                    )
-                });
-                // Each character renders in its own fixed-width cell
-                // (char_width, wide chars = 2x). A per-char cell keeps every
-                // column on the grid regardless of the font's real glyph
-                // advances — "monospace" can resolve to a proportional fallback,
-                // so a per-segment width would let caps overflow and narrow
-                // glyphs underflow. Text, indent guides, decorations and click
-                // hit-testing all share the same char_width coordinate system.
-                let content_div =
-                    base_div.children(segs.into_iter().flat_map(move |(text, kind, hl_color)| {
-                        let text_color = match (kind, hl_color) {
-                            (SegKind::Normal, Some(c)) => rgb(c),
-                            _ => line_fg,
-                        };
-                        expand_tabs(&text)
-                            .chars()
-                            .collect::<Vec<char>>()
-                            .into_iter()
-                            .map(move |ch| {
-                                let cell = div()
-                                    .flex_shrink_0()
-                                    .w(px(char_cols(ch) as f32 * char_width))
-                                    .overflow_hidden()
-                                    .text_sm()
-                                    .font_family(MONO_FONT_FAMILY)
-                                    .text_color(text_color)
-                                    .child(ch.to_string());
-
-                                match kind {
-                                    SegKind::Normal => cell.into_any_element(),
-                                    SegKind::Selected => cell.bg(sel_bg).into_any_element(),
-                                    SegKind::Cursor => {
-                                        cell.bg(cursor_bg).text_color(cursor_fg).into_any_element()
-                                    }
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                    }));
 
                 div()
                     .flex()
@@ -292,13 +216,15 @@ impl ArcadiaRoot {
                         div()
                             .w(gutter_w)
                             .flex_shrink_0()
-                            .px_2()
+                            .px_1()
                             .py_0p5()
                             .text_right()
                             .text_xs()
                             .font_family(MONO_FONT_FAMILY)
                             .text_color(gutter_fg)
                             .bg(gutter_bg)
+                            .border_r_1()
+                            .border_color(indent_guide_color)
                             .child((i + 1).to_string()),
                     )
                     .child(content_div)

@@ -1,22 +1,49 @@
 use openframe::{
-    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    ParentElement, StatefulInteractiveElement, Styled, Window,
+    div, font, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, StatefulInteractiveElement, Styled, Window,
 };
 
+use super::line_render::{code_line_content, LineStyle};
+use super::text::{detect_language, expand_tabs};
 use crate::gui::app::{ArcadiaRoot, CodeEditorTab};
 use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme;
 use arcadia_core::config::workspace::WorkspacesConfig;
 use arcadia_core::config::ConfigFile;
+use arcadia_core::modules::python_registry;
 
 impl ArcadiaRoot {
     pub(super) fn code_editor_dashboard(
         &mut self,
-        _window: &Window,
+        window: &Window,
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> AnyElement {
         let p = theme::theme_palette(cx, is_dark);
+
+        // Measured monospace cell width at text_xs — preview lines render on the
+        // same char grid as the editor.
+        let preview_cw = {
+            let font_size = window.rem_size() * 0.75;
+            let ts = window.text_system();
+            let fid = ts.resolve_font(&font(MONO_FONT_FAMILY));
+            ts.ch_advance(fid, font_size).map(f32::from).unwrap_or(7.0)
+        };
+        let preview_indent_guide = if is_dark {
+            rgb(0x2d3748)
+        } else {
+            rgb(0xd1d5db)
+        };
+        let preview_style = LineStyle {
+            char_width: preview_cw,
+            line_fg: p.content_title,
+            sel_bg: p.content_title,
+            cursor_bg: p.content_title,
+            cursor_fg: p.content_title,
+            indent_guide_color: preview_indent_guide,
+            show_indent_guides: true,
+            small: true,
+        };
 
         let pal = theme::nav_accent_palette("emerald", is_dark);
         let r = p.radius_md.min(12.0);
@@ -118,15 +145,24 @@ impl ArcadiaRoot {
                     .unwrap_or("unsaved")
                     .to_string();
                 let is_dirty = tab.content != tab.saved_content;
-                let preview_lines: Vec<String> = tab
-                    .content
-                    .lines()
-                    .take(9)
-                    .map(|l| {
-                        let s: String = l.chars().take(48).collect();
-                        s
-                    })
-                    .collect();
+                // Preview runs the real syntax + decoration providers so
+                // user-created extensions render here exactly as in the editor.
+                let prev_lang = tab.language.clone().or_else(|| detect_language(&tab.title));
+                let prev_src: String =
+                    tab.content.lines().take(9).collect::<Vec<_>>().join("\n");
+                let prev_hl = prev_lang
+                    .as_deref()
+                    .map(|l| python_registry::call_highlight_provider(l, &prev_src))
+                    .unwrap_or_default();
+                let prev_lines: Vec<(usize, String)> = {
+                    let mut v = Vec::new();
+                    let mut pos = 0usize;
+                    for ln in prev_src.split('\n') {
+                        v.push((pos, ln.to_string()));
+                        pos += ln.len() + 1;
+                    }
+                    v
+                };
                 let fh_card = self.code_editor_focus.clone();
                 div()
                     .flex_1()
@@ -161,19 +197,23 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_0()
-                            .children(preview_lines.into_iter().map(|line| {
-                                div()
-                                    .text_xs()
-                                    .font_family(MONO_FONT_FAMILY)
-                                    .text_color(p.content_meta)
-                                    .flex_shrink_0()
-                                    .child(if line.is_empty() {
-                                        " ".to_string()
-                                    } else {
-                                        line
-                                    })
-                                    .into_any_element()
-                            })),
+                            .children(prev_lines.into_iter().enumerate().map(
+                                move |(li, (start, ln))| {
+                                    let deco = python_registry::call_decoration_providers(
+                                        &expand_tabs(&ln),
+                                        li,
+                                    );
+                                    code_line_content(
+                                        &ln,
+                                        start,
+                                        &prev_hl,
+                                        &deco,
+                                        None,
+                                        None,
+                                        preview_style,
+                                    )
+                                },
+                            )),
                     )
                     .child(
                         div()

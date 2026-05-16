@@ -1,11 +1,10 @@
-//! Arcadia MOTD — ethereal gateway scene (gradient sky, parabolic arch, sun, dunes) + system info.
+//! Arcadia MOTD — app-icon scene (parabolic arch, rising sun, twin hills, stars) + system info.
 
 use crate::config::appearance::AppearanceConfig;
 use crate::config::extension_tokens;
 use crate::config::ConfigFile;
 use crate::modules::python_registry::{list_styles, GlyphParams};
 use crate::modules::{ExecutionContext, ModuleCommand};
-use std::fmt::Write as _;
 
 #[derive(Clone, Copy)]
 struct MotdAnsiPalette {
@@ -121,24 +120,12 @@ fn px(r: u8, g: u8, b: u8) -> String {
     format!("\x1b[38;2;{r};{g};{b}m\x1b[48;2;{r};{g};{b}m█\x1b[0m")
 }
 
-fn star_tile(fr: u8, fg: u8, fb: u8, br: u8, bg: u8, bb: u8) -> String {
-    format!("\x1b[38;2;{fr};{fg};{fb}m\x1b[48;2;{br};{bg};{bb}m█\x1b[0m")
-}
-
 fn lerp(a: u8, b: u8, t: f32) -> u8 {
     (a as f32 + (b as f32 - a as f32) * t).round() as u8
 }
 
 fn lerp3(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
     (lerp(a.0, b.0, t), lerp(a.1, b.1, t), lerp(a.2, b.2, t))
-}
-
-fn lighten(rgb: (u8, u8, u8), amt: u8) -> (u8, u8, u8) {
-    (
-        rgb.0.saturating_add(amt).min(255),
-        rgb.1.saturating_add(amt).min(255),
-        rgb.2.saturating_add((amt / 2).min(255)),
-    )
 }
 
 /// Visible char count — strips ANSI CSI/OSC sequences.
@@ -179,264 +166,139 @@ fn vw(s: &str) -> usize {
 
 // ── Arcadia arch art ──────────────────────────────────────────────────────────
 
+/// Pixel scene matching the app icon: a single white parabolic arch over a night
+/// sky, a sun rising between two hills, stars, on a rounded-square gradient field.
 fn arch_art_lines() -> Vec<String> {
-    /// Inner scene width; outer row width adds symmetric gutters for flush vertical edges.
-    const GUTTER: usize = 2;
-    /// Drawable columns — row length is `IW + 2 * GUTTER` (fixed vertical gutters).
-    const IW: usize = 40;
-    const SKY_ROWS: usize = 8;
-    const DUNE_ROWS: usize = 2;
-    const BASE_W: f32 = 36.0;
+    use std::f32::consts::PI;
 
-    let cx_f = (IW as f32) / 2.0;
-    let gs = (IW as f32) / BASE_W;
-    let gutter_rgb = (22, 16, 56);
+    const W: usize = 28;
+    const H: usize = 13;
+    let wf = W as f32;
+    let hf = H as f32;
+    let cx = wf / 2.0 - 0.5;
+    // Terminal cells are ~8.4w × 18h — compress x so discs read as round.
+    let ax = 8.4_f32 / 18.0_f32;
 
-    // Outer sky: deep indigo → warm dusk (Image #2 vibe)
-    let sky_out_t: (u8, u8, u8) = (42, 28, 92);
-    let sky_out_m: (u8, u8, u8) = (88, 48, 138);
-    let sky_out_b: (u8, u8, u8) = (168, 92, 118);
-    // Inner sky (through gate): cooler, subtler horizon bloom
-    let sky_in_t: (u8, u8, u8) = (38, 36, 108);
-    let sky_in_m: (u8, u8, u8) = (72, 52, 142);
-    let sky_in_b: (u8, u8, u8) = (122, 72, 132);
+    // ── palette ──────────────────────────────────────────────────────────────
+    let sky_top: (u8, u8, u8) = (94, 62, 182);
+    let sky_mid: (u8, u8, u8) = (150, 92, 186);
+    let sky_bot: (u8, u8, u8) = (236, 152, 178);
+    let night_top: (u8, u8, u8) = (30, 24, 72);
+    let night_bot: (u8, u8, u8) = (74, 48, 112);
+    let arch_core: (u8, u8, u8) = (250, 248, 255);
+    let arch_soft: (u8, u8, u8) = (214, 202, 242);
+    let sun_core: (u8, u8, u8) = (255, 247, 208);
+    let sun_mid: (u8, u8, u8) = (252, 223, 156);
+    let sun_glow: (u8, u8, u8) = (244, 174, 128);
+    let hill_back: (u8, u8, u8) = (112, 78, 170);
+    let hill_front: (u8, u8, u8) = (72, 48, 124);
+    let star_dim: (u8, u8, u8) = (224, 218, 246);
+    let star_bright: (u8, u8, u8) = (255, 255, 250);
 
-    // Arch — luminous lilac stack + deeper silhouettes on outer faces
-    let arch_core: (u8, u8, u8) = (252, 248, 255);
-    let arch_mid: (u8, u8, u8) = (224, 214, 248);
-    let arch_mid2: (u8, u8, u8) = (202, 188, 236);
-    let arch_edge: (u8, u8, u8) = (168, 150, 222);
-    let arch_deep: (u8, u8, u8) = (132, 112, 188);
+    // ── geometry ─────────────────────────────────────────────────────────────
+    // Arch follows a parabola: peak high at centre, arms sweeping to the corners.
+    let y_peak = 1.5_f32;
+    let k = (hf - 0.6 - y_peak) / (cx * cx);
+    let stroke = 1.15_f32; // half-thickness of the white arch band, in rows
 
-    let sun_c: (u8, u8, u8) = (255, 242, 188);
-    let sun_i: (u8, u8, u8) = (253, 228, 158);
-    let sun_g: (u8, u8, u8) = (246, 188, 102);
-    let sun_o: (u8, u8, u8) = (218, 132, 122);
-    let sun_r: (u8, u8, u8) = (158, 92, 138);
+    let hill_base = hf - 2.3;
+    let sun_cx = cx;
+    let sun_cy = hill_base - 0.2;
+    let sun_r = 3.05_f32;
 
-    // Layered dunes
-    let dune_back: (u8, u8, u8) = (52, 36, 118);
-    let dune_mid: (u8, u8, u8) = (44, 32, 98);
-    let dune_front: (u8, u8, u8) = (36, 26, 82);
+    // Smooth 0..1 hump centred at `center`, zero beyond `half`.
+    let bump = |x: f32, center: f32, half: f32| -> f32 {
+        let u = (x - center) / half;
+        if u.abs() < 1.0 {
+            0.5 * (1.0 + (PI * u).cos())
+        } else {
+            0.0
+        }
+    };
 
-    let stars_raw: &[(usize, usize, char)] = &[
-        (1, 5, '.'),
-        (1, 18, '.'),
-        (1, 31, '.'),
-        (2, 8, '.'),
-        (2, 22, '*'),
-        (2, 33, '.'),
-        (3, 6, '.'),
-        (3, 15, '.'),
-        (3, 28, '.'),
-        (4, 11, '.'),
-        (4, 24, '.'),
-        (5, 5, '.'),
-        (5, 13, '*'),
-        (5, 20, '.'),
-        (5, 30, '.'),
-        (6, 9, '.'),
-        (6, 26, '.'),
-        (7, 7, '.'),
-        (7, 18, '.'),
-        (7, 32, '.'),
+    // Stars — placed in the interior night sky, clear of the arch band and sun.
+    let stars: &[(usize, usize)] = &[
+        (3, 12),
+        (3, 16),
+        (4, 9),
+        (4, 14),
+        (4, 18),
+        (5, 8),
+        (5, 15),
+        (5, 20),
+        (6, 11),
+        (6, 19),
     ];
-    let wf_inner = IW as f32;
-    let stars: Vec<(usize, usize, char)> = stars_raw
-        .iter()
-        .copied()
-        .map(|(r, c, ch)| {
-            let nc = ((c as f32 / BASE_W) * wf_inner)
-                .round()
-                .clamp(0.0, wf_inner - 1.0) as usize;
-            (r, nc, ch)
-        })
-        .collect();
 
-    let mut out = Vec::with_capacity(SKY_ROWS + DUNE_ROWS);
-
-    /// Sky color by region and vertical position (smooth 3-stop gradient).
-    fn sky_at(
-        outer: bool,
-        y: f32,
-        sky_out_t: (u8, u8, u8),
-        sky_out_m: (u8, u8, u8),
-        sky_out_b: (u8, u8, u8),
-        sky_in_t: (u8, u8, u8),
-        sky_in_m: (u8, u8, u8),
-        sky_in_b: (u8, u8, u8),
-    ) -> (u8, u8, u8) {
-        let (t, m, b) = if outer {
-            (sky_out_t, sky_out_m, sky_out_b)
-        } else {
-            (sky_in_t, sky_in_m, sky_in_b)
-        };
-        if y < 0.5 {
-            let u = y * 2.0;
-            lerp3(t, m, u)
-        } else {
-            let u = (y - 0.5) * 2.0;
-            lerp3(m, b, u)
-        }
-    }
-
-    for r in 0..SKY_ROWS {
-        let t = r as f32 / (SKY_ROWS - 1).max(1) as f32;
+    let mut out = Vec::with_capacity(H);
+    for r in 0..H {
+        let rf = r as f32;
         let mut line = String::new();
-        for _ in 0..GUTTER {
-            line.push_str(&px(gutter_rgb.0, gutter_rgb.1, gutter_rgb.2));
-        }
+        for c in 0..W {
+            let cf = c as f32;
 
-        // Parabolic opening: narrow aloft, wide near horizon (∩ gateway).
-        let half_open = (3.2 + 11.8 * t.powf(1.35)) * gs;
-        let inner_l = (cx_f - half_open).floor() as isize;
-        let inner_r = (cx_f + half_open).ceil() as isize;
-        let pillar: isize = if r < 2 {
-            (2.0 * gs).round().clamp(2.0, 4.0) as isize
-        } else {
-            (3.0 * gs).round().clamp(3.0, 5.0) as isize
-        };
+            let para_y = y_peak + k * (cf - cx) * (cf - cx);
+            let vt = (rf / (hf - 1.0)).clamp(0.0, 1.0);
 
-        let lp0 = inner_l - pillar;
-        let lp1 = inner_l;
-        let rp0 = inner_r;
-        let rp1 = inner_r + pillar;
+            // Hills (foreground) — the sun rises in the dip between them.
+            let back_top = hill_base - 1.5 * bump(cf, 0.33 * wf, 0.40 * wf);
+            let front_top = hill_base + 0.5 - 1.8 * bump(cf, 0.68 * wf, 0.44 * wf);
+            if rf >= front_top {
+                line.push_str(&px(hill_front.0, hill_front.1, hill_front.2));
+                continue;
+            }
+            if rf >= back_top {
+                line.push_str(&px(hill_back.0, hill_back.1, hill_back.2));
+                continue;
+            }
 
-        // Keystone / curved lintel (rows 0–1): stone bridge above gap.
-        let lintel_half = half_open + pillar as f32 + 1.2 * gs;
-        let cap_row = r <= 1;
-
-        for ic in 0..IW {
-            let c = ic as isize;
-            let cf = ic as f32;
-
-            let dist_top = ((cf - cx_f).powi(2) + ((r as f32) - 0.8).powi(2)).sqrt();
-            let on_lintel =
-                cap_row && dist_top <= lintel_half + 1.8 * gs && dist_top >= lintel_half - 2.6 * gs;
-
-            let in_open = c >= lp1 && c < rp0;
-            let left_pillar = c >= lp0 && c < lp1;
-            let right_pillar = c >= rp0 && c < rp1;
-            let outer_left = c < lp0;
-            let outer_right = c >= rp1;
-
-            let region_open = in_open && !on_lintel;
-
-            let dx = (cf - cx_f).abs();
-            let sr = r as f32;
-            let sun_layer = if region_open && sr >= 3.0 {
-                let spread = gs * (5.2 + (sr - 3.0) * 0.75);
-                if dx <= spread {
-                    if sr >= 6.0 && dx <= 1.05 * gs {
-                        Some(sun_c)
-                    } else if sr >= 5.5 && dx <= 1.85 * gs {
-                        Some(sun_i)
-                    } else if sr >= 5.0 && dx <= 3.2 * gs {
-                        Some(sun_g)
-                    } else if sr >= 4.0 && dx <= 4.9 * gs {
-                        Some(sun_o)
-                    } else if dx <= spread {
-                        Some(sun_r)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            let arch_px = if on_lintel {
-                let rim = (dist_top - lintel_half).abs();
-                Some(if rim < 0.9 {
-                    arch_core
-                } else if rim < 1.7 {
-                    arch_mid
-                } else {
-                    arch_edge
-                })
-            } else if left_pillar || right_pillar {
-                let toward_inner = if left_pillar {
-                    (lp1 - 1 - c).max(0)
-                } else {
-                    (c - rp0).max(0)
-                };
-                Some(match toward_inner {
-                    0 => arch_core,
-                    1 => arch_mid,
-                    2 => arch_mid2,
-                    3 => arch_edge,
-                    _ => arch_deep,
-                })
-            } else {
-                None
-            };
-
-            if let Some(col) = arch_px {
+            // White arch band straddling the parabola.
+            if (rf - para_y).abs() <= stroke {
+                let edge = (rf - para_y).abs() / stroke;
+                let col = lerp3(arch_core, arch_soft, edge.powf(1.6));
                 line.push_str(&px(col.0, col.1, col.2));
-            } else if let Some(col) = sun_layer {
-                line.push_str(&px(col.0, col.1, col.2));
-            } else {
-                let outer = outer_left || outer_right;
-                let bg = sky_at(
-                    outer, t, sky_out_t, sky_out_m, sky_out_b, sky_in_t, sky_in_m, sky_in_b,
-                );
-                let star = stars.iter().find(|s| s.0 == r && s.1 == ic);
-                if let Some(&(_, _, ch)) = star {
-                    let (fr, fg, fb) = if ch == '*' {
-                        (255, 254, 245)
+                continue;
+            }
+
+            if rf > para_y {
+                // Interior: night sky, rising sun, stars.
+                let dx = (cf - sun_cx) * ax;
+                let dy = rf - sun_cy;
+                let d = (dx * dx + dy * dy).sqrt();
+                if d <= sun_r {
+                    let col = if d <= sun_r * 0.46 {
+                        sun_core
+                    } else if d <= sun_r * 0.78 {
+                        lerp3(sun_core, sun_mid, (d / sun_r - 0.46) / 0.32)
                     } else {
-                        (216, 210, 238)
+                        lerp3(sun_mid, sun_glow, (d / sun_r - 0.78) / 0.22)
                     };
-                    line.push_str(&star_tile(fr, fg, fb, bg.0, bg.1, bg.2));
-                } else {
-                    line.push_str(&px(bg.0, bg.1, bg.2));
+                    line.push_str(&px(col.0, col.1, col.2));
+                    continue;
                 }
-            }
-        }
-
-        for _ in 0..GUTTER {
-            line.push_str(&px(gutter_rgb.0, gutter_rgb.1, gutter_rgb.2));
-        }
-        out.push(line);
-    }
-
-    // Rolling dunes + faint crest highlights (same width as sky incl. gutters).
-    for hill_r in 0..DUNE_ROWS {
-        let mut line = String::new();
-        for _ in 0..GUTTER {
-            line.push_str(&px(gutter_rgb.0, gutter_rgb.1, gutter_rgb.2));
-        }
-        for ic in 0..IW {
-            let x = ic as f32 / (IW - 1).max(1) as f32;
-            let wave_a = (x * 6.25).sin();
-            let wave_b = (x * 4.05 + 1.05).sin();
-            let h0 = (wave_a * 0.35 + 0.5) > (hill_r as f32 * 0.12 + 0.38);
-            let h1 = (wave_b * 0.28 + 0.52) > (hill_r as f32 * 0.1 + 0.42);
-            let mut col = if hill_r == 0 {
-                if h0 {
-                    dune_back
+                let mut col = lerp3(night_top, night_bot, vt);
+                let bloom = (1.0 - (d / (sun_r * 2.6)).min(1.0)).powf(2.0);
+                col = lerp3(col, sun_glow, bloom * 0.5);
+                if stars.iter().any(|&(sr, sc)| sr == r && sc == c) {
+                    let s = if (r + c) % 3 == 0 {
+                        star_bright
+                    } else {
+                        star_dim
+                    };
+                    line.push_str(&px(s.0, s.1, s.2));
                 } else {
-                    dune_mid
+                    line.push_str(&px(col.0, col.1, col.2));
                 }
-            } else if h1 {
-                dune_mid
-            } else {
-                dune_front
-            };
-            let crest = if hill_r == 0 {
-                wave_a.abs()
-            } else {
-                wave_b.abs()
-            };
-            if crest > 0.92 {
-                col = lighten(col, 14);
+                continue;
             }
+
+            // Outer sky — indigo aloft warming to dusk pink at the horizon.
+            let col = if vt < 0.5 {
+                lerp3(sky_top, sky_mid, vt * 2.0)
+            } else {
+                lerp3(sky_mid, sky_bot, (vt - 0.5) * 2.0)
+            };
             line.push_str(&px(col.0, col.1, col.2));
-        }
-        for _ in 0..GUTTER {
-            line.push_str(&px(gutter_rgb.0, gutter_rgb.1, gutter_rgb.2));
         }
         out.push(line);
     }
@@ -690,27 +552,17 @@ fn stat_row(key: &str, value: &str, label_w: usize, pal: &MotdAnsiPalette) -> St
     )
 }
 
-fn palette_footer(pal: &MotdAnsiPalette) -> String {
-    let colors: [(u8, u8, u8); 8] = [
-        pal.accent,
-        (42, 28, 92),
-        (88, 48, 138),
-        (168, 92, 118),
-        (255, 238, 168),
-        (52, 36, 118),
-        (36, 26, 82),
-        (255, 252, 255),
-    ];
-    let mut s = String::new();
-    let _ = write!(
-        s,
-        "\x1b[38;2;{};{};{}m.\x1b[0m ",
-        pal.dim.0, pal.dim.1, pal.dim.2
-    );
-    for &(r, g, b) in &colors {
-        let _ = write!(s, "\x1b[38;2;{r};{g};{b}mo\x1b[0m  ");
-    }
-    s.trim_end().to_string()
+fn version_line(pal: &MotdAnsiPalette) -> String {
+    format!(
+        "\x1b[38;2;{};{};{}mArcadia\x1b[0m \x1b[38;2;{};{};{}m{}\x1b[0m",
+        pal.accent.0,
+        pal.accent.1,
+        pal.accent.2,
+        pal.dim.0,
+        pal.dim.1,
+        pal.dim.2,
+        env!("CARGO_PKG_VERSION"),
+    )
 }
 
 fn gather_right_column(pal: &MotdAnsiPalette) -> Vec<String> {
@@ -736,7 +588,7 @@ fn gather_right_column(pal: &MotdAnsiPalette) -> Vec<String> {
         pal.sep.0, pal.sep.1, pal.sep.2
     );
 
-    let mut lines = vec![head, sep_line];
+    let mut lines = vec![head, sep_line.clone()];
     let pairs: [(&str, String); 9] = [
         ("OS", os_pretty()),
         ("Host", machine_model()),
@@ -751,7 +603,8 @@ fn gather_right_column(pal: &MotdAnsiPalette) -> Vec<String> {
     for (k, v) in pairs {
         lines.push(stat_row(k, &v, KW, pal));
     }
-    lines.push(palette_footer(pal));
+    lines.push(sep_line);
+    lines.push(version_line(pal));
     lines
 }
 

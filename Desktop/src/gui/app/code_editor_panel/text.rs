@@ -143,7 +143,8 @@ pub fn pos_to_byte_offset(
         .min(line_bounds.len() - 1);
 
     let line_x = line_bounds[line_idx].origin.x;
-    let content_x = line_x + gutter_w + px(12.0);
+    // Must match the content line's left padding (`base_div` `.px_1()` in view.rs).
+    let content_x = line_x + gutter_w + px(4.0);
     let col_x = f32::from(event_pos.x - content_x).max(0.0);
     let col_chars = (col_x / char_width).floor() as usize;
 

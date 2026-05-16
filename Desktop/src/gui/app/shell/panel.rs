@@ -1,8 +1,9 @@
 use openframe::{
-    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    StatefulInteractiveElement, Styled, Window, WindowAppearance,
+    div, font, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, StatefulInteractiveElement, Styled, Window, WindowAppearance,
 };
 
+use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme;
 use crate::gui::tui::shell_history_line;
 
@@ -28,6 +29,14 @@ impl ArcadiaRoot {
             return self.terminal_dashboard(cx, is_dark);
         }
         let is_focused = self.shell_focus.is_focused(window);
+        // Measured monospace cell width — transcript renders one fixed-width cell
+        // per char so pixel-art rows and text stay on an exact grid.
+        let cell_w = {
+            let font_size = window.rem_size() * 0.875;
+            let ts = window.text_system();
+            let fid = ts.resolve_font(&font(MONO_FONT_FAMILY));
+            ts.ch_advance(fid, font_size).map(f32::from).unwrap_or(8.4)
+        };
         let shell_border = theme::ui_border(cx, is_dark);
         let shell_accent = theme::ui_accent(cx);
         let term = self.active_terminal();
@@ -69,7 +78,7 @@ impl ArcadiaRoot {
                             term.shell_history
                                 .iter()
                                 .filter(|line| !line.is_empty())
-                                .map(|line| shell_history_line(line, is_dark)),
+                                .map(|line| shell_history_line(line, is_dark, cell_w)),
                         ),
                     ),
             )
