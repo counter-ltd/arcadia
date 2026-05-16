@@ -426,15 +426,38 @@ fn kernel_line() -> String {
     }
 }
 
+/// Extract the up-duration from raw `uptime` output, dropping the clock,
+/// user count, and load averages — e.g. "6 days, 1:37".
+fn compact_uptime(raw: &str) -> String {
+    let after_up = match raw.split_once(" up ") {
+        Some((_, rest)) => rest,
+        None => raw.trim(),
+    };
+    let trimmed = after_up
+        .split(", load average")
+        .next()
+        .unwrap_or(after_up);
+    let cut = trimmed
+        .find(" user")
+        .map(|i| trimmed[..i].rsplit_once(',').map(|(a, _)| a).unwrap_or(trimmed))
+        .unwrap_or(trimmed);
+    let out = cut.trim().trim_end_matches(',').trim();
+    if out.is_empty() {
+        "n/a".into()
+    } else {
+        out.to_string()
+    }
+}
+
 fn uptime_line() -> String {
     #[cfg(target_os = "linux")]
     {
         if let Some(u) = run_cmd("uptime", &["-p"]) {
-            return u;
+            return u.trim_start_matches("up ").trim().to_string();
         }
     }
     if let Some(u) = run_cmd("uptime", &[]) {
-        return u;
+        return compact_uptime(&u);
     }
     "n/a".into()
 }
@@ -552,12 +575,10 @@ fn stat_row(key: &str, value: &str, label_w: usize, pal: &MotdAnsiPalette) -> St
     )
 }
 
-fn version_line(pal: &MotdAnsiPalette) -> String {
+fn version_line(pal: &MotdAnsiPalette, label_w: usize) -> String {
     format!(
-        "\x1b[38;2;{};{};{}mArcadia\x1b[0m \x1b[38;2;{};{};{}m{}\x1b[0m",
-        pal.accent.0,
-        pal.accent.1,
-        pal.accent.2,
+        "{}  \x1b[38;2;{};{};{}m{}\x1b[0m",
+        lbl_col("Arcadia", label_w, pal.accent),
         pal.dim.0,
         pal.dim.1,
         pal.dim.2,
@@ -604,7 +625,7 @@ fn gather_right_column(pal: &MotdAnsiPalette) -> Vec<String> {
         lines.push(stat_row(k, &v, KW, pal));
     }
     lines.push(sep_line);
-    lines.push(version_line(pal));
+    lines.push(version_line(pal, KW));
     lines
 }
 

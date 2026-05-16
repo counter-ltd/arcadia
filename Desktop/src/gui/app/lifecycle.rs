@@ -393,6 +393,7 @@ impl ArcadiaRoot {
             code_editor_focus,
             code_editor_char_width_focus,
             code_editor_workspace_picker_open: false,
+            code_editor_undo_history_open: false,
             code_editor_explorer_open: false,
             code_editor_explorer_expanded: std::collections::HashSet::new(),
             code_editor_context_menu_open: false,

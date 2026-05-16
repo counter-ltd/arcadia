@@ -262,6 +262,11 @@ impl Render for ArcadiaRoot {
                         this.code_editor_workspace_picker_open = false;
                         changed = true;
                     }
+                    #[cfg(feature = "gui")]
+                    if this.code_editor_undo_history_open {
+                        this.code_editor_undo_history_open = false;
+                        changed = true;
+                    }
                     if this.ai_context_menu_open {
                         this.ai_context_menu_open = false;
                         changed = true;

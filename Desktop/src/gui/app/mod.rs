@@ -399,6 +399,7 @@ pub struct ArcadiaRoot {
     pub code_editor_cursor_style: arcadia_core::config::code_editor::CursorStyle,
     pub code_editor_undo: code_editor_panel::EditorUndoMap,
     pub code_editor_workspace_picker_open: bool,
+    pub code_editor_undo_history_open: bool,
     pub code_editor_explorer_open: bool,
     pub code_editor_explorer_expanded: std::collections::HashSet<String>,
     pub code_editor_char_width_override: Option<f32>,
