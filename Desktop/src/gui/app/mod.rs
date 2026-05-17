@@ -688,6 +688,7 @@ pub struct ArcadiaRoot {
     /// Styling extension token values for Appearance (`module_id`, `token_key`).
     pub extension_token_values: HashMap<(String, String), String>,
     pub extension_token_editing: Option<(String, String)>,
+    pub extension_token_slider_active: Option<(String, String)>,
     pub extension_token_focus: FocusHandle,
     /// Active color picker modal state: (module, key, current_color, default_color).
     pub color_picker_modal: Option<(String, String, String, String)>,

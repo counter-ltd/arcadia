@@ -427,6 +427,157 @@ Files over 400 lines in `Shared/ArcadiaCore/src/modules/` or `Desktop/src/gui/ap
 
 ---
 
+## Naming and Generality Rules
+
+These rules exist because Arcadia is a general-purpose platform. Every name is a contract — a name that references a specific service, language, OS, or UI shape leaks an assumption that will break when the platform grows.
+
+### No platform names in cross-platform types
+
+Never add a variant, field, or function name that references a specific OS to any type in `Shared/ArcadiaCore/`. Platform-specific behaviour lives only in `platform/*.rs` and surface entrypoints.
+
+```rust
+// BAD — macOS concept as a first-class variant in a cross-platform enum
+pub enum OverlayStackingToken {
+    Hud,
+    BelowMenuBar,  // macOS menu bar doesn't exist on iOS or Windows
+}
+
+// GOOD — semantic name; the macOS backend maps it to NSWindowLevel 24 internally
+pub enum OverlayStackingToken {
+    Hud,
+    SystemEdge,  // "the edge owned by the platform's system chrome"
+}
+```
+
+### No service or brand names in module manifests or navigation
+
+Module names, page IDs, page titles, config keys, and field names must describe **what the feature does**, not which external service it connects to.
+
+```rust
+// BAD — brand name in navigation title and module description
+NavigationPageDefinition { id: "late.now_playing", title: "Late.sh", … }
+ModuleManifest { description: "Native late.sh client — chat rooms, …", … }
+
+// GOOD — describes the capability
+NavigationPageDefinition { id: "social.now_playing", title: "Social", … }
+ModuleManifest { description: "Real-time chat rooms, music stream, and reactions.", … }
+```
+
+### No language name in the extension namespace
+
+Extension page ID prefixes, config field names, and directory names must not embed a language name. The extension host is language-agnostic at the platform layer.
+
+```rust
+// BAD — language name in page ID prefix and config field
+pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "python.extension_tokens|";
+pub python_extensions: BTreeMap<String, bool>,
+
+// GOOD — language-neutral
+pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "extension.tokens|";
+pub extension_state: BTreeMap<String, bool>,
+```
+
+### Feature-prefixed flat root fields are banned
+
+Top-level view state structs (`ArcadiaRoot`) must not accumulate `feature_*` flat fields. New subsystem state goes in a dedicated nested struct.
+
+```rust
+// BAD — every new feature adds N more fields to the root; 95+ fields today
+pub code_editor_focus: FocusHandle,
+pub code_editor_tabs: Vec<CodeEditorTab>,
+pub code_editor_undo: EditorUndoMap,
+// … 21 more code_editor_* fields …
+
+// GOOD — nested substruct; ArcadiaRoot stays slim
+pub code_editor: CodeEditorUiState,
+
+pub struct CodeEditorUiState {
+    pub focus: FocusHandle,
+    pub tabs: Vec<CodeEditorTab>,
+    pub undo: EditorUndoMap,
+    // …
+}
+```
+
+### Theme functions named after consumers are banned
+
+Theme colour/style helpers must express **semantic purpose**, never the specific feature currently using them.
+
+```rust
+// BAD — name leaks the consumer; visual editor can't reuse without confusion
+pub fn code_explorer_sidebar_bg(is_dark: bool) -> Hsla { … }
+pub fn late_bonsai_well_bg(is_dark: bool) -> Hsla { … }
+
+// GOOD — semantic; any feature with a sidebar or decorative inset can use it
+pub fn explorer_sidebar_bg(is_dark: bool) -> Hsla { … }
+pub fn decorative_well_bg(is_dark: bool) -> Hsla { … }
+```
+
+### Magic string enum values are banned
+
+When a field accepts a finite set of values, use a typed enum. Magic strings are undiscoverable and break silently.
+
+```rust
+// BAD — 8 undocumented magic values; typos silently fall back to default
+pub struct OverlayHudSpritePayload {
+    pub anchor: String,   // "top-right" | "bottom-center" | "top-full" | …
+    pub stacking: String, // "hud" | "below_menu_bar"
+}
+
+// GOOD — exhaustive, compiler-checked
+pub enum SpriteAnchor {
+    TopRight, TopLeft, TopCenter, TopFull,
+    BottomRight, BottomLeft, BottomCenter, BottomFull,
+}
+pub struct OverlayHudSpritePayload {
+    pub anchor: SpriteAnchor,
+    pub stacking: OverlayStackingToken,
+}
+```
+
+### Provider/editor-specific duplicate state patterns are banned
+
+Adding a new AI provider, editor type, or collaboration service must not require adding new named fields to a root struct. Use a keyed collection.
+
+```rust
+// BAD — 9 fields per provider; adding a 4th provider adds 9 more root fields
+pub openai_create_draft: OpenAiCreateDraft,
+pub openai_create_name_focus: FocusHandle,
+pub llama_cpp_create_draft: LlamaCppCreateDraft,
+pub llama_cpp_create_name_focus: FocusHandle,
+
+// GOOD — one field handles all providers
+pub provider_create_drafts: HashMap<String, ProviderCreateDraft>,
+pub provider_focus_handles: HashMap<(String, FieldKey), FocusHandle>,
+```
+
+### Hardcoded page ID comparisons for routing/layout are banned
+
+Visibility rules, layout decisions, and sidebar expansion state must come from `NavigationPageDefinition` metadata — not from `if active_page_id == "some.page"` chains. New pages must not require editing routing functions.
+
+```rust
+// BAD — every new full-height page requires adding another arm here
+fn content_padding(&self) -> Option<Padding> {
+    if self.active_page_id == "editor.main" { return None; }
+    if self.active_page_id == "editor.visual" { return None; }
+    if self.active_page_id == "utility.shell" { return None; }
+    Some(Padding::default())
+}
+
+// GOOD — declared once in NavigationPageDefinition; routing reads it
+pub struct NavigationPageDefinition {
+    pub layout_kind: PageLayoutKind, // FullHeight, Standard, etc.
+    // …
+}
+
+fn content_padding(&self) -> Option<Padding> {
+    let page = navigation::page_by_id(&self.active_page_id)?;
+    if page.layout_kind == PageLayoutKind::FullHeight { None } else { Some(Padding::default()) }
+}
+```
+
+---
+
 ## AI Module Patterns
 
 ### Adding a new AI provider

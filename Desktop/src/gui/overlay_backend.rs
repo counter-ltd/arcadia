@@ -33,6 +33,12 @@ static OVERLAY_DIRTY_BMB: AtomicBool = AtomicBool::new(false);
 /// Last [`overlay_hud_sprite::version`] we requested a full window refresh for.
 static SPRITE_REFRESHED_AT_VERSION: AtomicU64 = AtomicU64::new(u64::MAX);
 
+/// Last [`overlay_hud_sprite::vibrancy_version`] we applied vibrancy state for.
+static VIBRANCY_REFRESHED_AT_VERSION: AtomicU64 = AtomicU64::new(u64::MAX);
+
+/// Whether the BMB window currently has vibrancy (`NSVisualEffectView`) active.
+static OVERLAY_VIBRANCY_BMB: AtomicBool = AtomicBool::new(false);
+
 /// Tracks the last-seen fullscreen state so we can detect transitions and dirty the BMB flag.
 static LAST_FULLSCREEN_STATE: AtomicBool = AtomicBool::new(false);
 
@@ -107,6 +113,7 @@ pub fn register_overlay_window(
 pub fn poll_overlay(async_app: &mut AsyncApp) {
     poll_overlay_visibility(async_app);
     poll_overlay_sprite_refresh(async_app);
+    poll_overlay_vibrancy(async_app);
 }
 
 fn poll_overlay_visibility(async_app: &mut AsyncApp) {
@@ -149,7 +156,8 @@ fn poll_overlay_visibility(async_app: &mut AsyncApp) {
 /// When sprite revision changes, auto-manage window visibility and schedule a redraw.
 ///
 /// HUD: auto-hides when all HUD sprites are cleared.
-/// BMB: auto-shows when first BMB sprite appears; auto-hides when last is cleared.
+/// BMB: auto-shows when first BMB sprite or vibrancy request appears;
+///      auto-hides when both are absent.
 fn poll_overlay_sprite_refresh(async_app: &AsyncApp) {
     let v = overlay_hud_sprite::version();
     let prev = SPRITE_REFRESHED_AT_VERSION.load(Ordering::Acquire);
@@ -163,7 +171,8 @@ fn poll_overlay_sprite_refresh(async_app: &AsyncApp) {
         OVERLAY_DIRTY_HUD.store(true, Ordering::Release);
     }
 
-    let bmb_has = overlay_hud_sprite::has_sprites_for_stacking("below_menu_bar");
+    let bmb_has = overlay_hud_sprite::has_sprites_for_stacking("below_menu_bar")
+        || overlay_hud_sprite::has_any_vibrancy();
     let bmb_visible = OVERLAY_VISIBLE_BMB.load(Ordering::Relaxed);
     if bmb_has && !bmb_visible {
         OVERLAY_VISIBLE_BMB.store(true, Ordering::Release);
@@ -174,4 +183,38 @@ fn poll_overlay_sprite_refresh(async_app: &AsyncApp) {
     }
 
     let _ = async_app.refresh();
+}
+
+/// Toggle `NSVisualEffectView` on the BMB window when the vibrancy owner set changes.
+fn poll_overlay_vibrancy(async_app: &mut AsyncApp) {
+    let v = overlay_hud_sprite::vibrancy_version();
+    let prev = VIBRANCY_REFRESHED_AT_VERSION.load(Ordering::Acquire);
+    if v == prev {
+        return;
+    }
+    VIBRANCY_REFRESHED_AT_VERSION.store(v, Ordering::Release);
+
+    let want_vibrancy = overlay_hud_sprite::has_any_vibrancy();
+    let height_px = overlay_hud_sprite::vibrancy_height_px();
+    OVERLAY_VIBRANCY_BMB.store(want_vibrancy, Ordering::Release);
+
+    let handle = OVERLAY_HANDLE_BMB.lock().ok().and_then(|g| *g);
+    if let Some(handle) = handle {
+        let _ = async_app.update(move |app| {
+            let _ = handle.update(app, |_root, window, _| -> Result<(), ()> {
+                window.set_vibrancy(want_vibrancy, height_px);
+                Ok(())
+            });
+        });
+    }
+
+    // Also ensure the BMB window is visible/invisible based on combined state.
+    // (sprite refresh may not have fired if only vibrancy changed)
+    let bmb_has =
+        overlay_hud_sprite::has_sprites_for_stacking("below_menu_bar") || want_vibrancy;
+    let bmb_visible = OVERLAY_VISIBLE_BMB.load(Ordering::Relaxed);
+    if bmb_has != bmb_visible {
+        OVERLAY_VISIBLE_BMB.store(bmb_has, Ordering::Release);
+        OVERLAY_DIRTY_BMB.store(true, Ordering::Release);
+    }
 }

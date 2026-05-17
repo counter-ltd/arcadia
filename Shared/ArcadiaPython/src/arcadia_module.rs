@@ -686,6 +686,30 @@ fn overlay_hud_clear_sprite(extension_id: String) -> PyResult<()> {
     Ok(())
 }
 
+/// Request native vibrancy (NSVisualEffectView, Menu material) for `stacking`.
+/// `height_px` is the logical-pixel height of the vibrancy strip pinned to the top of the
+/// display — typically `menu_bar_height() - 3`. Currently only `"below_menu_bar"` is supported.
+#[pyfunction]
+#[pyo3(signature = (extension_id, height_px, stacking = None))]
+fn overlay_hud_set_vibrancy(
+    extension_id: String,
+    height_px: f32,
+    stacking: Option<String>,
+) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    let _ = stacking; // reserved for future multi-window vibrancy; currently always BMB
+    overlay_hud_sprite::set_vibrancy_for_owner(extension_id, height_px);
+    Ok(())
+}
+
+/// Remove a previously registered vibrancy request for `extension_id`.
+#[pyfunction]
+fn overlay_hud_clear_vibrancy(extension_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    overlay_hud_sprite::clear_vibrancy_for_owner(&extension_id);
+    Ok(())
+}
+
 /// Start a tween. `callback(t: float)` is called on the Python timer lane every ~16 ms with
 /// eased `t ∈ [0.0, 1.0]`. Returns a tween id that can be passed to `cancel_animation`.
 ///
@@ -1081,6 +1105,8 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(menu_bar_height, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_set_sprite, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_clear_sprite, m)?)?;
+    m.add_function(wrap_pyfunction!(overlay_hud_set_vibrancy, m)?)?;
+    m.add_function(wrap_pyfunction!(overlay_hud_clear_vibrancy, m)?)?;
     m.add_function(wrap_pyfunction!(animate, m)?)?;
     m.add_function(wrap_pyfunction!(cancel_animation, m)?)?;
     m.add_function(wrap_pyfunction!(set_timer, m)?)?;

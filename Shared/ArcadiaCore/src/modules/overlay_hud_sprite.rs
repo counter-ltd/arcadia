@@ -2,6 +2,10 @@
 //!
 //! Multiple extensions may hold sprites simultaneously — each keyed by owner id.
 //! Desktop root view reads [`clone_if_newer_than`] inside paint (see `overlay_hud.rs`).
+//!
+//! A separate vibrancy store tracks owners that have requested native blur (no pixel data).
+//! The overlay backend shows/hides the Below-Menu-Bar window's `NSVisualEffectView` based
+//! on whether any owner has active vibrancy.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -110,4 +114,75 @@ pub fn clone_if_newer_than(
         return None;
     }
     Some((g.version, g.sprites.clone()))
+}
+
+// ── Vibrancy store ────────────────────────────────────────────────────────────
+//
+// Tracks which extension owners have requested native blur (no pixel data needed).
+// When any owner is present the overlay backend enables `NSVisualEffectView` on the
+// Below-Menu-Bar window.
+
+struct VibrancyEntry {
+    height_px: f32,
+}
+
+struct VibrancyInner {
+    version: u64,
+    owners: HashMap<String, VibrancyEntry>,
+}
+
+static VIBRANCY: OnceLock<Mutex<VibrancyInner>> = OnceLock::new();
+
+fn vibrancy_state() -> &'static Mutex<VibrancyInner> {
+    VIBRANCY.get_or_init(|| {
+        Mutex::new(VibrancyInner {
+            version: 0,
+            owners: HashMap::new(),
+        })
+    })
+}
+
+/// Monotonic counter bumped on every [`set_vibrancy_for_owner`] / [`clear_vibrancy_for_owner`].
+pub fn vibrancy_version() -> u64 {
+    vibrancy_state().lock().map(|g| g.version).unwrap_or(0)
+}
+
+/// `true` when at least one owner has active vibrancy.
+pub fn has_any_vibrancy() -> bool {
+    vibrancy_state()
+        .lock()
+        .map(|g| !g.owners.is_empty())
+        .unwrap_or(false)
+}
+
+/// Maximum `height_px` across all active vibrancy owners (0.0 when none).
+pub fn vibrancy_height_px() -> f32 {
+    vibrancy_state()
+        .lock()
+        .map(|g| {
+            g.owners
+                .values()
+                .map(|e| e.height_px)
+                .fold(0.0_f32, f32::max)
+        })
+        .unwrap_or(0.0)
+}
+
+/// Register `owner` as wanting native vibrancy at `height_px` logical pixels.
+/// Always bumps version so the overlay backend re-applies even if already active
+/// (height may have changed).
+pub fn set_vibrancy_for_owner(owner: String, height_px: f32) {
+    if let Ok(mut g) = vibrancy_state().lock() {
+        g.owners.insert(owner, VibrancyEntry { height_px });
+        g.version = g.version.wrapping_add(1);
+    }
+}
+
+/// Remove `owner`'s vibrancy request. No-op if not registered.
+pub fn clear_vibrancy_for_owner(owner: &str) {
+    if let Ok(mut g) = vibrancy_state().lock() {
+        if g.owners.remove(owner).is_some() {
+            g.version = g.version.wrapping_add(1);
+        }
+    }
 }

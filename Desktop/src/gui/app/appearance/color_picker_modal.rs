@@ -172,7 +172,7 @@ impl ArcadiaRoot {
                                             // color in the gradient JSON rather than replacing the
                                             // whole token value.
                                             if let Some(idx) = this.gradient_stop_editing_index {
-                                                use crate::gui::app::appearance::extension_tokens::{
+                                                use openframe::{
                                                     parse_gradient_stops, stops_to_json,
                                                 };
                                                 let pair = (m.clone(), k.clone());

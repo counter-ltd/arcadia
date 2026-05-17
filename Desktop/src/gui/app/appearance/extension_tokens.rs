@@ -5,127 +5,19 @@ use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 use arcadia_core::modules::python_registry::{
     format_slider_value, resolve_slider_numeric, snap_slider_value, style_token_row_visible,
-    StyleTokenKind, StyleTokenNumericGranularity, StyleTokenSpec,
+    StyleTokenKind, StyleTokenSpec,
 };
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, relative, rgb, AnyElement, AppContext, Bounds, ClickEvent, Context, DragMoveEvent,
-    FontWeight, Hitbox, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent,
-    ParentElement, Pixels, Point, Render, Rgba, SharedString, StatefulInteractiveElement, Styled,
-    Window,
+    div, gradient_slider_with_weak, parse_gradient_stops, parse_hex_color, px, rgb,
+    slider_with_weak, stops_to_json, AnyElement, Context, FontWeight,
+    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Rgba, SharedString,
+    Styled, Window,
 };
 
-// ── Gradient helpers ──────────────────────────────────────────────────────────
-
-const GRAD_BAR_H: f32 = 16.0;
-const GRAD_HANDLE_D: f32 = 18.0;
-const GRAD_HANDLE_R: f32 = GRAD_HANDLE_D / 2.0;
-// Container tall enough for the handle to sit centred on the bar.
-const GRAD_CONT_H: f32 = GRAD_HANDLE_D + 6.0;
-const GRAD_BAR_Y: f32 = (GRAD_CONT_H - GRAD_BAR_H) / 2.0;
-const GRAD_HANDLE_Y: f32 = (GRAD_CONT_H - GRAD_HANDLE_D) / 2.0;
-const GRAD_SEGMENTS: usize = 32;
-
-#[derive(Clone, Debug)]
-pub struct GradientStop {
-    pub pos: f32,
-    pub color: String,
-}
-
-pub fn parse_gradient_stops(s: &str) -> Vec<GradientStop> {
-    let s = s.trim();
-    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
-        let mut stops: Vec<GradientStop> = arr
-            .iter()
-            .filter_map(|v| {
-                let pos = v.get("pos")?.as_f64()? as f32;
-                let color = v.get("color")?.as_str()?.to_string();
-                Some(GradientStop {
-                    pos: pos.clamp(0., 1.),
-                    color,
-                })
-            })
-            .collect();
-        if stops.len() >= 2 {
-            stops.sort_by(|a, b| {
-                a.pos
-                    .partial_cmp(&b.pos)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            return stops;
-        }
-    }
-    vec![
-        GradientStop {
-            pos: 0.0,
-            color: "#1a1a2e".to_string(),
-        },
-        GradientStop {
-            pos: 1.0,
-            color: "#16213e".to_string(),
-        },
-    ]
-}
-
-pub fn stops_to_json(stops: &[GradientStop]) -> String {
-    let segs: Vec<String> = stops
-        .iter()
-        .map(|s| format!(r#"{{"pos":{},"color":"{}"}}"#, s.pos, s.color))
-        .collect();
-    format!("[{}]", segs.join(","))
-}
-
-fn lerp_rgba(a: Rgba, b: Rgba, t: f32) -> Rgba {
-    Rgba {
-        r: a.r + (b.r - a.r) * t,
-        g: a.g + (b.g - a.g) * t,
-        b: a.b + (b.b - a.b) * t,
-        a: 1.0,
-    }
-}
-
-fn sample_gradient(stops: &[GradientStop], t: f32) -> Rgba {
-    if stops.is_empty() {
-        return rgb(0x000000);
-    }
-    let first_rgba = crate::gui::app::lifecycle::parse_hex_color(&stops[0].color)
-        .unwrap_or_else(|| rgb(0x000000));
-    let last_rgba = crate::gui::app::lifecycle::parse_hex_color(&stops[stops.len() - 1].color)
-        .unwrap_or_else(|| rgb(0x000000));
-    if t <= stops[0].pos {
-        return first_rgba;
-    }
-    if t >= stops[stops.len() - 1].pos {
-        return last_rgba;
-    }
-    for i in 0..stops.len().saturating_sub(1) {
-        let a = &stops[i];
-        let b = &stops[i + 1];
-        if t >= a.pos && t <= b.pos {
-            let span = b.pos - a.pos;
-            let local_t = if span > 1e-6 { (t - a.pos) / span } else { 0.0 };
-            let ca = crate::gui::app::lifecycle::parse_hex_color(&a.color)
-                .unwrap_or_else(|| rgb(0x000000));
-            let cb = crate::gui::app::lifecycle::parse_hex_color(&b.color)
-                .unwrap_or_else(|| rgb(0x000000));
-            return lerp_rgba(ca, cb, local_t);
-        }
-    }
-    last_rgba
-}
-
-// ── Gradient drag payload ─────────────────────────────────────────────────────
-
-#[derive(Clone)]
-struct GradientStopDrag {
-    module: String,
-    key: String,
-    stop_index: usize,
-}
-
 fn token_edit_rgba(display: &str, default_s: &str) -> Rgba {
-    crate::gui::app::lifecycle::parse_hex_color(display.trim())
-        .or_else(|| crate::gui::app::lifecycle::parse_hex_color(default_s.trim()))
+    parse_hex_color(display.trim())
+        .or_else(|| parse_hex_color(default_s.trim()))
         .unwrap_or_else(|| rgb(0x00cc88))
 }
 
@@ -140,39 +32,11 @@ fn token_kind_label(kind: StyleTokenKind) -> &'static str {
     }
 }
 
-#[derive(Clone)]
-struct ExtensionTokenSliderDrag {
-    module: String,
-    key: String,
-    kind: StyleTokenKind,
-    lo: f64,
-    hi: f64,
-    step: f64,
-    granularity: StyleTokenNumericGranularity,
-}
-
-struct SliderDragGhost;
-
-impl Render for SliderDragGhost {
-    fn render(&mut self, _: &mut Window, _: &mut Context<'_, Self>) -> impl IntoElement {
-        div().w(px(1.)).h(px(1.))
-    }
-}
-
 fn bool_from_display(s: &str) -> bool {
     matches!(
         s.trim().to_ascii_lowercase().as_str(),
         "true" | "1" | "yes" | "on"
     )
-}
-
-fn slider_t_from_hit(bounds: &Bounds<Pixels>, position: &Point<Pixels>) -> f64 {
-    let w = bounds.size.width.to_f64();
-    if w <= f64::EPSILON {
-        return 0.;
-    }
-    let x = position.x.to_f64() - bounds.origin.x.to_f64();
-    (x / w).clamp(0., 1.)
 }
 
 impl ArcadiaRoot {
@@ -281,278 +145,57 @@ impl ArcadiaRoot {
                 )
                 .child({
                     let edit_cell: AnyElement = if kind == StyleTokenKind::Gradient {
-                        // ── Gradient editor ──────────────────────────────────
                         let stops = parse_gradient_stops(&display_val);
-                        let n_stops = stops.len();
-
-                        // Gradient bar: GRAD_SEGMENTS solid-colour segments.
-                        let segment_colors: Vec<Rgba> = (0..GRAD_SEGMENTS)
-                            .map(|i| {
-                                let t = (i as f32 + 0.5) / GRAD_SEGMENTS as f32;
-                                sample_gradient(&stops, t)
-                            })
-                            .collect();
-
-                        // Bar is absolutely positioned to span the full container width.
-                        // overflow_hidden on the bar (not the container) clips the flex
-                        // segments to the bar's rounded bounds.
-                        let gradient_bar = div()
-                            .absolute()
-                            .top(px(GRAD_BAR_Y))
-                            .left_0()
-                            .right_0()
-                            .h(px(GRAD_BAR_H))
-                            .flex()
-                            .flex_row()
-                            .children(
-                                segment_colors
-                                    .into_iter()
-                                    .enumerate()
-                                    .map(|(i, c)| {
-                                        let seg = div().flex_1().h_full().bg(c);
-                                        match (i == 0, i == GRAD_SEGMENTS - 1) {
-                                            (true, true) => seg.rounded_full(),
-                                            (true, false) => seg.rounded_l_full(),
-                                            (false, true) => seg.rounded_r_full(),
-                                            (false, false) => seg,
-                                        }
-                                    }),
-                            );
-
-                        // Click-to-add overlay: absolute over bar, transparent hit target.
-                        let bar_hit = {
-                            let m = row_module.clone();
-                            let k = row_key.clone();
-                            let stops_for_click = stops.clone();
-                            let weak = cx.weak_entity();
-                            div()
-                                .absolute()
-                                .top(px(GRAD_BAR_Y))
-                                .left_0()
-                                .right_0()
-                                .h(px(GRAD_BAR_H))
-                                .rounded(px(GRAD_BAR_H / 2.0))
-                                .cursor_pointer()
-                                .on_mouse_down_with_hitbox(
-                                    MouseButton::Left,
-                                    move |ev: &MouseDownEvent, hb: &Hitbox, _, cx| {
-                                        let raw_t = slider_t_from_hit(&hb.bounds, &ev.position) as f32;
-                                        let t = raw_t.clamp(0.0, 1.0);
-                                        // Near an existing handle → let handle's own handler take it.
-                                        let bar_w = (hb.bounds.size.width.to_f64() as f32).max(1.0);
-                                        let threshold = GRAD_HANDLE_D / bar_w;
-                                        let near_existing = stops_for_click
-                                            .iter()
-                                            .any(|s| (s.pos - t).abs() < threshold);
-                                        if near_existing {
-                                            return;
-                                        }
-                                        let _ = weak.update(cx, |this, cx| {
-                                            let pair = (m.clone(), k.clone());
-                                            let mut new_stops = stops_for_click.clone();
-                                            let sampled = sample_gradient(&stops_for_click, t);
-                                            let r = (sampled.r * 255.) as u8;
-                                            let g = (sampled.g * 255.) as u8;
-                                            let b = (sampled.b * 255.) as u8;
-                                            let hex = format!("#{r:02x}{g:02x}{b:02x}");
-                                            new_stops.push(GradientStop { pos: t, color: hex });
-                                            new_stops.sort_by(|a, b| {
-                                                a.pos
-                                                    .partial_cmp(&b.pos)
-                                                    .unwrap_or(std::cmp::Ordering::Equal)
-                                            });
-                                            let json = stops_to_json(&new_stops);
-                                            this.extension_token_values.insert(pair, json);
-                                            this.flush_extension_token_edit(m.clone(), k.clone(), cx);
-                                            cx.notify();
-                                        });
-                                    },
-                                )
-                        };
-
-                        // Per-stop handles (absolutely positioned on the container).
-                        let handles: Vec<_> = stops
-                            .iter()
-                            .enumerate()
-                            .map(|(i, stop)| {
-                                // Handle centre at stop.pos fraction of container width.
-                                // left(relative) puts the LEFT edge there; ml(-R) centres it.
-                                let stop_color = crate::gui::app::lifecycle::parse_hex_color(
-                                    &stop.color,
-                                )
-                                .unwrap_or_else(|| rgb(0x888888));
-
-                                let m = row_module.clone();
-                                let k = row_key.clone();
-                                let stops_clone = stops.clone();
-                                let stop_hex = stop.color.clone();
-
-                                div()
-                                    .absolute()
-                                    .top(px(GRAD_HANDLE_Y))
-                                    .left(relative(stop.pos))
-                                    .ml(-px(GRAD_HANDLE_R))
-                                    .w(px(GRAD_HANDLE_D))
-                                    .h(px(GRAD_HANDLE_D))
-                                    .rounded_full()
-                                    .bg(stop_color)
-                                    .border_2()
-                                    .border_color(openframe::white())
-                                    .shadow_sm()
-                                    .cursor_pointer()
-                                    .id((
-                                        SharedString::from(format!(
-                                            "grad-stop-{}-{}-{}",
-                                            row_module, row_key, i
-                                        )),
-                                        0usize,
-                                    ))
-                                    // Drag to reposition.
-                                    .on_drag(
-                                        GradientStopDrag {
-                                            module: m.clone(),
-                                            key: k.clone(),
-                                            stop_index: i,
-                                        },
-                                        |_, _, _, cx| cx.new(|_| SliderDragGhost),
-                                    )
-                                    // Click (not drag) to open colour picker.
-                                    .on_click({
-                                        let weak = cx.weak_entity();
-                                        let m2 = m.clone();
-                                        let k2 = k.clone();
-                                        let hex = stop_hex.clone();
-                                        let default_hex = stops_clone
-                                            .first()
-                                            .map(|s| s.color.clone())
-                                            .unwrap_or_default();
-                                        move |_: &ClickEvent, _, cx| {
-                                            let _ = weak.update(cx, |this, cx| {
-                                                if let Some((ref em, ref ek)) =
-                                                    this.extension_token_editing.clone()
-                                                {
-                                                    this.flush_extension_token_edit(
-                                                        em.clone(),
-                                                        ek.clone(),
-                                                        cx,
-                                                    );
-                                                }
-                                                this.extension_token_editing = None;
-                                                this.gradient_stop_editing_index = Some(i);
-                                                this.color_picker_modal = Some((
-                                                    m2.clone(),
-                                                    k2.clone(),
-                                                    hex.clone(),
-                                                    default_hex.clone(),
-                                                ));
-                                                cx.notify();
-                                            });
-                                        }
-                                    })
-                                    // Right-click to delete (if more than 2 stops).
-                                    .when(n_stops > 2, |d| {
-                                        d.on_mouse_down(
-                                            MouseButton::Right,
-                                            cx.listener({
-                                                let m = m.clone();
-                                                let k = k.clone();
-                                                let stops_del = stops.clone();
-                                                move |this, _, _, cx| {
-                                                    cx.stop_propagation();
-                                                    let mut new_stops = stops_del.clone();
-                                                    if new_stops.len() > 2 {
-                                                        new_stops.remove(i);
-                                                    }
-                                                    let pair = (m.clone(), k.clone());
-                                                    let json = stops_to_json(&new_stops);
-                                                    this.extension_token_values.insert(pair, json);
-                                                    this.flush_extension_token_edit(
-                                                        m.clone(),
-                                                        k.clone(),
-                                                        cx,
-                                                    );
-                                                    cx.notify();
-                                                }
-                                            }),
-                                        )
-                                    })
-                                    .into_any_element()
-                            })
-                            .collect();
-
-                        // Drag-move handler on the outer container updates stop position.
-                        let container = {
-                            let m = row_module.clone();
-                            let k = row_key.clone();
-                            let stops_drag = stops.clone();
-                            div()
-                                .relative()
-                                .w_full()
-                                .h(px(GRAD_CONT_H))
-                                .child(gradient_bar)
-                                .child(bar_hit)
-                                .children(handles)
-                                .on_drag_move(cx.listener(
-                                    move |this,
-                                          ev: &DragMoveEvent<GradientStopDrag>,
-                                          _,
-                                          cx| {
-                                        let (drag_m, drag_k, drag_idx) = {
-                                            let pl = ev.drag(cx);
-                                            if pl.module != m || pl.key != k {
-                                                return;
-                                            }
-                                            (pl.module.clone(), pl.key.clone(), pl.stop_index)
-                                        };
-                                        let t = (slider_t_from_hit(
-                                            &ev.bounds,
-                                            &ev.event.position,
-                                        ) as f32)
-                                            .clamp(0.0, 1.0);
-                                        let pair = (drag_m.clone(), drag_k.clone());
-                                        let current = this
-                                            .extension_token_values
-                                            .get(&pair)
-                                            .cloned()
-                                            .unwrap_or_else(|| stops_to_json(&stops_drag));
-                                        let mut cur_stops = parse_gradient_stops(&current);
-                                        if drag_idx < cur_stops.len() {
-                                            // Clamp so this stop never crosses its neighbours.
-                                            let lo = if drag_idx > 0 {
-                                                cur_stops[drag_idx - 1].pos + 0.01
-                                            } else {
-                                                0.0
-                                            };
-                                            let hi = if drag_idx + 1 < cur_stops.len() {
-                                                cur_stops[drag_idx + 1].pos - 0.01
-                                            } else {
-                                                1.0
-                                            };
-                                            cur_stops[drag_idx].pos = t.clamp(lo, hi);
-                                            let new_json = stops_to_json(&cur_stops);
-                                            let prev = this
-                                                .extension_token_values
-                                                .get(&pair)
-                                                .cloned();
-                                            if prev.as_deref() == Some(new_json.as_str()) {
-                                                return;
-                                            }
-                                            this.extension_token_values
-                                                .insert(pair, new_json);
-                                            this.flush_extension_token_edit(
-                                                drag_m, drag_k, cx,
-                                            );
-                                            cx.notify();
-                                        }
-                                    },
-                                ))
-                        };
-
+                        let weak = cx.weak_entity();
+                        let grad_id = SharedString::from(format!(
+                            "ext-grad-{}-{}",
+                            module_owned, row_key
+                        ));
+                        let default_hex =
+                            stops.first().map(|s| s.color.clone()).unwrap_or_default();
                         div()
                             .flex()
                             .flex_col()
                             .gap_1()
-                            .child(container)
+                            .child(gradient_slider_with_weak(
+                                grad_id,
+                                weak,
+                                &stops,
+                                {
+                                    let m = row_module.clone();
+                                    let k = row_key.clone();
+                                    move |this: &mut ArcadiaRoot, new_stops, cx| {
+                                        let json = stops_to_json(&new_stops);
+                                        this.extension_token_values
+                                            .insert((m.clone(), k.clone()), json);
+                                        this.flush_extension_token_edit(m.clone(), k.clone(), cx);
+                                    }
+                                },
+                                {
+                                    let m = row_module.clone();
+                                    let k = row_key.clone();
+                                    move |this: &mut ArcadiaRoot, idx, hex, cx| {
+                                        if let Some((ref em, ref ek)) =
+                                            this.extension_token_editing.clone()
+                                        {
+                                            this.flush_extension_token_edit(
+                                                em.clone(),
+                                                ek.clone(),
+                                                cx,
+                                            );
+                                        }
+                                        this.extension_token_editing = None;
+                                        this.gradient_stop_editing_index = Some(idx);
+                                        this.color_picker_modal = Some((
+                                            m.clone(),
+                                            k.clone(),
+                                            hex,
+                                            default_hex.clone(),
+                                        ));
+                                        cx.notify();
+                                    }
+                                },
+                            ))
                             .child(
                                 div()
                                     .text_xs()
@@ -700,18 +343,15 @@ impl ArcadiaRoot {
                         let gran = res.granularity;
                         let cur_raw = display_val.trim().parse::<f64>().unwrap_or(lo);
                         let cur = snap_slider_value(cur_raw, lo, hi, step, kind);
-                        let fill_t = (((cur - lo) / (hi - lo)) as f32).clamp(0., 1.);
-                        let fill_basis = fill_t.max(0.0001);
                         let weak = cx.weak_entity();
-                        let drag_payload = ExtensionTokenSliderDrag {
-                            module: row_module.clone(),
-                            key: row_key.clone(),
-                            kind,
-                            lo,
-                            hi,
-                            step,
-                            granularity: gran,
-                        };
+                        let slider_id = SharedString::from(format!(
+                            "ext-tok-slider-{}-{}",
+                            module_owned, row_key
+                        ));
+                        let is_slider_active = self
+                            .extension_token_slider_active
+                            .as_ref()
+                            .is_some_and(|(m, k)| m == &row_module && k == &row_key);
                         div()
                             .flex()
                             .flex_col()
@@ -723,88 +363,26 @@ impl ArcadiaRoot {
                                     .items_center()
                                     .gap_2()
                                     .child(
-                                        div()
-                                            .flex()
-                                            .flex_row()
-                                            .flex_1()
-                                            .min_w(px(120.))
-                                            .h(px(12.))
-                                            .rounded(px(6.))
-                                            .overflow_hidden()
-                                            .border_1()
-                                            .border_color(input_border)
-                                            .cursor_pointer()
-                                            .on_mouse_down_with_hitbox(
-                                                MouseButton::Left,
-                                                {
-                                                    let m = row_module.clone();
-                                                    let k = row_key.clone();
-                                                    let weak = weak.clone();
-                                                    move |ev: &MouseDownEvent, hb: &Hitbox, _, cx| {
-                                                        let _ = weak.update(cx, |this, cx| {
-                                                            if let Some((ref em, ref ek)) =
-                                                                this.extension_token_editing.clone()
-                                                            {
-                                                                if em != &m || ek != &k {
-                                                                    this.flush_extension_token_edit(
-                                                                        em.clone(),
-                                                                        ek.clone(),
-                                                                        cx,
-                                                                    );
-                                                                }
-                                                            }
-                                                            this.extension_token_editing = None;
-                                                            let t = slider_t_from_hit(&hb.bounds, &ev.position);
-                                                            let v = lo + t * (hi - lo);
-                                                            let v = snap_slider_value(v, lo, hi, step, kind);
-                                                            let s =
-                                                                format_slider_value(v, kind, gran);
-                                                            this.extension_token_values
-                                                                .insert((m.clone(), k.clone()), s);
-                                                            this.flush_extension_token_edit(m.clone(), k.clone(), cx);
-                                                            cx.notify();
-                                                        });
-                                                    }
-                                                }
-                                            )
-                                            .id((
-                                                SharedString::from(format!(
-                                                    "ext-tok-slider-{}-{}",
-                                                    module_owned, row_key
-                                                )),
-                                                0usize,
-                                            ))
-                                            .on_drag(drag_payload.clone(), |_, _, _, cx| {
-                                                cx.new(|_| SliderDragGhost)
-                                            })
-                                            .on_drag_move(cx.listener({
-                                                let row_module = row_module.clone();
-                                                let row_key = row_key.clone();
-                                                move |this, ev: &DragMoveEvent<ExtensionTokenSliderDrag>, _, cx| {
-                                                    let (module, key, lo, hi, kind, step, gran) = {
-                                                        let pl = ev.drag(&*cx);
-                                                        if pl.module != row_module || pl.key != row_key {
-                                                            return;
-                                                        }
-                                                        (
-                                                            pl.module.clone(),
-                                                            pl.key.clone(),
-                                                            pl.lo,
-                                                            pl.hi,
-                                                            pl.kind,
-                                                            pl.step,
-                                                            pl.granularity,
-                                                        )
-                                                    };
-                                                    let t = slider_t_from_hit(&ev.bounds, &ev.event.position);
-                                                    let v = lo + t * (hi - lo);
-                                                    let v = snap_slider_value(v, lo, hi, step, kind);
-                                                    let s =
-                                                        format_slider_value(v, kind, gran);
+                                        slider_with_weak(
+                                            slider_id,
+                                            weak,
+                                            cur,
+                                            lo,
+                                            hi,
+                                            is_slider_active,
+                                            p.accent,
+                                            input_bg,
+                                            input_border,
+                                            {
+                                                let m = row_module.clone();
+                                                let k = row_key.clone();
+                                                move |this: &mut ArcadiaRoot, v, cx| {
+                                                    this.extension_token_slider_active =
+                                                        Some((m.clone(), k.clone()));
                                                     if let Some((ref em, ref ek)) =
                                                         this.extension_token_editing.clone()
                                                     {
-                                                        if em != &module || ek != &key {
+                                                        if em != &m || ek != &k {
                                                             this.flush_extension_token_edit(
                                                                 em.clone(),
                                                                 ek.clone(),
@@ -813,28 +391,32 @@ impl ArcadiaRoot {
                                                         }
                                                     }
                                                     this.extension_token_editing = None;
-                                                    let pair = (module.clone(), key.clone());
-                                                    let prev = this
-                                                        .extension_token_values
-                                                        .get(&pair)
-                                                        .cloned();
-                                                    if prev.as_deref() == Some(s.as_str()) {
-                                                        return;
-                                                    }
+                                                    let v = snap_slider_value(v, lo, hi, step, kind);
+                                                    let s = format_slider_value(v, kind, gran);
                                                     this.extension_token_values
-                                                        .insert(pair, s);
-                                                    this.flush_extension_token_edit(module, key, cx);
-                                                    cx.notify();
+                                                        .insert((m.clone(), k.clone()), s);
+                                                    this.flush_extension_token_edit(
+                                                        m.clone(),
+                                                        k.clone(),
+                                                        cx,
+                                                    );
                                                 }
-                                            }))
-                                            .child(
-                                                div()
-                                                    .h_full()
-                                                    .flex_none()
-                                                    .flex_basis(relative(fill_basis))
-                                                    .bg(p.accent),
-                                            )
-                                            .child(div().h_full().flex_1().bg(input_bg)),
+                                            },
+                                            {
+                                                let m = row_module.clone();
+                                                let k = row_key.clone();
+                                                move |this: &mut ArcadiaRoot, _cx| {
+                                                    if this
+                                                        .extension_token_slider_active
+                                                        .as_ref()
+                                                        .is_some_and(|(am, ak)| am == &m && ak == &k)
+                                                    {
+                                                        this.extension_token_slider_active = None;
+                                                    }
+                                                }
+                                            },
+                                        )
+                                        .min_w(px(120.)),
                                     )
                                     .child(
                                         div()

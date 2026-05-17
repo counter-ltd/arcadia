@@ -638,6 +638,7 @@ impl ArcadiaRoot {
             late_settings_default_room_focus,
             extension_token_values: std::collections::HashMap::new(),
             extension_token_editing: None,
+            extension_token_slider_active: None,
             extension_token_focus,
             color_picker_modal: None,
             gradient_stop_editing_index: None,
