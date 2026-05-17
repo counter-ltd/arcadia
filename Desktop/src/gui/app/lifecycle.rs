@@ -340,6 +340,7 @@ impl ArcadiaRoot {
                     workspace_path: pt.workspace_path,
                     file_path: pt.file_path,
                     saved_content,
+                    block_positions: Vec::new(),
                 })
             })
             .collect();
@@ -453,6 +454,11 @@ impl ArcadiaRoot {
             visual_editor_edit_caret: 0,
             visual_editor_input_focus,
             visual_editor_palette_open: false,
+            visual_editor_drag: None,
+            visual_editor_canvas_origin: std::rc::Rc::new(std::cell::RefCell::new(
+                openframe::Point::default(),
+            )),
+            visual_editor_drop_zones: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             ai_chats: vec![],
             active_ai_chat_id: 0,
             ai_next_id: 1,

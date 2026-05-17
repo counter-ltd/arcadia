@@ -76,6 +76,7 @@ impl ArcadiaRoot {
                                 workspace_path: Some(ws_path.clone()),
                                 file_path: None,
                                 saved_content: String::new(),
+                                block_positions: Vec::new(),
                             });
                             this.active_visual_editor_tab = this.visual_editor_tabs.len() - 1;
                             this.visual_editor_next_id += 1;

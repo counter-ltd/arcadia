@@ -106,6 +106,51 @@ pub fn insert_block(source: &str, anchor: usize, indent: &str, snippet: &str) ->
     replace_region(source, le, le, &ins)
 }
 
+/// Move the block whose node span is `[drag_start, drag_end)` so its dedented
+/// text is re-inserted after byte `anchor`, re-indented to `indent`. Used for
+/// drag-reparenting. Returns `source` unchanged when `anchor` lies within the
+/// dragged block's own lines (a drop onto itself).
+pub fn move_block(
+    source: &str,
+    drag_start: usize,
+    drag_end: usize,
+    anchor: usize,
+    indent: &str,
+) -> String {
+    let (ds, de) = line_bounds(source, drag_start, drag_end);
+    let anchor = anchor.min(source.len());
+    if anchor >= ds && anchor <= de {
+        return source.to_string();
+    }
+    let base = indent_at(source, drag_start);
+    let reindented: String = source[ds..de]
+        .split('\n')
+        .map(|line| {
+            let stripped = line.strip_prefix(base.as_str()).unwrap_or(line);
+            if stripped.is_empty() {
+                String::new()
+            } else {
+                format!("{indent}{stripped}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mut out = String::with_capacity(source.len() + indent.len() * 4);
+    if anchor > de {
+        out.push_str(&source[..ds]);
+        out.push_str(&source[de..anchor]);
+        out.push_str(&reindented);
+        out.push_str(&source[anchor..]);
+    } else {
+        out.push_str(&source[..anchor]);
+        out.push_str(&reindented);
+        out.push_str(&source[anchor..ds]);
+        out.push_str(&source[de..]);
+    }
+    out
+}
+
 fn floor_boundary(source: &str, mut idx: usize) -> usize {
     while idx > 0 && !source.is_char_boundary(idx) {
         idx -= 1;
@@ -178,5 +223,27 @@ mod tests {
     #[test]
     fn insert_block_adds_leading_newline_when_missing() {
         assert_eq!(insert_block("x = 1", 0, "", "y = 2"), "x = 1\ny = 2\n");
+    }
+
+    #[test]
+    fn move_block_reparents_into_indented_target() {
+        // move "y = 2" (line 2) to the end, indented 4 spaces
+        let s = "y = 2\ndef f():\n    pass\n";
+        let out = move_block(s, 0, 5, s.len(), "    ");
+        assert_eq!(out, "def f():\n    pass\n    y = 2\n");
+    }
+
+    #[test]
+    fn move_block_promotes_to_column_zero() {
+        // move the nested "x = 1" out to the front at column 0
+        let s = "def f():\n    x = 1\n";
+        let out = move_block(s, 13, 18, 0, "");
+        assert_eq!(out, "x = 1\ndef f():\n");
+    }
+
+    #[test]
+    fn move_block_onto_self_is_noop() {
+        let s = "a = 1\nb = 2\n";
+        assert_eq!(move_block(s, 0, 5, 3, ""), s);
     }
 }

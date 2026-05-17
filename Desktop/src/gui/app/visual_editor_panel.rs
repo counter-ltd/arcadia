@@ -2,6 +2,7 @@ mod block_render;
 mod block_shape;
 mod canvas;
 mod dashboard;
+mod drag;
 mod inspector;
 mod palette;
 

@@ -3,14 +3,17 @@
 //! element containment, not indentation margins. Clicking a block selects it
 //! (by child-index path) for editing in the canvas inspector.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use openframe::{
-    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
-    MouseDownEvent, ParentElement, Rgba, Styled,
+    canvas, div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    MouseButton, MouseDownEvent, ParentElement, Rgba, Styled,
 };
 
 use super::block_shape::{c_block_bg, leaf_bg, BUMP_H, HEADER_H, LIP_H, SPINE_W};
 use crate::gui::app::code_editor_panel::{code_line_content, LineStyle};
-use crate::gui::app::ArcadiaRoot;
+use crate::gui::app::{ArcadiaRoot, DropZone};
 use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme::{block_accent, block_pill_text, block_soft, BlockCategory};
 use arcadia_core::config::code_editor::CursorStyle;
@@ -27,6 +30,8 @@ pub(super) struct BlockRenderCtx {
     pub surface: Rgba,
     /// Child-index path of the currently selected block, if any.
     pub selected: Option<Vec<usize>>,
+    /// Compound-mouth drop targets registered during this render pass.
+    pub drop_zones: Rc<RefCell<Vec<DropZone>>>,
 }
 
 fn classify(kind: &BlockKind) -> (&'static str, BlockCategory) {
@@ -167,13 +172,15 @@ fn render_leaf(
     } else {
         None
     };
+    let drag_label = label.to_string();
     div()
         .relative()
         .cursor_pointer()
         .on_mouse_down(
             MouseButton::Left,
-            cx.listener(move |this, _ev: &MouseDownEvent, window, cx| {
+            cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                 select(this, path.clone(), span_start, window);
+                this.start_visual_drag(path.clone(), drag_label.clone(), ev.position);
                 cx.stop_propagation();
                 cx.notify();
             }),
@@ -222,6 +229,7 @@ fn render_compound(
     };
     let header_text = detail(kind);
     let header_path = path.clone();
+    let drag_label = label.to_string();
 
     // Top of the C: the painted header bar carries the pill + header line.
     let mut header = div()
@@ -234,8 +242,9 @@ fn render_compound(
         .cursor_pointer()
         .on_mouse_down(
             MouseButton::Left,
-            cx.listener(move |this, _ev: &MouseDownEvent, window, cx| {
+            cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                 select(this, header_path.clone(), span_start, window);
+                this.start_visual_drag(header_path.clone(), drag_label.clone(), ev.position);
                 cx.stop_propagation();
                 cx.notify();
             }),
@@ -262,14 +271,31 @@ fn render_compound(
         })
         .collect();
 
-    // Children sit in the C's mouth — clear of the painted left spine.
+    // Children sit in the C's mouth — clear of the painted left spine. A
+    // full-size canvas registers the mouth as a drop target each frame.
+    let zones = ctx.drop_zones.clone();
+    let zone_path = path.clone();
     let mouth = div()
+        .relative()
         .flex()
         .flex_col()
         .gap_0()
         .pl(px(SPINE_W + 6.))
         .pr(px(8.))
         .py(px(6.))
+        .child(
+            canvas(
+                |_, _, _| {},
+                move |bounds, _, _, _| {
+                    zones.borrow_mut().push(DropZone {
+                        path: zone_path.clone(),
+                        bounds,
+                    });
+                },
+            )
+            .absolute()
+            .size_full(),
+        )
         .children(kids);
 
     div()
@@ -303,6 +329,7 @@ fn render_raw(
     } else {
         None
     };
+    let drag_label = label.to_string();
     let style = LineStyle {
         char_width: ctx.char_width,
         line_fg: ctx.text,
@@ -330,8 +357,9 @@ fn render_raw(
         .cursor_pointer()
         .on_mouse_down(
             MouseButton::Left,
-            cx.listener(move |this, _ev: &MouseDownEvent, window, cx| {
+            cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                 select(this, path.clone(), span_start, window);
+                this.start_visual_drag(path.clone(), drag_label.clone(), ev.position);
                 cx.stop_propagation();
                 cx.notify();
             }),

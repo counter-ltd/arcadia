@@ -179,7 +179,7 @@ pub struct CodeEditorTab {
 }
 
 /// One open document in the visual block editor. The Python source in `content`
-/// is canonical; the block tree is a re-derivation of it (built in Phase 2).
+/// is canonical; the block tree is a re-derivation of it.
 pub struct VisualEditorTab {
     pub id: usize,
     pub title: String,
@@ -191,6 +191,29 @@ pub struct VisualEditorTab {
     pub file_path: Option<String>,
     /// Content at last save. Used for dirty detection.
     pub saved_content: String,
+    /// Free-canvas (x, y) position of each top-level block, parallel to the
+    /// parsed module's children. Reconciled in length on every render.
+    pub block_positions: Vec<(f32, f32)>,
+}
+
+/// In-progress drag of a block on the free canvas. Any block can be dragged —
+/// dropped on a compound's mouth it nests, dropped on bare canvas it becomes a
+/// top-level stack.
+pub struct VisualDrag {
+    /// Child-index path of the dragged block.
+    pub path: Vec<usize>,
+    /// Short label shown in the drag ghost.
+    pub label: String,
+    /// Current pointer position (window-space pixels).
+    pub cursor: openframe::Point<openframe::Pixels>,
+}
+
+/// A registered drop target — the mouth region of a compound block.
+pub struct DropZone {
+    /// Child-index path of the compound owning this mouth.
+    pub path: Vec<usize>,
+    /// Mouth bounds in window-space pixels.
+    pub bounds: Bounds<Pixels>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -448,6 +471,13 @@ pub struct ArcadiaRoot {
     pub visual_editor_edit_caret: usize,
     pub visual_editor_input_focus: FocusHandle,
     pub visual_editor_palette_open: bool,
+    /// Active free-canvas drag, if a block is being dragged.
+    pub visual_editor_drag: Option<VisualDrag>,
+    /// Window-space origin of the free-canvas area, captured each frame for
+    /// pointer → canvas-space coordinate conversion.
+    pub visual_editor_canvas_origin: Rc<RefCell<openframe::Point<openframe::Pixels>>>,
+    /// Compound-block mouth drop targets, repopulated every frame.
+    pub visual_editor_drop_zones: Rc<RefCell<Vec<DropZone>>>,
     pub ai_chats: Vec<AiChat>,
     pub active_ai_chat_id: usize,
     pub ai_next_id: usize,
