@@ -36,8 +36,12 @@ fn build_menu(source: &[TrayMenuItem]) -> (Menu, HashMap<MenuId, TrayMenuItem>) 
     let menu = Menu::new();
     let mut map: HashMap<MenuId, TrayMenuItem> = HashMap::new();
     for spec in source {
-        if spec.command_token.is_empty() && spec.label.is_empty() {
-            let _ = menu.append(&PredefinedMenuItem::separator());
+        if spec.command_token.is_empty() {
+            if spec.label.is_empty() {
+                let _ = menu.append(&PredefinedMenuItem::separator());
+            } else {
+                let _ = menu.append(&MenuItem::new(spec.label.as_str(), false, None));
+            }
             continue;
         }
         let mi = MenuItem::new(spec.label.as_str(), true, None);
