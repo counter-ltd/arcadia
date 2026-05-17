@@ -54,11 +54,11 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> AnyElement {
-        let bg = theme::code_explorer_sidebar_bg(is_dark);
-        let border = theme::code_explorer_border(is_dark);
-        let text = theme::code_explorer_text(is_dark);
-        let dim = theme::code_explorer_dim(is_dark);
-        let hover = theme::code_explorer_hover_bg(is_dark);
+        let bg = theme::explorer_sidebar_bg(is_dark);
+        let border = theme::explorer_border(is_dark);
+        let text = theme::explorer_text(is_dark);
+        let dim = theme::explorer_dim(is_dark);
+        let hover = theme::explorer_hover_bg(is_dark);
 
         // Merge the three palette sources, preserving category grouping order.
         let mut groups: Vec<(String, Vec<BlockDef>)> = Vec::new();

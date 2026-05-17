@@ -152,7 +152,7 @@ pub struct NavPageAction {
 }
 
 /// A navigation page declared by a Python extension via `arcadia.register_nav_page()`.
-/// The page ID is always `"python.nav_page|{extension_id}"`.
+/// The page ID is always `"extension.page|{extension_id}"`.
 #[derive(Clone, Debug)]
 pub struct NavPageDeclaration {
     pub extension_id: String,
@@ -234,7 +234,7 @@ pub fn register_module(
         // `unwrap_or(true)` auto-enabled every extension dropped into `~/Arcadia/Extensions/`
         // on first launch, which is exactly what we don't want — the user must explicitly
         // opt in via the Extensions settings page so OS permission prompts only fire when
-        // the user has accepted them in Arcadia. See `python_extensions` in `ModulesConfig`.
+        // the user has accepted them in Arcadia. See `extension_state` in `ModulesConfig`.
         reg.modules.push(PythonModuleInfo {
             name,
             version,
@@ -252,7 +252,7 @@ pub fn register_module(
 /// for every `.py` / `<dir>/main.py` it finds so the Extensions settings page can list and
 /// toggle extensions without first executing their (potentially side-effectful) bodies.
 ///
-/// `persisted_enabled` comes from `ModulesConfig.python_extensions[id]` — when `false` the
+/// `persisted_enabled` comes from `ModulesConfig.extension_state[id]` — when `false` the
 /// loader skips `load_extension(path)` and the stub stays in the registry as a disabled,
 /// unloaded entry the user can flip on later.
 ///

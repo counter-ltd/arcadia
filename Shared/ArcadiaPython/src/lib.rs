@@ -14,7 +14,7 @@ use std::sync::{Arc, OnceLock};
 static PYTHON_INITIALIZED: OnceLock<()> = OnceLock::new();
 
 /// One on-disk extension found in `~/Arcadia/Extensions/`. `id` is derived from the file
-/// name / directory and used as the persistence key in `ModulesConfig.python_extensions`.
+/// name / directory and used as the persistence key in `ModulesConfig.extension_state`.
 ///
 /// Bundle layout: `Extensions/<folder>/main.py` with static files under
 /// `Extensions/<folder>/Assets/` (see `arcadia.extension_assets_path` / `read_extension_asset`).
@@ -52,7 +52,7 @@ impl PythonExtensionHost {
 }
 
 /// Discover all extensions on disk, register stubs in the python registry, and execute the
-/// body of those marked enabled in `ModulesConfig.python_extensions`. Extensions with no
+/// body of those marked enabled in `ModulesConfig.extension_state`. Extensions with no
 /// recorded state (i.e. dropped in for the first time) start **disabled**: the user must
 /// explicitly opt in from the Extensions settings page before the body runs. This is what
 /// stops side-effectful scripts (tray creation, OS Accessibility prompts via cursor backend,
@@ -99,17 +99,17 @@ fn sync_extensions(dir: &Path) -> Result<(), String> {
     }
 
     // Persist any folder-id ↔ declared-name renames discovered during this sync so the
-    // user's `python_extensions[<old_id>] = true` doesn't get re-evaluated as the old id
+    // user's `extension_state[<old_id>] = true` doesn't get re-evaluated as the old id
     // on next launch. `set_python_extension_enabled` is additive; if both entries exist we
     // keep the new one and drop the old.
     if !renames.is_empty() {
         if let Ok(mut new_cfg) = ModulesConfig::load_or_create() {
             let mut dirty = false;
             for (old_id, new_id) in &renames {
-                if new_cfg.python_extensions.remove(old_id).is_some() {
+                if new_cfg.extension_state.remove(old_id).is_some() {
                     dirty = true;
                 }
-                if !new_cfg.python_extensions.contains_key(new_id) {
+                if !new_cfg.extension_state.contains_key(new_id) {
                     new_cfg.set_python_extension_enabled(new_id, true);
                     dirty = true;
                 }

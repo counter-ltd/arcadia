@@ -176,7 +176,7 @@ impl ArcadiaRoot {
                                 }
                             })
                             .child({
-                                if self.active_page_id.as_str() == "python.settings" {
+                                if self.active_page_id.as_str() == "extensions.settings" {
                                     div()
                                         .px_2()
                                         .py_0p5()
@@ -196,7 +196,7 @@ impl ArcadiaRoot {
                                                     &[],
                                                     &ctx,
                                                 );
-                                                this.reload_python_extensions(cx);
+                                                this.reload_extension_state(cx);
                                                 cx.notify();
                                             }),
                                         )
@@ -963,7 +963,7 @@ impl ArcadiaRoot {
                                     let is_animated_pill = matches!(
                                         page.id(),
                                         "notification.main"
-                                            | "python.settings"
+                                            | "extensions.settings"
                                             | "global.modules"
                                     );
                                     let pill_expand_alpha = is_animated_pill.then(|| {

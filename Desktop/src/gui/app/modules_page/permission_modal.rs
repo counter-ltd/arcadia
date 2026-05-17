@@ -169,7 +169,7 @@ impl ArcadiaRoot {
                                                             &[extension.as_str()],
                                                             &ctx,
                                                         );
-                                                        this.reload_python_extensions(cx);
+                                                        this.reload_extension_state(cx);
                                                     }
                                                 }
                                                     this.pending_permission_grant = None;

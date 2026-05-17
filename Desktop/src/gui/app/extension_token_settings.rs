@@ -75,8 +75,8 @@ impl ArcadiaRoot {
                                     &[module_id_for_btn.as_str()],
                                     &ctx,
                                 );
-                                this.reload_python_extensions(cx);
-                                this.active_page_id = "python.settings".into();
+                                this.reload_extension_state(cx);
+                                this.active_page_id = "extensions.settings".into();
                                 this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
                             }),
@@ -140,7 +140,7 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(|this, _, _, cx| {
-                                this.active_page_id = "python.settings".into();
+                                this.active_page_id = "extensions.settings".into();
                                 this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
                             }),

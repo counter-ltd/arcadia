@@ -334,11 +334,11 @@ pub struct TabScrollAnim {
 #[derive(Clone, PartialEq)]
 pub enum NotificationPreviewPhase {
     /// Pill was collapsed: animate open with preview text (300 ms).
-    PillEnter,
+    BadgeEnter,
     /// Pill was collapsed: hold expanded showing preview (2 s).
-    PillHold,
+    BadgeHold,
     /// Pill was collapsed: animate closed (300 ms).
-    PillExit,
+    BadgeExit,
     /// Pill was expanded: fade existing label out (200 ms).
     TextFadeOut,
     /// Pill was expanded: fade preview text in after swap (200 ms).
@@ -403,7 +403,7 @@ pub struct ArcadiaRoot {
     pub active_group_id: String,
     /// Filters rows on global.modules (UI-only).
     pub modules_search_query: String,
-    /// Filters rows on python.settings (UI-only).
+    /// Filters rows on extensions.settings (UI-only).
     pub extensions_search_query: String,
     /// Filters rows on global.permissions (UI-only).
     pub permissions_search_query: String,

@@ -1,3 +1,8 @@
+pub const PLATFORM_MACOS: &str = "macos";
+pub const PLATFORM_WINDOWS: &str = "windows";
+pub const PLATFORM_LINUX: &str = "linux";
+pub const PLATFORM_IOS: &str = "ios";
+
 pub trait PlatformInfo {
     fn name(&self) -> &'static str;
 }

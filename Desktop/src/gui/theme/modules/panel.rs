@@ -40,8 +40,8 @@ pub fn module_panel_stroke(is_dark: bool) -> Rgba {
     }
 }
 
-/// Inset “tray” behind late.sh ASCII bonsai art.
-pub fn late_bonsai_well_bg(is_dark: bool) -> Rgba {
+/// Inset tray behind decorative ASCII art.
+pub fn decorative_well_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.051,
@@ -59,7 +59,7 @@ pub fn late_bonsai_well_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn late_bonsai_well_stroke(is_dark: bool) -> Rgba {
+pub fn decorative_well_stroke(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.145,
@@ -77,8 +77,8 @@ pub fn late_bonsai_well_stroke(is_dark: bool) -> Rgba {
     }
 }
 
-/// Terracotta-ish band suggesting pot rim above soil area.
-pub fn late_bonsai_pot_band(is_dark: bool) -> Rgba {
+/// Terracotta-ish accent band above the well content area.
+pub fn decorative_accent_band(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.290,
@@ -96,8 +96,8 @@ pub fn late_bonsai_pot_band(is_dark: bool) -> Rgba {
     }
 }
 
-/// Foliage tint for monospace tree glyphs.
-pub fn late_bonsai_foliage_text(is_dark: bool) -> Rgba {
+/// Foliage tint for decorative monospace glyphs.
+pub fn decorative_foliage_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.620,

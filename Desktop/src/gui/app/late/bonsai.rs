@@ -39,31 +39,31 @@ impl ArcadiaRoot {
         let btn_bg = glyph
             .as_ref()
             .map(|g| g.accent)
-            .unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
+            .unwrap_or_else(|| theme::button_positive_bg(is_dark));
         let btn_text = glyph
             .as_ref()
             .map(|g| g.bg)
-            .unwrap_or_else(|| theme::module_button_enable_text(is_dark));
+            .unwrap_or_else(|| theme::button_positive_text(is_dark));
         let btn_hover = glyph
             .as_ref()
             .map(|g| g.surface2)
-            .unwrap_or_else(|| theme::module_button_enable_hover_bg(is_dark));
+            .unwrap_or_else(|| theme::button_positive_hover_bg(is_dark));
         let well_bg = glyph
             .as_ref()
             .map(|g| g.bg)
-            .unwrap_or_else(|| theme::late_bonsai_well_bg(is_dark));
+            .unwrap_or_else(|| theme::decorative_well_bg(is_dark));
         let well_stroke = glyph
             .as_ref()
             .map(|g| g.border)
-            .unwrap_or_else(|| theme::late_bonsai_well_stroke(is_dark));
+            .unwrap_or_else(|| theme::decorative_well_stroke(is_dark));
         let pot_band = glyph
             .as_ref()
             .map(|g| g.surface2)
-            .unwrap_or_else(|| theme::late_bonsai_pot_band(is_dark));
+            .unwrap_or_else(|| theme::decorative_accent_band(is_dark));
         let foliage_c = glyph
             .as_ref()
             .map(|g| g.accent)
-            .unwrap_or_else(|| theme::late_bonsai_foliage_text(is_dark));
+            .unwrap_or_else(|| theme::decorative_foliage_text(is_dark));
         let accent_bar = glyph
             .as_ref()
             .map(|g| g.accent)

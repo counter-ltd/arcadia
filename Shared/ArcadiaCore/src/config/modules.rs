@@ -4,7 +4,7 @@ use std::io;
 
 use crate::config::workspace::WorkspacePermissionDef;
 use crate::config::{write_config_toml, ConfigFile};
-use crate::platform::PlatformInfo;
+use crate::platform::{PlatformInfo, PLATFORM_LINUX, PLATFORM_MACOS, PLATFORM_WINDOWS};
 
 /// OS id from [`crate::platform::PlatformInfo::name`]: `macos`, `windows`, `linux`, `ios`, `unknown`.
 pub fn runtime_platform_id() -> &'static str {
@@ -35,7 +35,7 @@ const LEGACY_TERMINAL_MODULE_NAME: &str = "shell";
 const LEGACY_TERMINAL_MOTD_MODULE_NAME: &str = "shell-motd";
 
 /// Earlier ids for the same terminal-styling Python extension. They all collapse to
-/// `terminal-theme` so `python_extensions[<id>] = true` survives the rename instead of
+/// `terminal-theme` so `extension_state[<id>] = true` survives the rename instead of
 /// silently resetting the extension to disabled.
 const LEGACY_TERMINAL_THEME_EXTENSION_IDS: &[&str] = &["tui-style", "shell-theme", "flux-theme"];
 const TERMINAL_THEME_EXTENSION_ID: &str = "terminal-theme";
@@ -161,7 +161,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         name: LATE_MODULE_NAME,
         glyph: "coffee",
         version: "0.1.0",
-        description: "Native late.sh client — chat rooms, music stream, reactions, and bonsai.",
+        description: "Real-time chat rooms, music stream, reactions, and social features.",
         required_modules: &[],
         required_permissions: &["late.outbound"],
         workspace_permissions: &[],
@@ -195,7 +195,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_modules: &[],
         required_permissions: &["tray.create"],
         workspace_permissions: &[],
-        supported_platforms: &["macos", "windows", "linux"],
+        supported_platforms: &[PLATFORM_MACOS, PLATFORM_WINDOWS, PLATFORM_LINUX],
     },
     ModuleManifest {
         name: CURSOR_MODULE_NAME,
@@ -205,7 +205,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_modules: &[],
         required_permissions: &["cursor.global_position"],
         workspace_permissions: &[],
-        supported_platforms: &["macos", "windows", "linux"],
+        supported_platforms: &[PLATFORM_MACOS, PLATFORM_WINDOWS, PLATFORM_LINUX],
     },
     ModuleManifest {
         name: OVERLAY_MODULE_NAME,
@@ -215,7 +215,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_modules: &[],
         required_permissions: &["overlay.hud"],
         workspace_permissions: &[],
-        supported_platforms: &["macos", "windows", "linux"],
+        supported_platforms: &[PLATFORM_MACOS, PLATFORM_WINDOWS, PLATFORM_LINUX],
     },
     ModuleManifest {
         name: WORKSPACE_MODULE_NAME,
@@ -393,7 +393,7 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         required_modules: &[AI_MODULE_NAME],
         required_permissions: &[],
         workspace_permissions: &[],
-        supported_platforms: &["macos"],
+        supported_platforms: &[PLATFORM_MACOS],
     },
     ModuleManifest {
         name: NOTIFICATION_MODULE_NAME,
@@ -416,7 +416,7 @@ pub struct ModulesConfig {
     /// Extensions settings page so that side-effectful `main.py` bodies do not run (and OS
     /// permission prompts do not fire) until the user opts in.
     #[serde(default)]
-    pub python_extensions: BTreeMap<String, bool>,
+    pub extension_state: BTreeMap<String, bool>,
 }
 
 fn required_modules(module_name: &str) -> &'static [&'static str] {
@@ -446,7 +446,7 @@ impl Default for ModulesConfig {
             .collect();
         Self {
             modules,
-            python_extensions: BTreeMap::new(),
+            extension_state: BTreeMap::new(),
         }
     }
 }
@@ -516,7 +516,7 @@ impl ModulesConfig {
     /// Persistent enable state for a Python extension. Unknown ids resolve to `false` — new
     /// extensions discovered on disk start disabled until the user explicitly opts in.
     pub fn python_extension_enabled(&self, extension_id: &str) -> bool {
-        self.python_extensions
+        self.extension_state
             .get(extension_id)
             .copied()
             .unwrap_or(false)
@@ -526,7 +526,7 @@ impl ModulesConfig {
         if extension_id.is_empty() {
             return;
         }
-        self.python_extensions
+        self.extension_state
             .insert(extension_id.to_string(), enabled);
     }
 
@@ -637,8 +637,8 @@ impl ConfigFile for ModulesConfig {
         // Collapse legacy ids for the terminal-styling Python extension onto its new id.
         // `or_insert` preserves any explicit user choice already on the new key.
         for legacy in LEGACY_TERMINAL_THEME_EXTENSION_IDS {
-            if let Some(val) = self.python_extensions.remove(*legacy) {
-                self.python_extensions
+            if let Some(val) = self.extension_state.remove(*legacy) {
+                self.extension_state
                     .entry(TERMINAL_THEME_EXTENSION_ID.to_string())
                     .or_insert(val);
                 changed = true;
@@ -744,7 +744,7 @@ mod tests {
                 m.insert(LEGACY_LAN_MODULE_NAME.to_string(), true);
                 m
             },
-            python_extensions: std::collections::BTreeMap::new(),
+            extension_state: std::collections::BTreeMap::new(),
         };
         let changed = cfg.merge_defaults();
         assert!(changed);
@@ -756,7 +756,7 @@ mod tests {
     fn merge_defaults_adds_missing_modules() {
         let mut cfg = ModulesConfig {
             modules: std::collections::BTreeMap::new(),
-            python_extensions: std::collections::BTreeMap::new(),
+            extension_state: std::collections::BTreeMap::new(),
         };
         let changed = cfg.merge_defaults();
         assert!(changed);
@@ -843,7 +843,7 @@ mod tests {
     fn set_python_extension_enabled_ignores_empty_id() {
         let mut cfg = base();
         cfg.set_python_extension_enabled("", true);
-        assert!(cfg.python_extensions.is_empty());
+        assert!(cfg.extension_state.is_empty());
     }
 
     #[test]

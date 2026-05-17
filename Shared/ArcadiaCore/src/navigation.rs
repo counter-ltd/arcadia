@@ -293,7 +293,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
     },
     NavigationPageDefinition {
         id: "late.now_playing",
-        title: "Late.sh",
+        title: "Social",
         description: "Live chat, now playing, votes, visualizer, and bonsai in one view.",
         glyph: "coffee",
         system_image: "cup.and.saucer.fill",
@@ -311,15 +311,15 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
     },
     NavigationPageDefinition {
         id: "late.settings",
-        title: "Late.sh",
-        description: "Configure Late.sh server URL, credentials, and connection preferences.",
+        title: "Social Settings",
+        description: "Configure server URL, credentials, and connection preferences.",
         glyph: "coffee",
         system_image: "cup.and.saucer.fill",
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
     },
     NavigationPageDefinition {
-        id: "python.settings",
+        id: "extensions.settings",
         title: "Extensions",
         description: "Enable or disable Python extensions loaded from ~/Arcadia/Extensions/.",
         glyph: "extensions",
@@ -464,10 +464,10 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
 
 pub const GLOBAL_PAGE_IDS: &[&str] = &["global.settings"];
 pub const LOGS_PAGE_ID: &str = "global.logs";
-pub const TOP_BAR_PAGE_IDS: &[&str] = &["python.settings", "global.modules", "notification.main"];
+pub const TOP_BAR_PAGE_IDS: &[&str] = &["extensions.settings", "global.modules", "notification.main"];
 /// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; these are **nested only**
 /// (not the hub header). Omit [`SETTINGS_HUB_ROOT_PAGE_ID`] — the header row is that page.
-/// Extensions (`python.settings`) and Modules live in [`TOP_BAR_PAGE_IDS`]. Logs is opened from the app-title context menu on Desktop, not the top bar.
+/// Extensions (`extensions.settings`) and Modules live in [`TOP_BAR_PAGE_IDS`]. Logs is opened from the app-title context menu on Desktop, not the top bar.
 pub const SETTINGS_HUB_ROOT_PAGE_ID: &str = "global.settings";
 pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
     "global.permissions",
@@ -482,11 +482,11 @@ pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
 pub const DEFAULT_GROUP_ID: &str = "utilities";
 pub const DEFAULT_PAGE_ID: &str = "global.settings";
 
-/// Settings hub pages for extensions with standalone `register_tokens` (not style-linked).
-pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "python.extension_tokens|";
+/// Settings hub pages for extensions with standalone `register_tokens`.
+pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "extension.tokens|";
 
-/// Nav group pages declared dynamically by Python extensions via `register_nav_page`.
-pub const EXTENSION_NAV_PAGE_PREFIX: &str = "python.nav_page|";
+/// Nav group pages declared dynamically by extensions via `register_nav_page`.
+pub const EXTENSION_NAV_PAGE_PREFIX: &str = "extension.page|";
 
 pub fn extension_nav_page_id(extension_id: &str) -> String {
     format!("{EXTENSION_NAV_PAGE_PREFIX}{extension_id}")

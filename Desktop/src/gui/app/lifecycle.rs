@@ -808,7 +808,7 @@ impl ArcadiaRoot {
         }
     }
 
-    pub fn reload_python_extensions(&mut self, cx: &mut Context<Self>) {
+    pub fn reload_extension_state(&mut self, cx: &mut Context<Self>) {
         self.python_extension_rows = {
             let mut rows = arcadia_core::modules::python_registry::list_modules();
             rows.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1827,7 +1827,7 @@ impl ArcadiaRoot {
         let elapsed = (now - anim.phase_start).as_secs_f32();
 
         match anim.phase {
-            NotificationPreviewPhase::PillEnter => {
+            NotificationPreviewPhase::BadgeEnter => {
                 let t = apply_easing(Easing::EaseOutCubic, (elapsed / PILL_FADE_S).min(1.0));
                 self.pill_expand_alphas.insert("notification.main".to_string(), t);
                 self.notification_preview_bg_alpha = t;
@@ -1836,23 +1836,23 @@ impl ArcadiaRoot {
                     self.notification_preview_bg_alpha = 1.0;
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
-                        phase: NotificationPreviewPhase::PillHold,
+                        phase: NotificationPreviewPhase::BadgeHold,
                         pending_title: anim.pending_title,
                     });
                 }
                 true
             }
-            NotificationPreviewPhase::PillHold => {
+            NotificationPreviewPhase::BadgeHold => {
                 if elapsed >= HOLD_S {
                     self.notification_preview_anim = Some(NotificationPreviewAnim {
                         phase_start: now,
-                        phase: NotificationPreviewPhase::PillExit,
+                        phase: NotificationPreviewPhase::BadgeExit,
                         pending_title: anim.pending_title,
                     });
                 }
                 true
             }
-            NotificationPreviewPhase::PillExit => {
+            NotificationPreviewPhase::BadgeExit => {
                 let t = apply_easing(Easing::EaseInCubic, (elapsed / PILL_FADE_S).min(1.0));
                 self.pill_expand_alphas.insert("notification.main".to_string(), 1.0 - t);
                 self.notification_preview_bg_alpha = 1.0 - t;
@@ -1978,7 +1978,7 @@ impl ArcadiaRoot {
             self.notification_preview_text = title.clone();
             self.notification_preview_anim = Some(NotificationPreviewAnim {
                 phase_start: Instant::now(),
-                phase: NotificationPreviewPhase::PillEnter,
+                phase: NotificationPreviewPhase::BadgeEnter,
                 pending_title: title,
             });
         }

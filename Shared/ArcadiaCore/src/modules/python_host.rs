@@ -123,7 +123,7 @@ fn extension_enable(args: &[&str], _context: &ExecutionContext) -> String {
                 // stub id — persist the rename so future toggles work against the canonical
                 // name instead of leaving an orphan key under the old id.
                 if let Ok(mut cfg) = ModulesConfig::load_or_create() {
-                    cfg.python_extensions.remove(*name);
+                    cfg.extension_state.remove(*name);
                     cfg.set_python_extension_enabled(&canonical, true);
                     let _ = cfg.save();
                 }

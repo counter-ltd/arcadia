@@ -2,7 +2,7 @@
 
 use openframe::Rgba;
 
-pub fn code_explorer_sidebar_bg(is_dark: bool) -> Rgba {
+pub fn explorer_sidebar_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.078,
@@ -20,7 +20,7 @@ pub fn code_explorer_sidebar_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn code_explorer_border(is_dark: bool) -> Rgba {
+pub fn explorer_border(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.165,
@@ -38,7 +38,7 @@ pub fn code_explorer_border(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn code_explorer_text(is_dark: bool) -> Rgba {
+pub fn explorer_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.820,
@@ -56,7 +56,7 @@ pub fn code_explorer_text(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn code_explorer_dim(is_dark: bool) -> Rgba {
+pub fn explorer_dim(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.420,
@@ -74,7 +74,7 @@ pub fn code_explorer_dim(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn code_explorer_hover_bg(is_dark: bool) -> Rgba {
+pub fn explorer_hover_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.118,
@@ -92,7 +92,7 @@ pub fn code_explorer_hover_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn code_explorer_active_row_bg(is_dark: bool) -> Rgba {
+pub fn explorer_active_row_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.102,
@@ -110,7 +110,7 @@ pub fn code_explorer_active_row_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn code_explorer_active_row_text(is_dark: bool) -> Rgba {
+pub fn explorer_active_row_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.576,

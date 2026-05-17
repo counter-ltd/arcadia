@@ -12,8 +12,8 @@ use super::config_root_dir;
 
 use crate::modules::python_registry::{GlyphParams, StyleTokenKind};
 
-/// Sanitize extension module id for use as a filename segment.
-pub fn sanitize_module_id(module: &str) -> String {
+/// Sanitize extension id for use as a config filename segment.
+pub fn sanitize_extension_id(module: &str) -> String {
     module
         .chars()
         .map(|c| {
@@ -35,7 +35,7 @@ fn tokens_dir() -> io::Result<PathBuf> {
 
 pub fn tokens_file_for_module(module: &str) -> io::Result<PathBuf> {
     let mut p = tokens_dir()?;
-    let safe = sanitize_module_id(module);
+    let safe = sanitize_extension_id(module);
     if safe.is_empty() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,

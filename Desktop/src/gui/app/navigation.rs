@@ -183,7 +183,7 @@ impl ArcadiaRoot {
                 .settings_hub_page_ids_effective()
                 .iter()
                 .any(|p| *p == active.as_str());
-        for &pill_id in &["notification.main", "python.settings", "global.modules"] {
+        for &pill_id in &["notification.main", "extensions.settings", "global.modules"] {
             let should_expand = on_settings || active.as_str() == pill_id;
             let current = self.pill_expanded.get(pill_id).copied().unwrap_or(false);
             if should_expand != current {
@@ -344,7 +344,7 @@ impl ArcadiaRoot {
                     self.late_settings_panel(window, cx, is_dark)
                         .into_any_element(),
                 ),
-                "python.settings" => Some(
+                "extensions.settings" => Some(
                     self.python_settings_panel(window, cx, is_dark)
                         .into_any_element(),
                 ),
@@ -408,11 +408,11 @@ impl ArcadiaRoot {
                 .and_then(|t| t.workspace_path.clone())
                 .unwrap_or_default();
             let show_explorer = self.code_editor_explorer_open && !ws_path.is_empty();
-            let sidebar_bg = theme::code_explorer_sidebar_bg(is_dark);
-            let border_color = theme::code_explorer_border(is_dark);
-            let text_color = theme::code_explorer_text(is_dark);
-            let dim_color = theme::code_explorer_dim(is_dark);
-            let hover_bg = theme::code_explorer_hover_bg(is_dark);
+            let sidebar_bg = theme::explorer_sidebar_bg(is_dark);
+            let border_color = theme::explorer_border(is_dark);
+            let text_color = theme::explorer_text(is_dark);
+            let dim_color = theme::explorer_dim(is_dark);
+            let hover_bg = theme::explorer_hover_bg(is_dark);
             let mut row = div().w_full().h_full().flex().flex_row();
             if show_explorer {
                 // Collect flat entry list with depth via recursive walk
@@ -453,8 +453,8 @@ impl ArcadiaRoot {
                     .code_editor_tabs
                     .get(active_idx)
                     .and_then(|t| t.file_path.clone());
-                let active_row_bg = theme::code_explorer_active_row_bg(is_dark);
-                let active_row_text = theme::code_explorer_active_row_text(is_dark);
+                let active_row_bg = theme::explorer_active_row_bg(is_dark);
+                let active_row_text = theme::explorer_active_row_text(is_dark);
 
                 if flat.is_empty() {
                     sidebar = sidebar.child(
@@ -591,11 +591,11 @@ impl ArcadiaRoot {
                 .and_then(|t| t.workspace_path.clone())
                 .unwrap_or_default();
             let show_explorer = self.visual_editor_explorer_open && !ws_path.is_empty();
-            let sidebar_bg = theme::code_explorer_sidebar_bg(is_dark);
-            let border_color = theme::code_explorer_border(is_dark);
-            let text_color = theme::code_explorer_text(is_dark);
-            let dim_color = theme::code_explorer_dim(is_dark);
-            let hover_bg = theme::code_explorer_hover_bg(is_dark);
+            let sidebar_bg = theme::explorer_sidebar_bg(is_dark);
+            let border_color = theme::explorer_border(is_dark);
+            let text_color = theme::explorer_text(is_dark);
+            let dim_color = theme::explorer_dim(is_dark);
+            let hover_bg = theme::explorer_hover_bg(is_dark);
             let mut row = div().w_full().h_full().flex().flex_row();
             if show_explorer {
                 let mut flat: Vec<(String, String, bool, usize)> = Vec::new();
@@ -634,8 +634,8 @@ impl ArcadiaRoot {
                     .visual_editor_tabs
                     .get(active_idx)
                     .and_then(|t| t.file_path.clone());
-                let active_row_bg = theme::code_explorer_active_row_bg(is_dark);
-                let active_row_text = theme::code_explorer_active_row_text(is_dark);
+                let active_row_bg = theme::explorer_active_row_bg(is_dark);
+                let active_row_text = theme::explorer_active_row_text(is_dark);
 
                 if flat.is_empty() {
                     sidebar = sidebar.child(

@@ -426,7 +426,7 @@ impl ArcadiaRoot {
                                         this.python_extension_action_error = Some(e);
                                     }
                                 }
-                                this.reload_python_extensions(cx);
+                                this.reload_extension_state(cx);
                                 cx.notify();
                             }),
                         )

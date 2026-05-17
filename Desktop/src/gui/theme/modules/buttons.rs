@@ -1,6 +1,6 @@
 use openframe::Rgba;
 
-pub fn module_button_enable_bg(is_dark: bool) -> Rgba {
+pub fn button_positive_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.120,
@@ -18,7 +18,7 @@ pub fn module_button_enable_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn module_button_enable_hover_bg(is_dark: bool) -> Rgba {
+pub fn button_positive_hover_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.145,
@@ -36,7 +36,7 @@ pub fn module_button_enable_hover_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn module_button_enable_text(is_dark: bool) -> Rgba {
+pub fn button_positive_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.905,
@@ -54,7 +54,7 @@ pub fn module_button_enable_text(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn module_button_disable_bg(is_dark: bool) -> Rgba {
+pub fn button_negative_bg(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 0.620,
@@ -72,7 +72,7 @@ pub fn module_button_disable_bg(is_dark: bool) -> Rgba {
     }
 }
 
-pub fn module_button_disable_text(is_dark: bool) -> Rgba {
+pub fn button_negative_text(is_dark: bool) -> Rgba {
     if is_dark {
         Rgba {
             r: 1.000,

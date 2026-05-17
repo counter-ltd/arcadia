@@ -52,19 +52,19 @@ impl ArcadiaRoot {
         let btn_bg = glyph
             .as_ref()
             .map(|g| g.accent)
-            .unwrap_or_else(|| theme::module_button_enable_bg(is_dark));
+            .unwrap_or_else(|| theme::button_positive_bg(is_dark));
         let btn_text = glyph
             .as_ref()
             .map(|g| g.bg)
-            .unwrap_or_else(|| theme::module_button_enable_text(is_dark));
+            .unwrap_or_else(|| theme::button_positive_text(is_dark));
         let dis_bg = glyph
             .as_ref()
             .map(|g| g.surface2)
-            .unwrap_or_else(|| theme::module_button_disable_bg(is_dark));
+            .unwrap_or_else(|| theme::button_negative_bg(is_dark));
         let dis_text = glyph
             .as_ref()
             .map(|g| g.dim)
-            .unwrap_or_else(|| theme::module_button_disable_text(is_dark));
+            .unwrap_or_else(|| theme::button_negative_text(is_dark));
         let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(8.0);
         let input_bg = glyph
             .as_ref()
