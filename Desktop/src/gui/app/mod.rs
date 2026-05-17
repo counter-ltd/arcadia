@@ -202,10 +202,20 @@ pub struct VisualEditorTab {
 pub struct VisualDrag {
     /// Child-index path of the dragged block.
     pub path: Vec<usize>,
-    /// Short label shown in the drag ghost.
-    pub label: String,
+    /// Pointer position when the press began (window-space pixels).
+    pub origin: openframe::Point<openframe::Pixels>,
     /// Current pointer position (window-space pixels).
     pub cursor: openframe::Point<openframe::Pixels>,
+    /// Pointer offset within the block at grab time, so the ghost holds the
+    /// point the user grabbed instead of snapping its corner to the cursor.
+    pub grab_x: f32,
+    pub grab_y: f32,
+    /// `false` until the pointer moves past the drag threshold — a press that
+    /// never moves is a click (select only), not a drag.
+    pub active: bool,
+    /// Top-level stack indices snapped below the dragged block that move with
+    /// it (shift-drag). Empty for an ordinary single-block drag.
+    pub followers: Vec<usize>,
 }
 
 /// A registered drop target — the mouth region of a compound block.
@@ -478,6 +488,9 @@ pub struct ArcadiaRoot {
     pub visual_editor_canvas_origin: Rc<RefCell<openframe::Point<openframe::Pixels>>>,
     /// Compound-block mouth drop targets, repopulated every frame.
     pub visual_editor_drop_zones: Rc<RefCell<Vec<DropZone>>>,
+    /// Window-space bounds of every rendered block, keyed by path, repopulated
+    /// every frame — used to compute the grab offset when a drag starts.
+    pub visual_editor_block_bounds: Rc<RefCell<Vec<(Vec<usize>, Bounds<Pixels>)>>>,
     pub ai_chats: Vec<AiChat>,
     pub active_ai_chat_id: usize,
     pub ai_next_id: usize,
@@ -678,6 +691,8 @@ pub struct ArcadiaRoot {
     pub extension_token_focus: FocusHandle,
     /// Active color picker modal state: (module, key, current_color, default_color).
     pub color_picker_modal: Option<(String, String, String, String)>,
+    /// When the color picker is open for a gradient token, the index of the stop being edited.
+    pub gradient_stop_editing_index: Option<usize>,
     /// Last observed window dark/light mode for mode-aware style re-application.
     pub last_color_scheme_dark: Option<bool>,
     /// Lines at top of each terminal transcript occupied by shell MOTD (incl. trailing blank), when enabled.

@@ -1,7 +1,9 @@
-//! Desktop cursor backend: returns the OS-global mouse cursor position and the size of the
-//! primary display. Cross-platform via `device_query` + `display-info`.
+//! Desktop cursor backend: OS-global mouse cursor position and button state only.
+//! Cross-platform via `device_query`.
 //!
-//! Wired into `arcadia_core::modules::cursor` from desktop startup.
+//! Wired into `arcadia_core::modules::cursor` from desktop startup via [`install`].
+//!
+//! Display geometry and platform metadata live in [`super::platform_backend`].
 //!
 //! macOS note: `device_query::DeviceState::new()` calls `application_is_trusted_with_prompt()`
 //! which surfaces the system Accessibility permission prompt and panics if the user has not
@@ -21,9 +23,7 @@ use std::sync::Mutex;
 
 use arcadia_core::config::permissions::PermissionsConfig;
 use arcadia_core::config::ConfigFile;
-use arcadia_core::modules::cursor::{
-    self, CursorBackend, CursorPosition, CursorSnapshot, ScreenSize,
-};
+use arcadia_core::modules::cursor::{self, CursorBackend, CursorPosition, CursorSnapshot};
 use device_query::{DeviceQuery, DeviceState};
 
 const CURSOR_GLOBAL_POSITION_PERMISSION: &str = "cursor.global_position";
@@ -82,20 +82,6 @@ impl CursorBackend for DesktopCursorBackend {
                 left_button: m.button_pressed.get(1).copied().unwrap_or(false),
                 right_button: m.button_pressed.get(2).copied().unwrap_or(false),
             }
-        })
-    }
-
-    fn primary_screen_size(&self) -> Option<ScreenSize> {
-        // `display-info` does not require Accessibility and is safe to call regardless of
-        // permission state — keep it independent of `with_device`.
-        let infos = display_info::DisplayInfo::all().ok()?;
-        let primary = infos
-            .iter()
-            .find(|d| d.is_primary)
-            .or_else(|| infos.first())?;
-        Some(ScreenSize {
-            width: primary.width,
-            height: primary.height,
         })
     }
 }

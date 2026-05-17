@@ -6,6 +6,8 @@ pub mod cursor_backend;
 #[cfg(feature = "gui")]
 mod overlay_backend;
 #[cfg(feature = "gui")]
+pub mod platform_backend;
+#[cfg(feature = "gui")]
 mod overlay_hud;
 mod theme;
 #[cfg(feature = "gui")]

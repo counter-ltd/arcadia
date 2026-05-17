@@ -118,7 +118,11 @@ pub fn move_block(
     indent: &str,
 ) -> String {
     let (ds, de) = line_bounds(source, drag_start, drag_end);
+    // The block is inserted *after the whole line* the anchor falls on, so the
+    // anchor must be snapped to a line boundary — a raw mid-line offset would
+    // splice the block onto the end of an existing statement.
     let anchor = anchor.min(source.len());
+    let anchor = line_bounds(source, anchor, anchor).1;
     if anchor >= ds && anchor <= de {
         return source.to_string();
     }
@@ -234,11 +238,11 @@ mod tests {
     }
 
     #[test]
-    fn move_block_promotes_to_column_zero() {
-        // move the nested "x = 1" out to the front at column 0
-        let s = "def f():\n    x = 1\n";
-        let out = move_block(s, 13, 18, 0, "");
-        assert_eq!(out, "x = 1\ndef f():\n");
+    fn move_block_snaps_anchor_to_line_end() {
+        // anchor (11) is mid-line in "b = 2"; the block must land on its own
+        // line after it, never glued onto the end of the statement.
+        let s = "a = 1\nb = 2\n";
+        assert_eq!(move_block(s, 0, 5, 11, ""), "b = 2\na = 1\n");
     }
 
     #[test]

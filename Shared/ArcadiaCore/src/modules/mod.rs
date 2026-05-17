@@ -18,6 +18,7 @@ pub mod openai;
 pub mod overlay;
 pub mod overlay_hud_sprite;
 pub mod permissions;
+pub mod platform;
 pub mod python_host;
 pub mod python_registry;
 pub mod remote_mirror;

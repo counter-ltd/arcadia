@@ -108,6 +108,12 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_4()
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|_, _, _, cx| {
+                                    cx.stop_propagation();
+                                }),
+                            )
                             .child(
                                 // Header
                                 div()
@@ -162,14 +168,47 @@ impl ArcadiaRoot {
                                         let k = key.clone();
                                         move |this, picked: Rgba, _cx| {
                                             let hex = rgba_to_hex(picked);
-                                            this.extension_token_values
-                                                .insert((m.clone(), k.clone()), hex.clone());
-                                            this.color_picker_modal = Some((
-                                                m.clone(),
-                                                k.clone(),
-                                                hex,
-                                                this.color_picker_modal.as_ref().map(|(_, _, _, d)| d.clone()).unwrap_or_default(),
-                                            ));
+                                            // If editing a specific gradient stop, patch that stop's
+                                            // color in the gradient JSON rather than replacing the
+                                            // whole token value.
+                                            if let Some(idx) = this.gradient_stop_editing_index {
+                                                use crate::gui::app::appearance::extension_tokens::{
+                                                    parse_gradient_stops, stops_to_json,
+                                                };
+                                                let pair = (m.clone(), k.clone());
+                                                let current = this
+                                                    .extension_token_values
+                                                    .get(&pair)
+                                                    .cloned()
+                                                    .unwrap_or_default();
+                                                let mut stops = parse_gradient_stops(&current);
+                                                if idx < stops.len() {
+                                                    stops[idx].color = hex.clone();
+                                                }
+                                                let new_json = stops_to_json(&stops);
+                                                this.extension_token_values.insert(pair, new_json.clone());
+                                                this.color_picker_modal = Some((
+                                                    m.clone(),
+                                                    k.clone(),
+                                                    hex,
+                                                    this.color_picker_modal
+                                                        .as_ref()
+                                                        .map(|(_, _, _, d)| d.clone())
+                                                        .unwrap_or_default(),
+                                                ));
+                                            } else {
+                                                this.extension_token_values
+                                                    .insert((m.clone(), k.clone()), hex.clone());
+                                                this.color_picker_modal = Some((
+                                                    m.clone(),
+                                                    k.clone(),
+                                                    hex,
+                                                    this.color_picker_modal
+                                                        .as_ref()
+                                                        .map(|(_, _, _, d)| d.clone())
+                                                        .unwrap_or_default(),
+                                                ));
+                                            }
                                         }
                                     },
                                 ),
@@ -207,6 +246,7 @@ impl ArcadiaRoot {
                                                         this.extension_token_values
                                                             .insert((m.clone(), k.clone()), reverted);
                                                         this.color_picker_modal = None;
+                                                        this.gradient_stop_editing_index = None;
                                                         cx.notify();
                                                     }
                                                 }),
@@ -233,6 +273,7 @@ impl ArcadiaRoot {
                                                             cx,
                                                         );
                                                         this.color_picker_modal = None;
+                                                        this.gradient_stop_editing_index = None;
                                                         cx.notify();
                                                     }
                                                 }),

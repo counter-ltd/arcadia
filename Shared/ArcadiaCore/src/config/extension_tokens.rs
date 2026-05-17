@@ -101,7 +101,9 @@ pub fn merged_display_for_key(key: &str, default: &str, file: &HashMap<String, V
 pub fn parse_input_to_value(kind: StyleTokenKind, input: &str) -> Result<Value, String> {
     let t = input.trim();
     match kind {
-        StyleTokenKind::Color | StyleTokenKind::String => Ok(Value::String(t.to_string())),
+        StyleTokenKind::Color | StyleTokenKind::String | StyleTokenKind::Gradient => {
+            Ok(Value::String(t.to_string()))
+        }
         StyleTokenKind::Float => t
             .parse::<f64>()
             .map(Value::Float)

@@ -9,8 +9,8 @@ use arcadia_core::modules::style_tokens::{
 };
 use arcadia_core::modules::visual_editor::palette::BlockDef;
 use arcadia_core::modules::{
-    animation, cursor as core_cursor, overlay_hud_sprite, python_registry, tray as core_tray,
-    ExecutionContext,
+    animation, cursor as core_cursor, overlay_hud_sprite, platform as core_platform,
+    python_registry, tray as core_tray, ExecutionContext,
 };
 use arcadia_core::scheduling;
 use arcadia_core::shortcuts::ShortcutRegistrationOwned;
@@ -357,6 +357,7 @@ fn register_tokens(module: String, tokens: Bound<'_, PyAny>) -> PyResult<()> {
             "string" => StyleTokenKind::String,
             "bool" | "boolean" => StyleTokenKind::Bool,
             "int" | "integer" => StyleTokenKind::Int,
+            "gradient" => StyleTokenKind::Gradient,
             other => {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                     "unknown token kind: {other}"
@@ -628,25 +629,35 @@ fn cursor_snapshot(extension_id: String) -> PyResult<Option<(f64, f64, bool, boo
 }
 
 #[pyfunction]
-fn screen_size(extension_id: String) -> PyResult<Option<(u32, u32)>> {
+fn screen_size(extension_id: String) -> PyResult<Option<(u32, u32, f32)>> {
     ensure_python_permission(&extension_id, "cursor.global_position")?;
-    Ok(core_cursor::primary_screen_size().map(|s| (s.width, s.height)))
+    Ok(core_platform::primary_screen_size().map(|s| (s.width, s.height, s.scale_factor)))
 }
 
 /// Primary display size for layout — gated on `overlay.hud` (no cursor permission required).
 #[pyfunction]
-fn overlay_display_size(extension_id: String) -> PyResult<Option<(u32, u32)>> {
+fn overlay_display_size(extension_id: String) -> PyResult<Option<(u32, u32, f32)>> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
-    Ok(core_cursor::primary_screen_size().map(|s| (s.width, s.height)))
+    Ok(core_platform::primary_screen_size().map(|s| (s.width, s.height, s.scale_factor)))
+}
+
+/// macOS menu bar height in logical points. `None` on non-macOS or if backend unavailable.
+/// Gated on `overlay.hud` — no cursor permission required.
+#[pyfunction]
+fn menu_bar_height(extension_id: String) -> PyResult<Option<f32>> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    Ok(core_platform::menu_bar_height())
 }
 
 #[pyfunction]
-#[pyo3(signature = (extension_id, rgba, width, height, pad_right=None, pad_bottom=None, display_width=None, display_height=None))]
+#[pyo3(signature = (extension_id, rgba, width, height, anchor=None, stacking=None, pad_right=None, pad_bottom=None, display_width=None, display_height=None))]
 fn overlay_hud_set_sprite(
     extension_id: String,
     rgba: &Bound<'_, PyBytes>,
     width: u32,
     height: u32,
+    anchor: Option<String>,
+    stacking: Option<String>,
     pad_right: Option<f32>,
     pad_bottom: Option<f32>,
     display_width: Option<f32>,
@@ -657,8 +668,10 @@ fn overlay_hud_set_sprite(
         rgba: rgba.as_bytes().to_vec(),
         width,
         height,
-        pad_right: pad_right.unwrap_or(24.),
-        pad_bottom: pad_bottom.unwrap_or(24.),
+        anchor: anchor.unwrap_or_else(|| "bottom-right".to_string()),
+        stacking: stacking.unwrap_or_else(|| "hud".to_string()),
+        pad_x: pad_right.unwrap_or(24.),
+        pad_y: pad_bottom.unwrap_or(24.),
         display_width,
         display_height,
     };
@@ -669,7 +682,7 @@ fn overlay_hud_set_sprite(
 #[pyfunction]
 fn overlay_hud_clear_sprite(extension_id: String) -> PyResult<()> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
-    overlay_hud_sprite::clear_sprite();
+    overlay_hud_sprite::clear_sprite_for_owner(&extension_id);
     Ok(())
 }
 
@@ -803,6 +816,48 @@ fn read_tokens<'py>(py: Python<'py>, module: String) -> PyResult<Bound<'py, PyDi
 #[pyfunction]
 fn register_editor_token_module(extension_id: String) {
     python_registry::register_editor_token_module(extension_id);
+}
+
+/// Register a callback invoked whenever the extension's tokens are saved by the user.
+///
+/// Internally registers `{extension_id}.reload` as a command — the same slot the desktop
+/// GUI dispatches after every token save — so the handler is also callable from the CLI.
+///
+/// `handler(tokens: dict)` receives the full current token dict (same shape as `read_tokens`).
+#[pyfunction]
+fn register_token_change_handler(extension_id: String, handler: PyObject) {
+    let ext = extension_id.clone();
+    let handler_fn: Arc<dyn Fn(Vec<String>) -> String + Send + Sync + 'static> =
+        Arc::new(move |_args: Vec<String>| {
+            let module = ext.clone();
+            Python::with_gil(|py| {
+                let file = extension_tokens::load_module_tokens(&module).unwrap_or_default();
+                let specs = python_registry::list_style_tokens()
+                    .into_iter()
+                    .find(|(m, _)| m == &module)
+                    .map(|(_, s)| s)
+                    .unwrap_or_default();
+                let dict = PyDict::new_bound(py);
+                for spec in &specs {
+                    let display = extension_tokens::merged_display_for_key(
+                        &spec.key,
+                        &spec.default_value,
+                        &file,
+                    );
+                    let _ = dict.set_item(&spec.key, display);
+                }
+                match handler.call1(py, (dict,)) {
+                    Ok(ret) => ret.extract::<String>(py).unwrap_or_default(),
+                    Err(e) => format!("token_change_handler error: {e}"),
+                }
+            })
+        });
+    python_registry::register_command(
+        format!("{extension_id}.reload"),
+        format!("Called automatically when {extension_id} tokens change."),
+        handler_fn,
+        vec![],
+    );
 }
 
 /// Register a syntax highlight provider for `language` (e.g. `"rust"`).
@@ -1023,6 +1078,7 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(cursor_snapshot, m)?)?;
     m.add_function(wrap_pyfunction!(screen_size, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_display_size, m)?)?;
+    m.add_function(wrap_pyfunction!(menu_bar_height, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_set_sprite, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_clear_sprite, m)?)?;
     m.add_function(wrap_pyfunction!(animate, m)?)?;
@@ -1033,6 +1089,7 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extension_assets_path, m)?)?;
     m.add_function(wrap_pyfunction!(read_extension_asset, m)?)?;
     m.add_function(wrap_pyfunction!(register_editor_token_module, m)?)?;
+    m.add_function(wrap_pyfunction!(register_token_change_handler, m)?)?;
     m.add_function(wrap_pyfunction!(register_highlight_provider, m)?)?;
     m.add_function(wrap_pyfunction!(register_decoration_provider, m)?)?;
     m.add_function(wrap_pyfunction!(list_highlight_providers, m)?)?;

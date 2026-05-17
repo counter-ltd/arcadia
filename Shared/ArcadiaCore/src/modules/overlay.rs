@@ -26,6 +26,7 @@ pub enum OverlayStackingToken {
     Floating,
     Hud,
     SystemUi,
+    BelowMenuBar,
 }
 
 impl OverlayStackingToken {
@@ -35,6 +36,7 @@ impl OverlayStackingToken {
             OverlayStackingToken::Floating => "floating",
             OverlayStackingToken::Hud => "hud",
             OverlayStackingToken::SystemUi => "system_ui",
+            OverlayStackingToken::BelowMenuBar => "below_menu_bar",
         }
     }
 }
@@ -46,8 +48,9 @@ pub fn parse_overlay_stacking_token(s: &str) -> Result<OverlayStackingToken, Str
         "floating" => Ok(OverlayStackingToken::Floating),
         "hud" => Ok(OverlayStackingToken::Hud),
         "system_ui" => Ok(OverlayStackingToken::SystemUi),
+        "below_menu_bar" => Ok(OverlayStackingToken::BelowMenuBar),
         other => Err(format!(
-            "Unknown overlay stacking token '{other}' (expected normal|floating|hud|system_ui)"
+            "Unknown overlay stacking token '{other}' (expected normal|floating|hud|system_ui|below_menu_bar)"
         )),
     }
 }
@@ -146,7 +149,7 @@ fn cmd_hide(_args: &[&str], _ctx: &ExecutionContext) -> String {
 
 fn cmd_set_stacking(args: &[&str], _ctx: &ExecutionContext) -> String {
     let Some(raw) = args.first().copied() else {
-        return "Usage: overlay.set-stacking <normal|floating|hud|system_ui>".to_string();
+        return "Usage: overlay.set-stacking <normal|floating|hud|system_ui|below_menu_bar>".to_string();
     };
     let token = match parse_overlay_stacking_token(raw) {
         Ok(t) => t,

@@ -7,11 +7,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use openframe::{
-    canvas, div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, MouseDownEvent, ParentElement, Rgba, Styled,
+    canvas, div, px, rgb, AnyElement, Bounds, Context, FontWeight, InteractiveElement, IntoElement,
+    MouseButton, MouseDownEvent, ParentElement, Pixels, Rgba, Styled,
 };
 
-use super::block_shape::{c_block_bg, leaf_bg, BUMP_H, HEADER_H, LIP_H, SPINE_W};
+use super::block_shape::{c_block_bg, leaf_bg, Edges, BUMP_H, HEADER_H, LIP_H, SPINE_W};
 use crate::gui::app::code_editor_panel::{code_line_content, LineStyle};
 use crate::gui::app::{ArcadiaRoot, DropZone};
 use crate::gui::assets::MONO_FONT_FAMILY;
@@ -32,6 +32,27 @@ pub(super) struct BlockRenderCtx {
     pub selected: Option<Vec<usize>>,
     /// Compound-mouth drop targets registered during this render pass.
     pub drop_zones: Rc<RefCell<Vec<DropZone>>>,
+    /// Per-block window-space bounds registered during this render pass.
+    pub block_bounds: Rc<RefCell<Vec<(Vec<usize>, Bounds<Pixels>)>>>,
+    /// Live drop preview: (target compound path, insertion index). Renders an
+    /// insertion marker inside the matching compound's mouth.
+    pub drop_preview: Option<(Vec<usize>, usize)>,
+}
+
+/// A full-size canvas that records its block's window bounds each frame, so a
+/// drag can compute the pointer offset within the grabbed block.
+fn bounds_capture(
+    path: Vec<usize>,
+    sink: Rc<RefCell<Vec<(Vec<usize>, Bounds<Pixels>)>>>,
+) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, _, _| {
+            sink.borrow_mut().push((path.clone(), bounds));
+        },
+    )
+    .absolute()
+    .size_full()
 }
 
 fn classify(kind: &BlockKind) -> (&'static str, BlockCategory) {
@@ -129,6 +150,7 @@ fn select(this: &mut ArcadiaRoot, path: Vec<usize>, span_start: usize, window: &
 pub(super) fn render_block(
     block: &Block,
     path: Vec<usize>,
+    edges: Edges,
     ctx: &BlockRenderCtx,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
@@ -136,7 +158,7 @@ pub(super) fn render_block(
     let selected = ctx.selected.as_deref() == Some(path.as_slice());
     match &block.kind {
         BlockKind::Raw { text } => {
-            render_raw(label, text, path, block.span.start, selected, ctx, cx)
+            render_raw(label, text, path, block.span.start, selected, edges, ctx, cx)
         }
         kind if kind.is_compound() => render_compound(
             label,
@@ -146,13 +168,15 @@ pub(super) fn render_block(
             path,
             block.span.start,
             selected,
+            edges,
             ctx,
             cx,
         ),
-        kind => render_leaf(label, cat, kind, path, block.span.start, selected, ctx, cx),
+        kind => render_leaf(label, cat, kind, path, block.span.start, selected, edges, ctx, cx),
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_leaf(
     label: &str,
     cat: BlockCategory,
@@ -160,6 +184,7 @@ fn render_leaf(
     path: Vec<usize>,
     span_start: usize,
     selected: bool,
+    edges: Edges,
     ctx: &BlockRenderCtx,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
@@ -172,33 +197,34 @@ fn render_leaf(
     } else {
         None
     };
-    let drag_label = label.to_string();
+    let bounds_cap = bounds_capture(path.clone(), ctx.block_bounds.clone());
     div()
         .relative()
         .cursor_pointer()
+        .child(bounds_cap)
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                 select(this, path.clone(), span_start, window);
-                this.start_visual_drag(path.clone(), drag_label.clone(), ev.position);
+                this.start_visual_drag(path.clone(), ev.position, ev.modifiers.shift);
                 cx.stop_propagation();
                 cx.notify();
             }),
         )
-        .child(leaf_bg(accent, ring))
+        .child(leaf_bg(accent, ring, edges))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .items_center()
                 .gap_2()
-                .pt(px(BUMP_H + 5.))
+                .pt(px(if edges.top_bump { BUMP_H + 5. } else { 5. }))
                 .pb(px(6.))
                 .px(px(10.))
                 .child(pill_on_accent(label, cat, ctx.is_dark))
                 .child(
                     div()
-                        .flex_1()
+                        .flex_shrink_0()
                         .font_family(MONO_FONT_FAMILY)
                         .text_xs()
                         .text_color(block_pill_text(ctx.is_dark))
@@ -217,6 +243,7 @@ fn render_compound(
     path: Vec<usize>,
     span_start: usize,
     selected: bool,
+    edges: Edges,
     ctx: &BlockRenderCtx,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
@@ -229,7 +256,7 @@ fn render_compound(
     };
     let header_text = detail(kind);
     let header_path = path.clone();
-    let drag_label = label.to_string();
+    let bounds_cap = bounds_capture(path.clone(), ctx.block_bounds.clone());
 
     // Top of the C: the painted header bar carries the pill + header line.
     let mut header = div()
@@ -244,7 +271,7 @@ fn render_compound(
             MouseButton::Left,
             cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                 select(this, header_path.clone(), span_start, window);
-                this.start_visual_drag(header_path.clone(), drag_label.clone(), ev.position);
+                this.start_visual_drag(header_path.clone(), ev.position, ev.modifiers.shift);
                 cx.stop_propagation();
                 cx.notify();
             }),
@@ -253,7 +280,7 @@ fn render_compound(
     if !header_text.is_empty() {
         header = header.child(
             div()
-                .flex_1()
+                .flex_shrink_0()
                 .font_family(MONO_FONT_FAMILY)
                 .text_xs()
                 .text_color(block_pill_text(ctx.is_dark))
@@ -261,15 +288,46 @@ fn render_compound(
         );
     }
 
-    let kids: Vec<AnyElement> = children
+    // While a drag hovers this compound, all interior connectors show as a
+    // drop affordance; otherwise the first/last block hide theirs for a
+    // cleaner resting look.
+    let hovering = ctx
+        .drop_preview
+        .as_ref()
+        .map(|(p, _)| p.as_slice() == path.as_slice())
+        .unwrap_or(false);
+    let last = children.len().saturating_sub(1);
+
+    // Negative top margin overlaps each child by the bump height so stacked
+    // nested blocks interlock — the bump sits inside the notch above.
+    let mut kids: Vec<AnyElement> = children
         .iter()
         .enumerate()
         .map(|(i, c)| {
             let mut cp = path.clone();
             cp.push(i);
-            render_block(c, cp, ctx, cx)
+            let child_edges = Edges {
+                top_bump: i != 0 || hovering,
+                bottom_notch: i != last || hovering,
+            };
+            let el = render_block(c, cp, child_edges, ctx, cx);
+            div().mt(px(-BUMP_H)).child(el).into_any_element()
         })
         .collect();
+
+    // Live drop-preview marker — an insertion bar where the dragged block lands.
+    if let Some((target, j)) = &ctx.drop_preview {
+        if target.as_slice() == path.as_slice() {
+            let marker = div()
+                .my(px(3.))
+                .h(px(8.))
+                .w(px(240.))
+                .rounded(px(4.))
+                .bg(accent)
+                .into_any_element();
+            kids.insert((*j).min(kids.len()), marker);
+        }
+    }
 
     // Children sit in the C's mouth — clear of the painted left spine. A
     // full-size canvas registers the mouth as a drop target each frame.
@@ -279,6 +337,7 @@ fn render_compound(
         .relative()
         .flex()
         .flex_col()
+        .items_start()
         .gap_0()
         .pl(px(SPINE_W + 6.))
         .pr(px(8.))
@@ -300,12 +359,13 @@ fn render_compound(
 
     div()
         .relative()
-        .child(c_block_bg(accent, soft, ring))
+        .child(bounds_cap)
+        .child(c_block_bg(accent, soft, ring, edges))
         .child(
             div()
                 .flex()
                 .flex_col()
-                .pt(px(BUMP_H))
+                .pt(px(if edges.top_bump { BUMP_H } else { 0. }))
                 .child(header)
                 .child(mouth)
                 .child(div().h(px(LIP_H))),
@@ -320,6 +380,7 @@ fn render_raw(
     path: Vec<usize>,
     span_start: usize,
     selected: bool,
+    edges: Edges,
     ctx: &BlockRenderCtx,
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
@@ -329,7 +390,7 @@ fn render_raw(
     } else {
         None
     };
-    let drag_label = label.to_string();
+    let bounds_cap = bounds_capture(path.clone(), ctx.block_bounds.clone());
     let style = LineStyle {
         char_width: ctx.char_width,
         line_fg: ctx.text,
@@ -355,21 +416,22 @@ fn render_raw(
     div()
         .relative()
         .cursor_pointer()
+        .child(bounds_cap)
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                 select(this, path.clone(), span_start, window);
-                this.start_visual_drag(path.clone(), drag_label.clone(), ev.position);
+                this.start_visual_drag(path.clone(), ev.position, ev.modifiers.shift);
                 cx.stop_propagation();
                 cx.notify();
             }),
         )
-        .child(leaf_bg(accent, ring))
+        .child(leaf_bg(accent, ring, edges))
         .child(
             div()
                 .flex()
                 .flex_col()
-                .pt(px(BUMP_H))
+                .pt(px(if edges.top_bump { BUMP_H } else { 0. }))
                 .child(
                     div()
                         .flex()

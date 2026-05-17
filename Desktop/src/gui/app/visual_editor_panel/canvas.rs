@@ -4,6 +4,7 @@ use openframe::{
 };
 
 use super::block_render::{render_block, BlockRenderCtx};
+use super::block_shape::{Edges, BUMP_H};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::assets::MONO_FONT_FAMILY;
 use crate::gui::theme;
@@ -59,8 +60,9 @@ impl ArcadiaRoot {
             }
         }
 
-        // Drop targets are repopulated each frame by compound-mouth canvases.
+        // Drop targets + per-block bounds are repopulated each frame.
         self.visual_editor_drop_zones.borrow_mut().clear();
+        self.visual_editor_block_bounds.borrow_mut().clear();
 
         let char_width = {
             let font_size = window.rem_size() * 0.75;
@@ -96,6 +98,15 @@ impl ArcadiaRoot {
             None => (false, false),
         };
 
+        // Live drop preview from the previous frame's zones / bounds.
+        let drag_info = self
+            .visual_editor_drag
+            .as_ref()
+            .filter(|d| d.active)
+            .map(|d| (d.cursor, d.path.clone()));
+        let drop_preview =
+            drag_info.and_then(|(cur, dp)| self.compute_drop(cur, &dp));
+
         let ctx = BlockRenderCtx {
             is_dark,
             char_width,
@@ -104,6 +115,8 @@ impl ArcadiaRoot {
             surface: p.panel_bg,
             selected,
             drop_zones: self.visual_editor_drop_zones.clone(),
+            block_bounds: self.visual_editor_block_bounds.clone(),
+            drop_preview,
         };
         let placed: Vec<(f32, f32, AnyElement)> = tree
             .root
@@ -112,7 +125,7 @@ impl ArcadiaRoot {
             .enumerate()
             .map(|(i, b)| {
                 let (x, y) = positions[i];
-                (x, y, render_block(b, vec![i], &ctx, cx))
+                (x, y, render_block(b, vec![i], Edges::full(), &ctx, cx))
             })
             .collect();
 
@@ -156,25 +169,49 @@ impl ArcadiaRoot {
             area = area.child(div().absolute().left(px(x)).top(px(y)).child(el));
         }
 
-        // Drag ghost — a floating chip following the cursor.
-        if let Some(drag) = &self.visual_editor_drag {
+        // Drag ghost — a translucent copy of the dragged block following the
+        // cursor. Only shown once the press promotes to an actual drag.
+        let ghost = self
+            .visual_editor_drag
+            .as_ref()
+            .filter(|d| d.active)
+            .map(|d| {
+                (
+                    d.path.clone(),
+                    d.cursor,
+                    d.grab_x,
+                    d.grab_y,
+                    d.followers.clone(),
+                )
+            });
+        if let Some((gpath, gcursor, grab_x, grab_y, followers)) = ghost {
             let origin = *self.visual_editor_canvas_origin.borrow();
-            let gx = (f32::from(drag.cursor.x) - f32::from(origin.x) + 12.0).max(0.0);
-            let gy = (f32::from(drag.cursor.y) - f32::from(origin.y) + 12.0).max(0.0);
-            area = area.child(
-                div()
-                    .absolute()
-                    .left(px(gx))
-                    .top(px(gy))
-                    .px_2()
-                    .py_1()
-                    .rounded(px(6.))
-                    .bg(rgb(0x2563eb))
-                    .text_xs()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(0xffffff))
-                    .child(drag.label.clone()),
-            );
+            let gx = (f32::from(gcursor.x) - f32::from(origin.x) - grab_x).max(0.0);
+            let gy = (f32::from(gcursor.y) - f32::from(origin.y) - grab_y).max(0.0);
+            let mut col = div().flex().flex_col();
+            let mut any = false;
+            if let Some(block) = tree.block_at(&gpath) {
+                col = col.child(render_block(block, gpath.clone(), Edges::full(), &ctx, cx));
+                any = true;
+            }
+            for f in &followers {
+                let fpath = vec![*f];
+                if let Some(block) = tree.block_at(&fpath) {
+                    let el = render_block(block, fpath, Edges::full(), &ctx, cx);
+                    col = col.child(div().mt(px(-BUMP_H)).child(el));
+                    any = true;
+                }
+            }
+            if any {
+                area = area.child(
+                    div()
+                        .absolute()
+                        .left(px(gx))
+                        .top(px(gy))
+                        .opacity(0.7)
+                        .child(col),
+                );
+            }
         }
 
         div()

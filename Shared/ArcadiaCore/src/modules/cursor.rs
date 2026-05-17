@@ -1,7 +1,10 @@
-//! Global cursor position module.
+//! Global cursor position module — cursor input only.
 //!
 //! Core defines the API + a backend trait; the desktop surface installs a platform-specific
 //! implementation at startup. Headless / iOS without a backend → query returns `None`.
+//!
+//! Display geometry (screen size, scale factor) and platform metadata (menu bar height) live
+//! in [`crate::modules::platform`] so this module stays cursor-input-only.
 
 use std::sync::{Mutex, OnceLock};
 
@@ -15,12 +18,6 @@ pub struct CursorPosition {
     pub y: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ScreenSize {
-    pub width: u32,
-    pub height: u32,
-}
-
 /// Global cursor position plus primary mouse buttons when the active cursor backend supports it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CursorSnapshot {
@@ -32,7 +29,6 @@ pub struct CursorSnapshot {
 
 pub trait CursorBackend: Send + Sync {
     fn position(&self) -> Option<CursorPosition>;
-    fn primary_screen_size(&self) -> Option<ScreenSize>;
     /// OS-global mouse sample including left/right button down state, or `None` if unavailable.
     fn snapshot(&self) -> Option<CursorSnapshot> {
         None
@@ -57,13 +53,6 @@ pub fn position() -> Option<CursorPosition> {
         .and_then(|slot| slot.as_ref().and_then(|b| b.position()))
 }
 
-pub fn primary_screen_size() -> Option<ScreenSize> {
-    backend_slot()
-        .lock()
-        .ok()
-        .and_then(|slot| slot.as_ref().and_then(|b| b.primary_screen_size()))
-}
-
 pub fn snapshot() -> Option<CursorSnapshot> {
     backend_slot()
         .lock()
@@ -79,9 +68,9 @@ fn cmd_position(_args: &[&str], _ctx: &ExecutionContext) -> String {
 }
 
 fn cmd_screen_size(_args: &[&str], _ctx: &ExecutionContext) -> String {
-    match primary_screen_size() {
+    match crate::modules::platform::primary_screen_size() {
         Some(s) => format!("{} {}", s.width, s.height),
-        None => "Cursor backend not available on this surface.".to_string(),
+        None => "Platform backend not available on this surface.".to_string(),
     }
 }
 

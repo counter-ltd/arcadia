@@ -459,6 +459,7 @@ impl ArcadiaRoot {
                 openframe::Point::default(),
             )),
             visual_editor_drop_zones: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+            visual_editor_block_bounds: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             ai_chats: vec![],
             active_ai_chat_id: 0,
             ai_next_id: 1,
@@ -639,6 +640,7 @@ impl ArcadiaRoot {
             extension_token_editing: None,
             extension_token_focus,
             color_picker_modal: None,
+            gradient_stop_editing_index: None,
             last_color_scheme_dark: None,
             #[cfg(feature = "gui")]
             shell_motd_prefix_lines: initial_motd_n,

@@ -401,6 +401,10 @@ pub enum StyleTokenKind {
     String,
     Bool,
     Int,
+    /// Multi-stop linear gradient. Stored as a JSON string:
+    /// `[{"pos":0.0,"color":"#rrggbb"},{"pos":1.0,"color":"#rrggbb"},...]`
+    /// At least two stops, sorted by `pos` (0.0–1.0).
+    Gradient,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -509,11 +513,13 @@ fn compare_values(
                 _ => false,
             }
         }
-        StyleTokenKind::String | StyleTokenKind::Color => match op {
-            StyleTokenCompareOp::Eq => current.trim() == literal.trim(),
-            StyleTokenCompareOp::Ne => current.trim() != literal.trim(),
-            _ => false,
-        },
+        StyleTokenKind::String | StyleTokenKind::Color | StyleTokenKind::Gradient => {
+            match op {
+                StyleTokenCompareOp::Eq => current.trim() == literal.trim(),
+                StyleTokenCompareOp::Ne => current.trim() != literal.trim(),
+                _ => false,
+            }
+        }
     }
 }
 
