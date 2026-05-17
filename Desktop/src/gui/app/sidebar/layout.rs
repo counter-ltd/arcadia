@@ -639,6 +639,79 @@ impl ArcadiaRoot {
                                                 .into_any_element(),
                                         );
                                     }
+                                    #[cfg(feature = "gui")]
+                                    if page_id == "editor.visual" {
+                                        for i in 0..self.visual_editor_tabs.len() {
+                                            let label = self.visual_editor_tabs[i].title.clone();
+                                            let is_sub_active = is_page_active
+                                                && self.active_visual_editor_tab == i
+                                                && !self.visual_editor_show_dashboard;
+                                            let ws_label = self.visual_editor_tabs[i]
+                                                .workspace_path
+                                                .as_deref()
+                                                .map(|p| {
+                                                    arcadia_core::config::workspace::list_workspaces()
+                                                        .into_iter()
+                                                        .find(|w| w.path == p)
+                                                        .map(|w| if w.label.is_empty() {
+                                                            p.rsplit('/').next().unwrap_or(p).to_string()
+                                                        } else {
+                                                            w.label.clone()
+                                                        })
+                                                        .unwrap_or_else(|| {
+                                                            p.rsplit('/').next().unwrap_or(p).to_string()
+                                                        })
+                                                });
+                                            let veditor_ha = *self.item_hover_alphas.get(&format!("veditor:{}", i)).unwrap_or(&0.0);
+                                            items.push(
+                                                Self::sidebar_visual_editor_sub_item(
+                                                    cx,
+                                                    openframe::SharedString::from(label),
+                                                    ws_label,
+                                                    i,
+                                                    is_sub_active,
+                                                    is_dark,
+                                                    glyph,
+                                                    veditor_ha,
+                                                )
+                                                .into_any_element(),
+                                            );
+                                        }
+                                        let dim = if is_dark { rgb(0x4a5568) } else { rgb(0x9ca3af) };
+                                        let dim_hover = if is_dark { rgb(0x718096) } else { rgb(0x6b7280) };
+                                        items.push(
+                                            div()
+                                                .ml_7()
+                                                .pl_2()
+                                                .py_1()
+                                                .text_xs()
+                                                .text_color(dim)
+                                                .cursor_pointer()
+                                                .hover(|d| d.text_color(dim_hover))
+                                                .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
+                                                    let id = this.visual_editor_next_id;
+                                                    let title = format!("untitled-{id}");
+                                                    this.visual_editor_tabs.push(crate::gui::app::VisualEditorTab {
+                                                        id,
+                                                        title,
+                                                        content: String::new(),
+                                                        workspace_path: None,
+                                                        file_path: None,
+                                                        saved_content: String::new(),
+                                                    });
+                                                    this.active_visual_editor_tab = this.visual_editor_tabs.len() - 1;
+                                                    this.visual_editor_next_id += 1;
+                                                    this.active_page_id = "editor.visual".to_string();
+                                                    this.visual_editor_show_dashboard = false;
+                                                    this.sync_settings_hub_expanded_from_active_page();
+                                                    this.save_visual_editor_session();
+                                                    this.visual_editor_focus.focus(window);
+                                                    cx.notify();
+                                                }))
+                                                .child("Click to Create")
+                                                .into_any_element(),
+                                        );
+                                    }
                                     if page_id == "ai.models" {
                                         let providers = arcadia_core::modules::ai::enabled_ai_providers(&self.module_rows);
                                         let cli_providers: Vec<_> = providers.iter().copied()

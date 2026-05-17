@@ -762,6 +762,68 @@ impl ArcadiaRoot {
             )
     }
 
+    pub fn sidebar_visual_editor_sub_item(
+        cx: &mut Context<Self>,
+        label: openframe::SharedString,
+        workspace_label: Option<String>,
+        editor_idx: usize,
+        is_active: bool,
+        is_dark: bool,
+        glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
+    ) -> impl IntoElement {
+        let pal = theme::nav_accent_palette("sky", is_dark);
+        let text_col = nav_item_text(
+            nav_idle_text(glyph, is_dark),
+            nav_active_text(glyph, pal.icon_active),
+            if is_active { 1.0 } else { 0.0 },
+            hover_alpha,
+        );
+        let meta_col = if is_active {
+            pal.icon_active
+        } else if is_dark {
+            rgb(0x4a5568)
+        } else {
+            rgb(0x9ca3af)
+        };
+        let radius = nav_radius(glyph);
+        let item_key = format!("veditor:{}", editor_idx);
+        div()
+            .id(SharedString::from(item_key.clone()))
+            .ml_7()
+            .pl_2()
+            .pr_2()
+            .py_1()
+            .rounded(px(radius))
+            .cursor_pointer()
+            .text_xs()
+            .font_weight(openframe::FontWeight::NORMAL)
+            .text_color(text_col)
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                this.start_item_hover_anim(item_key.clone(), *hovered);
+                cx.notify();
+            }))
+            .flex()
+            .flex_col()
+            .gap(px(1.))
+            .child(div().child(label))
+            .when_some(workspace_label, |d, ws| {
+                d.child(div().text_color(meta_col).child(ws))
+            })
+            .on_mouse_down(
+                openframe::MouseButton::Left,
+                cx.listener(move |this, _, _, cx| {
+                    if editor_idx < this.visual_editor_tabs.len() {
+                        this.active_visual_editor_tab = editor_idx;
+                        this.active_page_id = "editor.visual".to_string();
+                        this.visual_editor_show_dashboard = false;
+                        this.sync_settings_hub_expanded_from_active_page();
+                    }
+                    cx.notify();
+                }),
+            )
+    }
+
     pub fn sidebar_ai_provider_sub_item(
         cx: &mut Context<Self>,
         label: openframe::SharedString,

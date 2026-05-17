@@ -44,6 +44,7 @@ mod shortcuts_row;
 mod sidebar;
 mod splash;
 mod text_input_caret;
+mod visual_editor_panel;
 mod workspace_create_modal;
 mod workspace_panel;
 mod workspace_row;
@@ -175,6 +176,21 @@ pub struct CodeEditorTab {
     pub cached_lines: Vec<String>,
     /// Byte offset of each line's first character in `content`. Rebuilt with `cached_lines`.
     pub cached_line_byte_starts: Vec<usize>,
+}
+
+/// One open document in the visual block editor. The Python source in `content`
+/// is canonical; the block tree is a re-derivation of it (built in Phase 2).
+pub struct VisualEditorTab {
+    pub id: usize,
+    pub title: String,
+    /// Python source — the single source of truth for this tab.
+    pub content: String,
+    /// Workspace directory path bound to this tab, if any.
+    pub workspace_path: Option<String>,
+    /// Absolute path to the file on disk. `None` = new unsaved buffer.
+    pub file_path: Option<String>,
+    /// Content at last save. Used for dirty detection.
+    pub saved_content: String,
 }
 
 #[derive(Clone, PartialEq)]
@@ -416,6 +432,22 @@ pub struct ArcadiaRoot {
     pub code_editor_close_confirm: Option<usize>,
     pub code_editor_line_bounds: Rc<RefCell<Vec<Bounds<Pixels>>>>,
     pub code_editor_is_dragging: bool,
+    pub visual_editor_tabs: Vec<VisualEditorTab>,
+    pub active_visual_editor_tab: usize,
+    pub visual_editor_next_id: usize,
+    pub visual_editor_focus: FocusHandle,
+    pub visual_editor_show_dashboard: bool,
+    pub visual_editor_workspace_picker_open: bool,
+    pub visual_editor_explorer_open: bool,
+    pub visual_editor_explorer_expanded: std::collections::HashSet<String>,
+    /// Child-index path of the selected block in the active tab, if any.
+    pub visual_editor_selected: Option<Vec<usize>>,
+    /// Inline-editor draft for the selected block's source line.
+    pub visual_editor_edit_draft: String,
+    /// Caret byte offset within `visual_editor_edit_draft`.
+    pub visual_editor_edit_caret: usize,
+    pub visual_editor_input_focus: FocusHandle,
+    pub visual_editor_palette_open: bool,
     pub ai_chats: Vec<AiChat>,
     pub active_ai_chat_id: usize,
     pub ai_next_id: usize,
@@ -710,6 +742,32 @@ impl ArcadiaRoot {
         let _ = CodeEditorSession {
             active_tab: self.active_code_editor_tab,
             next_id: self.code_editor_next_id,
+            tabs,
+        }
+        .save();
+    }
+
+    pub(crate) fn save_visual_editor_session(&self) {
+        use arcadia_core::config::visual_editor::{PersistedVisualTab, VisualEditorSession};
+        use arcadia_core::config::ConfigFile;
+        let tabs = self
+            .visual_editor_tabs
+            .iter()
+            .map(|t| PersistedVisualTab {
+                id: t.id,
+                title: t.title.clone(),
+                file_path: t.file_path.clone(),
+                workspace_path: t.workspace_path.clone(),
+                unsaved_content: if t.file_path.is_none() {
+                    Some(t.content.clone())
+                } else {
+                    None
+                },
+            })
+            .collect();
+        let _ = VisualEditorSession {
+            active_tab: self.active_visual_editor_tab,
+            next_id: self.visual_editor_next_id,
             tabs,
         }
         .save();

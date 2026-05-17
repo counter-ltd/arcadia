@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::config::modules::supports_runtime_platform_owned;
 use crate::modules::style_tokens;
+use crate::modules::visual_editor::palette::BlockDef;
 
 pub use style_tokens::{
     clamp_numeric_display_for_spec, effective_token_display, format_slider_value,
@@ -95,6 +96,9 @@ struct PythonRegistry {
     editor_token_modules: std::collections::HashSet<String>,
     /// Nav pages declared by extensions via `register_nav_page`.
     nav_pages: Vec<NavPageDeclaration>,
+    /// Visual-editor block definitions, keyed by extension id, from
+    /// `register_blocks`.
+    blocks: HashMap<String, Vec<BlockDef>>,
 }
 
 /// Glyph rendering parameters provided by a Python extension when registering a style.
@@ -192,6 +196,7 @@ impl PythonRegistry {
             file_icon_providers: Vec::new(),
             editor_token_modules: std::collections::HashSet::new(),
             nav_pages: Vec::new(),
+            blocks: HashMap::new(),
         }
     }
 }
@@ -458,6 +463,7 @@ pub fn unregister_extension_contributions(name: &str) {
         reg.file_icon_providers.retain(|(id, _)| id != name);
         reg.editor_token_modules.remove(name);
         reg.nav_pages.retain(|p| p.extension_id != name);
+        reg.blocks.remove(name);
     }
     // Clear any overlay sprite this extension set — owner tracking not implemented yet so
     // we clear unconditionally on any disable. An extension that didn't set a sprite is a no-op.
@@ -859,7 +865,24 @@ pub fn clear() {
         reg.decoration_providers.clear();
         reg.editor_token_modules.clear();
         reg.nav_pages.clear();
+        reg.blocks.clear();
     }
+}
+
+/// Register visual-editor block definitions for an extension. Replaces any
+/// previous set for the same `extension_id`.
+pub fn register_blocks(extension_id: String, blocks: Vec<BlockDef>) {
+    if let Ok(mut reg) = registry().lock() {
+        reg.blocks.insert(extension_id, blocks);
+    }
+}
+
+/// All extension-contributed block definitions, flattened across extensions.
+pub fn list_blocks() -> Vec<BlockDef> {
+    let Ok(reg) = registry().lock() else {
+        return Vec::new();
+    };
+    reg.blocks.values().flatten().cloned().collect()
 }
 
 pub fn register_nav_page(decl: NavPageDeclaration) {

@@ -52,6 +52,8 @@ All navigation structure is declared in `navigation.rs` as static data. The GUI 
 | `global.permissions` | Permissions | — | settings hub |
 | `global.shortcuts` | Shortcuts | — | settings hub |
 | `global.workspaces` | Workspaces | `workspace` | settings hub |
+| `editor.main` | Editor | `code-editor` | `code` group |
+| `editor.visual` | Blocks | `visual-editor` | `code` group |
 | `network.nodes` | Nodes | `lan` | `network` group |
 | `late.now_playing` | Late.sh | `late` | `social` group |
 | `late.experimental` | Experimental | `late` | `social` group |
@@ -80,6 +82,7 @@ Extension pages are dynamically appended by `NavigationRegistryOwned::from_regis
 | `utilities` | Utilities | `utility.shell`, `utility.services` |
 | `network` | Network | `network.nodes` |
 | `social` | Social | `late.now_playing`, `late.experimental` |
+| `code` | Code | `editor.main`, `editor.visual` |
 
 ---
 

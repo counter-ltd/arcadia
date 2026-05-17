@@ -421,6 +421,7 @@ impl ArcadiaRoot {
                     &ws_path,
                     0,
                     &self.code_editor_explorer_expanded,
+                    false,
                     &mut flat,
                 );
 
@@ -579,6 +580,186 @@ impl ArcadiaRoot {
                     .overflow_hidden()
                     .child(self.code_editor_panel(window, cx, is_dark)),
             );
+        }
+        if self.active_page_id.as_str() == "editor.visual" {
+            let active_idx = self
+                .active_visual_editor_tab
+                .min(self.visual_editor_tabs.len().saturating_sub(1));
+            let ws_path = self
+                .visual_editor_tabs
+                .get(active_idx)
+                .and_then(|t| t.workspace_path.clone())
+                .unwrap_or_default();
+            let show_explorer = self.visual_editor_explorer_open && !ws_path.is_empty();
+            let sidebar_bg = theme::code_explorer_sidebar_bg(is_dark);
+            let border_color = theme::code_explorer_border(is_dark);
+            let text_color = theme::code_explorer_text(is_dark);
+            let dim_color = theme::code_explorer_dim(is_dark);
+            let hover_bg = theme::code_explorer_hover_bg(is_dark);
+            let mut row = div().w_full().h_full().flex().flex_row();
+            if show_explorer {
+                let mut flat: Vec<(String, String, bool, usize)> = Vec::new();
+                collect_explorer_entries(
+                    &ws_path,
+                    0,
+                    &self.visual_editor_explorer_expanded,
+                    true,
+                    &mut flat,
+                );
+
+                let mut sidebar = div()
+                    .w(px(220.))
+                    .h_full()
+                    .flex_shrink_0()
+                    .bg(sidebar_bg)
+                    .border_r_1()
+                    .border_color(border_color)
+                    .flex()
+                    .flex_col()
+                    .overflow_hidden();
+
+                sidebar = sidebar.child(
+                    div()
+                        .px_3()
+                        .py_2()
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(text_color)
+                        .border_b_1()
+                        .border_color(border_color)
+                        .child(ws_path.rsplit('/').next().unwrap_or(&ws_path).to_string()),
+                );
+
+                let active_file_path = self
+                    .visual_editor_tabs
+                    .get(active_idx)
+                    .and_then(|t| t.file_path.clone());
+                let active_row_bg = theme::code_explorer_active_row_bg(is_dark);
+                let active_row_text = theme::code_explorer_active_row_text(is_dark);
+
+                if flat.is_empty() {
+                    sidebar = sidebar.child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .text_xs()
+                            .text_color(dim_color)
+                            .child("No Python files found."),
+                    );
+                } else {
+                    for (full_path, name, is_dir, depth) in flat {
+                        let full_path2 = full_path.clone();
+                        let is_expanded =
+                            self.visual_editor_explorer_expanded.contains(&full_path);
+                        let is_active_file =
+                            !is_dir && active_file_path.as_deref() == Some(full_path.as_str());
+                        let folder_icon = if is_expanded { "folder-open" } else { "folder" };
+                        let file_icon = file_icon_for(&name);
+                        let indent_px = px(8. + depth as f32 * 16.);
+                        let row_text = if is_active_file {
+                            active_row_text
+                        } else {
+                            text_color
+                        };
+
+                        let entry_row = div()
+                            .pl(indent_px)
+                            .pr_2()
+                            .py(px(3.))
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1p5()
+                            .text_xs()
+                            .text_color(row_text)
+                            .cursor_pointer()
+                            .when(is_active_file, |s| s.bg(active_row_bg))
+                            .hover(move |s| s.bg(hover_bg));
+
+                        let entry_row = if is_dir {
+                            let chevron = if is_expanded {
+                                "chevron-down"
+                            } else {
+                                "chevron-right"
+                            };
+                            entry_row
+                                .child(theme::render_icon(chevron).size_3().text_color(dim_color))
+                                .child(
+                                    theme::render_icon(folder_icon)
+                                        .size_3()
+                                        .text_color(text_color),
+                                )
+                                .child(name)
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        if this
+                                            .visual_editor_explorer_expanded
+                                            .contains(&full_path2)
+                                        {
+                                            this.visual_editor_explorer_expanded
+                                                .remove(&full_path2);
+                                        } else {
+                                            this.visual_editor_explorer_expanded
+                                                .insert(full_path2.clone());
+                                        }
+                                        cx.notify();
+                                    }),
+                                )
+                        } else {
+                            entry_row
+                                .child(div().size_3())
+                                .child(theme::render_icon(&file_icon).size_3().text_color(row_text))
+                                .child(name)
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(move |this, _, _, cx| {
+                                        if let Some(existing) =
+                                            this.visual_editor_tabs.iter().position(|t| {
+                                                t.file_path.as_deref() == Some(full_path2.as_str())
+                                            })
+                                        {
+                                            this.active_visual_editor_tab = existing;
+                                            this.visual_editor_show_dashboard = false;
+                                            cx.notify();
+                                            return;
+                                        }
+                                        if let Ok(text) = std::fs::read_to_string(&full_path2) {
+                                            let title = std::path::Path::new(&full_path2)
+                                                .file_name()
+                                                .map(|n| n.to_string_lossy().to_string())
+                                                .unwrap_or_else(|| full_path2.clone());
+                                            let idx = this
+                                                .active_visual_editor_tab
+                                                .min(this.visual_editor_tabs.len().saturating_sub(1));
+                                            if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                                tab.saved_content = text.clone();
+                                                tab.content = text;
+                                                tab.file_path = Some(full_path2.clone());
+                                                tab.title = title;
+                                            }
+                                            this.save_visual_editor_session();
+                                            cx.notify();
+                                        }
+                                    }),
+                                )
+                        };
+                        sidebar = sidebar.child(entry_row);
+                    }
+                }
+                row = row.child(sidebar);
+            }
+            let canvas = div()
+                .flex_1()
+                .h_full()
+                .overflow_hidden()
+                .child(self.visual_editor_panel(window, cx, is_dark));
+            let mut row = row.child(canvas);
+            if self.visual_editor_palette_open {
+                let palette = self.visual_editor_palette_panel(cx, is_dark);
+                row = row.child(palette);
+            }
+            return row;
         }
         {
             let active_page = self
@@ -923,6 +1104,7 @@ fn collect_explorer_entries(
     dir: &str,
     depth: usize,
     expanded: &std::collections::HashSet<String>,
+    py_only: bool,
     out: &mut Vec<(String, String, bool, usize)>,
 ) {
     let Ok(rd) = std::fs::read_dir(dir) else {
@@ -935,13 +1117,14 @@ fn collect_explorer_entries(
             (e.file_name().to_string_lossy().to_string(), is_dir)
         })
         .filter(|(name, _)| !name.starts_with('.'))
+        .filter(|(name, is_dir)| *is_dir || !py_only || name.ends_with(".py"))
         .collect();
     entries.sort_by(|(a, a_dir), (b, b_dir)| b_dir.cmp(a_dir).then(a.cmp(b)));
     for (name, is_dir) in entries {
         let full = format!("{}/{}", dir, name);
         out.push((full.clone(), name, is_dir, depth));
         if is_dir && expanded.contains(&full) {
-            collect_explorer_entries(&full, depth + 1, expanded, out);
+            collect_explorer_entries(&full, depth + 1, expanded, py_only, out);
         }
     }
 }

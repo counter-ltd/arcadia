@@ -37,7 +37,7 @@ use openframe::{point, px, Context, RenderStyle, Rgba, Timer, UpdateGlobal, Wind
 use super::super::tui;
 use super::ArcadiaRoot;
 #[cfg(feature = "gui")]
-use super::{CodeEditorTab, ShellMode, TerminalInstance};
+use super::{CodeEditorTab, ShellMode, TerminalInstance, VisualEditorTab};
 
 /// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
 /// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
@@ -246,6 +246,8 @@ impl ArcadiaRoot {
         let workspace_create_path_focus = cx.focus_handle();
         let code_editor_focus = cx.focus_handle();
         let code_editor_char_width_focus = cx.focus_handle();
+        let visual_editor_focus = cx.focus_handle();
+        let visual_editor_input_focus = cx.focus_handle();
         let ai_rename_focus = cx.focus_handle();
         let ai_input_focus = cx.focus_handle();
         let llama_cpp_create_name_focus = cx.focus_handle();
@@ -312,6 +314,42 @@ impl ArcadiaRoot {
             0
         };
         let restored_show_dashboard = !restored_tabs.is_empty();
+
+        let visual_session =
+            arcadia_core::config::visual_editor::VisualEditorSession::load_or_create()
+                .unwrap_or_default();
+        let visual_session_active = visual_session.active_tab;
+        let visual_session_next_id = visual_session.next_id.max(1);
+        let restored_visual_tabs: Vec<VisualEditorTab> = visual_session
+            .tabs
+            .into_iter()
+            .filter_map(|pt| {
+                let (content, saved_content) = if let Some(ref path) = pt.file_path {
+                    match std::fs::read_to_string(path) {
+                        Ok(text) => (text.clone(), text),
+                        Err(_) => return None,
+                    }
+                } else {
+                    let c = pt.unsaved_content.unwrap_or_default();
+                    (c.clone(), String::new())
+                };
+                Some(VisualEditorTab {
+                    id: pt.id,
+                    title: pt.title,
+                    content,
+                    workspace_path: pt.workspace_path,
+                    file_path: pt.file_path,
+                    saved_content,
+                })
+            })
+            .collect();
+        let restored_visual_active = if !restored_visual_tabs.is_empty() {
+            visual_session_active.min(restored_visual_tabs.len() - 1)
+        } else {
+            0
+        };
+        let restored_visual_show_dashboard = !restored_visual_tabs.is_empty();
+
         let ai_cfg = AiConfig::load_or_create().unwrap_or_default();
         let llama_cpp_cfg = LlamaCppConfig::load_or_create().unwrap_or_default();
         let ollama_cfg =
@@ -402,6 +440,19 @@ impl ArcadiaRoot {
             code_editor_close_confirm: None,
             code_editor_line_bounds: std::rc::Rc::new(std::cell::RefCell::new(vec![])),
             code_editor_is_dragging: false,
+            visual_editor_tabs: restored_visual_tabs,
+            active_visual_editor_tab: restored_visual_active,
+            visual_editor_next_id: visual_session_next_id,
+            visual_editor_focus,
+            visual_editor_show_dashboard: restored_visual_show_dashboard,
+            visual_editor_workspace_picker_open: false,
+            visual_editor_explorer_open: false,
+            visual_editor_explorer_expanded: std::collections::HashSet::new(),
+            visual_editor_selected: None,
+            visual_editor_edit_draft: String::new(),
+            visual_editor_edit_caret: 0,
+            visual_editor_input_focus,
+            visual_editor_palette_open: false,
             ai_chats: vec![],
             active_ai_chat_id: 0,
             ai_next_id: 1,
@@ -1526,6 +1577,7 @@ impl ArcadiaRoot {
             || self
                 .workspace_create_path_focus
                 .contains_focused(window, cx)
+            || self.visual_editor_input_focus.contains_focused(window, cx)
     }
 
     /// Tick the nav caret fade-in/out animations using the arcadia animation engine's easing

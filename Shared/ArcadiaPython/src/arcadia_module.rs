@@ -7,6 +7,7 @@ use arcadia_core::modules::style_tokens::{
     merge_token_numeric_bounds, parse_granularity_str, StyleTokenCompareOp,
     StyleTokenNumericPartial, StyleTokenSpec, StyleTokenVisibility,
 };
+use arcadia_core::modules::visual_editor::palette::BlockDef;
 use arcadia_core::modules::{
     animation, cursor as core_cursor, overlay_hud_sprite, python_registry, tray as core_tray,
     ExecutionContext,
@@ -89,6 +90,32 @@ fn register_module(
         permissions.unwrap_or_default(),
         platforms.unwrap_or_default(),
     );
+}
+
+#[pyfunction]
+fn register_blocks(extension_id: String, blocks: Bound<'_, PyAny>) -> PyResult<()> {
+    let list = blocks.downcast::<PyList>()?;
+    let mut out: Vec<BlockDef> = Vec::new();
+    for item in list.iter() {
+        let d = item.downcast::<PyDict>()?;
+        let field = |key: &str| -> PyResult<String> {
+            d.get_item(key)?
+                .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "block missing '{key}'"
+                    ))
+                })?
+                .extract()
+        };
+        out.push(BlockDef {
+            id: field("id")?,
+            label: field("label")?,
+            category: field("category")?,
+            snippet: field("snippet")?,
+        });
+    }
+    python_registry::register_blocks(extension_id, out);
+    Ok(())
 }
 
 #[pyfunction]
@@ -978,6 +1005,7 @@ fn register_nav_page(
 pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_module, m)?)?;
     m.add_function(wrap_pyfunction!(register_command, m)?)?;
+    m.add_function(wrap_pyfunction!(register_blocks, m)?)?;
     m.add_function(wrap_pyfunction!(register_style, m)?)?;
     m.add_function(wrap_pyfunction!(register_tokens, m)?)?;
     m.add_function(wrap_pyfunction!(register_shortcut_json, m)?)?;

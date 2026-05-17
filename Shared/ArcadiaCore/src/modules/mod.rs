@@ -27,6 +27,7 @@ pub mod shell_motd;
 pub mod style_tokens;
 pub mod surface;
 pub mod tray;
+pub mod visual_editor;
 pub mod workspace;
 
 use crate::config::modules::{
@@ -34,7 +35,7 @@ use crate::config::modules::{
     AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, CURSOR_MODULE_NAME,
     LAN_MODULE_NAME, NET_MODULE_NAME, NOTIFICATION_MODULE_NAME, OVERLAY_MODULE_NAME,
     REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME,
-    WORKSPACE_MODULE_NAME,
+    VISUAL_EDITOR_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use crate::config::permissions::{self as perm_cfg, PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
@@ -73,6 +74,7 @@ fn module_commands(module_key: &str) -> Option<&'static [ModuleCommand]> {
         OVERLAY_MODULE_NAME => Some(overlay::commands()),
         WORKSPACE_MODULE_NAME => Some(workspace::commands()),
         CODE_EDITOR_MODULE_NAME => Some(code_editor::commands()),
+        VISUAL_EDITOR_MODULE_NAME => Some(visual_editor::commands()),
         AI_MODULE_NAME => Some(ai::commands()),
         AI_LLAMA_CPP_MODULE_NAME => Some(llama_cpp::commands()),
         AI_OLLAMA_MODULE_NAME => Some(ollama::commands()),

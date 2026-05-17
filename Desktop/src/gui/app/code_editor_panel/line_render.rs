@@ -11,7 +11,7 @@ use crate::gui::assets::MONO_FONT_FAMILY;
 /// dashboard preview so both render syntax / decoration / indent output from
 /// the same providers — no hard-coded, per-language styling anywhere.
 #[derive(Clone, Copy)]
-pub(super) struct LineStyle {
+pub(crate) struct LineStyle {
     pub char_width: f32,
     pub line_fg: Rgba,
     pub sel_bg: Rgba,
@@ -28,7 +28,7 @@ pub(super) struct LineStyle {
 /// guides and per-character cells. The caller supplies provider output
 /// (`hl_spans`, `decorations`) so extension-defined highlighting and
 /// decorations render identically in the editor and in dashboard previews.
-pub(super) fn code_line_content(
+pub(crate) fn code_line_content(
     line: &str,
     line_start_byte: usize,
     hl_spans: &[HighlightSpan],

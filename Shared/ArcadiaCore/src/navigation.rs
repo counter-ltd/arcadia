@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::modules::{
     AI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, LAN_MODULE_NAME, LATE_MODULE_NAME,
-    NOTIFICATION_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    NOTIFICATION_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
+    VISUAL_EDITOR_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use crate::modules::python_registry;
 use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
@@ -345,6 +346,15 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         required_module: Some(CODE_EDITOR_MODULE_NAME),
     },
     NavigationPageDefinition {
+        id: "editor.visual",
+        title: "Blocks",
+        description: "Scratch-style visual block editor for Python. Each open file appears as a tab in the sidebar.",
+        glyph: "blocks",
+        system_image: "square.grid.2x2",
+        accent: "sky",
+        required_module: Some(VISUAL_EDITOR_MODULE_NAME),
+    },
+    NavigationPageDefinition {
         id: "ai.chat",
         title: "Chat",
         description: "AI chat sessions. Each conversation appears as a sub-item in the sidebar.",
@@ -439,7 +449,7 @@ pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
         label: "Code",
         glyph: "file-code",
         system_image: "doc.text",
-        pages: &["editor.main"],
+        pages: &["editor.main", "editor.visual"],
         accent: "sky",
     },
     NavigationGroupDefinition {

@@ -16,6 +16,7 @@ pub mod permissions;
 pub mod shortcuts;
 pub mod thin_client;
 pub mod ui_prefs;
+pub mod visual_editor;
 pub mod workspace;
 
 use std::env;

@@ -339,6 +339,7 @@ impl ArcadiaRoot {
                                                             directories: false,
                                                             multiple: false,
                                                             prompt: None,
+                                                            allowed_extensions: Vec::new(),
                                                         });
                                                         cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                                                             let mut cx = cx.clone();
@@ -415,6 +416,7 @@ impl ArcadiaRoot {
                                                             directories: false,
                                                             multiple: false,
                                                             prompt: None,
+                                                            allowed_extensions: Vec::new(),
                                                         });
                                                         cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                                                             let mut cx = cx.clone();
@@ -722,6 +724,7 @@ impl ArcadiaRoot {
                                             directories: false,
                                             multiple: false,
                                             prompt: None,
+                                            allowed_extensions: Vec::new(),
                                         });
                                         cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                                             let mut cx = cx.clone();
@@ -796,6 +799,7 @@ impl ArcadiaRoot {
                                             directories: false,
                                             multiple: false,
                                             prompt: None,
+                                            allowed_extensions: Vec::new(),
                                         });
                                         cx.spawn_in(window, move |this: openframe::WeakEntity<ArcadiaRoot>, cx: &mut openframe::AsyncWindowContext| {
                                             let mut cx = cx.clone();

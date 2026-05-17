@@ -207,6 +207,27 @@ impl Render for ArcadiaRoot {
                 {
                     raw_page_title
                 }
+            } else if pid == "editor.visual" {
+                #[cfg(feature = "gui")]
+                {
+                    if self.visual_editor_show_dashboard || self.visual_editor_tabs.is_empty() {
+                        "Blocks  ~  Dashboard".to_string()
+                    } else {
+                        let idx = self
+                            .active_visual_editor_tab
+                            .min(self.visual_editor_tabs.len().saturating_sub(1));
+                        let tab_title = self
+                            .visual_editor_tabs
+                            .get(idx)
+                            .map(|t| t.title.clone())
+                            .unwrap_or_else(|| "untitled".to_string());
+                        format!("Blocks  ~  {tab_title}")
+                    }
+                }
+                #[cfg(not(feature = "gui"))]
+                {
+                    raw_page_title
+                }
             } else {
                 raw_page_title
             }
@@ -260,6 +281,11 @@ impl Render for ArcadiaRoot {
                     #[cfg(feature = "gui")]
                     if this.code_editor_workspace_picker_open {
                         this.code_editor_workspace_picker_open = false;
+                        changed = true;
+                    }
+                    #[cfg(feature = "gui")]
+                    if this.visual_editor_workspace_picker_open {
+                        this.visual_editor_workspace_picker_open = false;
                         changed = true;
                     }
                     #[cfg(feature = "gui")]
@@ -913,6 +939,204 @@ impl ArcadiaRoot {
                 );
             }
             picker.into_any_element()
+        } else if self.visual_editor_workspace_picker_open {
+            let workspaces = arcadia_core::config::workspace::list_workspaces();
+            let active_idx = self
+                .active_visual_editor_tab
+                .min(self.visual_editor_tabs.len().saturating_sub(1));
+            let current_path = self
+                .visual_editor_tabs
+                .get(active_idx)
+                .and_then(|t| t.workspace_path.clone());
+            let mut picker = div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(220.))
+                .max_w(px(320.))
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .on_mouse_down(
+                    openframe::MouseButton::Left,
+                    cx.listener(|_, _, _, cx| {
+                        cx.stop_propagation();
+                    }),
+                );
+            if workspaces.is_empty() {
+                picker = picker.child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(text_color)
+                        .child("No workspaces registered."),
+                );
+            } else {
+                for ws in &workspaces {
+                    let is_active = current_path.as_deref() == Some(ws.path.as_str());
+                    let ws_path = ws.path.clone();
+                    let ws_label = ws.label.clone();
+                    let display = if ws_label.is_empty() {
+                        ws_path.rsplit('/').next().unwrap_or(&ws_path).to_string()
+                    } else {
+                        ws_label.clone()
+                    };
+                    let ws_path2 = ws.path.clone();
+                    picker = picker.child(
+                        menu_row(
+                            "folder",
+                            display.into(),
+                            text_color,
+                            if is_active {
+                                crate::gui::theme::ui_accent(cx)
+                            } else {
+                                text_color
+                            },
+                        )
+                        .on_mouse_down(
+                            openframe::MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                let idx = this
+                                    .active_visual_editor_tab
+                                    .min(this.visual_editor_tabs.len().saturating_sub(1));
+                                if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                    tab.workspace_path = if is_active {
+                                        None
+                                    } else {
+                                        Some(ws_path2.clone())
+                                    };
+                                }
+                                this.visual_editor_workspace_picker_open = false;
+                                this.save_visual_editor_session();
+                                cx.notify();
+                            }),
+                        ),
+                    );
+                }
+            }
+            if current_path.is_some() {
+                picker = picker.child(
+                    menu_row("x", "Clear Workspace".into(), text_color, text_color).on_mouse_down(
+                        openframe::MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            let idx = this
+                                .active_visual_editor_tab
+                                .min(this.visual_editor_tabs.len().saturating_sub(1));
+                            if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                tab.workspace_path = None;
+                            }
+                            this.visual_editor_workspace_picker_open = false;
+                            this.save_visual_editor_session();
+                            cx.notify();
+                        }),
+                    ),
+                );
+            }
+            picker.into_any_element()
+        } else if self.code_editor_undo_history_open {
+            let active_idx = self
+                .active_code_editor_tab
+                .min(self.code_editor_tabs.len().saturating_sub(1));
+            let tab_id = self.code_editor_tabs.get(active_idx).map(|t| t.id);
+            let (undo_rows, redo_rows): (Vec<String>, Vec<String>) = tab_id
+                .and_then(|id| self.code_editor_undo.get(&id))
+                .map(|u| (u.undo_previews(), u.redo_previews()))
+                .unwrap_or_default();
+            let accent = crate::gui::theme::ui_accent(cx);
+            let mut menu = div()
+                .absolute()
+                .left(pos.x)
+                .top(pos.y)
+                .min_w(px(220.))
+                .max_w(px(340.))
+                .max_h(px(360.))
+                .id("editor-undo-history")
+                .overflow_y_scroll()
+                .p_1()
+                .rounded_md()
+                .border_1()
+                .border_color(border_color)
+                .bg(bg_color)
+                .occlude()
+                .on_mouse_down(
+                    openframe::MouseButton::Left,
+                    cx.listener(|_, _, _, cx| {
+                        cx.stop_propagation();
+                    }),
+                );
+            if undo_rows.is_empty() && redo_rows.is_empty() {
+                menu = menu.child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(text_color)
+                        .child("No history."),
+                );
+            } else {
+                let redo_len = redo_rows.len();
+                for (j, label) in redo_rows.into_iter().enumerate() {
+                    let steps = redo_len - j;
+                    menu = menu.child(
+                        div()
+                            .w_full()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(radius))
+                            .cursor_pointer()
+                            .text_sm()
+                            .text_color(text_color)
+                            .hover(move |s| s.bg(hover_bg))
+                            .child(label)
+                            .on_mouse_down(
+                                openframe::MouseButton::Left,
+                                cx.listener(move |this, _, _, cx| {
+                                    this.code_editor_undo_history_open = false;
+                                    this.editor_undo_jump(true, steps);
+                                    cx.notify();
+                                }),
+                            ),
+                    );
+                }
+                menu = menu.child(
+                    div()
+                        .w_full()
+                        .px_2()
+                        .py_1()
+                        .text_sm()
+                        .font_weight(openframe::FontWeight::SEMIBOLD)
+                        .text_color(accent)
+                        .child("Current"),
+                );
+                for (j, label) in undo_rows.into_iter().enumerate() {
+                    let steps = j + 1;
+                    menu = menu.child(
+                        div()
+                            .w_full()
+                            .px_2()
+                            .py_1()
+                            .rounded(px(radius))
+                            .cursor_pointer()
+                            .text_sm()
+                            .text_color(text_color)
+                            .hover(move |s| s.bg(hover_bg))
+                            .child(label)
+                            .on_mouse_down(
+                                openframe::MouseButton::Left,
+                                cx.listener(move |this, _, _, cx| {
+                                    this.code_editor_undo_history_open = false;
+                                    this.editor_undo_jump(false, steps);
+                                    cx.notify();
+                                }),
+                            ),
+                    );
+                }
+            }
+            menu.into_any_element()
         } else if let Some(menu_pos) = self.llama_cpp_provider_menu {
             div()
                 .absolute()

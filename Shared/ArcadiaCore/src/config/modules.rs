@@ -54,6 +54,7 @@ pub const CURSOR_MODULE_NAME: &str = "cursor";
 pub const OVERLAY_MODULE_NAME: &str = "overlay";
 pub const WORKSPACE_MODULE_NAME: &str = "workspace";
 pub const CODE_EDITOR_MODULE_NAME: &str = "code-editor";
+pub const VISUAL_EDITOR_MODULE_NAME: &str = "visual-editor";
 pub const AI_MODULE_NAME: &str = "ai";
 pub const AI_LLAMA_CPP_MODULE_NAME: &str = "ai-provider-llama-cpp";
 pub const AI_OLLAMA_MODULE_NAME: &str = "ai-provider-ollama";
@@ -250,6 +251,16 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         glyph: "file-code",
         version: "0.1.0",
         description: "Code editor with per-file tabs in the sidebar.",
+        required_modules: &[],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: VISUAL_EDITOR_MODULE_NAME,
+        glyph: "blocks",
+        version: "0.1.0",
+        description: "Scratch-style visual block editor for Python, with per-file tabs in the sidebar.",
         required_modules: &[],
         required_permissions: &[],
         workspace_permissions: &[],

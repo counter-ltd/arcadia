@@ -59,6 +59,7 @@ pub struct ModuleManifest {
 | `overlay` | — | macOS, Windows, Linux | Always-on-top transparent HUD window |
 | `workspace` | — | all | Workspace directory registry + scoped permissions |
 | `code-editor` | — | all | Code editor panel |
+| `visual-editor` | — | all | Scratch-style visual block editor for Python |
 | `ai` | — | all | AI provider registry + base types |
 | `ai-provider-llama-cpp` | `ai` | all | Local inference via llama.cpp |
 | `ai-provider-ollama` | `ai` | all | Local inference via Ollama HTTP API |

@@ -7,6 +7,7 @@ mod text;
 mod view;
 
 pub use commands::EditorUndoMap;
+pub(crate) use line_render::{code_line_content, LineStyle};
 pub use text::detect_language;
 
 use openframe::{AnyElement, Context, Window};
