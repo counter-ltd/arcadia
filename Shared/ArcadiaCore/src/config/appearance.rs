@@ -21,9 +21,9 @@ impl ConfigFile for AppearanceConfig {
     }
 
     fn merge_defaults(&mut self) -> bool {
-        // Style id renames for the same Python extension: terminal → flux → shell → terminal
-        // (back to the original name to match the native `terminal` module). All old ids
-        // collapse onto `terminal`.
+        // Active-style renames for the terminal-theme extension (short-form ids stored in
+        // appearance.toml, distinct from the full extension IDs in `config::modules`).
+        // "flux" and "shell" are dead names — never reuse.
         match self.active_style.as_str() {
             "flux" | "shell" => {
                 self.active_style = "terminal".to_string();

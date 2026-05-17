@@ -37,8 +37,10 @@ const LEGACY_TERMINAL_MOTD_MODULE_NAME: &str = "shell-motd";
 /// Earlier ids for the same terminal-styling Python extension. They all collapse to
 /// `terminal-theme` so `extension_state[<id>] = true` survives the rename instead of
 /// silently resetting the extension to disabled.
-const LEGACY_TERMINAL_THEME_EXTENSION_IDS: &[&str] = &["tui-style", "shell-theme", "flux-theme"];
-const TERMINAL_THEME_EXTENSION_ID: &str = "terminal-theme";
+/// Dead names — never reuse. Referenced by `config::extension_tokens` to migrate token files.
+pub(crate) const LEGACY_TERMINAL_THEME_EXTENSION_IDS: &[&str] =
+    &["tui-style", "shell-theme", "flux-theme"];
+pub(crate) const TERMINAL_THEME_EXTENSION_ID: &str = "terminal-theme";
 pub const ANIMATION_MODULE_NAME: &str = "animation";
 pub const LAN_MODULE_NAME: &str = "lan";
 pub const LATE_MODULE_NAME: &str = "late";

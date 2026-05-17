@@ -11,13 +11,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use arcadia_core::modules::overlay_hud_sprite;
+use arcadia_core::modules::overlay::OverlayStackingToken;
+use arcadia_core::modules::overlay_hud_sprite::{self, SpriteAnchor};
 use image::{Frame, ImageBuffer, Rgba};
 use openframe::{div, img, prelude::*, px, IntoElement, Render, RenderImage, Window};
 
 struct CachedSprite {
     image: Arc<RenderImage>,
-    anchor: String,
+    anchor: SpriteAnchor,
     pad_x: f32,
     pad_y: f32,
     display_width: Option<f32>,
@@ -27,15 +28,15 @@ struct CachedSprite {
 pub struct OverlayHudRoot {
     last_sprite_version: u64,
     sprites: HashMap<String, CachedSprite>,
-    stacking_filter: String,
+    stacking_filter: OverlayStackingToken,
 }
 
 impl OverlayHudRoot {
-    pub fn new(_cx: &mut Context<Self>, stacking_filter: &str) -> Self {
+    pub fn new(_cx: &mut Context<Self>, stacking_filter: OverlayStackingToken) -> Self {
         Self {
             last_sprite_version: u64::MAX,
             sprites: HashMap::new(),
-            stacking_filter: stacking_filter.to_string(),
+            stacking_filter,
         }
     }
 
@@ -84,7 +85,7 @@ pub fn render_image_from_rgba(
 
 /// Render one sprite as a full-screen transparent flex layer positioned at its anchor.
 fn sprite_layer(s: &CachedSprite) -> impl IntoElement {
-    let anchor = s.anchor.as_str();
+    let anchor = s.anchor;
     let pad_x = s.pad_x;
     let pad_y = s.pad_y;
 
@@ -93,10 +94,10 @@ fn sprite_layer(s: &CachedSprite) -> impl IntoElement {
         (sz.width.0 as f32, sz.height.0 as f32)
     };
 
-    let is_full = matches!(anchor, "top-full" | "bottom-full");
-    let is_top = anchor.starts_with("top");
-    let is_right = matches!(anchor, "top-right" | "bottom-right");
-    let is_center = matches!(anchor, "top-center" | "bottom-center");
+    let is_full = anchor.is_full();
+    let is_top = anchor.is_top();
+    let is_right = anchor.is_right();
+    let is_center = anchor.is_center();
 
     let dw = s.display_width.unwrap_or(iw);
     let dh = s.display_height.unwrap_or(ih);

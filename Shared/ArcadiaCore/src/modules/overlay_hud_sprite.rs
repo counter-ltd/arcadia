@@ -4,27 +4,78 @@
 //! Desktop root view reads [`clone_if_newer_than`] inside paint (see `overlay_hud.rs`).
 //!
 //! A separate vibrancy store tracks owners that have requested native blur (no pixel data).
-//! The overlay backend shows/hides the Below-Menu-Bar window's `NSVisualEffectView` based
+//! The overlay backend shows/hides the system-edge window's native blur backend based
 //! on whether any owner has active vibrancy.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-/// Anchor positions for a HUD sprite within the full-screen overlay window.
+use crate::modules::overlay::OverlayStackingToken;
+
+/// Anchor position for a HUD sprite within the full-screen overlay window.
 ///
-/// `pad_x` is the offset from the anchor's horizontal edge;
-/// `pad_y` is the offset from the anchor's vertical edge.
-/// For `*-full` variants the sprite stretches to fill the window width — `pad_x` is ignored.
-///
-/// Valid values: `"bottom-right"` (default) · `"bottom-left"` · `"bottom-center"` · `"bottom-full"`
-///               `"top-right"` · `"top-left"` · `"top-center"` · `"top-full"`
+/// `pad_x` is the horizontal offset from the anchor edge;
+/// `pad_y` is the vertical offset from the anchor edge.
+/// `*Full` variants stretch the sprite to fill the window width — `pad_x` is ignored.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpriteAnchor {
+    BottomRight,
+    BottomLeft,
+    BottomCenter,
+    BottomFull,
+    TopRight,
+    TopLeft,
+    TopCenter,
+    TopFull,
+}
+
+impl SpriteAnchor {
+    pub fn parse(s: &str) -> Result<Self, String> {
+        match s.trim() {
+            "bottom-right" | "" => Ok(Self::BottomRight),
+            "bottom-left" => Ok(Self::BottomLeft),
+            "bottom-center" => Ok(Self::BottomCenter),
+            "bottom-full" => Ok(Self::BottomFull),
+            "top-right" => Ok(Self::TopRight),
+            "top-left" => Ok(Self::TopLeft),
+            "top-center" => Ok(Self::TopCenter),
+            "top-full" => Ok(Self::TopFull),
+            other => Err(format!(
+                "Unknown sprite anchor '{other}' (expected bottom-right|bottom-left|bottom-center|bottom-full|top-right|top-left|top-center|top-full)"
+            )),
+        }
+    }
+
+    pub fn is_full(self) -> bool {
+        matches!(self, Self::TopFull | Self::BottomFull)
+    }
+
+    pub fn is_top(self) -> bool {
+        matches!(self, Self::TopRight | Self::TopLeft | Self::TopCenter | Self::TopFull)
+    }
+
+    pub fn is_right(self) -> bool {
+        matches!(self, Self::TopRight | Self::BottomRight)
+    }
+
+    pub fn is_center(self) -> bool {
+        matches!(self, Self::TopCenter | Self::BottomCenter)
+    }
+}
+
+impl Default for SpriteAnchor {
+    fn default() -> Self {
+        Self::BottomRight
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct OverlayHudSpritePayload {
     pub rgba: Vec<u8>,
     pub width: u32,
     pub height: u32,
-    pub anchor: String,
-    pub stacking: String,
+    pub anchor: SpriteAnchor,
+    pub stacking: OverlayStackingToken,
     pub pad_x: f32,
     pub pad_y: f32,
     pub display_width: Option<f32>,
@@ -60,7 +111,7 @@ pub fn has_sprites() -> bool {
         .unwrap_or(false)
 }
 
-pub fn has_sprites_for_stacking(stacking: &str) -> bool {
+pub fn has_sprites_for_stacking(stacking: OverlayStackingToken) -> bool {
     state()
         .lock()
         .map(|g| g.sprites.values().any(|p| p.stacking == stacking))

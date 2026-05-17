@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use toml::Value;
 
 use super::config_root_dir;
+use super::modules::{LEGACY_TERMINAL_THEME_EXTENSION_IDS, TERMINAL_THEME_EXTENSION_ID};
 
 use crate::modules::python_registry::{GlyphParams, StyleTokenKind};
 
@@ -64,12 +65,10 @@ pub fn load_module_tokens(module: &str) -> io::Result<HashMap<String, Value>> {
     if path.exists() {
         return load_tokens_file(&path);
     }
-    // Legacy token files from previous names of the same Python extension. The canonical
-    // name was `terminal-theme` → `flux-theme` → `shell-theme` → `terminal-theme` (back to
-    // the original to match the native `terminal` module). Read from any older name's
-    // token file when the new one doesn't exist yet.
-    if module == "terminal-theme" {
-        for legacy in ["shell-theme", "flux-theme", "tui-style"] {
+    // Migrate legacy token files when the canonical name doesn't have a file yet.
+    // Legacy names are defined in `config::modules` — single source of truth.
+    if module == TERMINAL_THEME_EXTENSION_ID {
+        for legacy in LEGACY_TERMINAL_THEME_EXTENSION_IDS {
             let p = tokens_file_for_module(legacy)?;
             if p.exists() {
                 return load_tokens_file(&p);

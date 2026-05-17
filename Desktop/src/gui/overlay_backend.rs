@@ -90,13 +90,13 @@ pub fn init_overlay_module() {
     overlay::set_backend(Box::new(DesktopOverlayBackendThunk));
 }
 
-/// Store a window handle in the appropriate slot based on `stacking_label`.
+/// Store a window handle in the appropriate slot based on `stacking`.
 pub fn register_overlay_window(
     handle: openframe::WindowHandle<super::overlay_hud::OverlayHudRoot>,
-    stacking_label: &str,
+    stacking: OverlayStackingToken,
 ) {
     let any: AnyWindowHandle = handle.into();
-    if stacking_label == "below_menu_bar" {
+    if stacking == OverlayStackingToken::BelowMenuBar {
         if let Ok(mut g) = OVERLAY_HANDLE_BMB.lock() {
             *g = Some(any);
         }
@@ -105,7 +105,7 @@ pub fn register_overlay_window(
             *g = Some(any);
         }
         SPRITE_REFRESHED_AT_VERSION.store(u64::MAX, Ordering::Release);
-        overlay::set_stacking_status_label("hud");
+        overlay::set_stacking_status_label(OverlayStackingToken::Hud.as_str());
     }
 }
 
@@ -166,12 +166,12 @@ fn poll_overlay_sprite_refresh(async_app: &AsyncApp) {
     }
     SPRITE_REFRESHED_AT_VERSION.store(v, Ordering::Release);
 
-    if !overlay_hud_sprite::has_sprites_for_stacking("hud") {
+    if !overlay_hud_sprite::has_sprites_for_stacking(OverlayStackingToken::Hud) {
         OVERLAY_VISIBLE_HUD.store(false, Ordering::Release);
         OVERLAY_DIRTY_HUD.store(true, Ordering::Release);
     }
 
-    let bmb_has = overlay_hud_sprite::has_sprites_for_stacking("below_menu_bar")
+    let bmb_has = overlay_hud_sprite::has_sprites_for_stacking(OverlayStackingToken::BelowMenuBar)
         || overlay_hud_sprite::has_any_vibrancy();
     let bmb_visible = OVERLAY_VISIBLE_BMB.load(Ordering::Relaxed);
     if bmb_has && !bmb_visible {
@@ -211,7 +211,7 @@ fn poll_overlay_vibrancy(async_app: &mut AsyncApp) {
     // Also ensure the BMB window is visible/invisible based on combined state.
     // (sprite refresh may not have fired if only vibrancy changed)
     let bmb_has =
-        overlay_hud_sprite::has_sprites_for_stacking("below_menu_bar") || want_vibrancy;
+        overlay_hud_sprite::has_sprites_for_stacking(OverlayStackingToken::BelowMenuBar) || want_vibrancy;
     let bmb_visible = OVERLAY_VISIBLE_BMB.load(Ordering::Relaxed);
     if bmb_has != bmb_visible {
         OVERLAY_VISIBLE_BMB.store(bmb_has, Ordering::Release);

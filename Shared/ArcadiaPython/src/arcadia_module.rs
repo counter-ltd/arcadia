@@ -8,9 +8,11 @@ use arcadia_core::modules::style_tokens::{
     StyleTokenNumericPartial, StyleTokenSpec, StyleTokenVisibility,
 };
 use arcadia_core::modules::visual_editor::palette::BlockDef;
+use arcadia_core::modules::overlay::parse_overlay_stacking_token;
+use arcadia_core::modules::overlay_hud_sprite::{self as overlay_hud_sprite, SpriteAnchor};
 use arcadia_core::modules::{
-    animation, cursor as core_cursor, overlay_hud_sprite, platform as core_platform,
-    python_registry, tray as core_tray, ExecutionContext,
+    animation, cursor as core_cursor, platform as core_platform, python_registry, tray as core_tray,
+    ExecutionContext,
 };
 use arcadia_core::scheduling;
 use arcadia_core::shortcuts::ShortcutRegistrationOwned;
@@ -664,12 +666,16 @@ fn overlay_hud_set_sprite(
     display_height: Option<f32>,
 ) -> PyResult<()> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
+    let anchor = SpriteAnchor::parse(anchor.as_deref().unwrap_or("bottom-right"))
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+    let stacking = parse_overlay_stacking_token(stacking.as_deref().unwrap_or("hud"))
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
     let payload = overlay_hud_sprite::OverlayHudSpritePayload {
         rgba: rgba.as_bytes().to_vec(),
         width,
         height,
-        anchor: anchor.unwrap_or_else(|| "bottom-right".to_string()),
-        stacking: stacking.unwrap_or_else(|| "hud".to_string()),
+        anchor,
+        stacking,
         pad_x: pad_right.unwrap_or(24.),
         pad_y: pad_bottom.unwrap_or(24.),
         display_width,

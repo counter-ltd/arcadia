@@ -11,6 +11,7 @@ use super::ArcadiaRoot;
 
 use crate::cli;
 use crate::gui::{cursor_backend, overlay_backend, platform_backend, tray_backend};
+use arcadia_core::modules::overlay::OverlayStackingToken;
 use arcadia_core::scheduling;
 
 pub fn run() {
@@ -53,18 +54,18 @@ pub fn run() {
             move |_, app| {
                 let overlay_opts_hud = hud_overlay_window_options(app, WindowStacking::Hud);
                 if let Ok(handle) = app.open_window(overlay_opts_hud, |_ow, app2| {
-                    app2.new(|cx| OverlayHudRoot::new(cx, "hud"))
+                    app2.new(|cx| OverlayHudRoot::new(cx, OverlayStackingToken::Hud))
                 }) {
-                    overlay_backend::register_overlay_window(handle, "hud");
+                    overlay_backend::register_overlay_window(handle, OverlayStackingToken::Hud);
                 } else {
                     eprintln!("arcadia: failed to open HUD overlay window");
                 }
 
                 let overlay_opts_bmb = hud_overlay_window_options(app, WindowStacking::BelowMenuBar);
                 if let Ok(handle) = app.open_window(overlay_opts_bmb, |_ow, app2| {
-                    app2.new(|cx| OverlayHudRoot::new(cx, "below_menu_bar"))
+                    app2.new(|cx| OverlayHudRoot::new(cx, OverlayStackingToken::BelowMenuBar))
                 }) {
-                    overlay_backend::register_overlay_window(handle, "below_menu_bar");
+                    overlay_backend::register_overlay_window(handle, OverlayStackingToken::BelowMenuBar);
                 } else {
                     eprintln!("arcadia: failed to open below-menu-bar overlay window");
                 }
