@@ -79,7 +79,6 @@ impl ArcadiaRoot {
             char_width,
             border: p.panel_border,
             text: p.content_title,
-            meta: p.content_meta,
             surface: p.panel_bg,
             selected,
         };
@@ -111,7 +110,7 @@ impl ArcadiaRoot {
                     .child("BLOCKS"),
             )
             .child(inspector)
-            .child(div().flex().flex_col().gap_2().children(block_els))
+            .child(div().flex().flex_col().gap_0().children(block_els))
             .into_any_element()
     }
 }

@@ -3,12 +3,12 @@
 //! element containment, not indentation margins. Clicking a block selects it
 //! (by child-index path) for editing in the canvas inspector.
 
-use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
     MouseDownEvent, ParentElement, Rgba, Styled,
 };
 
+use super::block_shape::{c_block_bg, leaf_bg, BUMP_H, HEADER_H, LIP_H, SPINE_W};
 use crate::gui::app::code_editor_panel::{code_line_content, LineStyle};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::assets::MONO_FONT_FAMILY;
@@ -24,7 +24,6 @@ pub(super) struct BlockRenderCtx {
     pub char_width: f32,
     pub border: Rgba,
     pub text: Rgba,
-    pub meta: Rgba,
     pub surface: Rgba,
     /// Child-index path of the currently selected block, if any.
     pub selected: Option<Vec<usize>>,
@@ -76,16 +75,26 @@ fn detail(kind: &BlockKind) -> &str {
     }
 }
 
-fn pill(label: &str, cat: BlockCategory, is_dark: bool) -> AnyElement {
+/// Selection-ring colour painted around the selected block silhouette.
+fn ring_color(is_dark: bool) -> Rgba {
+    if is_dark {
+        rgb(0xffffff)
+    } else {
+        rgb(0x1f2937)
+    }
+}
+
+/// Inverted pill — sits on a solid-accent block surface.
+fn pill_on_accent(label: &str, cat: BlockCategory, is_dark: bool) -> AnyElement {
     div()
         .flex_shrink_0()
         .px_1p5()
         .py_0p5()
         .rounded(px(4.))
-        .bg(block_accent(cat, is_dark))
+        .bg(block_pill_text(is_dark))
         .text_xs()
         .font_weight(FontWeight::SEMIBOLD)
-        .text_color(block_pill_text(is_dark))
+        .text_color(block_accent(cat, is_dark))
         .child(label.to_string())
         .into_any_element()
 }
@@ -153,18 +162,13 @@ fn render_leaf(
     let first = d.lines().next().unwrap_or("");
     let suffix = if d.lines().count() > 1 { " …" } else { "" };
     let accent = block_accent(cat, ctx.is_dark);
+    let ring = if selected {
+        Some(ring_color(ctx.is_dark))
+    } else {
+        None
+    };
     div()
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap_2()
-        .px_2()
-        .py_1()
-        .rounded(px(6.))
-        .bg(block_soft(cat, ctx.is_dark))
-        .border_color(accent)
-        .when(selected, |d| d.border_2())
-        .when(!selected, |d| d.border_1())
+        .relative()
         .cursor_pointer()
         .on_mouse_down(
             MouseButton::Left,
@@ -174,14 +178,25 @@ fn render_leaf(
                 cx.notify();
             }),
         )
-        .child(pill(label, cat, ctx.is_dark))
+        .child(leaf_bg(accent, ring))
         .child(
             div()
-                .flex_1()
-                .font_family(MONO_FONT_FAMILY)
-                .text_xs()
-                .text_color(ctx.text)
-                .child(format!("{first}{suffix}")),
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_2()
+                .pt(px(BUMP_H + 5.))
+                .pb(px(6.))
+                .px(px(10.))
+                .child(pill_on_accent(label, cat, ctx.is_dark))
+                .child(
+                    div()
+                        .flex_1()
+                        .font_family(MONO_FONT_FAMILY)
+                        .text_xs()
+                        .text_color(block_pill_text(ctx.is_dark))
+                        .child(format!("{first}{suffix}")),
+                ),
         )
         .into_any_element()
 }
@@ -199,17 +214,23 @@ fn render_compound(
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
     let accent = block_accent(cat, ctx.is_dark);
+    let soft = block_soft(cat, ctx.is_dark);
+    let ring = if selected {
+        Some(ring_color(ctx.is_dark))
+    } else {
+        None
+    };
     let header_text = detail(kind);
     let header_path = path.clone();
 
+    // Top of the C: the painted header bar carries the pill + header line.
     let mut header = div()
         .flex()
         .flex_row()
         .items_center()
         .gap_2()
-        .px_2()
-        .py_1()
-        .bg(block_soft(cat, ctx.is_dark))
+        .h(px(HEADER_H))
+        .px(px(10.))
         .cursor_pointer()
         .on_mouse_down(
             MouseButton::Left,
@@ -219,52 +240,51 @@ fn render_compound(
                 cx.notify();
             }),
         )
-        .child(pill(label, cat, ctx.is_dark));
+        .child(pill_on_accent(label, cat, ctx.is_dark));
     if !header_text.is_empty() {
         header = header.child(
             div()
                 .flex_1()
                 .font_family(MONO_FONT_FAMILY)
                 .text_xs()
-                .text_color(ctx.text)
+                .text_color(block_pill_text(ctx.is_dark))
                 .child(header_text.to_string()),
         );
     }
 
-    let mut container = div()
+    let kids: Vec<AnyElement> = children
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let mut cp = path.clone();
+            cp.push(i);
+            render_block(c, cp, ctx, cx)
+        })
+        .collect();
+
+    // Children sit in the C's mouth — clear of the painted left spine.
+    let mouth = div()
         .flex()
         .flex_col()
-        .rounded(px(8.))
-        .border_color(accent)
-        .when(selected, |d| d.border_2())
-        .when(!selected, |d| d.border_1())
-        .overflow_hidden()
-        .child(header);
+        .gap_0()
+        .pl(px(SPINE_W + 6.))
+        .pr(px(8.))
+        .py(px(6.))
+        .children(kids);
 
-    if !children.is_empty() {
-        let kids: Vec<AnyElement> = children
-            .iter()
-            .enumerate()
-            .map(|(i, c)| {
-                let mut cp = path.clone();
-                cp.push(i);
-                render_block(c, cp, ctx, cx)
-            })
-            .collect();
-        let body = div()
-            .flex()
-            .flex_col()
-            .gap_1p5()
-            .pl_3()
-            .pr_2()
-            .py_2()
-            .border_l_2()
-            .border_color(accent)
-            .children(kids);
-        container = container.child(body);
-    }
-
-    container.into_any_element()
+    div()
+        .relative()
+        .child(c_block_bg(accent, soft, ring))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .pt(px(BUMP_H))
+                .child(header)
+                .child(mouth)
+                .child(div().h(px(LIP_H))),
+        )
+        .into_any_element()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -278,6 +298,11 @@ fn render_raw(
     cx: &mut Context<ArcadiaRoot>,
 ) -> AnyElement {
     let accent = block_accent(BlockCategory::Raw, ctx.is_dark);
+    let ring = if selected {
+        Some(ring_color(ctx.is_dark))
+    } else {
+        None
+    };
     let style = LineStyle {
         char_width: ctx.char_width,
         line_fg: ctx.text,
@@ -301,34 +326,52 @@ fn render_raw(
     }
 
     div()
-        .flex()
-        .flex_col()
-        .rounded(px(8.))
-        .border_color(accent)
-        .when(selected, |d| d.border_2())
-        .when(!selected, |d| d.border_1())
-        .overflow_hidden()
+        .relative()
+        .cursor_pointer()
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, _ev: &MouseDownEvent, window, cx| {
+                select(this, path.clone(), span_start, window);
+                cx.stop_propagation();
+                cx.notify();
+            }),
+        )
+        .child(leaf_bg(accent, ring))
         .child(
             div()
                 .flex()
-                .flex_row()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .bg(block_soft(BlockCategory::Raw, ctx.is_dark))
-                .cursor_pointer()
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, _ev: &MouseDownEvent, window, cx| {
-                        select(this, path.clone(), span_start, window);
-                        cx.stop_propagation();
-                        cx.notify();
-                    }),
+                .flex_col()
+                .pt(px(BUMP_H))
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_2()
+                        .h(px(HEADER_H))
+                        .px(px(10.))
+                        .child(pill_on_accent(label, BlockCategory::Raw, ctx.is_dark))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(block_pill_text(ctx.is_dark))
+                                .child("verbatim Python"),
+                        ),
                 )
-                .child(pill(label, BlockCategory::Raw, ctx.is_dark))
-                .child(div().text_xs().text_color(ctx.meta).child("verbatim Python")),
+                .child(
+                    // Code body on an inset panel so highlighted text stays
+                    // readable over the solid accent silhouette.
+                    div()
+                        .mx(px(8.))
+                        .mb(px(8.))
+                        .rounded(px(6.))
+                        .bg(ctx.surface)
+                        .px_2()
+                        .py_1()
+                        .flex()
+                        .flex_col()
+                        .children(lines),
+                ),
         )
-        .child(div().flex().flex_col().px_2().py_1().children(lines))
         .into_any_element()
 }

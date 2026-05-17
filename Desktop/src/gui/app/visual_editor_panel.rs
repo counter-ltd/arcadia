@@ -1,4 +1,5 @@
 mod block_render;
+mod block_shape;
 mod canvas;
 mod dashboard;
 mod inspector;
