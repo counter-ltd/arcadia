@@ -17,7 +17,6 @@ use openframe::{
 
 // ── Gradient helpers ──────────────────────────────────────────────────────────
 
-const GRAD_BAR_W: f32 = 280.0;
 const GRAD_BAR_H: f32 = 16.0;
 const GRAD_HANDLE_D: f32 = 18.0;
 const GRAD_HANDLE_R: f32 = GRAD_HANDLE_D / 2.0;
@@ -26,17 +25,6 @@ const GRAD_CONT_H: f32 = GRAD_HANDLE_D + 6.0;
 const GRAD_BAR_Y: f32 = (GRAD_CONT_H - GRAD_BAR_H) / 2.0;
 const GRAD_HANDLE_Y: f32 = (GRAD_CONT_H - GRAD_HANDLE_D) / 2.0;
 const GRAD_SEGMENTS: usize = 32;
-// Bar is inset by one handle-radius on each side so end-handles sit centred
-// on the rounded caps rather than hanging off the pixel edge.
-const GRAD_BAR_INSET: f32 = GRAD_HANDLE_R;
-const GRAD_BAR_INNER_W: f32 = GRAD_BAR_W - 2.0 * GRAD_BAR_INSET;
-
-/// Remap a raw t-value (0–1 across the full container width) to a gradient
-/// position (0–1 across the inset bar area).
-#[inline]
-fn remap_t_to_pos(raw_t: f32) -> f32 {
-    ((raw_t * GRAD_BAR_W - GRAD_BAR_INSET) / GRAD_BAR_INNER_W).clamp(0.0, 1.0)
-}
 
 #[derive(Clone, Debug)]
 pub struct GradientStop {
@@ -305,20 +293,31 @@ impl ArcadiaRoot {
                             })
                             .collect();
 
-                        // Normal-flow bar inset by GRAD_BAR_INSET on each side so the
-                        // end handles sit centred on the rounded caps.
+                        // Bar is absolutely positioned to span the full container width.
+                        // overflow_hidden on the bar (not the container) clips the flex
+                        // segments to the bar's rounded bounds.
                         let gradient_bar = div()
-                            .mt(px(GRAD_BAR_Y))
-                            .ml(px(GRAD_BAR_INSET))
-                            .w(px(GRAD_BAR_INNER_W))
+                            .absolute()
+                            .top(px(GRAD_BAR_Y))
+                            .left_0()
+                            .right_0()
                             .h(px(GRAD_BAR_H))
-                            .rounded(px(GRAD_BAR_H / 2.0))
-                            .overflow_hidden()
                             .flex()
                             .flex_row()
-                            .children(segment_colors.into_iter().map(|c| {
-                                div().flex_1().h_full().bg(c)
-                            }));
+                            .children(
+                                segment_colors
+                                    .into_iter()
+                                    .enumerate()
+                                    .map(|(i, c)| {
+                                        let seg = div().flex_1().h_full().bg(c);
+                                        match (i == 0, i == GRAD_SEGMENTS - 1) {
+                                            (true, true) => seg.rounded_full(),
+                                            (true, false) => seg.rounded_l_full(),
+                                            (false, true) => seg.rounded_r_full(),
+                                            (false, false) => seg,
+                                        }
+                                    }),
+                            );
 
                         // Click-to-add overlay: absolute over bar, transparent hit target.
                         let bar_hit = {
@@ -338,9 +337,10 @@ impl ArcadiaRoot {
                                     MouseButton::Left,
                                     move |ev: &MouseDownEvent, hb: &Hitbox, _, cx| {
                                         let raw_t = slider_t_from_hit(&hb.bounds, &ev.position) as f32;
-                                        let t = remap_t_to_pos(raw_t);
+                                        let t = raw_t.clamp(0.0, 1.0);
                                         // Near an existing handle → let handle's own handler take it.
-                                        let threshold = GRAD_HANDLE_D / GRAD_BAR_INNER_W;
+                                        let bar_w = (hb.bounds.size.width.to_f64() as f32).max(1.0);
+                                        let threshold = GRAD_HANDLE_D / bar_w;
                                         let near_existing = stops_for_click
                                             .iter()
                                             .any(|s| (s.pos - t).abs() < threshold);
@@ -375,9 +375,8 @@ impl ArcadiaRoot {
                             .iter()
                             .enumerate()
                             .map(|(i, stop)| {
-                                // Handle centre sits at INSET + pos*INNER_W; subtract
-                                // HANDLE_R to get the left-edge pixel offset.
-                                let handle_x = stop.pos * GRAD_BAR_INNER_W;
+                                // Handle centre at stop.pos fraction of container width.
+                                // left(relative) puts the LEFT edge there; ml(-R) centres it.
                                 let stop_color = crate::gui::app::lifecycle::parse_hex_color(
                                     &stop.color,
                                 )
@@ -391,7 +390,8 @@ impl ArcadiaRoot {
                                 div()
                                     .absolute()
                                     .top(px(GRAD_HANDLE_Y))
-                                    .left(px(handle_x))
+                                    .left(relative(stop.pos))
+                                    .ml(-px(GRAD_HANDLE_R))
                                     .w(px(GRAD_HANDLE_D))
                                     .h(px(GRAD_HANDLE_D))
                                     .rounded_full()
@@ -487,7 +487,7 @@ impl ArcadiaRoot {
                             let stops_drag = stops.clone();
                             div()
                                 .relative()
-                                .w(px(GRAD_BAR_W))
+                                .w_full()
                                 .h(px(GRAD_CONT_H))
                                 .child(gradient_bar)
                                 .child(bar_hit)
@@ -504,10 +504,11 @@ impl ArcadiaRoot {
                                             }
                                             (pl.module.clone(), pl.key.clone(), pl.stop_index)
                                         };
-                                        let t = remap_t_to_pos(
-                                            slider_t_from_hit(&ev.bounds, &ev.event.position)
-                                                as f32,
-                                        );
+                                        let t = (slider_t_from_hit(
+                                            &ev.bounds,
+                                            &ev.event.position,
+                                        ) as f32)
+                                            .clamp(0.0, 1.0);
                                         let pair = (drag_m.clone(), drag_k.clone());
                                         let current = this
                                             .extension_token_values

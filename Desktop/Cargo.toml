@@ -43,4 +43,4 @@ include_dir      = "0.7"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2            = { version = "0.6.2", features = ["relax-sign-encoding"] }
-objc2-app-kit    = { version = "0.3.2", features = ["NSStatusBar", "objc2-core-foundation"] }
+objc2-app-kit    = { version = "0.3.2", features = ["NSApplication", "NSStatusBar", "objc2-core-foundation"] }
