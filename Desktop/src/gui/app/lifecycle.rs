@@ -37,7 +37,7 @@ use openframe::{point, px, Context, RenderStyle, Rgba, Timer, UpdateGlobal, Wind
 use super::super::tui;
 use super::ArcadiaRoot;
 #[cfg(feature = "gui")]
-use super::{CodeEditorTab, ShellMode, TerminalInstance, VisualEditorTab};
+use super::{AiUiState, CodeEditorTab, CodeEditorUiState, LateUiState, ShellMode, TerminalInstance, VisualEditorTab, VisualEditorUiState};
 
 /// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
 /// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
@@ -413,144 +413,148 @@ impl ArcadiaRoot {
             shortcut_create_label_focus,
             shortcut_create_token_focus,
             shortcut_create_args_focus,
-            code_editor_show_indentation_marks: code_editor_cfg.show_indentation_marks,
-            code_editor_auto_indent: code_editor_cfg.auto_indent,
-            code_editor_auto_close: code_editor_cfg.auto_close_brackets,
-            code_editor_undo_enabled: code_editor_cfg.undo_enabled,
-            code_editor_line_commands: code_editor_cfg.line_commands,
-            code_editor_cursor_style: code_editor_cfg.cursor_style,
-            code_editor_undo: std::collections::HashMap::new(),
-            code_editor_char_width_override: code_editor_cfg.char_width_override,
-            code_editor_char_width_draft: code_editor_cfg
-                .char_width_override
-                .map(|v| format!("{:.2}", v))
-                .unwrap_or_default(),
-            code_editor_char_width_editing: false,
-            code_editor_tabs: restored_tabs,
-            active_code_editor_tab: restored_active,
-            code_editor_next_id: session_next_id,
-            code_editor_focus,
-            code_editor_char_width_focus,
-            code_editor_workspace_picker_open: false,
-            code_editor_undo_history_open: false,
-            code_editor_explorer_open: false,
-            code_editor_explorer_expanded: std::collections::HashSet::new(),
-            code_editor_context_menu_open: false,
-            code_editor_show_dashboard: restored_show_dashboard,
-            code_editor_tab_menu: None,
-            code_editor_close_confirm: None,
-            code_editor_line_bounds: std::rc::Rc::new(std::cell::RefCell::new(vec![])),
-            code_editor_is_dragging: false,
-            visual_editor_tabs: restored_visual_tabs,
-            active_visual_editor_tab: restored_visual_active,
-            visual_editor_next_id: visual_session_next_id,
-            visual_editor_focus,
-            visual_editor_show_dashboard: restored_visual_show_dashboard,
-            visual_editor_workspace_picker_open: false,
-            visual_editor_explorer_open: false,
-            visual_editor_explorer_expanded: std::collections::HashSet::new(),
-            visual_editor_selected: None,
-            visual_editor_edit_draft: String::new(),
-            visual_editor_edit_caret: 0,
-            visual_editor_input_focus,
-            visual_editor_palette_open: false,
-            visual_editor_drag: None,
-            visual_editor_canvas_origin: std::rc::Rc::new(std::cell::RefCell::new(
-                openframe::Point::default(),
-            )),
-            visual_editor_drop_zones: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
-            visual_editor_block_bounds: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
-            ai_chats: vec![],
-            active_ai_chat_id: 0,
-            ai_next_id: 1,
-            ai_chat_show_dashboard: false,
-            ai_context_menu_open: false,
-            ai_chat_menu: None,
-            ai_session_menu: None,
-            ai_session_rename: None,
-            ai_rename_focus,
-            ai_input_focus,
-            ai_default_system_prompt: ai_cfg.default_system_prompt,
-            ai_chat_model_id: None,
-            ai_chat_model_picker_open: false,
-            ai_chat_workspace_id: None,
-            ai_chat_workspace_picker_open: false,
-            ai_runtime: None,
-            ai_stream_chat_id: None,
-            ai_poll_task_started: false,
-            ai_active_rule_ids: Vec::new(),
-            ai_active_skill_ids: Vec::new(),
-            ai_rule_picker_open: false,
-            ai_skill_picker_open: false,
-            ai_sessions: ai_chat_store::list_sessions()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|s| crate::gui::app::AiSessionSummary {
-                    id: s.id,
-                    title: s.title,
-                    updated_at: s.updated_at,
-                    provider: s.provider,
-                    workspace_id: s.workspace_id,
-                    last_messages: s.last_messages,
-                })
-                .collect(),
-            ai_pending_edits: Vec::new(),
-            ai_diff_panel_open: false,
-            ai_stage_writes: false,
-            active_ai_provider_module: String::new(),
-            detected_cli_providers: {
-                let detected = arcadia_core::modules::ai_exec_cli::scan_for_cli_providers();
-                // Merge newly detected providers into the persisted config so users can
-                // customise model_flag / model_value / extra_args without editing code.
-                let mut exec_cfg = AiExecProvidersConfig::load_or_create().unwrap_or_default();
-                let mut changed = false;
-                for p in &detected {
-                    if !exec_cfg.entries.iter().any(|e| e.id == p.id) {
-                        exec_cfg.entries.push(ExecCliEntry {
-                            id: p.id.clone(),
-                            binary: p.binary.clone(),
-                            label: p.label.clone(),
-                            model_flag: p.model_flag.clone(),
-                            model_value: String::new(),
-                            extra_args: p.extra_args.clone(),
-                            enabled: true,
-                        });
-                        changed = true;
-                    }
-                }
-                if changed {
-                    let _ = exec_cfg.save();
-                }
-                detected
+            code_editor: CodeEditorUiState {
+                show_indentation_marks: code_editor_cfg.show_indentation_marks,
+                auto_indent: code_editor_cfg.auto_indent,
+                auto_close: code_editor_cfg.auto_close_brackets,
+                undo_enabled: code_editor_cfg.undo_enabled,
+                line_commands: code_editor_cfg.line_commands,
+                cursor_style: code_editor_cfg.cursor_style,
+                undo: std::collections::HashMap::new(),
+                char_width_override: code_editor_cfg.char_width_override,
+                char_width_draft: code_editor_cfg
+                    .char_width_override
+                    .map(|v| format!("{:.2}", v))
+                    .unwrap_or_default(),
+                char_width_editing: false,
+                tabs: restored_tabs,
+                active_tab: restored_active,
+                next_id: session_next_id,
+                focus: code_editor_focus,
+                char_width_focus: code_editor_char_width_focus,
+                workspace_picker_open: false,
+                undo_history_open: false,
+                explorer_open: false,
+                explorer_expanded: std::collections::HashSet::new(),
+                context_menu_open: false,
+                show_dashboard: restored_show_dashboard,
+                tab_menu: None,
+                close_confirm: None,
+                line_bounds: std::rc::Rc::new(std::cell::RefCell::new(vec![])),
+                is_dragging: false,
             },
-            llama_cpp_models: llama_cpp_cfg.models,
-            ollama_endpoint: ollama_cfg.endpoint,
-            ollama_models: ollama_cfg.models,
-            ollama_discovering: false,
-            openai_providers: openai_cfg.providers,
-            active_openai_provider_id: None,
-            openai_provider_edit_draft: None,
-            openai_edit_name_focus,
-            openai_edit_api_key_focus,
-            openai_edit_base_url_focus,
-            openai_provider_delete_confirm: false,
-            openai_create_draft: None,
-            openai_create_name_focus,
-            openai_create_api_key_focus,
-            openai_create_base_url_focus,
+            visual_editor: VisualEditorUiState {
+                tabs: restored_visual_tabs,
+                active_tab: restored_visual_active,
+                next_id: visual_session_next_id,
+                focus: visual_editor_focus,
+                show_dashboard: restored_visual_show_dashboard,
+                workspace_picker_open: false,
+                explorer_open: false,
+                explorer_expanded: std::collections::HashSet::new(),
+                selected: None,
+                edit_draft: String::new(),
+                edit_caret: 0,
+                input_focus: visual_editor_input_focus,
+                palette_open: false,
+                drag: None,
+                canvas_origin: std::rc::Rc::new(std::cell::RefCell::new(
+                    openframe::Point::default(),
+                )),
+                drop_zones: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+                block_bounds: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+            },
+            ai: AiUiState {
+                chats: vec![],
+                active_chat_id: 0,
+                next_id: 1,
+                chat_show_dashboard: false,
+                context_menu_open: false,
+                chat_menu: None,
+                session_menu: None,
+                session_rename: None,
+                rename_focus: ai_rename_focus,
+                input_focus: ai_input_focus,
+                default_system_prompt: ai_cfg.default_system_prompt,
+                chat_model_id: None,
+                chat_model_picker_open: false,
+                chat_workspace_id: None,
+                chat_workspace_picker_open: false,
+                runtime: None,
+                stream_chat_id: None,
+                poll_task_started: false,
+                active_rule_ids: Vec::new(),
+                active_skill_ids: Vec::new(),
+                rule_picker_open: false,
+                skill_picker_open: false,
+                sessions: ai_chat_store::list_sessions()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|s| crate::gui::app::AiSessionSummary {
+                        id: s.id,
+                        title: s.title,
+                        updated_at: s.updated_at,
+                        provider: s.provider,
+                        workspace_id: s.workspace_id,
+                        last_messages: s.last_messages,
+                    })
+                    .collect(),
+                pending_edits: Vec::new(),
+                diff_panel_open: false,
+                stage_writes: false,
+                active_provider_module: String::new(),
+                detected_cli_providers: {
+                    let detected = arcadia_core::modules::ai_exec_cli::scan_for_cli_providers();
+                    let mut exec_cfg = AiExecProvidersConfig::load_or_create().unwrap_or_default();
+                    let mut changed = false;
+                    for p in &detected {
+                        if !exec_cfg.entries.iter().any(|e| e.id == p.id) {
+                            exec_cfg.entries.push(ExecCliEntry {
+                                id: p.id.clone(),
+                                binary: p.binary.clone(),
+                                label: p.label.clone(),
+                                model_flag: p.model_flag.clone(),
+                                model_value: String::new(),
+                                extra_args: p.extra_args.clone(),
+                                enabled: true,
+                            });
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        let _ = exec_cfg.save();
+                    }
+                    detected
+                },
+                llama_cpp_models: llama_cpp_cfg.models,
+                ollama_endpoint: ollama_cfg.endpoint,
+                ollama_models: ollama_cfg.models,
+                ollama_discovering: false,
+                openai_providers: openai_cfg.providers,
+                active_openai_provider_id: None,
+                openai_provider_edit_draft: None,
+                openai_edit_name_focus,
+                openai_edit_api_key_focus,
+                openai_edit_base_url_focus,
+                openai_provider_delete_confirm: false,
+                openai_create_draft: None,
+                openai_create_name_focus,
+                openai_create_api_key_focus,
+                openai_create_base_url_focus,
+                active_llama_cpp_model_id: None,
+                llama_cpp_provider_menu: None,
+                ollama_provider_menu: None,
+                llama_cpp_create_draft: None,
+                llama_cpp_create_name_focus,
+                llama_cpp_create_path_focus,
+                llama_cpp_create_mmproj_focus,
+                llama_cpp_edit_draft: None,
+                llama_cpp_edit_name_focus,
+                llama_cpp_edit_path_focus,
+                llama_cpp_edit_mmproj_focus,
+                llama_cpp_delete_confirm: false,
+            },
             workspace_entries,
-            active_llama_cpp_model_id: None,
-            llama_cpp_provider_menu: None,
-            ollama_provider_menu: None,
-            llama_cpp_create_draft: None,
-            llama_cpp_create_name_focus,
-            llama_cpp_create_path_focus,
-            llama_cpp_create_mmproj_focus,
-            llama_cpp_edit_draft: None,
-            llama_cpp_edit_name_focus,
-            llama_cpp_edit_path_focus,
-            llama_cpp_edit_mmproj_focus,
-            llama_cpp_delete_confirm: false,
             workspace_create_draft: None,
             workspace_create_label_focus,
             workspace_create_path_focus,
@@ -580,7 +584,20 @@ impl ArcadiaRoot {
             session_route_menu_position: openframe::Point::default(),
             #[cfg(feature = "gui")]
             shell_focus,
-            late_compose_focus,
+            late: LateUiState {
+                compose_focus: late_compose_focus,
+                poll_task_started: false,
+                last_revision: 0,
+                active_room: 1,
+                compose_text: String::new(),
+                settings_server_url: late_cfg.server_url,
+                settings_username: late_cfg.username,
+                settings_default_room: late_cfg.default_room.to_string(),
+                settings_feedback: String::new(),
+                settings_server_url_focus: late_settings_server_url_focus,
+                settings_username_focus: late_settings_username_focus,
+                settings_default_room_focus: late_settings_default_room_focus,
+            },
             text_caret_blink_visible: true,
             text_caret_blink_task_started: false,
             splash_elapsed_ms: 0.0,
@@ -625,17 +642,6 @@ impl ArcadiaRoot {
             lan_service_feedback: String::new(),
             pending_port_kill_prompt: None,
             lan_poll_task_started: false,
-            late_poll_task_started: false,
-            late_last_revision: 0,
-            late_active_room: 1,
-            late_compose_text: String::new(),
-            late_settings_server_url: late_cfg.server_url,
-            late_settings_username: late_cfg.username,
-            late_settings_default_room: late_cfg.default_room.to_string(),
-            late_settings_feedback: String::new(),
-            late_settings_server_url_focus,
-            late_settings_username_focus,
-            late_settings_default_room_focus,
             extension_token_values: std::collections::HashMap::new(),
             extension_token_editing: None,
             extension_token_slider_active: None,
@@ -826,7 +832,7 @@ impl ArcadiaRoot {
         self.available_styles = styles;
         self.refresh_extension_token_cache();
         self.refresh_local_navigation_registry();
-        for tab in &mut self.code_editor_tabs {
+        for tab in &mut self.code_editor.tabs {
             tab.highlight_dirty = true;
         }
         self.apply_style(active, self.current_color_scheme_dark(), cx);
@@ -958,7 +964,7 @@ impl ArcadiaRoot {
         }
         self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();
-        for tab in &mut self.code_editor_tabs {
+        for tab in &mut self.code_editor.tabs {
             tab.highlight_dirty = true;
         }
         #[cfg(all(feature = "gui", not(target_os = "ios")))]
@@ -1003,10 +1009,10 @@ impl ArcadiaRoot {
     // an identical spawn_in → loop → Timer → should_stop pattern. Extracting a generic helper
     // requires careful GPUI async-closure typing; left as a TODO for a dedicated refactor pass.
     pub fn ensure_ai_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ai_poll_task_started {
+        if self.ai.poll_task_started {
             return;
         }
-        self.ai_poll_task_started = true;
+        self.ai.poll_task_started = true;
         cx.spawn_in(
             window,
             move |view: openframe::WeakEntity<ArcadiaRoot>,
@@ -1019,10 +1025,10 @@ impl ArcadiaRoot {
                             .update(|_, app| {
                                 view.update(app, |this, cx| {
                                     let had_event = this.poll_ai_events(cx);
-                                    if had_event || this.ai_stream_chat_id.is_some() {
+                                    if had_event || this.ai.stream_chat_id.is_some() {
                                         false
                                     } else {
-                                        this.ai_poll_task_started = false;
+                                        this.ai.poll_task_started = false;
                                         true
                                     }
                                 })
@@ -1049,7 +1055,7 @@ impl ArcadiaRoot {
 
         loop {
             // Borrow ai_runtime only for the try_recv call; drop before any &mut self calls.
-            let event = match self.ai_runtime.as_ref() {
+            let event = match self.ai.runtime.as_ref() {
                 Some(r) => r.event_rx.try_recv(),
                 None => break,
             };
@@ -1057,8 +1063,8 @@ impl ArcadiaRoot {
             match event {
                 Ok(RuntimeEvent::Token(s)) => {
                     any = true;
-                    if let Some(chat_id) = self.ai_stream_chat_id {
-                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                    if let Some(chat_id) = self.ai.stream_chat_id {
+                        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == chat_id) {
                             if let Some(last) = chat.messages.last_mut() {
                                 if last.role == AiMessageRole::Assistant {
                                     last.content.push_str(&s);
@@ -1069,18 +1075,18 @@ impl ArcadiaRoot {
                 }
                 Ok(RuntimeEvent::Done) => {
                     any = true;
-                    if let Some(chat_id) = self.ai_stream_chat_id {
-                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                    if let Some(chat_id) = self.ai.stream_chat_id {
+                        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == chat_id) {
                             chat.is_loading = false;
                         }
                         pending_autosave = Some(chat_id);
                     }
-                    self.ai_stream_chat_id = None;
+                    self.ai.stream_chat_id = None;
                 }
                 Ok(RuntimeEvent::Error(e)) => {
                     any = true;
-                    if let Some(chat_id) = self.ai_stream_chat_id {
-                        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) {
+                    if let Some(chat_id) = self.ai.stream_chat_id {
+                        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == chat_id) {
                             chat.is_loading = false;
                             let chat_provider = chat.session_provider.clone();
                             if let Some(last) = chat.messages.last_mut() {
@@ -1098,7 +1104,7 @@ impl ArcadiaRoot {
                         }
                         pending_autosave = Some(chat_id);
                     }
-                    self.ai_stream_chat_id = None;
+                    self.ai.stream_chat_id = None;
                 }
                 Ok(RuntimeEvent::PendingEdit {
                     path,
@@ -1107,7 +1113,7 @@ impl ArcadiaRoot {
                 }) => {
                     any = true;
                     let hunks = compute_diff_hunks(&original, &proposed);
-                    self.ai_pending_edits.push(AiPendingEdit {
+                    self.ai.pending_edits.push(AiPendingEdit {
                         path,
                         original,
                         proposed,
@@ -1115,7 +1121,7 @@ impl ArcadiaRoot {
                         accepted: std::collections::BTreeSet::new(),
                         rejected: std::collections::BTreeSet::new(),
                     });
-                    self.ai_diff_panel_open = true;
+                    self.ai.diff_panel_open = true;
                 }
                 Err(_) => break,
             }
@@ -1134,7 +1140,7 @@ impl ArcadiaRoot {
     fn autosave_session(&mut self, chat_id: usize) {
         use crate::gui::app::AiMessageRole;
 
-        let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == chat_id) else {
+        let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == chat_id) else {
             return;
         };
 
@@ -1172,9 +1178,9 @@ impl ArcadiaRoot {
                 }
             }
         }
-        session.active_rule_ids = self.ai_active_rule_ids.clone();
-        session.active_skill_ids = self.ai_active_skill_ids.clone();
-        session.workspace_id = self.ai_chat_workspace_id.clone();
+        session.active_rule_ids = self.ai.active_rule_ids.clone();
+        session.active_skill_ids = self.ai.active_skill_ids.clone();
+        session.workspace_id = self.ai.chat_workspace_id.clone();
 
         // Rebuild messages from chat (source of truth for in-memory state).
         session.messages = chat
@@ -1202,14 +1208,14 @@ impl ArcadiaRoot {
         }
 
         // Back-sync title from session to in-memory chat.
-        let chat = self.ai_chats.iter_mut().find(|c| c.id == chat_id).unwrap();
+        let chat = self.ai.chats.iter_mut().find(|c| c.id == chat_id).unwrap();
         if session.title != "New Chat" && session.title != format!("Chat {}", chat.id) {
             chat.title = session.title.clone();
         }
 
         // Refresh session summary list.
         if let Ok(summaries) = ai_chat_store::list_sessions() {
-            self.ai_sessions = summaries
+            self.ai.sessions = summaries
                 .into_iter()
                 .map(|s| crate::gui::app::AiSessionSummary {
                     id: s.id,
@@ -1327,15 +1333,15 @@ fn lcs_diff<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<Edit> {
 
 impl ArcadiaRoot {
     /// Spawn a background thread to fetch models from the running Ollama instance via /api/tags.
-    /// Updates `self.ollama_models` on completion and clears `self.ollama_discovering`.
+    /// Updates `self.ai.ollama_models` on completion and clears `self.ai.ollama_discovering`.
     pub fn discover_ollama_models(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ollama_discovering {
+        if self.ai.ollama_discovering {
             return;
         }
-        self.ollama_discovering = true;
+        self.ai.ollama_discovering = true;
         cx.notify();
 
-        let endpoint = self.ollama_endpoint.clone();
+        let endpoint = self.ai.ollama_endpoint.clone();
         cx.spawn_in(
             window,
             move |view: openframe::WeakEntity<ArcadiaRoot>,
@@ -1354,9 +1360,9 @@ impl ArcadiaRoot {
                             Ok(result) => {
                                 cx.update(|_, app| {
                                     view.update(app, |this, cx| {
-                                        this.ollama_discovering = false;
+                                        this.ai.ollama_discovering = false;
                                         if let Ok(models) = result {
-                                            this.ollama_models = models;
+                                            this.ai.ollama_models = models;
                                         }
                                         cx.notify();
                                     })
@@ -1369,7 +1375,7 @@ impl ArcadiaRoot {
                             Err(_) => {
                                 cx.update(|_, app| {
                                     view.update(app, |this, cx| {
-                                        this.ollama_discovering = false;
+                                        this.ai.ollama_discovering = false;
                                         cx.notify();
                                     })
                                     .ok();
@@ -1387,15 +1393,15 @@ impl ArcadiaRoot {
 
     /// Save edits to the active OpenAI provider.
     pub fn openai_provider_save_edit(&mut self, cx: &mut Context<Self>) {
-        let Some(provider_id) = self.active_openai_provider_id.clone() else {
+        let Some(provider_id) = self.ai.active_openai_provider_id.clone() else {
             return;
         };
-        let Some(draft) = self.openai_provider_edit_draft.clone() else {
+        let Some(draft) = self.ai.openai_provider_edit_draft.clone() else {
             return;
         };
         let name = draft.name.trim().to_string();
         if name.is_empty() {
-            if let Some(ref mut d) = self.openai_provider_edit_draft {
+            if let Some(ref mut d) = self.ai.openai_provider_edit_draft {
                 d.error = Some("Name is required.".to_string());
             }
             cx.notify();
@@ -1410,12 +1416,12 @@ impl ArcadiaRoot {
         }
         match cfg.save() {
             Ok(()) => {
-                if let Some(p) = self.openai_providers.iter_mut().find(|p| p.id == provider_id) {
+                if let Some(p) = self.ai.openai_providers.iter_mut().find(|p| p.id == provider_id) {
                     p.name = name;
                     p.api_key = draft.api_key;
                     p.base_url = draft.base_url;
                 }
-                self.openai_provider_edit_draft = None;
+                self.ai.openai_provider_edit_draft = None;
             }
             Err(e) => {
                 eprintln!("openai config save failed: {e}");
@@ -1426,7 +1432,7 @@ impl ArcadiaRoot {
 
     /// Delete the active OpenAI provider.
     pub fn openai_provider_delete(&mut self, cx: &mut Context<Self>) {
-        let Some(provider_id) = self.active_openai_provider_id.clone() else {
+        let Some(provider_id) = self.ai.active_openai_provider_id.clone() else {
             return;
         };
         let mut cfg =
@@ -1435,20 +1441,20 @@ impl ArcadiaRoot {
         if cfg.save().is_err() {
             return;
         }
-        self.openai_providers.retain(|p| p.id != provider_id);
-        self.active_openai_provider_id = None;
-        self.openai_provider_delete_confirm = false;
+        self.ai.openai_providers.retain(|p| p.id != provider_id);
+        self.ai.active_openai_provider_id = None;
+        self.ai.openai_provider_delete_confirm = false;
         cx.notify();
     }
 
     /// Save a new OpenAI provider from the create draft.
     pub fn openai_provider_save_create(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.openai_create_draft.clone() else {
+        let Some(draft) = self.ai.openai_create_draft.clone() else {
             return;
         };
         let name = draft.name.trim().to_string();
         if name.is_empty() {
-            if let Some(ref mut d) = self.openai_create_draft {
+            if let Some(ref mut d) = self.ai.openai_create_draft {
                 d.error = Some("Name is required.".to_string());
             }
             cx.notify();
@@ -1477,12 +1483,12 @@ impl ArcadiaRoot {
         cfg.providers.push(provider.clone());
         match cfg.save() {
             Ok(()) => {
-                self.openai_providers.push(provider);
-                self.active_openai_provider_id = Some(id);
-                self.openai_create_draft = None;
+                self.ai.openai_providers.push(provider);
+                self.ai.active_openai_provider_id = Some(id);
+                self.ai.openai_create_draft = None;
             }
             Err(e) => {
-                if let Some(ref mut d) = self.openai_create_draft {
+                if let Some(ref mut d) = self.ai.openai_create_draft {
                     d.error = Some(format!("Save failed: {e}"));
                 }
             }
@@ -1532,17 +1538,11 @@ impl ArcadiaRoot {
     #[cfg(any(feature = "gui", feature = "ios-gui"))]
     pub(crate) fn any_text_input_focused(&self, window: &Window, cx: &Context<Self>) -> bool {
         self.shell_focus.contains_focused(window, cx)
-            || self.ai_input_focus.contains_focused(window, cx)
-            || self.late_compose_focus.contains_focused(window, cx)
-            || self
-                .late_settings_server_url_focus
-                .contains_focused(window, cx)
-            || self
-                .late_settings_username_focus
-                .contains_focused(window, cx)
-            || self
-                .late_settings_default_room_focus
-                .contains_focused(window, cx)
+            || self.ai.input_focus.contains_focused(window, cx)
+            || self.late.compose_focus.contains_focused(window, cx)
+            || self.late.settings_server_url_focus.contains_focused(window, cx)
+            || self.late.settings_username_focus.contains_focused(window, cx)
+            || self.late.settings_default_room_focus.contains_focused(window, cx)
             || self.extension_token_focus.contains_focused(window, cx)
             || self.modules_search_focus.contains_focused(window, cx)
             || self.extensions_search_focus.contains_focused(window, cx)
@@ -1556,29 +1556,29 @@ impl ArcadiaRoot {
                 .shortcut_create_token_focus
                 .contains_focused(window, cx)
             || self.shortcut_create_args_focus.contains_focused(window, cx)
-            || self.code_editor_focus.contains_focused(window, cx)
+            || self.code_editor.focus.contains_focused(window, cx)
             || self
-                .code_editor_char_width_focus
+                .code_editor.char_width_focus
                 .contains_focused(window, cx)
-            || self.openai_edit_name_focus.contains_focused(window, cx)
-            || self.openai_edit_api_key_focus.contains_focused(window, cx)
-            || self.openai_edit_base_url_focus.contains_focused(window, cx)
-            || self.openai_create_name_focus.contains_focused(window, cx)
-            || self.openai_create_api_key_focus.contains_focused(window, cx)
-            || self.openai_create_base_url_focus.contains_focused(window, cx)
+            || self.ai.openai_edit_name_focus.contains_focused(window, cx)
+            || self.ai.openai_edit_api_key_focus.contains_focused(window, cx)
+            || self.ai.openai_edit_base_url_focus.contains_focused(window, cx)
+            || self.ai.openai_create_name_focus.contains_focused(window, cx)
+            || self.ai.openai_create_api_key_focus.contains_focused(window, cx)
+            || self.ai.openai_create_base_url_focus.contains_focused(window, cx)
             || self
-                .llama_cpp_create_name_focus
-                .contains_focused(window, cx)
-            || self
-                .llama_cpp_create_path_focus
+                .ai.llama_cpp_create_name_focus
                 .contains_focused(window, cx)
             || self
-                .llama_cpp_create_mmproj_focus
+                .ai.llama_cpp_create_path_focus
                 .contains_focused(window, cx)
-            || self.llama_cpp_edit_name_focus.contains_focused(window, cx)
-            || self.llama_cpp_edit_path_focus.contains_focused(window, cx)
             || self
-                .llama_cpp_edit_mmproj_focus
+                .ai.llama_cpp_create_mmproj_focus
+                .contains_focused(window, cx)
+            || self.ai.llama_cpp_edit_name_focus.contains_focused(window, cx)
+            || self.ai.llama_cpp_edit_path_focus.contains_focused(window, cx)
+            || self
+                .ai.llama_cpp_edit_mmproj_focus
                 .contains_focused(window, cx)
             || self
                 .workspace_create_label_focus
@@ -1586,7 +1586,7 @@ impl ArcadiaRoot {
             || self
                 .workspace_create_path_focus
                 .contains_focused(window, cx)
-            || self.visual_editor_input_focus.contains_focused(window, cx)
+            || self.visual_editor.input_focus.contains_focused(window, cx)
     }
 
     /// Tick the nav caret fade-in/out animations using the arcadia animation engine's easing
@@ -2195,10 +2195,10 @@ pub(crate) fn merged_available_styles() -> Vec<StyleInfo> {
     styles
 }
 
-/// Convert a `GlyphParams` (hex strings from the Python extension) into a
+/// Convert a `ExtensionStyleParams` (hex strings from the Python extension) into a
 /// `GlyphStyleConfig` (Rgba values) the Desktop rendering layer can use.
 pub(crate) fn build_glyph_style_config(
-    p: &arcadia_core::modules::python_registry::GlyphParams,
+    p: &arcadia_core::modules::python_registry::ExtensionStyleParams,
 ) -> GlyphStyleConfig {
     let hex = |s: &Option<String>, default: Rgba| -> Rgba {
         s.as_deref().and_then(parse_hex_color).unwrap_or(default)

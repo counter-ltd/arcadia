@@ -13,7 +13,7 @@ impl ArcadiaRoot {
     pub(super) fn late_message_list(&self, is_dark: bool) -> impl IntoElement {
         let arc = state();
         let st = arc.lock().unwrap_or_else(|e| e.into_inner());
-        let room = self.late_active_room;
+        let room = self.late.active_room;
         let messages: Vec<LateMessage> = st
             .messages
             .iter()
@@ -113,9 +113,9 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
-        let input_text = self.late_compose_text.clone();
-        let room = self.late_active_room;
-        let compose_focused = self.late_compose_focus.is_focused(window);
+        let input_text = self.late.compose_text.clone();
+        let room = self.late.active_room;
+        let compose_focused = self.late.compose_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
 
         let compose_border = theme::ui_border(cx, is_dark);
@@ -141,11 +141,11 @@ impl ArcadiaRoot {
                     .border_color(compose_border)
                     .text_sm()
                     .text_color(theme::module_title_text(is_dark))
-                    .track_focus(&self.late_compose_focus)
+                    .track_focus(&self.late.compose_focus)
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, _, window, _| {
-                            this.late_compose_focus.focus(window);
+                            this.late.compose_focus.focus(window);
                         }),
                     )
                     .child(if input_text.is_empty() {
@@ -169,25 +169,25 @@ impl ArcadiaRoot {
                         let key = event.keystroke.key.as_str();
                         let mods = event.keystroke.modifiers;
                         if key == "backspace" {
-                            this.late_compose_text.pop();
+                            this.late.compose_text.pop();
                             cx.notify();
                         } else if key == "enter" || key == "return" {
-                            let body = this.late_compose_text.trim().to_string();
+                            let body = this.late.compose_text.trim().to_string();
                             if !body.is_empty() {
                                 send_ws(format!(
                                     r#"{{"type":"send","room_id":{room},"body":{}}}"#,
                                     serde_json::json!(body)
                                 ));
-                                this.late_compose_text.clear();
+                                this.late.compose_text.clear();
                                 cx.notify();
                             }
                         } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
                             if let Some(key_char) = &event.keystroke.key_char {
-                                this.late_compose_text.push_str(key_char);
+                                this.late.compose_text.push_str(key_char);
                                 cx.notify();
                             }
                         } else if key == "space" {
-                            this.late_compose_text.push(' ');
+                            this.late.compose_text.push(' ');
                             cx.notify();
                         }
                     })),
@@ -206,13 +206,13 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            let body = this.late_compose_text.trim().to_string();
+                            let body = this.late.compose_text.trim().to_string();
                             if !body.is_empty() {
                                 send_ws(format!(
                                     r#"{{"type":"send","room_id":{room},"body":{}}}"#,
                                     serde_json::json!(body)
                                 ));
-                                this.late_compose_text.clear();
+                                this.late.compose_text.clear();
                                 cx.notify();
                             }
                         }),

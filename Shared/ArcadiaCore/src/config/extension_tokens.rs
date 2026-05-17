@@ -11,7 +11,7 @@ use toml::Value;
 use super::config_root_dir;
 use super::modules::{LEGACY_TERMINAL_THEME_EXTENSION_IDS, TERMINAL_THEME_EXTENSION_ID};
 
-use crate::modules::python_registry::{GlyphParams, StyleTokenKind};
+use crate::modules::python_registry::{ExtensionStyleParams, StyleTokenKind};
 
 /// Sanitize extension id for use as a config filename segment.
 pub fn sanitize_extension_id(module: &str) -> String {
@@ -147,7 +147,7 @@ fn value_as_glyph_color_string(v: &Value) -> Option<String> {
     }
 }
 
-fn apply_glyph_token_key(g: &mut GlyphParams, key: &str, v: &Value) {
+fn apply_glyph_token_key(g: &mut ExtensionStyleParams, key: &str, v: &Value) {
     match key {
         "bg" => {
             if let Some(s) = value_as_glyph_color_string(v) {
@@ -228,13 +228,13 @@ fn apply_glyph_token_key(g: &mut GlyphParams, key: &str, v: &Value) {
     }
 }
 
-/// Apply saved token file entries onto glyph params. Only keys that map to [`GlyphParams`] are used;
+/// Apply saved token file entries onto glyph params. Only keys that map to [`ExtensionStyleParams`] are used;
 /// other keys are for custom / future use and stay in the file.
 ///
 /// Any `*_dark` / `*_light` token variants are mode-specific overrides applied after their
 /// base token (when present), so each color scheme can have independent values per key.
 pub fn apply_file_tokens_to_glyph(
-    g: &mut GlyphParams,
+    g: &mut ExtensionStyleParams,
     file: &HashMap<String, Value>,
     is_dark: bool,
 ) {

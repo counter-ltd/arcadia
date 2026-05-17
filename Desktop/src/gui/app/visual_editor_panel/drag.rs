@@ -19,12 +19,12 @@ fn within_subtree(zone: &[usize], dragged: &[usize]) -> bool {
 
 impl ArcadiaRoot {
     fn visual_drag_idx(&self) -> Option<usize> {
-        if self.visual_editor_tabs.is_empty() {
+        if self.visual_editor.tabs.is_empty() {
             None
         } else {
             Some(
-                self.active_visual_editor_tab
-                    .min(self.visual_editor_tabs.len() - 1),
+                self.visual_editor.active_tab
+                    .min(self.visual_editor.tabs.len() - 1),
             )
         }
     }
@@ -34,7 +34,7 @@ impl ArcadiaRoot {
 
     /// Window-space height of the top-level stack `k` from last frame's bounds.
     fn stack_height(&self, k: usize) -> f32 {
-        self.visual_editor_block_bounds
+        self.visual_editor.block_bounds
             .borrow()
             .iter()
             .find(|(p, _)| p.as_slice() == [k])
@@ -46,7 +46,7 @@ impl ArcadiaRoot {
     /// that shift-drag carries along with the lead block.
     fn attached_chain_below(&self, idx: usize, lead: usize) -> Vec<usize> {
         const TOL: f32 = 10.0;
-        let positions = self.visual_editor_tabs[idx].block_positions.clone();
+        let positions = self.visual_editor.tabs[idx].block_positions.clone();
         let mut chain = Vec::new();
         let mut cur = lead;
         while let Some(&(cx, cy)) = positions.get(cur) {
@@ -79,7 +79,7 @@ impl ArcadiaRoot {
     ) {
         // Pointer offset within the grabbed block, from last frame's bounds.
         let (grab_x, grab_y) = self
-            .visual_editor_block_bounds
+            .visual_editor.block_bounds
             .borrow()
             .iter()
             .find(|(p, _)| p == &path)
@@ -94,7 +94,7 @@ impl ArcadiaRoot {
             (true, Some(idx), Some(&k)) => self.attached_chain_below(idx, k),
             _ => Vec::new(),
         };
-        self.visual_editor_drag = Some(VisualDrag {
+        self.visual_editor.drag = Some(VisualDrag {
             path,
             origin: pointer,
             cursor: pointer,
@@ -108,7 +108,7 @@ impl ArcadiaRoot {
     /// Track the pointer; promote a pending press to an active drag once it
     /// moves past the threshold.
     pub(super) fn update_visual_drag(&mut self, pointer: Point<Pixels>) {
-        if let Some(drag) = self.visual_editor_drag.as_mut() {
+        if let Some(drag) = self.visual_editor.drag.as_mut() {
             drag.cursor = pointer;
             if !drag.active {
                 let dx = f32::from(pointer.x) - f32::from(drag.origin.x);
@@ -129,7 +129,7 @@ impl ArcadiaRoot {
         dragged: &[usize],
     ) -> Option<(Vec<usize>, usize)> {
         let target = {
-            let zones = self.visual_editor_drop_zones.borrow();
+            let zones = self.visual_editor.drop_zones.borrow();
             zones
                 .iter()
                 .filter(|z| z.bounds.contains(&cursor))
@@ -137,7 +137,7 @@ impl ArcadiaRoot {
                 .max_by_key(|z| z.path.len())
                 .map(|z| z.path.clone())?
         };
-        let bounds = self.visual_editor_block_bounds.borrow();
+        let bounds = self.visual_editor.block_bounds.borrow();
         let mut ci = 0usize;
         loop {
             let mut child = target.clone();
@@ -157,7 +157,7 @@ impl ArcadiaRoot {
     /// Finish a drag: reparent into a compound mouth or reposition on the free
     /// canvas, then re-derive top-level source order from stack y-positions.
     pub(super) fn finish_visual_drag(&mut self) {
-        let Some(drag) = self.visual_editor_drag.take() else {
+        let Some(drag) = self.visual_editor.drag.take() else {
             return;
         };
         // A press that never moved is a click — selection already happened on
@@ -181,13 +181,13 @@ impl ArcadiaRoot {
             None
         };
 
-        let origin = *self.visual_editor_canvas_origin.borrow();
+        let origin = *self.visual_editor.canvas_origin.borrow();
         let drop_pos = (
             (f32::from(cursor.x) - f32::from(origin.x) - grab_x).max(0.0),
             (f32::from(cursor.y) - f32::from(origin.y) - grab_y).max(0.0),
         );
 
-        let content = self.visual_editor_tabs[idx].content.clone();
+        let content = self.visual_editor.tabs[idx].content.clone();
         let tree = parse::parse(&content);
         let Some(dragged) = tree.block_at(&path) else {
             return;
@@ -212,16 +212,16 @@ impl ArcadiaRoot {
                 let indent = format!("{}    ", codegen::indent_at(&content, tb.span.start));
                 let new_content = codegen::move_block(&content, ds, de, anchor, &indent);
                 if new_content != content {
-                    self.visual_editor_tabs[idx].content = new_content;
+                    self.visual_editor.tabs[idx].content = new_content;
                     if was_top {
                         if let Some(k) = path.first().copied() {
-                            let positions = &mut self.visual_editor_tabs[idx].block_positions;
+                            let positions = &mut self.visual_editor.tabs[idx].block_positions;
                             if k < positions.len() {
                                 positions.remove(k);
                             }
                         }
                     }
-                    self.visual_editor_selected = None;
+                    self.visual_editor.selected = None;
                 }
             }
             None => {
@@ -238,16 +238,16 @@ impl ArcadiaRoot {
                                 self.place_group(idx, k, &followers, drop_pos);
                             }
                         }
-                        self.visual_editor_selected = None;
+                        self.visual_editor.selected = None;
                     }
                 } else {
                     // Promote a nested block to a top-level stack.
                     let anchor = content.len();
                     let new_content = codegen::move_block(&content, ds, de, anchor, "");
                     if new_content != content {
-                        self.visual_editor_tabs[idx].content = new_content;
-                        self.visual_editor_tabs[idx].block_positions.push(drop_pos);
-                        self.visual_editor_selected = None;
+                        self.visual_editor.tabs[idx].content = new_content;
+                        self.visual_editor.tabs[idx].block_positions.push(drop_pos);
+                        self.visual_editor.selected = None;
                     }
                 }
             }
@@ -255,10 +255,10 @@ impl ArcadiaRoot {
 
         self.resort_visual_top_level(idx);
         self.save_visual_editor_session();
-        if let Some(path) = self.visual_editor_tabs[idx].file_path.clone() {
+        if let Some(path) = self.visual_editor.tabs[idx].file_path.clone() {
             visual_editor::save_block_positions(
                 &path,
-                &self.visual_editor_tabs[idx].block_positions,
+                &self.visual_editor.tabs[idx].block_positions,
             );
         }
     }
@@ -274,7 +274,7 @@ impl ArcadiaRoot {
     ) -> Option<(usize, bool)> {
         const SNAP: f32 = 28.0;
         let dragged_h = self.stack_height(lead);
-        let positions = self.visual_editor_tabs[idx].block_positions.clone();
+        let positions = self.visual_editor.tabs[idx].block_positions.clone();
         let mut best: Option<(usize, bool, f32)> = None;
         for (other, opos) in positions.iter().enumerate() {
             if exclude.contains(&other) || (pos.0 - opos.0).abs() >= SNAP {
@@ -296,7 +296,7 @@ impl ArcadiaRoot {
     /// Walk up to the top of the flush stack containing top-level block `k`.
     fn stack_top(&self, idx: usize, k: usize) -> usize {
         const TOL: f32 = 10.0;
-        let positions = self.visual_editor_tabs[idx].block_positions.clone();
+        let positions = self.visual_editor.tabs[idx].block_positions.clone();
         let mut cur = k;
         loop {
             let Some(&(cx, cy)) = positions.get(cur) else {
@@ -341,7 +341,7 @@ impl ArcadiaRoot {
             members.insert(at, g);
         }
 
-        let positions = self.visual_editor_tabs[idx].block_positions.clone();
+        let positions = self.visual_editor.tabs[idx].block_positions.clone();
         let anchor_x = positions.get(sibling).map(|p| p.0).unwrap_or(40.0);
         let anchor_y = members
             .iter()
@@ -355,7 +355,7 @@ impl ArcadiaRoot {
         };
 
         let heights: Vec<f32> = members.iter().map(|&m| self.stack_height(m)).collect();
-        let positions = &mut self.visual_editor_tabs[idx].block_positions;
+        let positions = &mut self.visual_editor.tabs[idx].block_positions;
         let mut y = anchor_y;
         for (i, &m) in members.iter().enumerate() {
             if m < positions.len() {
@@ -376,7 +376,7 @@ impl ArcadiaRoot {
     ) {
         let lead_h = self.stack_height(lead);
         let follower_h: Vec<f32> = followers.iter().map(|&f| self.stack_height(f)).collect();
-        let positions = &mut self.visual_editor_tabs[idx].block_positions;
+        let positions = &mut self.visual_editor.tabs[idx].block_positions;
         if lead < positions.len() {
             positions[lead] = lead_pos;
         }
@@ -392,18 +392,18 @@ impl ArcadiaRoot {
     /// Reconcile the positions list, then re-emit top-level blocks top-to-bottom
     /// by y so the source order always matches the visual layout.
     fn resort_visual_top_level(&mut self, idx: usize) {
-        let content = self.visual_editor_tabs[idx].content.clone();
+        let content = self.visual_editor.tabs[idx].content.clone();
         let tree = parse::parse(&content);
         let n = tree.root.children.len();
         {
-            let positions = &mut self.visual_editor_tabs[idx].block_positions;
+            let positions = &mut self.visual_editor.tabs[idx].block_positions;
             while positions.len() < n {
                 let i = positions.len();
                 positions.push((40.0, 40.0 + i as f32 * 150.0));
             }
             positions.truncate(n);
         }
-        let positions = self.visual_editor_tabs[idx].block_positions.clone();
+        let positions = self.visual_editor.tabs[idx].block_positions.clone();
         let mut order: Vec<usize> = (0..n).collect();
         order.sort_by(|&a, &b| {
             positions[a]
@@ -420,8 +420,8 @@ impl ArcadiaRoot {
                 rewritten.push_str(&content[s..e]);
                 rewritten.push('\n');
             }
-            self.visual_editor_tabs[idx].content = rewritten;
-            self.visual_editor_tabs[idx].block_positions =
+            self.visual_editor.tabs[idx].content = rewritten;
+            self.visual_editor.tabs[idx].block_positions =
                 order.iter().map(|&oi| positions[oi]).collect();
         }
     }

@@ -46,7 +46,7 @@ pub struct GlyphBorderTypography {
     pub side_rail_px: Option<f32>,
 }
 
-/// Repeating horizontal / vertical border sequences from [`GlyphParams`] (spaces = gaps).
+/// Repeating horizontal / vertical border sequences from [`ExtensionStyleParams`] (spaces = gaps).
 #[derive(Clone)]
 pub struct GlyphBorderPatterns {
     pub horizontal: Option<String>,
@@ -59,17 +59,17 @@ pub struct ActiveGlyphStyle(pub Option<GlyphStyleConfig>);
 
 impl Global for ActiveGlyphStyle {}
 
-/// Active border typography from the Python style’s [`arcadia_core::modules::python_registry::GlyphParams`].
+/// Active border typography from the Python style’s [`arcadia_core::modules::python_registry::ExtensionStyleParams`].
 pub struct ActiveGlyphBorderTypography(pub Option<GlyphBorderTypography>);
 
 impl Global for ActiveGlyphBorderTypography {}
 
-/// Active dashed / alternating border patterns from [`GlyphParams`].
+/// Active dashed / alternating border patterns from [`ExtensionStyleParams`].
 pub struct ActiveGlyphBorderPatterns(pub Option<GlyphBorderPatterns>);
 
 impl Global for ActiveGlyphBorderPatterns {}
 
-/// Active global UI font family from [`GlyphParams::ui_font_family`].
+/// Active global UI font family from [`ExtensionStyleParams::ui_font_family`].
 pub struct ActiveGlyphUiFontFamily(pub Option<String>);
 
 impl Global for ActiveGlyphUiFontFamily {}

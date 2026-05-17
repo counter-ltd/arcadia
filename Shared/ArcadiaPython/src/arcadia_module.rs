@@ -37,7 +37,7 @@ fn glyph_from_fields(
     border_font_size_rems: Option<f32>,
     border_side_rail_px: Option<f32>,
     border_radius: f32,
-) -> Option<python_registry::GlyphParams> {
+) -> Option<python_registry::ExtensionStyleParams> {
     let has_glyph = bg.is_some()
         || surface.is_some()
         || surface2.is_some()
@@ -54,7 +54,7 @@ fn glyph_from_fields(
         || border_side_rail_px.is_some();
 
     if has_glyph {
-        Some(python_registry::GlyphParams {
+        Some(python_registry::ExtensionStyleParams {
             bg,
             surface,
             surface2,

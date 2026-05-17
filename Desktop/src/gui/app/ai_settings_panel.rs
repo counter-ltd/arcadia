@@ -23,7 +23,7 @@ impl ArcadiaRoot {
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
         let provider_available = is_ai_provider_available(&self.module_rows);
-        let system_prompt = self.ai_default_system_prompt.clone();
+        let system_prompt = self.ai.default_system_prompt.clone();
 
         let mut root = div()
             .w_full()
@@ -160,15 +160,15 @@ impl ArcadiaRoot {
                                 .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| {
                                     let key = &ev.keystroke.key;
                                     if key == "backspace" {
-                                        this.ai_default_system_prompt.pop();
+                                        this.ai.default_system_prompt.pop();
                                     } else if key == "enter" {
-                                        this.ai_default_system_prompt.push('\n');
+                                        this.ai.default_system_prompt.push('\n');
                                     } else if ev.keystroke.key.len() == 1
                                         && !ev.keystroke.modifiers.platform
                                     {
                                         let ch = ev.keystroke.key.chars().next().unwrap();
                                         if !ch.is_control() {
-                                            this.ai_default_system_prompt.push(ch);
+                                            this.ai.default_system_prompt.push(ch);
                                         }
                                     }
                                     this.save_ai_settings();
@@ -181,7 +181,7 @@ impl ArcadiaRoot {
 
     fn save_ai_settings(&self) {
         let mut cfg = AiConfig::load_or_create().unwrap_or_default();
-        cfg.default_system_prompt = self.ai_default_system_prompt.clone();
+        cfg.default_system_prompt = self.ai.default_system_prompt.clone();
         let _ = cfg.save();
     }
 }

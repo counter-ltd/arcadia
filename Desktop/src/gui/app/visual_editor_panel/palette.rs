@@ -20,15 +20,15 @@ impl ArcadiaRoot {
     /// Splice `snippet` into the active tab. Insertion target: the body of the
     /// selected compound block, after the selected leaf, or end of file.
     pub(super) fn visual_editor_insert_block(&mut self, snippet: &str) {
-        if self.visual_editor_tabs.is_empty() {
+        if self.visual_editor.tabs.is_empty() {
             return;
         }
         let idx = self
-            .active_visual_editor_tab
-            .min(self.visual_editor_tabs.len() - 1);
-        let content = self.visual_editor_tabs[idx].content.clone();
+            .visual_editor.active_tab
+            .min(self.visual_editor.tabs.len() - 1);
+        let content = self.visual_editor.tabs[idx].content.clone();
 
-        let (anchor, indent) = match &self.visual_editor_selected {
+        let (anchor, indent) = match &self.visual_editor.selected {
             Some(path) => {
                 let tree = parse::parse(&content);
                 match tree.block_at(path) {
@@ -44,7 +44,7 @@ impl ArcadiaRoot {
         };
 
         let updated = codegen::insert_block(&content, anchor, &indent, snippet);
-        self.visual_editor_tabs[idx].content = updated;
+        self.visual_editor.tabs[idx].content = updated;
         self.save_visual_editor_session();
     }
 

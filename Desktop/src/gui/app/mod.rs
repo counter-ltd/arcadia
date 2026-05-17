@@ -373,6 +373,127 @@ pub enum PendingPermissionGrant {
     },
 }
 
+pub struct CodeEditorUiState {
+    pub show_indentation_marks: bool,
+    pub auto_indent: bool,
+    pub auto_close: bool,
+    pub undo_enabled: bool,
+    pub line_commands: bool,
+    pub cursor_style: arcadia_core::config::code_editor::CursorStyle,
+    pub undo: code_editor_panel::EditorUndoMap,
+    pub workspace_picker_open: bool,
+    pub undo_history_open: bool,
+    pub explorer_open: bool,
+    pub explorer_expanded: std::collections::HashSet<String>,
+    pub char_width_override: Option<f32>,
+    pub char_width_draft: String,
+    pub char_width_editing: bool,
+    pub tabs: Vec<CodeEditorTab>,
+    pub active_tab: usize,
+    pub next_id: usize,
+    pub focus: FocusHandle,
+    pub char_width_focus: FocusHandle,
+    pub context_menu_open: bool,
+    pub show_dashboard: bool,
+    pub tab_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
+    pub close_confirm: Option<usize>,
+    pub line_bounds: Rc<RefCell<Vec<Bounds<Pixels>>>>,
+    pub is_dragging: bool,
+}
+
+pub struct LateUiState {
+    pub compose_focus: FocusHandle,
+    pub poll_task_started: bool,
+    pub last_revision: u64,
+    pub active_room: u32,
+    pub compose_text: String,
+    pub settings_server_url: String,
+    pub settings_username: String,
+    pub settings_default_room: String,
+    pub settings_feedback: String,
+    pub settings_server_url_focus: FocusHandle,
+    pub settings_username_focus: FocusHandle,
+    pub settings_default_room_focus: FocusHandle,
+}
+
+pub struct VisualEditorUiState {
+    pub tabs: Vec<VisualEditorTab>,
+    pub active_tab: usize,
+    pub next_id: usize,
+    pub focus: FocusHandle,
+    pub show_dashboard: bool,
+    pub workspace_picker_open: bool,
+    pub explorer_open: bool,
+    pub explorer_expanded: std::collections::HashSet<String>,
+    pub selected: Option<Vec<usize>>,
+    pub edit_draft: String,
+    pub edit_caret: usize,
+    pub input_focus: FocusHandle,
+    pub palette_open: bool,
+    pub drag: Option<VisualDrag>,
+    pub canvas_origin: Rc<RefCell<openframe::Point<openframe::Pixels>>>,
+    pub drop_zones: Rc<RefCell<Vec<DropZone>>>,
+    pub block_bounds: Rc<RefCell<Vec<(Vec<usize>, Bounds<Pixels>)>>>,
+}
+
+pub struct AiUiState {
+    pub chats: Vec<AiChat>,
+    pub active_chat_id: usize,
+    pub next_id: usize,
+    pub chat_show_dashboard: bool,
+    pub context_menu_open: bool,
+    pub chat_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
+    pub session_menu: Option<(String, openframe::Point<openframe::Pixels>)>,
+    pub session_rename: Option<(String, String)>,
+    pub rename_focus: FocusHandle,
+    pub input_focus: FocusHandle,
+    pub default_system_prompt: String,
+    pub chat_model_id: Option<String>,
+    pub chat_model_picker_open: bool,
+    pub chat_workspace_id: Option<String>,
+    pub chat_workspace_picker_open: bool,
+    pub runtime: Option<ai_runtime::AiRuntimeHandle>,
+    pub stream_chat_id: Option<usize>,
+    pub poll_task_started: bool,
+    pub active_rule_ids: Vec<String>,
+    pub active_skill_ids: Vec<String>,
+    pub rule_picker_open: bool,
+    pub skill_picker_open: bool,
+    pub sessions: Vec<AiSessionSummary>,
+    pub pending_edits: Vec<AiPendingEdit>,
+    pub diff_panel_open: bool,
+    pub stage_writes: bool,
+    pub active_provider_module: String,
+    pub detected_cli_providers: Vec<arcadia_core::modules::ai_exec_cli::DetectedCliProvider>,
+    pub llama_cpp_models: Vec<arcadia_core::config::llama_cpp::LlamaCppModel>,
+    pub ollama_endpoint: String,
+    pub ollama_models: Vec<arcadia_core::config::ollama::OllamaModel>,
+    pub ollama_discovering: bool,
+    pub openai_providers: Vec<arcadia_core::config::openai::OpenAiProvider>,
+    pub active_openai_provider_id: Option<String>,
+    pub openai_provider_edit_draft: Option<OpenAiProviderDraft>,
+    pub openai_edit_name_focus: FocusHandle,
+    pub openai_edit_api_key_focus: FocusHandle,
+    pub openai_edit_base_url_focus: FocusHandle,
+    pub openai_provider_delete_confirm: bool,
+    pub openai_create_draft: Option<OpenAiProviderDraft>,
+    pub openai_create_name_focus: FocusHandle,
+    pub openai_create_api_key_focus: FocusHandle,
+    pub openai_create_base_url_focus: FocusHandle,
+    pub active_llama_cpp_model_id: Option<String>,
+    pub llama_cpp_provider_menu: Option<openframe::Point<openframe::Pixels>>,
+    pub ollama_provider_menu: Option<openframe::Point<openframe::Pixels>>,
+    pub llama_cpp_create_draft: Option<LlamaCppModelCreateDraft>,
+    pub llama_cpp_create_name_focus: FocusHandle,
+    pub llama_cpp_create_path_focus: FocusHandle,
+    pub llama_cpp_create_mmproj_focus: FocusHandle,
+    pub llama_cpp_edit_draft: Option<LlamaCppModelCreateDraft>,
+    pub llama_cpp_edit_name_focus: FocusHandle,
+    pub llama_cpp_edit_path_focus: FocusHandle,
+    pub llama_cpp_edit_mmproj_focus: FocusHandle,
+    pub llama_cpp_delete_confirm: bool,
+}
+
 #[cfg(feature = "gui")]
 pub struct TerminalInstance {
     pub label: String,
@@ -440,146 +561,11 @@ pub struct ArcadiaRoot {
     pub shortcut_create_label_focus: FocusHandle,
     pub shortcut_create_token_focus: FocusHandle,
     pub shortcut_create_args_focus: FocusHandle,
-    pub code_editor_show_indentation_marks: bool,
-    pub code_editor_auto_indent: bool,
-    pub code_editor_auto_close: bool,
-    pub code_editor_undo_enabled: bool,
-    pub code_editor_line_commands: bool,
-    pub code_editor_cursor_style: arcadia_core::config::code_editor::CursorStyle,
-    pub code_editor_undo: code_editor_panel::EditorUndoMap,
-    pub code_editor_workspace_picker_open: bool,
-    pub code_editor_undo_history_open: bool,
-    pub code_editor_explorer_open: bool,
-    pub code_editor_explorer_expanded: std::collections::HashSet<String>,
-    pub code_editor_char_width_override: Option<f32>,
-    pub code_editor_char_width_draft: String,
-    pub code_editor_char_width_editing: bool,
-    pub code_editor_tabs: Vec<CodeEditorTab>,
-    pub active_code_editor_tab: usize,
-    pub code_editor_next_id: usize,
-    pub code_editor_focus: FocusHandle,
-    pub code_editor_char_width_focus: FocusHandle,
-    pub code_editor_context_menu_open: bool,
-    pub code_editor_show_dashboard: bool,
-    pub code_editor_tab_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
-    pub code_editor_close_confirm: Option<usize>,
-    pub code_editor_line_bounds: Rc<RefCell<Vec<Bounds<Pixels>>>>,
-    pub code_editor_is_dragging: bool,
-    pub visual_editor_tabs: Vec<VisualEditorTab>,
-    pub active_visual_editor_tab: usize,
-    pub visual_editor_next_id: usize,
-    pub visual_editor_focus: FocusHandle,
-    pub visual_editor_show_dashboard: bool,
-    pub visual_editor_workspace_picker_open: bool,
-    pub visual_editor_explorer_open: bool,
-    pub visual_editor_explorer_expanded: std::collections::HashSet<String>,
-    /// Child-index path of the selected block in the active tab, if any.
-    pub visual_editor_selected: Option<Vec<usize>>,
-    /// Inline-editor draft for the selected block's source line.
-    pub visual_editor_edit_draft: String,
-    /// Caret byte offset within `visual_editor_edit_draft`.
-    pub visual_editor_edit_caret: usize,
-    pub visual_editor_input_focus: FocusHandle,
-    pub visual_editor_palette_open: bool,
-    /// Active free-canvas drag, if a block is being dragged.
-    pub visual_editor_drag: Option<VisualDrag>,
-    /// Window-space origin of the free-canvas area, captured each frame for
-    /// pointer → canvas-space coordinate conversion.
-    pub visual_editor_canvas_origin: Rc<RefCell<openframe::Point<openframe::Pixels>>>,
-    /// Compound-block mouth drop targets, repopulated every frame.
-    pub visual_editor_drop_zones: Rc<RefCell<Vec<DropZone>>>,
-    /// Window-space bounds of every rendered block, keyed by path, repopulated
-    /// every frame — used to compute the grab offset when a drag starts.
-    pub visual_editor_block_bounds: Rc<RefCell<Vec<(Vec<usize>, Bounds<Pixels>)>>>,
-    pub ai_chats: Vec<AiChat>,
-    pub active_ai_chat_id: usize,
-    pub ai_next_id: usize,
-    pub ai_chat_show_dashboard: bool,
-    pub ai_context_menu_open: bool,
-    pub ai_chat_menu: Option<(usize, openframe::Point<openframe::Pixels>)>,
-    /// Right-click context menu on a persisted session item (session_id, position).
-    pub ai_session_menu: Option<(String, openframe::Point<openframe::Pixels>)>,
-    /// Inline rename state for a session (session_id, draft_title).
-    pub ai_session_rename: Option<(String, String)>,
-    pub ai_rename_focus: FocusHandle,
-    pub ai_input_focus: FocusHandle,
-    pub ai_default_system_prompt: String,
-    /// Model selected for use in chat (model ID string).
-    pub ai_chat_model_id: Option<String>,
-    /// Whether the model picker dropdown is open.
-    pub ai_chat_model_picker_open: bool,
-    /// Workspace scoping the AI chat context (workspace ID string).
-    pub ai_chat_workspace_id: Option<String>,
-    /// Whether the workspace picker dropdown is open.
-    pub ai_chat_workspace_picker_open: bool,
-    /// Unified AI inference runtime (lazy-started on first send, shared across providers).
-    pub ai_runtime: Option<ai_runtime::AiRuntimeHandle>,
-    /// Which chat ID is currently receiving streamed tokens.
-    pub ai_stream_chat_id: Option<usize>,
-    /// Whether the 50ms inference poll task is running.
-    pub ai_poll_task_started: bool,
-    /// Active rule IDs for the current chat session.
-    pub ai_active_rule_ids: Vec<String>,
-    /// Active skill IDs for the current chat session.
-    pub ai_active_skill_ids: Vec<String>,
-    /// Whether the rule picker popover is open.
-    pub ai_rule_picker_open: bool,
-    /// Whether the skill picker popover is open.
-    pub ai_skill_picker_open: bool,
-    /// Index of past chat sessions (loaded on startup, refreshed on save).
-    pub ai_sessions: Vec<AiSessionSummary>,
-    /// Staged file edits awaiting user approval.
-    pub ai_pending_edits: Vec<AiPendingEdit>,
-    /// Whether the diff review panel is open.
-    pub ai_diff_panel_open: bool,
-    /// Whether AI write tools stage edits for review rather than writing directly.
-    pub ai_stage_writes: bool,
-    /// Module name of the provider selected in the Models sidebar (e.g. `"ai-provider-llama-cpp"`).
-    pub active_ai_provider_module: String,
-    /// CLI AI providers detected on PATH at startup (claude, codex, gemini, aider, …).
-    pub detected_cli_providers: Vec<arcadia_core::modules::ai_exec_cli::DetectedCliProvider>,
-    /// Models loaded from llama-cpp.toml.
-    pub llama_cpp_models: Vec<arcadia_core::config::llama_cpp::LlamaCppModel>,
-    /// Endpoint URL for Ollama (loaded from ollama.toml).
-    pub ollama_endpoint: String,
-    /// Models discovered from the running Ollama instance (merged with ollama.toml on discovery).
-    pub ollama_models: Vec<arcadia_core::config::ollama::OllamaModel>,
-    /// True while a background /api/tags discovery call is in flight.
-    pub ollama_discovering: bool,
-    /// OpenAI-compatible providers loaded from openai.toml.
-    pub openai_providers: Vec<arcadia_core::config::openai::OpenAiProvider>,
-    /// Provider selected in the OpenAI detail/edit view (None = list view).
-    pub active_openai_provider_id: Option<String>,
-    /// Edit draft for the active provider (Some = editing mode).
-    pub openai_provider_edit_draft: Option<OpenAiProviderDraft>,
-    pub openai_edit_name_focus: FocusHandle,
-    pub openai_edit_api_key_focus: FocusHandle,
-    pub openai_edit_base_url_focus: FocusHandle,
-    /// Confirm-delete state for the active provider.
-    pub openai_provider_delete_confirm: bool,
-    /// Create draft for a new provider (Some = create form visible).
-    pub openai_create_draft: Option<OpenAiProviderDraft>,
-    pub openai_create_name_focus: FocusHandle,
-    pub openai_create_api_key_focus: FocusHandle,
-    pub openai_create_base_url_focus: FocusHandle,
+    pub code_editor: CodeEditorUiState,
+    pub visual_editor: VisualEditorUiState,
+    pub ai: AiUiState,
     /// Workspace entries loaded from workspace.toml — refreshed on module reload.
     pub workspace_entries: Vec<arcadia_core::config::workspace::WorkspaceEntry>,
-    /// ID of the model sub-item selected under llama.cpp in the sidebar.
-    pub active_llama_cpp_model_id: Option<String>,
-    /// Right-click context menu on the llama.cpp provider sidebar item.
-    pub llama_cpp_provider_menu: Option<openframe::Point<openframe::Pixels>>,
-    /// Right-click context menu on the Ollama provider sidebar item.
-    pub ollama_provider_menu: Option<openframe::Point<openframe::Pixels>>,
-    /// Draft state for Create Model modal.
-    pub llama_cpp_create_draft: Option<LlamaCppModelCreateDraft>,
-    pub llama_cpp_create_name_focus: FocusHandle,
-    pub llama_cpp_create_path_focus: FocusHandle,
-    pub llama_cpp_create_mmproj_focus: FocusHandle,
-    pub llama_cpp_edit_draft: Option<LlamaCppModelCreateDraft>,
-    pub llama_cpp_edit_name_focus: FocusHandle,
-    pub llama_cpp_edit_path_focus: FocusHandle,
-    pub llama_cpp_edit_mmproj_focus: FocusHandle,
-    pub llama_cpp_delete_confirm: bool,
     pub workspace_create_draft: Option<WorkspaceCreateDraft>,
     pub workspace_create_label_focus: FocusHandle,
     pub workspace_create_path_focus: FocusHandle,
@@ -618,7 +604,7 @@ pub struct ArcadiaRoot {
     pub session_route_menu_position: openframe::Point<openframe::Pixels>,
     #[cfg(feature = "gui")]
     pub shell_focus: FocusHandle,
-    pub late_compose_focus: FocusHandle,
+    pub late: LateUiState,
     /// Shared blink phase for focused single-line text fields (shell, compose, settings inputs).
     pub text_caret_blink_visible: bool,
     pub text_caret_blink_task_started: bool,
@@ -674,17 +660,6 @@ pub struct ArcadiaRoot {
     /// detected port + raw error) to recover generically without per-service GUI code.
     pub pending_port_kill_prompt: Option<PendingPortKill>,
     pub lan_poll_task_started: bool,
-    pub late_poll_task_started: bool,
-    pub late_last_revision: u64,
-    pub late_active_room: u32,
-    pub late_compose_text: String,
-    pub late_settings_server_url: String,
-    pub late_settings_username: String,
-    pub late_settings_default_room: String,
-    pub late_settings_feedback: String,
-    pub late_settings_server_url_focus: FocusHandle,
-    pub late_settings_username_focus: FocusHandle,
-    pub late_settings_default_room_focus: FocusHandle,
     /// Styling extension token values for Appearance (`module_id`, `token_key`).
     pub extension_token_values: HashMap<(String, String), String>,
     pub extension_token_editing: Option<(String, String)>,
@@ -770,7 +745,7 @@ impl ArcadiaRoot {
         use arcadia_core::config::code_editor::{CodeEditorSession, PersistedTab};
         use arcadia_core::config::ConfigFile;
         let tabs = self
-            .code_editor_tabs
+            .code_editor.tabs
             .iter()
             .map(|t| PersistedTab {
                 id: t.id,
@@ -786,8 +761,8 @@ impl ArcadiaRoot {
             })
             .collect();
         let _ = CodeEditorSession {
-            active_tab: self.active_code_editor_tab,
-            next_id: self.code_editor_next_id,
+            active_tab: self.code_editor.active_tab,
+            next_id: self.code_editor.next_id,
             tabs,
         }
         .save();
@@ -797,7 +772,7 @@ impl ArcadiaRoot {
         use arcadia_core::config::visual_editor::{PersistedVisualTab, VisualEditorSession};
         use arcadia_core::config::ConfigFile;
         let tabs = self
-            .visual_editor_tabs
+            .visual_editor.tabs
             .iter()
             .map(|t| PersistedVisualTab {
                 id: t.id,
@@ -812,8 +787,8 @@ impl ArcadiaRoot {
             })
             .collect();
         let _ = VisualEditorSession {
-            active_tab: self.active_visual_editor_tab,
-            next_id: self.visual_editor_next_id,
+            active_tab: self.visual_editor.active_tab,
+            next_id: self.visual_editor.next_id,
             tabs,
         }
         .save();

@@ -20,12 +20,12 @@ impl ArcadiaRoot {
         let accent = theme::ui_accent(cx);
         let accent_fg = theme::ui_accent_fg(cx);
 
-        let pending_count = self.ai_pending_edits.len();
+        let pending_count = self.ai.pending_edits.len();
 
         // Outer panel: fixed right side or bottom bar.
         let mut edit_list = div().flex().flex_col().gap_4().p_4();
 
-        for (edit_idx, edit) in self.ai_pending_edits.iter().enumerate() {
+        for (edit_idx, edit) in self.ai.pending_edits.iter().enumerate() {
             let path = edit.path.clone();
             let _all_resolved = edit
                 .hunks
@@ -82,7 +82,7 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
+                                    if let Some(edit) = this.ai.pending_edits.get_mut(edit_idx) {
                                         for h in &edit.hunks {
                                             edit.accepted.insert(h.index);
                                         }
@@ -107,7 +107,7 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx) {
+                                    if let Some(edit) = this.ai.pending_edits.get_mut(edit_idx) {
                                         for h in &edit.hunks {
                                             edit.rejected.insert(h.index);
                                         }
@@ -202,7 +202,7 @@ impl ArcadiaRoot {
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
-                                        if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx)
+                                        if let Some(edit) = this.ai.pending_edits.get_mut(edit_idx)
                                         {
                                             edit.accepted.insert(hunk_idx);
                                         }
@@ -226,7 +226,7 @@ impl ArcadiaRoot {
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
-                                        if let Some(edit) = this.ai_pending_edits.get_mut(edit_idx)
+                                        if let Some(edit) = this.ai.pending_edits.get_mut(edit_idx)
                                         {
                                             edit.rejected.insert(hunk_idx);
                                         }
@@ -281,7 +281,7 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(|this, _, _, cx| {
-                                    this.ai_diff_panel_open = false;
+                                    this.ai.diff_panel_open = false;
                                     cx.notify();
                                 }),
                             ),
@@ -299,7 +299,7 @@ impl ArcadiaRoot {
 
     /// Apply accepted hunks to disk if all hunks in an edit are resolved, then remove it.
     pub(crate) fn apply_edit_if_resolved(&mut self, edit_idx: usize, cx: &mut Context<Self>) {
-        let Some(edit) = self.ai_pending_edits.get(edit_idx) else {
+        let Some(edit) = self.ai.pending_edits.get(edit_idx) else {
             return;
         };
         let all_resolved = edit.hunks.is_empty()
@@ -319,7 +319,7 @@ impl ArcadiaRoot {
         // Write to disk if any hunk was accepted.
         if any_accepted {
             let workspace_ctx: Option<AiWorkspaceContext> =
-                self.ai_chat_workspace_id.as_deref().and_then(|ws_id| {
+                self.ai.chat_workspace_id.as_deref().and_then(|ws_id| {
                     self.workspace_entries
                         .iter()
                         .find(|w| w.id == ws_id)
@@ -332,9 +332,9 @@ impl ArcadiaRoot {
         }
 
         // Remove the resolved edit.
-        self.ai_pending_edits.remove(edit_idx);
-        if self.ai_pending_edits.is_empty() {
-            self.ai_diff_panel_open = false;
+        self.ai.pending_edits.remove(edit_idx);
+        if self.ai.pending_edits.is_empty() {
+            self.ai.diff_panel_open = false;
         }
         cx.notify();
     }

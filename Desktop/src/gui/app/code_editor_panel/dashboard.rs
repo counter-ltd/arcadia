@@ -97,8 +97,8 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
-                            let id = this.code_editor_next_id;
-                            this.code_editor_tabs.push(CodeEditorTab {
+                            let id = this.code_editor.next_id;
+                            this.code_editor.tabs.push(CodeEditorTab {
                                 id,
                                 title: format!("untitled-{id}"),
                                 content: String::new(),
@@ -114,13 +114,13 @@ impl ArcadiaRoot {
                                 cached_lines: vec![],
                                 cached_line_byte_starts: vec![],
                             });
-                            this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
-                            this.code_editor_next_id += 1;
+                            this.code_editor.active_tab = this.code_editor.tabs.len() - 1;
+                            this.code_editor.next_id += 1;
                             this.active_page_id = "editor.main".to_string();
                             this.sync_settings_hub_expanded_from_active_page();
-                            this.code_editor_show_dashboard = false;
+                            this.code_editor.show_dashboard = false;
                             this.save_editor_session();
-                            this.code_editor_focus.focus(window);
+                            this.code_editor.focus.focus(window);
                             cx.notify();
                         }),
                     )
@@ -134,7 +134,7 @@ impl ArcadiaRoot {
             rgb(0xf0f2f5)
         };
         let editor_cards: Vec<AnyElement> = self
-            .code_editor_tabs
+            .code_editor.tabs
             .iter()
             .enumerate()
             .map(|(tab_idx, tab)| {
@@ -164,7 +164,7 @@ impl ArcadiaRoot {
                     }
                     v
                 };
-                let fh_card = self.code_editor_focus.clone();
+                let fh_card = self.code_editor.focus.clone();
                 div()
                     .flex_1()
                     .min_w(px(220.))
@@ -180,8 +180,8 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
-                            this.active_code_editor_tab = tab_idx;
-                            this.code_editor_show_dashboard = false;
+                            this.code_editor.active_tab = tab_idx;
+                            this.code_editor.show_dashboard = false;
                             this.active_page_id = "editor.main".to_string();
                             this.sync_settings_hub_expanded_from_active_page();
                             fh_card.focus(window);

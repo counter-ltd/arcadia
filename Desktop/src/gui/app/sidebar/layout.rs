@@ -562,12 +562,12 @@ impl ArcadiaRoot {
                                     }
                                     #[cfg(feature = "gui")]
                                     if page_id == "editor.main" {
-                                        for i in 0..self.code_editor_tabs.len() {
-                                            let label = self.code_editor_tabs[i].title.clone();
+                                        for i in 0..self.code_editor.tabs.len() {
+                                            let label = self.code_editor.tabs[i].title.clone();
                                             let is_sub_active = is_page_active
-                                                && self.active_code_editor_tab == i
-                                                && !self.code_editor_show_dashboard;
-                                            let ws_label = self.code_editor_tabs[i]
+                                                && self.code_editor.active_tab == i
+                                                && !self.code_editor.show_dashboard;
+                                            let ws_label = self.code_editor.tabs[i]
                                                 .workspace_path
                                                 .as_deref()
                                                 .map(|p| {
@@ -610,9 +610,9 @@ impl ArcadiaRoot {
                                                 .cursor_pointer()
                                                 .hover(|d| d.text_color(dim_hover))
                                                 .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                                    let id = this.code_editor_next_id;
+                                                    let id = this.code_editor.next_id;
                                                     let title = format!("untitled-{id}");
-                                                    this.code_editor_tabs.push(crate::gui::app::CodeEditorTab {
+                                                    this.code_editor.tabs.push(crate::gui::app::CodeEditorTab {
                                                         id,
                                                         title,
                                                         content: String::new(),
@@ -628,11 +628,11 @@ impl ArcadiaRoot {
                                                         cached_lines: vec![],
                                                         cached_line_byte_starts: vec![],
                                                     });
-                                                    this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
-                                                    this.code_editor_next_id += 1;
+                                                    this.code_editor.active_tab = this.code_editor.tabs.len() - 1;
+                                                    this.code_editor.next_id += 1;
                                                     this.active_page_id = "editor.main".to_string();
                                                     this.sync_settings_hub_expanded_from_active_page();
-                                                    this.code_editor_focus.focus(window);
+                                                    this.code_editor.focus.focus(window);
                                                     cx.notify();
                                                 }))
                                                 .child("Click to Create")
@@ -641,12 +641,12 @@ impl ArcadiaRoot {
                                     }
                                     #[cfg(feature = "gui")]
                                     if page_id == "editor.visual" {
-                                        for i in 0..self.visual_editor_tabs.len() {
-                                            let label = self.visual_editor_tabs[i].title.clone();
+                                        for i in 0..self.visual_editor.tabs.len() {
+                                            let label = self.visual_editor.tabs[i].title.clone();
                                             let is_sub_active = is_page_active
-                                                && self.active_visual_editor_tab == i
-                                                && !self.visual_editor_show_dashboard;
-                                            let ws_label = self.visual_editor_tabs[i]
+                                                && self.visual_editor.active_tab == i
+                                                && !self.visual_editor.show_dashboard;
+                                            let ws_label = self.visual_editor.tabs[i]
                                                 .workspace_path
                                                 .as_deref()
                                                 .map(|p| {
@@ -689,9 +689,9 @@ impl ArcadiaRoot {
                                                 .cursor_pointer()
                                                 .hover(|d| d.text_color(dim_hover))
                                                 .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
-                                                    let id = this.visual_editor_next_id;
+                                                    let id = this.visual_editor.next_id;
                                                     let title = format!("untitled-{id}");
-                                                    this.visual_editor_tabs.push(crate::gui::app::VisualEditorTab {
+                                                    this.visual_editor.tabs.push(crate::gui::app::VisualEditorTab {
                                                         id,
                                                         title,
                                                         content: String::new(),
@@ -700,13 +700,13 @@ impl ArcadiaRoot {
                                                         saved_content: String::new(),
                                                         block_positions: Vec::new(),
                                                     });
-                                                    this.active_visual_editor_tab = this.visual_editor_tabs.len() - 1;
-                                                    this.visual_editor_next_id += 1;
+                                                    this.visual_editor.active_tab = this.visual_editor.tabs.len() - 1;
+                                                    this.visual_editor.next_id += 1;
                                                     this.active_page_id = "editor.visual".to_string();
-                                                    this.visual_editor_show_dashboard = false;
+                                                    this.visual_editor.show_dashboard = false;
                                                     this.sync_settings_hub_expanded_from_active_page();
                                                     this.save_visual_editor_session();
-                                                    this.visual_editor_focus.focus(window);
+                                                    this.visual_editor.focus.focus(window);
                                                     cx.notify();
                                                 }))
                                                 .child("Click to Create")
@@ -727,8 +727,8 @@ impl ArcadiaRoot {
                                             let module_name = provider.module_name.to_string();
                                             let label = provider.display_name.to_string();
                                             let is_sub_active = is_page_active
-                                                && self.active_ai_provider_module == provider.module_name
-                                                && self.active_llama_cpp_model_id.is_none();
+                                                && self.ai.active_provider_module == provider.module_name
+                                                && self.ai.active_llama_cpp_model_id.is_none();
                                             let provider_icon = arcadia_core::config::modules::MODULE_REGISTRY.iter()
                                                 .find(|m| m.name == provider.module_name)
                                                 .map(|m| m.glyph)
@@ -750,12 +750,12 @@ impl ArcadiaRoot {
                                                 );
                                             }
                                             if module_name == arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME {
-                                                for model in &self.llama_cpp_models {
+                                                for model in &self.ai.llama_cpp_models {
                                                     let model_id = model.id.clone();
                                                     let model_label = model.name.clone();
                                                     let model_icon = model.model_kind.icon_key();
                                                     let is_model_active = is_page_active
-                                                        && self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
+                                                        && self.ai.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
                                                     let model_ha = *self.item_hover_alphas.get(&format!("llamamod:{}", model.id)).unwrap_or(&0.0);
                                                     items.push(
                                                         Self::sidebar_llama_cpp_model_sub_item(
@@ -777,8 +777,8 @@ impl ArcadiaRoot {
                                         // Single "CLI" parent item for all exec-CLI providers.
                                         if has_cli {
                                             let any_cli_active = is_page_active
-                                                && arcadia_core::modules::ai::is_cli_provider(&self.active_ai_provider_module)
-                                                && self.active_llama_cpp_model_id.is_none();
+                                                && arcadia_core::modules::ai::is_cli_provider(&self.ai.active_provider_module)
+                                                && self.ai.active_llama_cpp_model_id.is_none();
                                             let first_cli_module = cli_providers[0].module_name.to_string();
                                             let cli_parent_ha = *self.item_hover_alphas.get(&format!("aiprov:{}", first_cli_module)).unwrap_or(&0.0);
                                             items.push(
@@ -798,8 +798,8 @@ impl ArcadiaRoot {
                                                 let module_name = cli_provider.module_name.to_string();
                                                 let label = arcadia_core::modules::ai::cli_display_name(cli_provider.module_name).to_string();
                                                 let is_cli_sub_active = is_page_active
-                                                    && self.active_ai_provider_module == cli_provider.module_name
-                                                    && self.active_llama_cpp_model_id.is_none();
+                                                    && self.ai.active_provider_module == cli_provider.module_name
+                                                    && self.ai.active_llama_cpp_model_id.is_none();
                                                 let cli_ha = *self.item_hover_alphas.get(&format!("cliprov:{}", module_name)).unwrap_or(&0.0);
                                                 items.push(
                                                     Self::sidebar_cli_provider_sub_item(
@@ -817,13 +817,13 @@ impl ArcadiaRoot {
                                         }
                                     }
                                     if page_id == "ai.chat" {
-                                        let active_session_id = self.ai_chats.iter()
-                                            .find(|c| c.id == self.active_ai_chat_id)
+                                        let active_session_id = self.ai.chats.iter()
+                                            .find(|c| c.id == self.ai.active_chat_id)
                                             .and_then(|c| c.session_id.clone());
 
                                         // Unsaved in-memory chats (no session_id yet)
                                         let ws_cfg_mem = arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok();
-                                        for chat in &self.ai_chats {
+                                        for chat in &self.ai.chats {
                                             if chat.session_id.is_some() {
                                                 continue;
                                             }
@@ -834,8 +834,8 @@ impl ArcadiaRoot {
                                                 chat.title.clone()
                                             };
                                             let is_sub_active = is_page_active
-                                                && self.active_ai_chat_id == chat.id
-                                                && !self.ai_chat_show_dashboard;
+                                                && self.ai.active_chat_id == chat.id
+                                                && !self.ai.chat_show_dashboard;
                                             let chat_provider_icon: &'static str = arcadia_core::config::modules::MODULE_REGISTRY.iter()
                                                 .find(|m| m.name == chat.session_provider.as_str())
                                                 .map(|m| m.glyph)
@@ -868,17 +868,17 @@ impl ArcadiaRoot {
                                         }
 
                                         let ws_cfg_ses = arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok();
-                                        for session in &self.ai_sessions {
+                                        for session in &self.ai.sessions {
                                             let session_id = session.id.clone();
                                             let session_id_rc = session.id.clone();
                                             let is_sub_active = is_page_active
                                                 && active_session_id.as_deref() == Some(session.id.as_str())
-                                                && !self.ai_chat_show_dashboard;
-                                            let is_renaming = self.ai_session_rename
+                                                && !self.ai.chat_show_dashboard;
+                                            let is_renaming = self.ai.session_rename
                                                 .as_ref()
                                                 .map(|(id, _)| id == &session.id)
                                                 .unwrap_or(false);
-                                            let rename_draft = self.ai_session_rename
+                                            let rename_draft = self.ai.session_rename
                                                 .as_ref()
                                                 .filter(|(id, _)| id == &session.id)
                                                 .map(|(_, d)| d.clone())
@@ -911,7 +911,7 @@ impl ArcadiaRoot {
                                             let ses_active_a = if is_sub_active || is_renaming { 1.0_f32 } else { 0.0_f32 };
                                             let text_col = crate::gui::app::sidebar::nav_items::nav_item_text(idle_text, pal.icon_active, ses_active_a, ses_ha);
                                             let radius = glyph.as_ref().map(|g| g.border_radius).unwrap_or(6.0_f32);
-                                            let rename_focus = self.ai_rename_focus.clone();
+                                            let rename_focus = self.ai.rename_focus.clone();
                                             let ses_item_key_hover = ses_item_key.clone();
                                             let mut item = div()
                                                     .id(openframe::SharedString::from(ses_item_key))
@@ -947,14 +947,14 @@ impl ArcadiaRoot {
                                                 item = item
                                                     .track_focus(&rename_focus)
                                                     .on_key_down(cx.listener(move |this, ev: &openframe::KeyDownEvent, _, cx| {
-                                                        let Some((ref id, ref mut _draft)) = this.ai_session_rename else { return; };
+                                                        let Some((ref id, ref mut _draft)) = this.ai.session_rename else { return; };
                                                         if id != &session_id_rc { return; }
                                                         match ev.keystroke.key.as_str() {
                                                             "escape" => {
-                                                                this.ai_session_rename = None;
+                                                                this.ai.session_rename = None;
                                                             }
                                                             "enter" | "return" => {
-                                                                if let Some((ref sid, ref title)) = this.ai_session_rename.clone() {
+                                                                if let Some((ref sid, ref title)) = this.ai.session_rename.clone() {
                                                                     let sid = sid.clone();
                                                                     let title = title.clone();
                                                                     if !title.is_empty() {
@@ -962,22 +962,22 @@ impl ArcadiaRoot {
                                                                             s.title = title.clone();
                                                                             let _ = arcadia_core::modules::ai_chat_store::save_session(&s);
                                                                         }
-                                                                        for chat in &mut this.ai_chats {
+                                                                        for chat in &mut this.ai.chats {
                                                                             if chat.session_id.as_deref() == Some(&sid) {
                                                                                 chat.title = title.clone();
                                                                             }
                                                                         }
                                                                         if let Ok(summaries) = arcadia_core::modules::ai_chat_store::list_sessions() {
-                                                                            this.ai_sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
+                                                                            this.ai.sessions = summaries.into_iter().map(|s| crate::gui::app::AiSessionSummary {
                                                                                 id: s.id, title: s.title, updated_at: s.updated_at, provider: s.provider, workspace_id: s.workspace_id, last_messages: s.last_messages,
                                                                             }).collect();
                                                                         }
                                                                     }
-                                                                    this.ai_session_rename = None;
+                                                                    this.ai.session_rename = None;
                                                                 }
                                                             }
                                                             "backspace" => {
-                                                                if let Some((_, ref mut d)) = this.ai_session_rename { d.pop(); }
+                                                                if let Some((_, ref mut d)) = this.ai.session_rename { d.pop(); }
                                                             }
                                                             _ => {
                                                                 if !ev.keystroke.modifiers.platform
@@ -986,7 +986,7 @@ impl ArcadiaRoot {
                                                                     && !ev.keystroke.modifiers.function
                                                                 {
                                                                     if let Some(kc) = &ev.keystroke.key_char {
-                                                                        if let Some((_, ref mut d)) = this.ai_session_rename { d.push_str(kc); }
+                                                                        if let Some((_, ref mut d)) = this.ai.session_rename { d.push_str(kc); }
                                                                     }
                                                                 }
                                                             }
@@ -997,17 +997,17 @@ impl ArcadiaRoot {
                                                 let session_id_left = session_id.clone();
                                                 item = item
                                                     .on_mouse_down(openframe::MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                                        if let Some(existing) = this.ai_chats.iter().find(|c| c.session_id.as_deref() == Some(session_id_left.as_str())) {
-                                                            this.active_ai_chat_id = existing.id;
+                                                        if let Some(existing) = this.ai.chats.iter().find(|c| c.session_id.as_deref() == Some(session_id_left.as_str())) {
+                                                            this.ai.active_chat_id = existing.id;
                                                             this.active_page_id = "ai.chat".to_string();
                                                             this.sync_settings_hub_expanded_from_active_page();
-                                                            this.ai_chat_show_dashboard = false;
+                                                            this.ai.chat_show_dashboard = false;
                                                             cx.notify();
                                                             return;
                                                         }
                                                         if let Ok(stored) = arcadia_core::modules::ai_chat_store::load_session(&session_id_left) {
-                                                            let id = this.ai_next_id;
-                                                            this.ai_next_id += 1;
+                                                            let id = this.ai.next_id;
+                                                            this.ai.next_id += 1;
                                                             let messages = stored.messages.iter().map(|m| {
                                                                 let role = if m.role == "user" {
                                                                     crate::gui::app::AiMessageRole::User
@@ -1016,7 +1016,7 @@ impl ArcadiaRoot {
                                                                 };
                                                                 crate::gui::app::AiMessage { role, content: m.content.clone(), provider: stored.provider.clone() }
                                                             }).collect();
-                                                            this.ai_chats.push(crate::gui::app::AiChat {
+                                                            this.ai.chats.push(crate::gui::app::AiChat {
                                                                 id,
                                                                 title: stored.title.clone(),
                                                                 messages,
@@ -1027,20 +1027,20 @@ impl ArcadiaRoot {
                                                                 session_model_id: stored.model_id.clone(),
                                                                 workspace_id: stored.workspace_id.clone(),
                                                             });
-                                                            this.active_ai_chat_id = id;
+                                                            this.ai.active_chat_id = id;
                                                             this.active_page_id = "ai.chat".to_string();
                                                             this.sync_settings_hub_expanded_from_active_page();
-                                                            this.ai_chat_show_dashboard = false;
-                                                            this.ai_active_rule_ids = stored.active_rule_ids.clone();
-                                                            this.ai_active_skill_ids = stored.active_skill_ids.clone();
-                                                            this.ai_chat_workspace_id = stored.workspace_id.clone();
+                                                            this.ai.chat_show_dashboard = false;
+                                                            this.ai.active_rule_ids = stored.active_rule_ids.clone();
+                                                            this.ai.active_skill_ids = stored.active_skill_ids.clone();
+                                                            this.ai.chat_workspace_id = stored.workspace_id.clone();
                                                             cx.notify();
                                                         }
                                                     }))
                                                     .on_mouse_down(openframe::MouseButton::Right, cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
-                                                        this.ai_session_menu = Some((session_id.clone(), event.position));
-                                                        this.ai_context_menu_open = false;
-                                                        this.ai_chat_menu = None;
+                                                        this.ai.session_menu = Some((session_id.clone(), event.position));
+                                                        this.ai.context_menu_open = false;
+                                                        this.ai.chat_menu = None;
                                                         cx.notify();
                                                     }));
                                             }
@@ -1059,8 +1059,8 @@ impl ArcadiaRoot {
                                                 .cursor_pointer()
                                                 .hover(|d| d.text_color(dim_hover))
                                                 .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                    let id = this.ai_next_id;
-                                                    this.ai_chats.push(crate::gui::app::AiChat {
+                                                    let id = this.ai.next_id;
+                                                    this.ai.chats.push(crate::gui::app::AiChat {
                                                         id,
                                                         title: format!("Chat {id}"),
                                                         messages: vec![],
@@ -1071,11 +1071,11 @@ impl ArcadiaRoot {
                                                         session_model_id: String::new(),
                                                         workspace_id: None,
                                                     });
-                                                    this.active_ai_chat_id = id;
-                                                    this.ai_next_id += 1;
+                                                    this.ai.active_chat_id = id;
+                                                    this.ai.next_id += 1;
                                                     this.active_page_id = "ai.chat".to_string();
                                                     this.sync_settings_hub_expanded_from_active_page();
-                                                    this.ai_chat_show_dashboard = false;
+                                                    this.ai.chat_show_dashboard = false;
                                                     cx.notify();
                                                 }))
                                                 .child("Click to Create")

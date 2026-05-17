@@ -21,7 +21,7 @@ impl ArcadiaRoot {
         let g_snap = theme::glyph_snapshot(cx);
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
-        let active_ids = self.ai_active_rule_ids.clone();
+        let active_ids = self.ai.active_rule_ids.clone();
         let cfg = AiRulesConfig::load_or_create().unwrap_or_default();
         let all = all_rules(&cfg);
         let q = self.rules_search_query.trim().to_ascii_lowercase();
@@ -194,10 +194,10 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    if this.ai_active_rule_ids.contains(&rule_id_toggle) {
-                                        this.ai_active_rule_ids.retain(|id| id != &rule_id_toggle);
+                                    if this.ai.active_rule_ids.contains(&rule_id_toggle) {
+                                        this.ai.active_rule_ids.retain(|id| id != &rule_id_toggle);
                                     } else {
-                                        this.ai_active_rule_ids.push(rule_id_toggle.clone());
+                                        this.ai.active_rule_ids.push(rule_id_toggle.clone());
                                     }
                                     cx.notify();
                                 }),

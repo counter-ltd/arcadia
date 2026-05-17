@@ -285,21 +285,21 @@ fn toggle_comment(tab: &mut CodeEditorTab, lang: Option<&str>) -> bool {
 impl ArcadiaRoot {
     /// Run an editor command fired by the shortcut system (`editor.*`).
     pub(crate) fn editor_run_command(&mut self, control_id: &str) {
-        if self.code_editor_tabs.is_empty() {
+        if self.code_editor.tabs.is_empty() {
             return;
         }
         let idx = self
-            .active_code_editor_tab
-            .min(self.code_editor_tabs.len() - 1);
-        let tab_id = self.code_editor_tabs[idx].id;
+            .code_editor.active_tab
+            .min(self.code_editor.tabs.len() - 1);
+        let tab_id = self.code_editor.tabs[idx].id;
 
         match control_id {
             "editor.undo" | "editor.redo" => {
-                if !self.code_editor_undo_enabled {
+                if !self.code_editor.undo_enabled {
                     return;
                 }
-                let undo = self.code_editor_undo.entry(tab_id).or_default();
-                let tab = &self.code_editor_tabs[idx];
+                let undo = self.code_editor.undo.entry(tab_id).or_default();
+                let tab = &self.code_editor.tabs[idx];
                 let current = (tab.content.clone(), tab.cursor, tab.selection_anchor);
                 let restored = if control_id == "editor.undo" {
                     undo.step_back(current)
@@ -308,7 +308,7 @@ impl ArcadiaRoot {
                 };
                 undo.coalescing = false;
                 if let Some((content, cursor, anchor)) = restored {
-                    let tab = &mut self.code_editor_tabs[idx];
+                    let tab = &mut self.code_editor.tabs[idx];
                     tab.content = content;
                     tab.cursor = cursor.min(tab.content.len());
                     tab.selection_anchor = anchor;
@@ -317,7 +317,7 @@ impl ArcadiaRoot {
                 }
             }
             "editor.save" => {
-                let tab = &mut self.code_editor_tabs[idx];
+                let tab = &mut self.code_editor.tabs[idx];
                 if let Some(path) = tab.file_path.clone() {
                     if std::fs::write(&path, &tab.content).is_ok() {
                         tab.saved_content = tab.content.clone();
@@ -326,15 +326,15 @@ impl ArcadiaRoot {
                 self.save_editor_session();
             }
             _ => {
-                if !self.code_editor_line_commands {
+                if !self.code_editor.line_commands {
                     return;
                 }
-                let lang = self.code_editor_tabs[idx].language.clone();
+                let lang = self.code_editor.tabs[idx].language.clone();
                 let before = {
-                    let t = &self.code_editor_tabs[idx];
+                    let t = &self.code_editor.tabs[idx];
                     (t.content.clone(), t.cursor, t.selection_anchor)
                 };
-                let tab = &mut self.code_editor_tabs[idx];
+                let tab = &mut self.code_editor.tabs[idx];
                 let changed = match control_id {
                     "editor.select_line" => {
                         select_line(tab);
@@ -351,8 +351,8 @@ impl ArcadiaRoot {
                 };
                 if changed {
                     tab.highlight_dirty = true;
-                    if self.code_editor_undo_enabled {
-                        let u = self.code_editor_undo.entry(tab_id).or_default();
+                    if self.code_editor.undo_enabled {
+                        let u = self.code_editor.undo.entry(tab_id).or_default();
                         u.push(before);
                         u.coalescing = false;
                     }
@@ -365,15 +365,15 @@ impl ArcadiaRoot {
     /// Apply `steps` undo (or redo when `redo` is true) operations at once —
     /// drives the undo-history popup so a click can jump multiple steps.
     pub(crate) fn editor_undo_jump(&mut self, redo: bool, steps: usize) {
-        if self.code_editor_tabs.is_empty() || steps == 0 || !self.code_editor_undo_enabled {
+        if self.code_editor.tabs.is_empty() || steps == 0 || !self.code_editor.undo_enabled {
             return;
         }
         let idx = self
-            .active_code_editor_tab
-            .min(self.code_editor_tabs.len() - 1);
-        let tab_id = self.code_editor_tabs[idx].id;
-        let undo = self.code_editor_undo.entry(tab_id).or_default();
-        let tab = &self.code_editor_tabs[idx];
+            .code_editor.active_tab
+            .min(self.code_editor.tabs.len() - 1);
+        let tab_id = self.code_editor.tabs[idx].id;
+        let undo = self.code_editor.undo.entry(tab_id).or_default();
+        let tab = &self.code_editor.tabs[idx];
         let mut current = (tab.content.clone(), tab.cursor, tab.selection_anchor);
         let mut restored = None;
         for _ in 0..steps {
@@ -392,7 +392,7 @@ impl ArcadiaRoot {
         }
         undo.coalescing = false;
         if let Some((content, cursor, anchor)) = restored {
-            let tab = &mut self.code_editor_tabs[idx];
+            let tab = &mut self.code_editor.tabs[idx];
             tab.content = content;
             tab.cursor = cursor.min(tab.content.len());
             tab.selection_anchor = anchor;

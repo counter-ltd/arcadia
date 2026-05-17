@@ -75,8 +75,8 @@ impl ArcadiaRoot {
                                     )
                             .child({
                                 if self.active_page_id.as_str() == "ai.chat"
-                                    && !self.ai_chat_show_dashboard
-                                    && !self.ai_chats.is_empty()
+                                    && !self.ai.chat_show_dashboard
+                                    && !self.ai.chats.is_empty()
                                 {
                                     let label = {
                                         use arcadia_core::config::modules::{
@@ -85,8 +85,8 @@ impl ArcadiaRoot {
                                             AI_EXEC_GEMINI_MODULE_NAME,
                                         };
                                         use arcadia_core::modules::ai::provider_display_name;
-                                        let provider = self.active_ai_provider_module.as_str();
-                                        let mid = self.ai_chat_model_id.as_deref();
+                                        let provider = self.ai.active_provider_module.as_str();
+                                        let mid = self.ai.chat_model_id.as_deref();
                                         // CLI providers and on-device providers: display name needs no model ID
                                         if matches!(provider, p if p == AI_EXEC_CLAUDE_MODULE_NAME
                                             || p == AI_EXEC_CODEX_MODULE_NAME
@@ -94,16 +94,16 @@ impl ArcadiaRoot {
                                             || p == AI_EXEC_AIDER_MODULE_NAME
                                             || p == AI_APFEL_MODULE_NAME)
                                         {
-                                            self.detected_cli_providers.iter()
+                                            self.ai.detected_cli_providers.iter()
                                                 .find(|c| c.id == provider)
                                                 .map(|c| c.label.clone())
                                                 .or_else(|| provider_display_name(provider).map(|s| s.to_string()))
                                                 .unwrap_or_else(|| provider.to_string())
                                         } else {
                                             mid.and_then(|id| {
-                                                self.llama_cpp_models.iter().find(|m| m.id == id).map(|m| m.name.clone())
-                                                    .or_else(|| self.ollama_models.iter().find(|m| m.id == id).map(|m| m.name.clone()))
-                                                    .or_else(|| self.openai_providers.iter().flat_map(|p| p.models.iter()).find(|m| m.id == id).map(|m| m.name.clone()))
+                                                self.ai.llama_cpp_models.iter().find(|m| m.id == id).map(|m| m.name.clone())
+                                                    .or_else(|| self.ai.ollama_models.iter().find(|m| m.id == id).map(|m| m.name.clone()))
+                                                    .or_else(|| self.ai.openai_providers.iter().flat_map(|p| p.models.iter()).find(|m| m.id == id).map(|m| m.name.clone()))
                                             })
                                             .unwrap_or_else(|| "No Model".to_string())
                                         }
@@ -121,7 +121,7 @@ impl ArcadiaRoot {
                                         .on_mouse_down(
                                             openframe::MouseButton::Left,
                                             cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                this.ai_chat_model_picker_open = !this.ai_chat_model_picker_open;
+                                                this.ai.chat_model_picker_open = !this.ai.chat_model_picker_open;
                                                 #[cfg(feature = "gui")]
                                                 { this.context_menu_position = event.position; }
                                                 #[cfg(not(feature = "gui"))]
@@ -136,11 +136,11 @@ impl ArcadiaRoot {
                             })
                             .child({
                                 if self.active_page_id.as_str() == "ai.chat"
-                                    && !self.ai_chat_show_dashboard
-                                    && !self.ai_chats.is_empty()
+                                    && !self.ai.chat_show_dashboard
+                                    && !self.ai.chats.is_empty()
                                     && self.is_module_enabled(arcadia_core::config::modules::WORKSPACE_MODULE_NAME)
                                 {
-                                    let ws_label = self.ai_chat_workspace_id
+                                    let ws_label = self.ai.chat_workspace_id
                                         .as_deref()
                                         .and_then(|id| {
                                             arcadia_core::config::workspace::WorkspacesConfig::load_or_create().ok()
@@ -161,8 +161,8 @@ impl ArcadiaRoot {
                                         .on_mouse_down(
                                             openframe::MouseButton::Left,
                                             cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                this.ai_chat_workspace_picker_open = !this.ai_chat_workspace_picker_open;
-                                                this.ai_chat_model_picker_open = false;
+                                                this.ai.chat_workspace_picker_open = !this.ai.chat_workspace_picker_open;
+                                                this.ai.chat_model_picker_open = false;
                                                 #[cfg(feature = "gui")]
                                                 { this.context_menu_position = event.position; }
                                                 #[cfg(not(feature = "gui"))]
@@ -294,7 +294,7 @@ impl ArcadiaRoot {
                                     .gap_1()
                                     .children(LATE_ROOMS.iter().map(|(label, room_id)| {
                                         let rid = *room_id;
-                                        let is_active = rid == self.late_active_room;
+                                        let is_active = rid == self.late.active_room;
                                         div()
                                             .cursor_pointer()
                                             .px_2()
@@ -323,7 +323,7 @@ impl ArcadiaRoot {
                                             .on_mouse_down(
                                                 openframe::MouseButton::Left,
                                                 cx.listener(move |this, _, _, cx| {
-                                                    this.late_active_room = rid;
+                                                    this.late.active_room = rid;
                                                     arcadia_core::modules::late::send_ws(
                                                         format!(r#"{{"type":"subscribe","room_id":{rid}}}"#),
                                                     );
@@ -338,12 +338,12 @@ impl ArcadiaRoot {
                                 #[cfg(feature = "gui")]
                                 {
                                     if self.active_page_id.as_str() == "editor.main"
-                                        && !self.code_editor_tabs.is_empty()
-                                        && !self.code_editor_show_dashboard
+                                        && !self.code_editor.tabs.is_empty()
+                                        && !self.code_editor.show_dashboard
                                     {
-                                        let active_idx = self.active_code_editor_tab
-                                            .min(self.code_editor_tabs.len().saturating_sub(1));
-                                        let ws_label = self.code_editor_tabs
+                                        let active_idx = self.code_editor.active_tab
+                                            .min(self.code_editor.tabs.len().saturating_sub(1));
+                                        let ws_label = self.code_editor.tabs
                                             .get(active_idx)
                                             .and_then(|t| t.workspace_path.as_deref())
                                             .map(|p| {
@@ -359,15 +359,15 @@ impl ArcadiaRoot {
                                                         p.rsplit('/').next().unwrap_or(p).to_string()
                                                     })
                                             });
-                                        let has_file = self.code_editor_tabs
+                                        let has_file = self.code_editor.tabs
                                             .get(active_idx)
                                             .map(|t| t.file_path.is_some())
                                             .unwrap_or(false);
-                                        let is_dirty = self.code_editor_tabs
+                                        let is_dirty = self.code_editor.tabs
                                             .get(active_idx)
                                             .map(|t| t.file_path.is_some() && t.content != t.saved_content)
                                             .unwrap_or(false);
-                                        let has_explorer = self.code_editor_tabs
+                                        let has_explorer = self.code_editor.tabs
                                             .get(active_idx)
                                             .and_then(|t| t.workspace_path.as_deref())
                                             .map(|p| arcadia_core::config::workspace::any_workspace_grants(p, "workspace.read"))
@@ -403,8 +403,8 @@ impl ArcadiaRoot {
                                                     .on_mouse_down(
                                                         openframe::MouseButton::Left,
                                                         cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                            this.code_editor_workspace_picker_open =
-                                                                !this.code_editor_workspace_picker_open;
+                                                            this.code_editor.workspace_picker_open =
+                                                                !this.code_editor.workspace_picker_open;
                                                             this.context_menu_position = event.position;
                                                             cx.stop_propagation();
                                                             cx.notify();
@@ -418,8 +418,8 @@ impl ArcadiaRoot {
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                                this.code_editor_explorer_open =
-                                                                    !this.code_editor_explorer_open;
+                                                                this.code_editor.explorer_open =
+                                                                    !this.code_editor.explorer_open;
                                                                 this.context_menu_position = event.position;
                                                                 cx.stop_propagation();
                                                                 cx.notify();
@@ -454,9 +454,9 @@ impl ArcadiaRoot {
                                                                                 let lang = crate::gui::app::code_editor_panel::detect_language(&title);
                                                                                 cx.update(|_, app| {
                                                                                     this.update(app, |this, cx| {
-                                                                                        let idx = this.active_code_editor_tab
-                                                                                            .min(this.code_editor_tabs.len().saturating_sub(1));
-                                                                                        if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                                        let idx = this.code_editor.active_tab
+                                                                                            .min(this.code_editor.tabs.len().saturating_sub(1));
+                                                                                        if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                                                                             tab.saved_content = text.clone();
                                                                                             tab.content = text;
                                                                                             tab.file_path = Some(path_str);
@@ -485,9 +485,9 @@ impl ArcadiaRoot {
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, _, _, cx| {
-                                                                let idx = this.active_code_editor_tab
-                                                                    .min(this.code_editor_tabs.len().saturating_sub(1));
-                                                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                let idx = this.code_editor.active_tab
+                                                                    .min(this.code_editor.tabs.len().saturating_sub(1));
+                                                                if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                                                     if let Some(path) = tab.file_path.clone() {
                                                                         let _ = std::fs::write(&path, &tab.content);
                                                                         tab.saved_content = tab.content.clone();
@@ -505,13 +505,13 @@ impl ArcadiaRoot {
                                                     .on_mouse_down(
                                                         openframe::MouseButton::Left,
                                                         cx.listener(|this, _, window, cx| {
-                                                            let idx = this.active_code_editor_tab
-                                                                .min(this.code_editor_tabs.len().saturating_sub(1));
-                                                            let (content, suggested) = this.code_editor_tabs
+                                                            let idx = this.code_editor.active_tab
+                                                                .min(this.code_editor.tabs.len().saturating_sub(1));
+                                                            let (content, suggested) = this.code_editor.tabs
                                                                 .get(idx)
                                                                 .map(|t| (t.content.clone(), t.title.clone()))
                                                                 .unwrap_or_default();
-                                                            let init_dir = this.code_editor_tabs
+                                                            let init_dir = this.code_editor.tabs
                                                                 .get(idx)
                                                                 .and_then(|t| t.file_path.as_deref())
                                                                 .and_then(|p| std::path::Path::new(p).parent())
@@ -534,9 +534,9 @@ impl ArcadiaRoot {
                                                                         let lang = crate::gui::app::code_editor_panel::detect_language(&title);
                                                                         cx.update(|_, app| {
                                                                             this.update(app, |this, cx| {
-                                                                                let idx = this.active_code_editor_tab
-                                                                                    .min(this.code_editor_tabs.len().saturating_sub(1));
-                                                                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                                let idx = this.code_editor.active_tab
+                                                                                    .min(this.code_editor.tabs.len().saturating_sub(1));
+                                                                                if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                                                                     tab.file_path = Some(path_str);
                                                                                     tab.title = title;
                                                                                     tab.saved_content = tab.content.clone();
@@ -554,14 +554,14 @@ impl ArcadiaRoot {
                                                     )
                                             )
                                             // Undo history
-                                            .when(self.code_editor_undo_enabled, |row| {
+                                            .when(self.code_editor.undo_enabled, |row| {
                                                 row.child(
                                                     make_pill("History")
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                                this.code_editor_undo_history_open =
-                                                                    !this.code_editor_undo_history_open;
+                                                                this.code_editor.undo_history_open =
+                                                                    !this.code_editor.undo_history_open;
                                                                 this.context_menu_position = event.position;
                                                                 cx.stop_propagation();
                                                                 cx.notify();
@@ -576,9 +576,9 @@ impl ArcadiaRoot {
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, _, _, cx| {
-                                                                let idx = this.active_code_editor_tab
-                                                                    .min(this.code_editor_tabs.len().saturating_sub(1));
-                                                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                                let idx = this.code_editor.active_tab
+                                                                    .min(this.code_editor.tabs.len().saturating_sub(1));
+                                                                if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                                                     tab.content = tab.saved_content.clone();
                                                                     tab.cursor = 0;
                                                                     tab.selection_anchor = None;
@@ -600,12 +600,12 @@ impl ArcadiaRoot {
                                 #[cfg(feature = "gui")]
                                 {
                                     if self.active_page_id.as_str() == "editor.visual"
-                                        && !self.visual_editor_tabs.is_empty()
-                                        && !self.visual_editor_show_dashboard
+                                        && !self.visual_editor.tabs.is_empty()
+                                        && !self.visual_editor.show_dashboard
                                     {
-                                        let active_idx = self.active_visual_editor_tab
-                                            .min(self.visual_editor_tabs.len().saturating_sub(1));
-                                        let ws_label = self.visual_editor_tabs
+                                        let active_idx = self.visual_editor.active_tab
+                                            .min(self.visual_editor.tabs.len().saturating_sub(1));
+                                        let ws_label = self.visual_editor.tabs
                                             .get(active_idx)
                                             .and_then(|t| t.workspace_path.as_deref())
                                             .map(|p| {
@@ -621,15 +621,15 @@ impl ArcadiaRoot {
                                                         p.rsplit('/').next().unwrap_or(p).to_string()
                                                     })
                                             });
-                                        let has_file = self.visual_editor_tabs
+                                        let has_file = self.visual_editor.tabs
                                             .get(active_idx)
                                             .map(|t| t.file_path.is_some())
                                             .unwrap_or(false);
-                                        let is_dirty = self.visual_editor_tabs
+                                        let is_dirty = self.visual_editor.tabs
                                             .get(active_idx)
                                             .map(|t| t.file_path.is_some() && t.content != t.saved_content)
                                             .unwrap_or(false);
-                                        let has_explorer = self.visual_editor_tabs
+                                        let has_explorer = self.visual_editor.tabs
                                             .get(active_idx)
                                             .and_then(|t| t.workspace_path.as_deref())
                                             .map(|p| arcadia_core::config::workspace::any_workspace_grants(p, "workspace.read"))
@@ -664,8 +664,8 @@ impl ArcadiaRoot {
                                                     .on_mouse_down(
                                                         openframe::MouseButton::Left,
                                                         cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                            this.visual_editor_workspace_picker_open =
-                                                                !this.visual_editor_workspace_picker_open;
+                                                            this.visual_editor.workspace_picker_open =
+                                                                !this.visual_editor.workspace_picker_open;
                                                             this.context_menu_position = event.position;
                                                             cx.stop_propagation();
                                                             cx.notify();
@@ -678,8 +678,8 @@ impl ArcadiaRoot {
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
-                                                                this.visual_editor_explorer_open =
-                                                                    !this.visual_editor_explorer_open;
+                                                                this.visual_editor.explorer_open =
+                                                                    !this.visual_editor.explorer_open;
                                                                 this.context_menu_position = event.position;
                                                                 cx.stop_propagation();
                                                                 cx.notify();
@@ -692,8 +692,8 @@ impl ArcadiaRoot {
                                                     .on_mouse_down(
                                                         openframe::MouseButton::Left,
                                                         cx.listener(|this, _, _, cx| {
-                                                            this.visual_editor_palette_open =
-                                                                !this.visual_editor_palette_open;
+                                                            this.visual_editor.palette_open =
+                                                                !this.visual_editor.palette_open;
                                                             cx.stop_propagation();
                                                             cx.notify();
                                                         }),
@@ -724,9 +724,9 @@ impl ArcadiaRoot {
                                                                                     .unwrap_or_else(|| path_str.clone());
                                                                                 cx.update(|_, app| {
                                                                                     this.update(app, |this, cx| {
-                                                                                        let idx = this.active_visual_editor_tab
-                                                                                            .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                                                                        if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                                                                        let idx = this.visual_editor.active_tab
+                                                                                            .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                                                                        if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                                                                             tab.saved_content = text.clone();
                                                                                             tab.content = text;
                                                                                             tab.file_path = Some(path_str);
@@ -750,9 +750,9 @@ impl ArcadiaRoot {
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, _, _, cx| {
-                                                                let idx = this.active_visual_editor_tab
-                                                                    .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                                                if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                                                let idx = this.visual_editor.active_tab
+                                                                    .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                                                if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                                                     if let Some(path) = tab.file_path.clone() {
                                                                         let _ = std::fs::write(&path, &tab.content);
                                                                         tab.saved_content = tab.content.clone();
@@ -769,13 +769,13 @@ impl ArcadiaRoot {
                                                     .on_mouse_down(
                                                         openframe::MouseButton::Left,
                                                         cx.listener(|this, _, window, cx| {
-                                                            let idx = this.active_visual_editor_tab
-                                                                .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                                            let (content, suggested) = this.visual_editor_tabs
+                                                            let idx = this.visual_editor.active_tab
+                                                                .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                                            let (content, suggested) = this.visual_editor.tabs
                                                                 .get(idx)
                                                                 .map(|t| (t.content.clone(), t.title.clone()))
                                                                 .unwrap_or_default();
-                                                            let init_dir = this.visual_editor_tabs
+                                                            let init_dir = this.visual_editor.tabs
                                                                 .get(idx)
                                                                 .and_then(|t| t.file_path.as_deref())
                                                                 .and_then(|p| std::path::Path::new(p).parent())
@@ -797,9 +797,9 @@ impl ArcadiaRoot {
                                                                             .unwrap_or_else(|| path_str.clone());
                                                                         cx.update(|_, app| {
                                                                             this.update(app, |this, cx| {
-                                                                                let idx = this.active_visual_editor_tab
-                                                                                    .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                                                                if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                                                                let idx = this.visual_editor.active_tab
+                                                                                    .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                                                                if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                                                                     tab.file_path = Some(path_str);
                                                                                     tab.title = title;
                                                                                     tab.saved_content = tab.content.clone();
@@ -820,9 +820,9 @@ impl ArcadiaRoot {
                                                         .on_mouse_down(
                                                             openframe::MouseButton::Left,
                                                             cx.listener(|this, _, _, cx| {
-                                                                let idx = this.active_visual_editor_tab
-                                                                    .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                                                if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                                                let idx = this.visual_editor.active_tab
+                                                                    .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                                                if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                                                     tab.content = tab.saved_content.clone();
                                                                 }
                                                                 this.save_visual_editor_session();

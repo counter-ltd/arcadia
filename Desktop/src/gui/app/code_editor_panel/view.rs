@@ -21,21 +21,21 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
 
         let idx = self
-            .active_code_editor_tab
-            .min(self.code_editor_tabs.len().saturating_sub(1));
-        let cursor = self.code_editor_tabs[idx].cursor;
-        let selection_anchor = self.code_editor_tabs[idx].selection_anchor;
-        let tab_title = self.code_editor_tabs[idx].title.clone();
-        let language = self.code_editor_tabs[idx]
+            .code_editor.active_tab
+            .min(self.code_editor.tabs.len().saturating_sub(1));
+        let cursor = self.code_editor.tabs[idx].cursor;
+        let selection_anchor = self.code_editor.tabs[idx].selection_anchor;
+        let tab_title = self.code_editor.tabs[idx].title.clone();
+        let language = self.code_editor.tabs[idx]
             .language
             .clone()
             .or_else(|| detect_language(&tab_title));
-        let focused = self.code_editor_focus.is_focused(window);
+        let focused = self.code_editor.focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
 
         // Rebuild highlight + decoration caches (and line caches) only when content changed.
-        if self.code_editor_tabs[idx].highlight_dirty {
-            let content = &self.code_editor_tabs[idx].content;
+        if self.code_editor.tabs[idx].highlight_dirty {
+            let content = &self.code_editor.tabs[idx].content;
             let mut new_lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
             if new_lines.is_empty() || content.ends_with('\n') || content.is_empty() {
                 new_lines.push(String::new());
@@ -60,7 +60,7 @@ impl ArcadiaRoot {
                     python_registry::call_decoration_providers(&expanded, i)
                 })
                 .collect();
-            let tab = &mut self.code_editor_tabs[idx];
+            let tab = &mut self.code_editor.tabs[idx];
             tab.hl_spans = hl;
             tab.decorations = deco;
             tab.highlight_dirty = false;
@@ -70,8 +70,8 @@ impl ArcadiaRoot {
 
         // (line_idx, col_byte_in_line) for cursor — O(log N) via binary search.
         let cursor_line_col: Option<(usize, usize)> = if focused && blink {
-            let starts = &self.code_editor_tabs[idx].cached_line_byte_starts;
-            let cursor_clamped = cursor.min(self.code_editor_tabs[idx].content.len());
+            let starts = &self.code_editor.tabs[idx].cached_line_byte_starts;
+            let cursor_clamped = cursor.min(self.code_editor.tabs[idx].content.len());
             let line_idx = starts
                 .partition_point(|&s| s <= cursor_clamped)
                 .saturating_sub(1);
@@ -90,7 +90,7 @@ impl ArcadiaRoot {
             }
         });
 
-        let line_count = self.code_editor_tabs[idx].cached_lines.len();
+        let line_count = self.code_editor.tabs[idx].cached_lines.len();
         let gutter_w = if line_count >= 1000 {
             px(56.)
         } else if line_count >= 100 {
@@ -130,29 +130,29 @@ impl ArcadiaRoot {
         } else {
             rgb(0xbfdbfe)
         };
-        let show_marks = self.code_editor_show_indentation_marks;
+        let show_marks = self.code_editor.show_indentation_marks;
         let indent_guide_color = if is_dark {
             rgb(0x2d3748)
         } else {
             rgb(0xd1d5db)
         };
 
-        let char_width = self.code_editor_char_width_override.unwrap_or_else(|| {
+        let char_width = self.code_editor.char_width_override.unwrap_or_else(|| {
             let font_size = window.rem_size() * 0.875;
             let ts = window.text_system();
             let fid = ts.resolve_font(&font(MONO_FONT_FAMILY));
             ts.ch_advance(fid, font_size).map(f32::from).unwrap_or(8.4)
         });
-        let fh_click = self.code_editor_focus.clone();
-        let fh_click2 = self.code_editor_focus.clone();
-        let fh = self.code_editor_focus.clone();
-        let bounds_cell = self.code_editor_line_bounds.clone();
+        let fh_click = self.code_editor.focus.clone();
+        let fh_click2 = self.code_editor.focus.clone();
+        let fh = self.code_editor.focus.clone();
+        let bounds_cell = self.code_editor.line_bounds.clone();
 
         // Borrow cached data by reference — no per-frame heap allocation.
-        let line_byte_starts = &self.code_editor_tabs[idx].cached_line_byte_starts;
-        let hl_spans = &self.code_editor_tabs[idx].hl_spans;
-        let cached_decorations = &self.code_editor_tabs[idx].decorations;
-        let lines = &self.code_editor_tabs[idx].cached_lines;
+        let line_byte_starts = &self.code_editor.tabs[idx].cached_line_byte_starts;
+        let hl_spans = &self.code_editor.tabs[idx].hl_spans;
+        let cached_decorations = &self.code_editor.tabs[idx].decorations;
+        let lines = &self.code_editor.tabs[idx].cached_lines;
 
         let line_style = LineStyle {
             char_width,
@@ -163,7 +163,7 @@ impl ArcadiaRoot {
             indent_guide_color,
             show_indent_guides: show_marks,
             small: false,
-            cursor_style: self.code_editor_cursor_style,
+            cursor_style: self.code_editor.cursor_style,
         };
 
         let line_els: Vec<AnyElement> = lines
@@ -247,23 +247,23 @@ impl ArcadiaRoot {
                 }),
             )
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                if this.code_editor_tabs.is_empty() {
+                if this.code_editor.tabs.is_empty() {
                     return;
                 }
                 let idx = this
-                    .active_code_editor_tab
-                    .min(this.code_editor_tabs.len().saturating_sub(1));
-                let tab_id = this.code_editor_tabs[idx].id;
+                    .code_editor.active_tab
+                    .min(this.code_editor.tabs.len().saturating_sub(1));
+                let tab_id = this.code_editor.tabs[idx].id;
                 let ctx = super::edit::EditCtx {
-                    auto_indent: this.code_editor_auto_indent,
-                    auto_close: this.code_editor_auto_close,
-                    record_undo: this.code_editor_undo_enabled,
+                    auto_indent: this.code_editor.auto_indent,
+                    auto_close: this.code_editor.auto_close,
+                    record_undo: this.code_editor.undo_enabled,
                 };
-                let len_before = this.code_editor_tabs[idx].content.len();
-                let undo = this.code_editor_undo.entry(tab_id).or_default();
-                super::edit::apply_key(&mut this.code_editor_tabs[idx], undo, ctx, &event.keystroke);
-                if this.code_editor_tabs[idx].content.len() != len_before {
-                    this.code_editor_tabs[idx].highlight_dirty = true;
+                let len_before = this.code_editor.tabs[idx].content.len();
+                let undo = this.code_editor.undo.entry(tab_id).or_default();
+                super::edit::apply_key(&mut this.code_editor.tabs[idx], undo, ctx, &event.keystroke);
+                if this.code_editor.tabs[idx].content.len() != len_before {
+                    this.code_editor.tabs[idx].highlight_dirty = true;
                     this.save_editor_session();
                 }
                 cx.notify();
@@ -285,11 +285,11 @@ impl ArcadiaRoot {
                                 MouseButton::Left,
                                 cx.listener(move |this, event: &MouseDownEvent, window, cx| {
                                     let idx = this
-                                        .active_code_editor_tab
-                                        .min(this.code_editor_tabs.len().saturating_sub(1));
-                                    let bounds = this.code_editor_line_bounds.borrow();
+                                        .code_editor.active_tab
+                                        .min(this.code_editor.tabs.len().saturating_sub(1));
+                                    let bounds = this.code_editor.line_bounds.borrow();
                                     let byte_pos = pos_to_byte_offset(
-                                        &this.code_editor_tabs[idx].content,
+                                        &this.code_editor.tabs[idx].content,
                                         &bounds,
                                         event.position,
                                         gutter_w,
@@ -299,21 +299,21 @@ impl ArcadiaRoot {
 
                                     if event.click_count == 2 {
                                         let (ws, we) = word_bounds(
-                                            &this.code_editor_tabs[idx].content,
+                                            &this.code_editor.tabs[idx].content,
                                             byte_pos,
                                         );
-                                        this.code_editor_tabs[idx].selection_anchor = Some(ws);
-                                        this.code_editor_tabs[idx].cursor = we;
+                                        this.code_editor.tabs[idx].selection_anchor = Some(ws);
+                                        this.code_editor.tabs[idx].cursor = we;
                                     } else if event.modifiers.shift {
-                                        if this.code_editor_tabs[idx].selection_anchor.is_none() {
-                                            this.code_editor_tabs[idx].selection_anchor =
-                                                Some(this.code_editor_tabs[idx].cursor);
+                                        if this.code_editor.tabs[idx].selection_anchor.is_none() {
+                                            this.code_editor.tabs[idx].selection_anchor =
+                                                Some(this.code_editor.tabs[idx].cursor);
                                         }
-                                        this.code_editor_tabs[idx].cursor = byte_pos;
+                                        this.code_editor.tabs[idx].cursor = byte_pos;
                                     } else {
-                                        this.code_editor_tabs[idx].cursor = byte_pos;
-                                        this.code_editor_tabs[idx].selection_anchor = None;
-                                        this.code_editor_is_dragging = true;
+                                        this.code_editor.tabs[idx].cursor = byte_pos;
+                                        this.code_editor.tabs[idx].selection_anchor = None;
+                                        this.code_editor.is_dragging = true;
                                     }
                                     fh_click2.focus(window);
                                     cx.notify();
@@ -321,33 +321,33 @@ impl ArcadiaRoot {
                             )
                             .on_mouse_move(cx.listener(
                                 move |this, event: &MouseMoveEvent, _, cx| {
-                                    if !this.code_editor_is_dragging || !event.dragging() {
+                                    if !this.code_editor.is_dragging || !event.dragging() {
                                         return;
                                     }
                                     let idx = this
-                                        .active_code_editor_tab
-                                        .min(this.code_editor_tabs.len().saturating_sub(1));
-                                    if this.code_editor_tabs[idx].selection_anchor.is_none() {
-                                        this.code_editor_tabs[idx].selection_anchor =
-                                            Some(this.code_editor_tabs[idx].cursor);
+                                        .code_editor.active_tab
+                                        .min(this.code_editor.tabs.len().saturating_sub(1));
+                                    if this.code_editor.tabs[idx].selection_anchor.is_none() {
+                                        this.code_editor.tabs[idx].selection_anchor =
+                                            Some(this.code_editor.tabs[idx].cursor);
                                     }
-                                    let bounds = this.code_editor_line_bounds.borrow();
+                                    let bounds = this.code_editor.line_bounds.borrow();
                                     let byte_pos = pos_to_byte_offset(
-                                        &this.code_editor_tabs[idx].content,
+                                        &this.code_editor.tabs[idx].content,
                                         &bounds,
                                         event.position,
                                         gutter_w,
                                         char_width,
                                     );
                                     drop(bounds);
-                                    this.code_editor_tabs[idx].cursor = byte_pos;
+                                    this.code_editor.tabs[idx].cursor = byte_pos;
                                     cx.notify();
                                 },
                             ))
                             .on_mouse_up(
                                 MouseButton::Left,
                                 cx.listener(|this, _, _, _| {
-                                    this.code_editor_is_dragging = false;
+                                    this.code_editor.is_dragging = false;
                                 }),
                             )
                             .on_children_prepainted({

@@ -91,18 +91,10 @@ pub(super) fn nav_item_text(idle: Rgba, active: Rgba, active_alpha: f32, hover_a
 }
 
 fn ai_provider_accent(module_name: &str) -> &'static str {
-    use arcadia_core::config::modules::*;
-    match module_name {
-        AI_EXEC_CLAUDE_MODULE_NAME => "orange",
-        AI_EXEC_GEMINI_MODULE_NAME => "sky",
-        AI_EXEC_CODEX_MODULE_NAME => "cyan",
-        AI_OPENAI_MODULE_NAME => "emerald",
-        AI_EXEC_AIDER_MODULE_NAME => "emerald",
-        AI_LLAMA_CPP_MODULE_NAME => "amber",
-        AI_OLLAMA_MODULE_NAME => "cyan",
-        AI_APFEL_MODULE_NAME => "indigo",
-        _ => "violet",
-    }
+    arcadia_core::config::modules::ModulesConfig::manifest_for(module_name)
+        .map(|m| m.accent)
+        .filter(|a| !a.is_empty())
+        .unwrap_or("violet")
 }
 
 // ---------------------------------------------------------------------------
@@ -640,14 +632,14 @@ impl ArcadiaRoot {
                     this.active_page_id = page_id_left.clone();
                     #[cfg(feature = "gui")]
                     if _is_editor_page {
-                        this.code_editor_show_dashboard = true;
+                        this.code_editor.show_dashboard = true;
                     }
                     #[cfg(feature = "gui")]
                     if _is_shell_page && this.terminals.len() > 1 {
                         this.terminal_show_dashboard = true;
                     }
                     if _is_ai_page {
-                        this.ai_chat_show_dashboard = true;
+                        this.ai.chat_show_dashboard = true;
                     }
                     this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
@@ -666,7 +658,7 @@ impl ArcadiaRoot {
                     }
                     #[cfg(feature = "gui")]
                     if _is_editor_page {
-                        this.code_editor_context_menu_open = true;
+                        this.code_editor.context_menu_open = true;
                         this.terminal_context_menu_open = false;
                         this.terminal_kill_menu = None;
                         this.session_route_menu_open = false;
@@ -674,13 +666,13 @@ impl ArcadiaRoot {
                         cx.notify();
                     }
                     if _is_ai_page {
-                        this.ai_context_menu_open = true;
+                        this.ai.context_menu_open = true;
                         #[cfg(feature = "gui")]
                         {
                             this.terminal_context_menu_open = false;
                             this.terminal_kill_menu = None;
                             this.session_route_menu_open = false;
-                            this.code_editor_context_menu_open = false;
+                            this.code_editor.context_menu_open = false;
                             this.context_menu_position = event.position;
                         }
                         cx.notify();
@@ -702,64 +694,7 @@ impl ArcadiaRoot {
         glyph: Option<GlyphStyleConfig>,
         hover_alpha: f32,
     ) -> impl IntoElement {
-        let pal = theme::nav_accent_palette("sky", is_dark);
-        let text_col = nav_item_text(
-            nav_idle_text(glyph, is_dark),
-            nav_active_text(glyph, pal.icon_active),
-            if is_active { 1.0 } else { 0.0 },
-            hover_alpha,
-        );
-        let meta_col = if is_active {
-            pal.icon_active
-        } else if is_dark {
-            rgb(0x4a5568)
-        } else {
-            rgb(0x9ca3af)
-        };
-        let radius = nav_radius(glyph);
-        let item_key = format!("editor:{}", editor_idx);
-        div()
-            .id(SharedString::from(item_key.clone()))
-            .ml_7()
-            .pl_2()
-            .pr_2()
-            .py_1()
-            .rounded(px(radius))
-            .cursor_pointer()
-            .text_xs()
-            .font_weight(openframe::FontWeight::NORMAL)
-            .text_color(text_col)
-            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
-                this.start_item_hover_anim(item_key.clone(), *hovered);
-                cx.notify();
-            }))
-            .flex()
-            .flex_col()
-            .gap(px(1.))
-            .child(div().child(label))
-            .when_some(workspace_label, |d, ws| {
-                d.child(div().text_color(meta_col).child(ws))
-            })
-            .on_mouse_down(
-                openframe::MouseButton::Left,
-                cx.listener(move |this, _, _, cx| {
-                    if editor_idx < this.code_editor_tabs.len() {
-                        this.active_code_editor_tab = editor_idx;
-                        this.active_page_id = "editor.main".to_string();
-                        this.code_editor_show_dashboard = false;
-                        this.sync_settings_hub_expanded_from_active_page();
-                    }
-                    cx.notify();
-                }),
-            )
-            .on_mouse_down(
-                openframe::MouseButton::Right,
-                cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
-                    this.code_editor_tab_menu = Some((editor_idx, event.position));
-                    this.code_editor_context_menu_open = false;
-                    cx.notify();
-                }),
-            )
+        Self::sidebar_editor_sub_item(cx, label, workspace_label, editor_idx, is_active, is_dark, glyph, hover_alpha, false)
     }
 
     pub fn sidebar_visual_editor_sub_item(
@@ -771,6 +706,20 @@ impl ArcadiaRoot {
         is_dark: bool,
         glyph: Option<GlyphStyleConfig>,
         hover_alpha: f32,
+    ) -> impl IntoElement {
+        Self::sidebar_editor_sub_item(cx, label, workspace_label, editor_idx, is_active, is_dark, glyph, hover_alpha, true)
+    }
+
+    fn sidebar_editor_sub_item(
+        cx: &mut Context<Self>,
+        label: openframe::SharedString,
+        workspace_label: Option<String>,
+        editor_idx: usize,
+        is_active: bool,
+        is_dark: bool,
+        glyph: Option<GlyphStyleConfig>,
+        hover_alpha: f32,
+        is_visual: bool,
     ) -> impl IntoElement {
         let pal = theme::nav_accent_palette("sky", is_dark);
         let text_col = nav_item_text(
@@ -787,8 +736,12 @@ impl ArcadiaRoot {
             rgb(0x9ca3af)
         };
         let radius = nav_radius(glyph);
-        let item_key = format!("veditor:{}", editor_idx);
-        div()
+        let item_key = if is_visual {
+            format!("veditor:{}", editor_idx)
+        } else {
+            format!("editor:{}", editor_idx)
+        };
+        let el = div()
             .id(SharedString::from(item_key.clone()))
             .ml_7()
             .pl_2()
@@ -813,15 +766,34 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    if editor_idx < this.visual_editor_tabs.len() {
-                        this.active_visual_editor_tab = editor_idx;
-                        this.active_page_id = "editor.visual".to_string();
-                        this.visual_editor_show_dashboard = false;
+                    if is_visual {
+                        if editor_idx < this.visual_editor.tabs.len() {
+                            this.visual_editor.active_tab = editor_idx;
+                            this.active_page_id = "editor.visual".to_string();
+                            this.visual_editor.show_dashboard = false;
+                            this.sync_settings_hub_expanded_from_active_page();
+                        }
+                    } else if editor_idx < this.code_editor.tabs.len() {
+                        this.code_editor.active_tab = editor_idx;
+                        this.active_page_id = "editor.main".to_string();
+                        this.code_editor.show_dashboard = false;
                         this.sync_settings_hub_expanded_from_active_page();
                     }
                     cx.notify();
                 }),
+            );
+        if is_visual {
+            el
+        } else {
+            el.on_mouse_down(
+                openframe::MouseButton::Right,
+                cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
+                    this.code_editor.tab_menu = Some((editor_idx, event.position));
+                    this.code_editor.context_menu_open = false;
+                    cx.notify();
+                }),
             )
+        }
     }
 
     pub fn sidebar_ai_provider_sub_item(
@@ -867,8 +839,8 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    this.active_ai_provider_module = module_name.clone();
-                    this.active_llama_cpp_model_id = None;
+                    this.ai.active_provider_module = module_name.clone();
+                    this.ai.active_llama_cpp_model_id = None;
                     this.active_page_id = "ai.models".to_string();
                     this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
@@ -879,29 +851,29 @@ impl ArcadiaRoot {
                 cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
                     if module_name_right == arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME
                     {
-                        this.llama_cpp_provider_menu = Some(event.position);
-                        this.ollama_provider_menu = None;
-                        this.ai_context_menu_open = false;
-                        this.ai_chat_menu = None;
+                        this.ai.llama_cpp_provider_menu = Some(event.position);
+                        this.ai.ollama_provider_menu = None;
+                        this.ai.context_menu_open = false;
+                        this.ai.chat_menu = None;
                         #[cfg(feature = "gui")]
                         {
                             this.terminal_context_menu_open = false;
                             this.terminal_kill_menu = None;
-                            this.code_editor_context_menu_open = false;
+                            this.code_editor.context_menu_open = false;
                             this.context_menu_position = event.position;
                         }
                         cx.notify();
                     } else if module_name_right == arcadia_core::config::modules::AI_OLLAMA_MODULE_NAME
                     {
-                        this.ollama_provider_menu = Some(event.position);
-                        this.llama_cpp_provider_menu = None;
-                        this.ai_context_menu_open = false;
-                        this.ai_chat_menu = None;
+                        this.ai.ollama_provider_menu = Some(event.position);
+                        this.ai.llama_cpp_provider_menu = None;
+                        this.ai.context_menu_open = false;
+                        this.ai.chat_menu = None;
                         #[cfg(feature = "gui")]
                         {
                             this.terminal_context_menu_open = false;
                             this.terminal_kill_menu = None;
-                            this.code_editor_context_menu_open = false;
+                            this.code_editor.context_menu_open = false;
                             this.context_menu_position = event.position;
                         }
                         cx.notify();
@@ -955,8 +927,8 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    this.active_llama_cpp_model_id = Some(model_id.clone());
-                    this.active_ai_provider_module =
+                    this.ai.active_llama_cpp_model_id = Some(model_id.clone());
+                    this.ai.active_provider_module =
                         arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME.to_string();
                     this.active_page_id = "ai.models".to_string();
                     this.sync_settings_hub_expanded_from_active_page();
@@ -1015,8 +987,8 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    this.active_ai_provider_module = module_name.clone();
-                    this.active_llama_cpp_model_id = None;
+                    this.ai.active_provider_module = module_name.clone();
+                    this.ai.active_llama_cpp_model_id = None;
                     this.active_page_id = "ai.models".to_string();
                     this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
@@ -1085,9 +1057,9 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Left,
                 cx.listener(move |this, _, _, cx| {
-                    this.active_ai_chat_id = chat_id;
+                    this.ai.active_chat_id = chat_id;
                     this.active_page_id = "ai.chat".to_string();
-                    this.ai_chat_show_dashboard = false;
+                    this.ai.chat_show_dashboard = false;
                     this.sync_settings_hub_expanded_from_active_page();
                     cx.notify();
                 }),
@@ -1095,8 +1067,8 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 openframe::MouseButton::Right,
                 cx.listener(move |this, event: &openframe::MouseDownEvent, _, cx| {
-                    this.ai_chat_menu = Some((chat_id, event.position));
-                    this.ai_context_menu_open = false;
+                    this.ai.chat_menu = Some((chat_id, event.position));
+                    this.ai.context_menu_open = false;
                     cx.notify();
                 }),
             )

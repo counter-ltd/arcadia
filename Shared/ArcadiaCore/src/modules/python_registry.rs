@@ -110,7 +110,7 @@ struct PythonRegistry {
 /// sequences — include ordinary spaces for gaps (e.g. `"- "` or `"├ "`). Corners (indices 0,2,4,6)
 /// stay single glyphs from `border_chars`.
 #[derive(Clone, Debug, Default)]
-pub struct GlyphParams {
+pub struct ExtensionStyleParams {
     pub bg: Option<String>,
     pub surface: Option<String>,
     pub surface2: Option<String>,
@@ -173,9 +173,9 @@ pub struct StyleInfo {
     pub label: String,
     pub description: String,
     /// Glyph params used for dark mode (or all modes when `glyph_light` is `None`).
-    pub glyph: Option<GlyphParams>,
+    pub glyph: Option<ExtensionStyleParams>,
     /// Optional light-mode glyph params for mode-specific alternates.
-    pub glyph_light: Option<GlyphParams>,
+    pub glyph_light: Option<ExtensionStyleParams>,
     /// Owning Python extension module id (e.g. `shell-theme`) for token files + overrides.
     pub module_name: Option<String>,
 }
@@ -756,8 +756,8 @@ pub fn register_style(
     name: String,
     label: String,
     description: String,
-    glyph: Option<GlyphParams>,
-    glyph_light: Option<GlyphParams>,
+    glyph: Option<ExtensionStyleParams>,
+    glyph_light: Option<ExtensionStyleParams>,
     module_name: Option<String>,
 ) {
     if let Ok(mut reg) = registry().lock() {

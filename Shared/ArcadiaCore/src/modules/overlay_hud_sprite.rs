@@ -170,8 +170,8 @@ pub fn clone_if_newer_than(
 // ── Vibrancy store ────────────────────────────────────────────────────────────
 //
 // Tracks which extension owners have requested native blur (no pixel data needed).
-// When any owner is present the overlay backend enables `NSVisualEffectView` on the
-// Below-Menu-Bar window.
+// When any owner is present the overlay backend enables the native blur/vibrancy backend on the
+// SystemEdge window.
 
 struct VibrancyEntry {
     height_px: f32,

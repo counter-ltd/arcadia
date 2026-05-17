@@ -3,7 +3,7 @@
 use crate::config::appearance::AppearanceConfig;
 use crate::config::extension_tokens;
 use crate::config::ConfigFile;
-use crate::modules::python_registry::{list_styles, GlyphParams};
+use crate::modules::python_registry::{list_styles, ExtensionStyleParams};
 use crate::modules::{ExecutionContext, ModuleCommand};
 
 #[derive(Clone, Copy)]
@@ -29,7 +29,7 @@ fn rgb_from_hex(opt: Option<&String>, fallback: (u8, u8, u8)) -> (u8, u8, u8) {
     opt.and_then(|s| hex_to_rgb(s.as_str())).unwrap_or(fallback)
 }
 
-fn merged_glyph_for_active_style(is_dark: bool) -> Option<GlyphParams> {
+fn merged_glyph_for_active_style(is_dark: bool) -> Option<ExtensionStyleParams> {
     let active = AppearanceConfig::load_or_create()
         .unwrap_or_default()
         .active_style;
@@ -50,7 +50,7 @@ fn merged_glyph_for_active_style(is_dark: bool) -> Option<GlyphParams> {
     Some(g)
 }
 
-fn palette_from_glyph(g: &GlyphParams, is_dark: bool) -> MotdAnsiPalette {
+fn palette_from_glyph(g: &ExtensionStyleParams, is_dark: bool) -> MotdAnsiPalette {
     let defaults = if is_dark {
         (
             (16_u8, 185_u8, 129_u8),

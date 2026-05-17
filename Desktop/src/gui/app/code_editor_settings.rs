@@ -31,12 +31,12 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
         let panel_radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
-        let show_marks = self.code_editor_show_indentation_marks;
-        let auto_indent = self.code_editor_auto_indent;
-        let auto_close = self.code_editor_auto_close;
-        let undo_on = self.code_editor_undo_enabled;
-        let line_cmds = self.code_editor_line_commands;
-        let cursor_style = self.code_editor_cursor_style;
+        let show_marks = self.code_editor.show_indentation_marks;
+        let auto_indent = self.code_editor.auto_indent;
+        let auto_close = self.code_editor.auto_close;
+        let undo_on = self.code_editor.undo_enabled;
+        let line_cmds = self.code_editor.line_commands;
+        let cursor_style = self.code_editor.cursor_style;
 
         let editor_token_modules = python_registry::editor_scoped_token_modules();
 
@@ -216,10 +216,10 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
-                    this.code_editor_show_indentation_marks =
-                        !this.code_editor_show_indentation_marks;
+                    this.code_editor.show_indentation_marks =
+                        !this.code_editor.show_indentation_marks;
                     let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
-                    cfg.show_indentation_marks = this.code_editor_show_indentation_marks;
+                    cfg.show_indentation_marks = this.code_editor.show_indentation_marks;
                     let _ = cfg.save();
                     cx.notify();
                 }),
@@ -297,20 +297,20 @@ impl ArcadiaRoot {
                     let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
                     match kind {
                         EditorToggle::AutoIndent => {
-                            this.code_editor_auto_indent = !this.code_editor_auto_indent;
-                            cfg.auto_indent = this.code_editor_auto_indent;
+                            this.code_editor.auto_indent = !this.code_editor.auto_indent;
+                            cfg.auto_indent = this.code_editor.auto_indent;
                         }
                         EditorToggle::AutoClose => {
-                            this.code_editor_auto_close = !this.code_editor_auto_close;
-                            cfg.auto_close_brackets = this.code_editor_auto_close;
+                            this.code_editor.auto_close = !this.code_editor.auto_close;
+                            cfg.auto_close_brackets = this.code_editor.auto_close;
                         }
                         EditorToggle::Undo => {
-                            this.code_editor_undo_enabled = !this.code_editor_undo_enabled;
-                            cfg.undo_enabled = this.code_editor_undo_enabled;
+                            this.code_editor.undo_enabled = !this.code_editor.undo_enabled;
+                            cfg.undo_enabled = this.code_editor.undo_enabled;
                         }
                         EditorToggle::LineCommands => {
-                            this.code_editor_line_commands = !this.code_editor_line_commands;
-                            cfg.line_commands = this.code_editor_line_commands;
+                            this.code_editor.line_commands = !this.code_editor.line_commands;
+                            cfg.line_commands = this.code_editor.line_commands;
                         }
                     }
                     let _ = cfg.save();
@@ -349,7 +349,7 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.code_editor_cursor_style = style;
+                            this.code_editor.cursor_style = style;
                             let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
                             cfg.cursor_style = style;
                             let _ = cfg.save();
@@ -399,23 +399,23 @@ impl ArcadiaRoot {
     ) -> impl IntoElement {
         let p = theme::theme_palette(cx, is_dark);
         let input_radius = panel_radius.min(8.0);
-        let editing = self.code_editor_char_width_editing;
-        let focused = self.code_editor_char_width_focus.is_focused(window);
+        let editing = self.code_editor.char_width_editing;
+        let focused = self.code_editor.char_width_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
-        let draft = self.code_editor_char_width_draft.clone();
-        let cw_focus = self.code_editor_char_width_focus.clone();
+        let draft = self.code_editor.char_width_draft.clone();
+        let cw_focus = self.code_editor.char_width_focus.clone();
 
         let display = if editing {
             text_with_trailing_caret(&draft, focused, blink)
         } else {
-            self.code_editor_char_width_override
+            self.code_editor.char_width_override
                 .map(|v| format!("{:.2}", v))
                 .unwrap_or_else(|| "auto".to_string())
         };
 
         let input_color = if editing {
             p.content_title
-        } else if self.code_editor_char_width_override.is_some() {
+        } else if self.code_editor.char_width_override.is_some() {
             p.content_title
         } else {
             p.content_meta
@@ -437,52 +437,52 @@ impl ArcadiaRoot {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, _, window, cx| {
-                    if !this.code_editor_char_width_editing {
-                        this.code_editor_char_width_draft = this
-                            .code_editor_char_width_override
+                    if !this.code_editor.char_width_editing {
+                        this.code_editor.char_width_draft = this
+                            .code_editor.char_width_override
                             .map(|v| format!("{:.2}", v))
                             .unwrap_or_default();
-                        this.code_editor_char_width_editing = true;
+                        this.code_editor.char_width_editing = true;
                     }
-                    this.code_editor_char_width_focus.focus(window);
+                    this.code_editor.char_width_focus.focus(window);
                     cx.notify();
                 }),
             )
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                if !this.code_editor_char_width_editing {
+                if !this.code_editor.char_width_editing {
                     return;
                 }
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 match key {
                     "enter" | "return" => {
-                        let parsed = if this.code_editor_char_width_draft.is_empty() {
+                        let parsed = if this.code_editor.char_width_draft.is_empty() {
                             None
                         } else {
-                            this.code_editor_char_width_draft
+                            this.code_editor.char_width_draft
                                 .parse::<f32>()
                                 .ok()
                                 .map(|v| v.max(1.0))
                         };
-                        this.code_editor_char_width_override = parsed;
-                        this.code_editor_char_width_draft =
+                        this.code_editor.char_width_override = parsed;
+                        this.code_editor.char_width_draft =
                             parsed.map(|v| format!("{:.2}", v)).unwrap_or_default();
-                        this.code_editor_char_width_editing = false;
+                        this.code_editor.char_width_editing = false;
                         let mut cfg = CodeEditorConfig::load_or_create().unwrap_or_default();
                         cfg.char_width_override = parsed;
                         let _ = cfg.save();
                         cx.notify();
                     }
                     "escape" => {
-                        this.code_editor_char_width_draft = this
-                            .code_editor_char_width_override
+                        this.code_editor.char_width_draft = this
+                            .code_editor.char_width_override
                             .map(|v| format!("{:.2}", v))
                             .unwrap_or_default();
-                        this.code_editor_char_width_editing = false;
+                        this.code_editor.char_width_editing = false;
                         cx.notify();
                     }
                     "backspace" => {
-                        this.code_editor_char_width_draft.pop();
+                        this.code_editor.char_width_draft.pop();
                         cx.notify();
                     }
                     _ => {
@@ -492,9 +492,9 @@ impl ArcadiaRoot {
                                 let c = kc.chars().next().unwrap_or('\0');
                                 if c.is_ascii_digit()
                                     || (c == '.'
-                                        && !this.code_editor_char_width_draft.contains('.'))
+                                        && !this.code_editor.char_width_draft.contains('.'))
                                 {
-                                    this.code_editor_char_width_draft.push(c);
+                                    this.code_editor.char_width_draft.push(c);
                                     cx.notify();
                                 }
                             }

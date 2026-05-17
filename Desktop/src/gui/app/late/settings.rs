@@ -17,10 +17,10 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
-        let server_url = self.late_settings_server_url.clone();
-        let username = self.late_settings_username.clone();
-        let default_room = self.late_settings_default_room.clone();
-        let feedback = self.late_settings_feedback.clone();
+        let server_url = self.late.settings_server_url.clone();
+        let username = self.late.settings_username.clone();
+        let default_room = self.late.settings_default_room.clone();
+        let feedback = self.late.settings_feedback.clone();
         let has_token = LateConfig::load_or_create()
             .map(|c| !c.auth_token.is_empty())
             .unwrap_or(false);
@@ -128,7 +128,7 @@ impl ArcadiaRoot {
                                 let url_val = server_url.clone();
                                 {
                                     let url_focused =
-                                        self.late_settings_server_url_focus.is_focused(window);
+                                        self.late.settings_server_url_focus.is_focused(window);
                                     let blink = self.text_caret_blink_visible;
                                     div()
                                         .id("late-settings-url")
@@ -140,11 +140,11 @@ impl ArcadiaRoot {
                                         .border_color(input_border)
                                         .text_sm()
                                         .text_color(text_c)
-                                        .track_focus(&self.late_settings_server_url_focus)
+                                        .track_focus(&self.late.settings_server_url_focus)
                                         .on_mouse_down(
                                             MouseButton::Left,
                                             cx.listener(|this, _, window, _| {
-                                                this.late_settings_server_url_focus.focus(window);
+                                                this.late.settings_server_url_focus.focus(window);
                                             }),
                                         )
                                         .child(if url_val.is_empty() {
@@ -168,10 +168,10 @@ impl ArcadiaRoot {
                                             let key = event.keystroke.key.as_str();
                                             let mods = event.keystroke.modifiers;
                                             if key == "backspace" {
-                                                this.late_settings_server_url.pop();
+                                                this.late.settings_server_url.pop();
                                                 cx.notify();
                                             } else if key == "space" {
-                                                this.late_settings_server_url.push(' ');
+                                                this.late.settings_server_url.push(' ');
                                                 cx.notify();
                                             } else if !mods.control
                                                 && !mods.alt
@@ -179,7 +179,7 @@ impl ArcadiaRoot {
                                                 && !mods.function
                                             {
                                                 if let Some(ch) = &event.keystroke.key_char {
-                                                    this.late_settings_server_url.push_str(ch);
+                                                    this.late.settings_server_url.push_str(ch);
                                                     cx.notify();
                                                 }
                                             }
@@ -203,7 +203,7 @@ impl ArcadiaRoot {
                             .child({
                                 let uname_val = username.clone();
                                 let uname_focused =
-                                    self.late_settings_username_focus.is_focused(window);
+                                    self.late.settings_username_focus.is_focused(window);
                                 let blink = self.text_caret_blink_visible;
                                 div()
                                     .id("late-settings-username")
@@ -215,11 +215,11 @@ impl ArcadiaRoot {
                                     .border_color(input_border)
                                     .text_sm()
                                     .text_color(text_c)
-                                    .track_focus(&self.late_settings_username_focus)
+                                    .track_focus(&self.late.settings_username_focus)
                                     .on_mouse_down(
                                         MouseButton::Left,
                                         cx.listener(|this, _, window, _| {
-                                            this.late_settings_username_focus.focus(window);
+                                            this.late.settings_username_focus.focus(window);
                                         }),
                                     )
                                     .child(if uname_val.is_empty() {
@@ -243,10 +243,10 @@ impl ArcadiaRoot {
                                         let key = event.keystroke.key.as_str();
                                         let mods = event.keystroke.modifiers;
                                         if key == "backspace" {
-                                            this.late_settings_username.pop();
+                                            this.late.settings_username.pop();
                                             cx.notify();
                                         } else if key == "space" {
-                                            this.late_settings_username.push(' ');
+                                            this.late.settings_username.push(' ');
                                             cx.notify();
                                         } else if !mods.control
                                             && !mods.alt
@@ -254,7 +254,7 @@ impl ArcadiaRoot {
                                             && !mods.function
                                         {
                                             if let Some(ch) = &event.keystroke.key_char {
-                                                this.late_settings_username.push_str(ch);
+                                                this.late.settings_username.push_str(ch);
                                                 cx.notify();
                                             }
                                         }
@@ -277,7 +277,7 @@ impl ArcadiaRoot {
                             .child({
                                 let room_val = default_room.clone();
                                 let room_focused =
-                                    self.late_settings_default_room_focus.is_focused(window);
+                                    self.late.settings_default_room_focus.is_focused(window);
                                 let blink = self.text_caret_blink_visible;
                                 div()
                                     .id("late-settings-room")
@@ -289,11 +289,11 @@ impl ArcadiaRoot {
                                     .border_color(input_border)
                                     .text_sm()
                                     .text_color(text_c)
-                                    .track_focus(&self.late_settings_default_room_focus)
+                                    .track_focus(&self.late.settings_default_room_focus)
                                     .on_mouse_down(
                                         MouseButton::Left,
                                         cx.listener(|this, _, window, _| {
-                                            this.late_settings_default_room_focus.focus(window);
+                                            this.late.settings_default_room_focus.focus(window);
                                         }),
                                     )
                                     .child(if room_val.is_empty() {
@@ -315,7 +315,7 @@ impl ArcadiaRoot {
                                         let key = event.keystroke.key.as_str();
                                         let mods = event.keystroke.modifiers;
                                         if key == "backspace" {
-                                            this.late_settings_default_room.pop();
+                                            this.late.settings_default_room.pop();
                                             cx.notify();
                                         } else if !mods.control
                                             && !mods.alt
@@ -324,7 +324,7 @@ impl ArcadiaRoot {
                                         {
                                             if let Some(ch) = &event.keystroke.key_char {
                                                 if ch.chars().all(|c| c.is_ascii_digit()) {
-                                                    this.late_settings_default_room.push_str(ch);
+                                                    this.late.settings_default_room.push_str(ch);
                                                     cx.notify();
                                                 }
                                             }
@@ -400,7 +400,7 @@ impl ArcadiaRoot {
                                             let ctx = this.execution_context();
                                             let result =
                                                 modules::execute_command("late.logout", &[], &ctx);
-                                            this.late_settings_feedback = match result {
+                                            this.late.settings_feedback = match result {
                                                 Ok(Some(msg)) => msg,
                                                 Ok(None) => "Logged out.".to_string(),
                                                 Err(e) => format!("Error: {e}"),
@@ -436,16 +436,16 @@ impl ArcadiaRoot {
                                 MouseButton::Left,
                                 cx.listener(|this, _, _, cx| {
                                     let room: u8 =
-                                        this.late_settings_default_room.trim().parse().unwrap_or(1);
+                                        this.late.settings_default_room.trim().parse().unwrap_or(1);
                                     let result = LateConfig::load_or_create().and_then(|mut cfg| {
                                         cfg.server_url =
-                                            this.late_settings_server_url.trim().to_string();
+                                            this.late.settings_server_url.trim().to_string();
                                         cfg.username =
-                                            this.late_settings_username.trim().to_string();
+                                            this.late.settings_username.trim().to_string();
                                         cfg.default_room = room;
                                         cfg.save()
                                     });
-                                    this.late_settings_feedback = match result {
+                                    this.late.settings_feedback = match result {
                                         Ok(_) => "Saved.".to_string(),
                                         Err(e) => format!("Error: {e}"),
                                     };
@@ -470,7 +470,7 @@ impl ArcadiaRoot {
                                     let ctx = this.execution_context();
                                     let result =
                                         modules::execute_command("late.connect", &[], &ctx);
-                                    this.late_settings_feedback = match result {
+                                    this.late.settings_feedback = match result {
                                         Ok(Some(msg)) => msg,
                                         Ok(None) => "Connecting…".to_string(),
                                         Err(e) => format!("Error: {e}"),
@@ -498,7 +498,7 @@ impl ArcadiaRoot {
                                     let ctx = this.execution_context();
                                     let result =
                                         modules::execute_command("late.disconnect", &[], &ctx);
-                                    this.late_settings_feedback = match result {
+                                    this.late.settings_feedback = match result {
                                         Ok(Some(msg)) => msg,
                                         Ok(None) => "Disconnected.".to_string(),
                                         Err(e) => format!("Error: {e}"),

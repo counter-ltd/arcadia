@@ -68,8 +68,8 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
-                            let id = this.visual_editor_next_id;
-                            this.visual_editor_tabs.push(VisualEditorTab {
+                            let id = this.visual_editor.next_id;
+                            this.visual_editor.tabs.push(VisualEditorTab {
                                 id,
                                 title: format!("untitled-{id}"),
                                 content: String::new(),
@@ -78,13 +78,13 @@ impl ArcadiaRoot {
                                 saved_content: String::new(),
                                 block_positions: Vec::new(),
                             });
-                            this.active_visual_editor_tab = this.visual_editor_tabs.len() - 1;
-                            this.visual_editor_next_id += 1;
+                            this.visual_editor.active_tab = this.visual_editor.tabs.len() - 1;
+                            this.visual_editor.next_id += 1;
                             this.active_page_id = "editor.visual".to_string();
                             this.sync_settings_hub_expanded_from_active_page();
-                            this.visual_editor_show_dashboard = false;
+                            this.visual_editor.show_dashboard = false;
                             this.save_visual_editor_session();
-                            this.visual_editor_focus.focus(window);
+                            this.visual_editor.focus.focus(window);
                             cx.notify();
                         }),
                     )
@@ -93,7 +93,7 @@ impl ArcadiaRoot {
             .collect();
 
         let tab_cards: Vec<AnyElement> = self
-            .visual_editor_tabs
+            .visual_editor.tabs
             .iter()
             .enumerate()
             .map(|(tab_idx, tab)| {
@@ -121,11 +121,11 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
-                            this.active_visual_editor_tab = tab_idx;
-                            this.visual_editor_show_dashboard = false;
+                            this.visual_editor.active_tab = tab_idx;
+                            this.visual_editor.show_dashboard = false;
                             this.active_page_id = "editor.visual".to_string();
                             this.sync_settings_hub_expanded_from_active_page();
-                            this.visual_editor_focus.focus(window);
+                            this.visual_editor.focus.focus(window);
                             cx.notify();
                         }),
                     )

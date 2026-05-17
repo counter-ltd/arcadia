@@ -37,65 +37,65 @@ fn next_boundary(s: &str, mut i: usize) -> usize {
 
 impl ArcadiaRoot {
     fn visual_active_idx(&self) -> Option<usize> {
-        if self.visual_editor_tabs.is_empty() {
+        if self.visual_editor.tabs.is_empty() {
             None
         } else {
             Some(
-                self.active_visual_editor_tab
-                    .min(self.visual_editor_tabs.len() - 1),
+                self.visual_editor.active_tab
+                    .min(self.visual_editor.tabs.len() - 1),
             )
         }
     }
 
     /// Commit the inline draft — replace the selected block's source line.
     pub(super) fn visual_editor_commit_edit(&mut self) {
-        let Some(path) = self.visual_editor_selected.clone() else {
+        let Some(path) = self.visual_editor.selected.clone() else {
             return;
         };
         let Some(idx) = self.visual_active_idx() else {
             return;
         };
-        let content = self.visual_editor_tabs[idx].content.clone();
+        let content = self.visual_editor.tabs[idx].content.clone();
         let tree = parse::parse(&content);
         let Some(block) = tree.block_at(&path) else {
             return;
         };
         let start = block.span.start.min(content.len());
         let end = codegen::line_end(&content, start);
-        let draft = self.visual_editor_edit_draft.clone();
+        let draft = self.visual_editor.edit_draft.clone();
         let updated = codegen::replace_region(&content, start, end, &draft);
-        self.visual_editor_tabs[idx].content = updated;
+        self.visual_editor.tabs[idx].content = updated;
         self.save_visual_editor_session();
     }
 
     /// Delete the selected block, removing its whole line(s).
     pub(super) fn visual_editor_delete_selected(&mut self) {
-        let Some(path) = self.visual_editor_selected.clone() else {
+        let Some(path) = self.visual_editor.selected.clone() else {
             return;
         };
         let Some(idx) = self.visual_active_idx() else {
             return;
         };
-        let content = self.visual_editor_tabs[idx].content.clone();
+        let content = self.visual_editor.tabs[idx].content.clone();
         let tree = parse::parse(&content);
         let Some(block) = tree.block_at(&path) else {
             return;
         };
         let updated = codegen::delete_block(&content, block.span.start, block.span.end);
-        self.visual_editor_tabs[idx].content = updated;
-        self.visual_editor_selected = None;
+        self.visual_editor.tabs[idx].content = updated;
+        self.visual_editor.selected = None;
         self.save_visual_editor_session();
     }
 
     /// Move the selected block up or down among its siblings.
     pub(super) fn visual_editor_move_selected(&mut self, down: bool) {
-        let Some(path) = self.visual_editor_selected.clone() else {
+        let Some(path) = self.visual_editor.selected.clone() else {
             return;
         };
         let Some(idx) = self.visual_active_idx() else {
             return;
         };
-        let content = self.visual_editor_tabs[idx].content.clone();
+        let content = self.visual_editor.tabs[idx].content.clone();
         let tree = parse::parse(&content);
         let Some(siblings) = tree.siblings_at(&path) else {
             return;
@@ -122,12 +122,12 @@ impl ArcadiaRoot {
             later.span.start,
             later.span.end,
         );
-        self.visual_editor_tabs[idx].content = updated;
+        self.visual_editor.tabs[idx].content = updated;
         let mut new_path = path.clone();
         if let Some(last) = new_path.last_mut() {
             *last = target;
         }
-        self.visual_editor_selected = Some(new_path);
+        self.visual_editor.selected = Some(new_path);
         self.save_visual_editor_session();
     }
 
@@ -151,21 +151,21 @@ impl ArcadiaRoot {
                 .into_any_element();
         }
 
-        let focused = self.visual_editor_input_focus.is_focused(window);
+        let focused = self.visual_editor.input_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
         let caret = self
-            .visual_editor_edit_caret
-            .min(self.visual_editor_edit_draft.len());
-        let before = &self.visual_editor_edit_draft[..caret];
-        let after = &self.visual_editor_edit_draft[caret..];
+            .visual_editor.edit_caret
+            .min(self.visual_editor.edit_draft.len());
+        let before = &self.visual_editor.edit_draft[..caret];
+        let after = &self.visual_editor.edit_draft[caret..];
         let shown = if focused {
             format!("{}{}", text_with_trailing_caret(before, focused, blink), after)
         } else {
-            self.visual_editor_edit_draft.clone()
+            self.visual_editor.edit_draft.clone()
         };
 
         let input_bg = if is_dark { p.row_bg } else { p.panel_bg };
-        let fh = self.visual_editor_input_focus.clone();
+        let fh = self.visual_editor.input_focus.clone();
 
         let editor = div()
             .flex_1()
@@ -178,7 +178,7 @@ impl ArcadiaRoot {
             .font_family(MONO_FONT_FAMILY)
             .text_xs()
             .text_color(p.content_title)
-            .track_focus(&self.visual_editor_input_focus)
+            .track_focus(&self.visual_editor.input_focus)
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |_, _, window, _| {
@@ -189,8 +189,8 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 let mut caret = this
-                    .visual_editor_edit_caret
-                    .min(this.visual_editor_edit_draft.len());
+                    .visual_editor.edit_caret
+                    .min(this.visual_editor.edit_draft.len());
                 match key {
                     "enter" => {
                         this.visual_editor_commit_edit();
@@ -198,41 +198,41 @@ impl ArcadiaRoot {
                         return;
                     }
                     "escape" => {
-                        this.visual_editor_selected = None;
+                        this.visual_editor.selected = None;
                         cx.notify();
                         return;
                     }
                     "backspace" => {
                         if caret > 0 {
-                            let prev = prev_boundary(&this.visual_editor_edit_draft, caret);
-                            this.visual_editor_edit_draft.replace_range(prev..caret, "");
+                            let prev = prev_boundary(&this.visual_editor.edit_draft, caret);
+                            this.visual_editor.edit_draft.replace_range(prev..caret, "");
                             caret = prev;
                         }
                     }
                     "delete" => {
-                        if caret < this.visual_editor_edit_draft.len() {
-                            let next = next_boundary(&this.visual_editor_edit_draft, caret);
-                            this.visual_editor_edit_draft.replace_range(caret..next, "");
+                        if caret < this.visual_editor.edit_draft.len() {
+                            let next = next_boundary(&this.visual_editor.edit_draft, caret);
+                            this.visual_editor.edit_draft.replace_range(caret..next, "");
                         }
                     }
-                    "left" => caret = prev_boundary(&this.visual_editor_edit_draft, caret),
-                    "right" => caret = next_boundary(&this.visual_editor_edit_draft, caret),
+                    "left" => caret = prev_boundary(&this.visual_editor.edit_draft, caret),
+                    "right" => caret = next_boundary(&this.visual_editor.edit_draft, caret),
                     "home" => caret = 0,
-                    "end" => caret = this.visual_editor_edit_draft.len(),
+                    "end" => caret = this.visual_editor.edit_draft.len(),
                     "space" => {
-                        this.visual_editor_edit_draft.insert(caret, ' ');
+                        this.visual_editor.edit_draft.insert(caret, ' ');
                         caret += 1;
                     }
                     _ => {
                         if !mods.control && !mods.alt && !mods.platform && !mods.function {
                             if let Some(ch) = &event.keystroke.key_char {
-                                this.visual_editor_edit_draft.insert_str(caret, ch);
+                                this.visual_editor.edit_draft.insert_str(caret, ch);
                                 caret += ch.len();
                             }
                         }
                     }
                 }
-                this.visual_editor_edit_caret = caret;
+                this.visual_editor.edit_caret = caret;
                 cx.notify();
             }))
             .child(shown);

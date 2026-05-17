@@ -76,25 +76,16 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
             }
         }
     }
-    if this.late_compose_focus.contains_focused(window, cx) {
+    if this.late.compose_focus.contains_focused(window, cx) {
         return true;
     }
-    if this
-        .late_settings_server_url_focus
-        .contains_focused(window, cx)
-    {
+    if this.late.settings_server_url_focus.contains_focused(window, cx) {
         return true;
     }
-    if this
-        .late_settings_username_focus
-        .contains_focused(window, cx)
-    {
+    if this.late.settings_username_focus.contains_focused(window, cx) {
         return true;
     }
-    if this
-        .late_settings_default_room_focus
-        .contains_focused(window, cx)
-    {
+    if this.late.settings_default_room_focus.contains_focused(window, cx) {
         return true;
     }
     if this.extension_token_focus.contains_focused(window, cx) {

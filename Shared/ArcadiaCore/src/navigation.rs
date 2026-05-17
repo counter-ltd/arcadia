@@ -1,5 +1,22 @@
 use serde::{Deserialize, Serialize};
 
+/// Describes how the UI host should size and wrap the page content area.
+///
+/// Added to [`NavigationPageDefinition`] so layout decisions derive from the
+/// registry rather than from hardcoded `if active_page_id == …` chains in
+/// the render path.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PageLayoutKind {
+    /// Standard scrollable/padded content well (`w_full + p_6`).
+    #[default]
+    Standard,
+    /// Edge-to-edge full-height page (flex_1 + h_full, no outer padding).
+    FullHeight,
+    /// Settings hub landing page — special canvas background and wider padding.
+    SettingsHub,
+}
+
 use crate::config::modules::{
     AI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, LAN_MODULE_NAME, LATE_MODULE_NAME,
     NOTIFICATION_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
@@ -20,6 +37,9 @@ pub struct NavigationPageDefinition {
     /// When set, the page is shown only if this module is enabled (`MODULE_REGISTRY` name).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required_module: Option<&'static str>,
+    /// Content area layout contract — drives wrapper selection in the render path.
+    #[serde(default)]
+    pub layout_kind: PageLayoutKind,
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -60,6 +80,8 @@ pub struct NavigationPageOwned {
     pub accent: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required_module: Option<String>,
+    #[serde(default)]
+    pub layout_kind: PageLayoutKind,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,6 +166,7 @@ impl NavigationRegistryOwned {
                 system_image: decl.system_image.clone(),
                 accent: decl.accent.clone(),
                 required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),
+                layout_kind: PageLayoutKind::Standard,
             });
             if let Some(group) = self.groups.iter_mut().find(|g| g.id == decl.group_id) {
                 if !group.pages.contains(&page_id) {
@@ -181,6 +204,7 @@ impl From<&NavigationPageDefinition> for NavigationPageOwned {
             system_image: p.system_image.to_string(),
             accent: p.accent.to_string(),
             required_module: p.required_module.map(|s| s.to_string()),
+            layout_kind: p.layout_kind,
         }
     }
 }
@@ -207,6 +231,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "terminal",
         accent: "emerald",
         required_module: Some(TERMINAL_MODULE_NAME),
+        layout_kind: PageLayoutKind::FullHeight,
     },
     NavigationPageDefinition {
         id: "utility.services",
@@ -218,6 +243,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         // Visibility is service-driven: page is shown iff at least one entry in
         // `SERVICE_DEFINITIONS` targets this page id and has its required module enabled.
         required_module: None,
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "global.logs",
@@ -227,6 +253,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "doc.text.magnifyingglass",
         accent: "sky",
         required_module: None,
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "global.settings",
@@ -236,6 +263,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "gearshape",
         accent: "indigo",
         required_module: None,
+        layout_kind: PageLayoutKind::SettingsHub,
     },
     NavigationPageDefinition {
         id: "global.modules",
@@ -245,6 +273,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "switch.2",
         accent: "fuchsia",
         required_module: None,
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "global.appearance",
@@ -254,6 +283,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "paintpalette",
         accent: "indigo",
         required_module: None,
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "global.permissions",
@@ -263,6 +293,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "lock.shield",
         accent: "indigo",
         required_module: None,
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "global.shortcuts",
@@ -272,6 +303,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "keyboard",
         accent: "indigo",
         required_module: None,
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "global.workspaces",
@@ -281,6 +313,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "folder",
         accent: "emerald",
         required_module: Some(WORKSPACE_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "network.nodes",
@@ -290,6 +323,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "wifi",
         accent: "cyan",
         required_module: Some(LAN_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "late.now_playing",
@@ -299,6 +333,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "cup.and.saucer.fill",
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
+        layout_kind: PageLayoutKind::FullHeight,
     },
     NavigationPageDefinition {
         id: "late.experimental",
@@ -308,6 +343,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "flask.fill",
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "late.settings",
@@ -317,6 +353,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "cup.and.saucer.fill",
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "extensions.settings",
@@ -326,6 +363,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "flask.fill",
         accent: "indigo",
         required_module: Some(PYTHON_HOST_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "editor.main",
@@ -335,6 +373,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "doc.text",
         accent: "sky",
         required_module: Some(CODE_EDITOR_MODULE_NAME),
+        layout_kind: PageLayoutKind::FullHeight,
     },
     NavigationPageDefinition {
         id: "editor.settings",
@@ -344,6 +383,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "doc.text",
         accent: "sky",
         required_module: Some(CODE_EDITOR_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "editor.visual",
@@ -353,6 +393,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "square.grid.2x2",
         accent: "sky",
         required_module: Some(VISUAL_EDITOR_MODULE_NAME),
+        layout_kind: PageLayoutKind::FullHeight,
     },
     NavigationPageDefinition {
         id: "ai.chat",
@@ -362,6 +403,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "message",
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
+        layout_kind: PageLayoutKind::FullHeight,
     },
     NavigationPageDefinition {
         id: "ai.settings",
@@ -371,6 +413,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "message",
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "ai.models",
@@ -380,6 +423,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "cpu",
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "ai.rules",
@@ -389,6 +433,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "wrench.and.screwdriver",
         accent: "violet",
         required_module: Some("ai-rules"),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "ai.skills",
@@ -398,6 +443,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "flask",
         accent: "violet",
         required_module: Some("ai-skills"),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "notification.main",
@@ -407,6 +453,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "bell",
         accent: "amber",
         required_module: Some(NOTIFICATION_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
     NavigationPageDefinition {
         id: "notification.settings",
@@ -416,6 +463,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         system_image: "bell.badge",
         accent: "amber",
         required_module: Some(NOTIFICATION_MODULE_NAME),
+        layout_kind: PageLayoutKind::Standard,
     },
 ];
 
@@ -561,6 +609,7 @@ fn build_extension_token_settings_page_owned(module_id: &str) -> NavigationPageO
         system_image: "slider.horizontal.3".to_string(),
         accent: extension_token_settings_page_accent(module_id).to_string(),
         required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),
+        layout_kind: PageLayoutKind::Standard,
     }
 }
 

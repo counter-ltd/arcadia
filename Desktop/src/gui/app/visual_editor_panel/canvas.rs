@@ -23,11 +23,11 @@ impl ArcadiaRoot {
     ) -> AnyElement {
         let p = theme::theme_palette(cx, is_dark);
         let idx = self
-            .active_visual_editor_tab
-            .min(self.visual_editor_tabs.len().saturating_sub(1));
+            .visual_editor.active_tab
+            .min(self.visual_editor.tabs.len().saturating_sub(1));
         let canvas_bg = if is_dark { rgb(0x1a1f29) } else { rgb(0xfafafa) };
 
-        if self.visual_editor_tabs[idx].content.trim().is_empty() {
+        if self.visual_editor.tabs[idx].content.trim().is_empty() {
             return div()
                 .id("visual-editor-canvas")
                 .w_full()
@@ -51,18 +51,18 @@ impl ArcadiaRoot {
         }
 
         // Lazily load saved positions from the sidecar on first render.
-        if self.visual_editor_tabs[idx].block_positions.is_empty() {
-            if let Some(path) = self.visual_editor_tabs[idx].file_path.clone() {
+        if self.visual_editor.tabs[idx].block_positions.is_empty() {
+            if let Some(path) = self.visual_editor.tabs[idx].file_path.clone() {
                 let loaded = visual_editor::load_block_positions(&path);
                 if !loaded.is_empty() {
-                    self.visual_editor_tabs[idx].block_positions = loaded;
+                    self.visual_editor.tabs[idx].block_positions = loaded;
                 }
             }
         }
 
         // Drop targets + per-block bounds are repopulated each frame.
-        self.visual_editor_drop_zones.borrow_mut().clear();
-        self.visual_editor_block_bounds.borrow_mut().clear();
+        self.visual_editor.drop_zones.borrow_mut().clear();
+        self.visual_editor.block_bounds.borrow_mut().clear();
 
         let char_width = {
             let font_size = window.rem_size() * 0.75;
@@ -71,21 +71,21 @@ impl ArcadiaRoot {
             ts.ch_advance(fid, font_size).map(f32::from).unwrap_or(7.0)
         };
 
-        let tree = parse::parse(&self.visual_editor_tabs[idx].content);
+        let tree = parse::parse(&self.visual_editor.tabs[idx].content);
         let n = tree.root.children.len();
 
         // Reconcile the positions list with the current top-level block count.
         {
-            let positions = &mut self.visual_editor_tabs[idx].block_positions;
+            let positions = &mut self.visual_editor.tabs[idx].block_positions;
             while positions.len() < n {
                 let i = positions.len();
                 positions.push((40.0, 40.0 + i as f32 * 150.0));
             }
             positions.truncate(n);
         }
-        let positions = self.visual_editor_tabs[idx].block_positions.clone();
+        let positions = self.visual_editor.tabs[idx].block_positions.clone();
 
-        let selected = self.visual_editor_selected.clone();
+        let selected = self.visual_editor.selected.clone();
         let sel_valid = selected
             .as_ref()
             .map(|path| tree.block_at(path).is_some())
@@ -100,7 +100,7 @@ impl ArcadiaRoot {
 
         // Live drop preview from the previous frame's zones / bounds.
         let drag_info = self
-            .visual_editor_drag
+            .visual_editor.drag
             .as_ref()
             .filter(|d| d.active)
             .map(|d| (d.cursor, d.path.clone()));
@@ -114,8 +114,8 @@ impl ArcadiaRoot {
             text: p.content_title,
             surface: p.panel_bg,
             selected,
-            drop_zones: self.visual_editor_drop_zones.clone(),
-            block_bounds: self.visual_editor_block_bounds.clone(),
+            drop_zones: self.visual_editor.drop_zones.clone(),
+            block_bounds: self.visual_editor.block_bounds.clone(),
             drop_preview,
         };
         let placed: Vec<(f32, f32, AnyElement)> = tree
@@ -135,13 +135,13 @@ impl ArcadiaRoot {
         let max_x = positions.iter().map(|(x, _)| *x).fold(0.0_f32, f32::max) + 640.0;
         let max_y = positions.iter().map(|(_, y)| *y).fold(0.0_f32, f32::max) + 520.0;
 
-        let origin_cell = self.visual_editor_canvas_origin.clone();
+        let origin_cell = self.visual_editor.canvas_origin.clone();
         let mut area = div()
             .relative()
             .min_w(px(max_x))
             .min_h(px(max_y))
             .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, _, cx| {
-                if this.visual_editor_drag.is_some() {
+                if this.visual_editor.drag.is_some() {
                     this.update_visual_drag(ev.position);
                     cx.notify();
                 }
@@ -149,7 +149,7 @@ impl ArcadiaRoot {
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| {
-                    if this.visual_editor_drag.is_some() {
+                    if this.visual_editor.drag.is_some() {
                         this.finish_visual_drag();
                         cx.notify();
                     }
@@ -172,7 +172,7 @@ impl ArcadiaRoot {
         // Drag ghost — a translucent copy of the dragged block following the
         // cursor. Only shown once the press promotes to an actual drag.
         let ghost = self
-            .visual_editor_drag
+            .visual_editor.drag
             .as_ref()
             .filter(|d| d.active)
             .map(|d| {
@@ -185,7 +185,7 @@ impl ArcadiaRoot {
                 )
             });
         if let Some((gpath, gcursor, grab_x, grab_y, followers)) = ghost {
-            let origin = *self.visual_editor_canvas_origin.borrow();
+            let origin = *self.visual_editor.canvas_origin.borrow();
             let gx = (f32::from(gcursor.x) - f32::from(origin.x) - grab_x).max(0.0);
             let gy = (f32::from(gcursor.y) - f32::from(origin.y) - grab_y).max(0.0);
             let mut col = div().flex().flex_col();

@@ -29,7 +29,7 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
-        if self.ai_chats.is_empty() || self.ai_chat_show_dashboard {
+        if self.ai.chats.is_empty() || self.ai.chat_show_dashboard {
             return self.ai_chat_dashboard(cx, is_dark).into_any_element();
         }
 
@@ -112,8 +112,8 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                let id = this.ai_next_id;
-                                this.ai_chats.push(crate::gui::app::AiChat {
+                                let id = this.ai.next_id;
+                                this.ai.chats.push(crate::gui::app::AiChat {
                                     id,
                                     title: format!("Chat {id}"),
                                     messages: vec![],
@@ -124,10 +124,10 @@ impl ArcadiaRoot {
                                     session_model_id: String::new(),
                                     workspace_id: Some(ws_id.clone()),
                                 });
-                                this.active_ai_chat_id = id;
-                                this.ai_next_id += 1;
-                                this.ai_chat_workspace_id = Some(ws_id.clone());
-                                this.ai_chat_show_dashboard = false;
+                                this.ai.active_chat_id = id;
+                                this.ai.next_id += 1;
+                                this.ai.chat_workspace_id = Some(ws_id.clone());
+                                this.ai.chat_show_dashboard = false;
                                 this.active_page_id = "ai.chat".to_string();
                                 this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
@@ -140,7 +140,7 @@ impl ArcadiaRoot {
         // Open chat cards — rendered from ai_sessions so they persist across restarts.
         // If a session is currently open in ai_chats, use live messages for the preview.
         let chat_cards: Vec<openframe::AnyElement> = self
-            .ai_sessions
+            .ai.sessions
             .iter()
             .map(|session| {
                 let session_id = session.id.clone();
@@ -148,7 +148,7 @@ impl ArcadiaRoot {
                 let provider = session.provider.clone();
                 let workspace_id_card = session.workspace_id.clone();
                 let open_chat = self
-                    .ai_chats
+                    .ai.chats
                     .iter()
                     .find(|c| c.session_id.as_deref() == Some(&session.id));
                 let is_loading = open_chat.map(|c| c.is_loading).unwrap_or(false);
@@ -230,13 +230,13 @@ impl ArcadiaRoot {
                         cx.listener(move |this, _, _, cx| {
                             // If already open, switch to it.
                             if let Some(chat) = this
-                                .ai_chats
+                                .ai.chats
                                 .iter()
                                 .find(|c| c.session_id.as_deref() == Some(&session_id))
                             {
                                 let chat_id = chat.id;
-                                this.active_ai_chat_id = chat_id;
-                                this.ai_chat_show_dashboard = false;
+                                this.ai.active_chat_id = chat_id;
+                                this.ai.chat_show_dashboard = false;
                                 this.active_page_id = "ai.chat".to_string();
                                 this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
@@ -246,8 +246,8 @@ impl ArcadiaRoot {
                             if let Ok(stored) =
                                 arcadia_core::modules::ai_chat_store::load_session(&session_id)
                             {
-                                let id = this.ai_next_id;
-                                this.ai_next_id += 1;
+                                let id = this.ai.next_id;
+                                this.ai.next_id += 1;
                                 let messages = stored
                                     .messages
                                     .iter()
@@ -264,7 +264,7 @@ impl ArcadiaRoot {
                                         }
                                     })
                                     .collect();
-                                this.ai_chats.push(crate::gui::app::AiChat {
+                                this.ai.chats.push(crate::gui::app::AiChat {
                                     id,
                                     title: stored.title.clone(),
                                     messages,
@@ -275,13 +275,13 @@ impl ArcadiaRoot {
                                     session_model_id: stored.model_id.clone(),
                                     workspace_id: stored.workspace_id.clone(),
                                 });
-                                this.active_ai_chat_id = id;
-                                this.ai_chat_show_dashboard = false;
+                                this.ai.active_chat_id = id;
+                                this.ai.chat_show_dashboard = false;
                                 this.active_page_id = "ai.chat".to_string();
                                 this.sync_settings_hub_expanded_from_active_page();
-                                this.ai_active_rule_ids = stored.active_rule_ids.clone();
-                                this.ai_active_skill_ids = stored.active_skill_ids.clone();
-                                this.ai_chat_workspace_id = stored.workspace_id.clone();
+                                this.ai.active_rule_ids = stored.active_rule_ids.clone();
+                                this.ai.active_skill_ids = stored.active_skill_ids.clone();
+                                this.ai.chat_workspace_id = stored.workspace_id.clone();
                                 cx.notify();
                             }
                         }),
@@ -546,10 +546,10 @@ impl ArcadiaRoot {
         let g_snap = theme::glyph_snapshot(cx);
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
         let blink = self.text_caret_blink_visible;
-        let is_focused = self.ai_input_focus.is_focused(window);
-        let active_id = self.active_ai_chat_id;
+        let is_focused = self.ai.input_focus.is_focused(window);
+        let active_id = self.ai.active_chat_id;
 
-        let chat = self.ai_chats.iter().find(|c| c.id == active_id);
+        let chat = self.ai.chats.iter().find(|c| c.id == active_id);
         let draft = chat.map(|c| c.input_draft.clone()).unwrap_or_default();
         let messages = chat.map(|c| c.messages.clone()).unwrap_or_default();
         let is_loading = chat.map(|c| c.is_loading).unwrap_or(false);
@@ -672,7 +672,7 @@ impl ArcadiaRoot {
                     .text_sm()
                     .text_color(p.content_body)
                     .cursor_text()
-                    .track_focus(&self.ai_input_focus)
+                    .track_focus(&self.ai.input_focus)
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|_, _, window, _| {
@@ -688,7 +688,7 @@ impl ArcadiaRoot {
                             this.ai_send_message(window, cx);
                             return;
                         }
-                        let chat = this.ai_chats.iter_mut().find(|c| c.id == active_id);
+                        let chat = this.ai.chats.iter_mut().find(|c| c.id == active_id);
                         let Some(chat) = chat else { return };
                         if key == "backspace" {
                             chat.input_draft.pop();
@@ -744,10 +744,10 @@ impl ArcadiaRoot {
         let accent = theme::ui_accent(cx);
         let accent_fg = theme::ui_accent_fg(cx);
 
-        let active_rules = self.ai_active_rule_ids.clone();
-        let active_skills = self.ai_active_skill_ids.clone();
-        let rule_picker_open = self.ai_rule_picker_open;
-        let skill_picker_open = self.ai_skill_picker_open;
+        let active_rules = self.ai.active_rule_ids.clone();
+        let active_skills = self.ai.active_skill_ids.clone();
+        let rule_picker_open = self.ai.rule_picker_open;
+        let skill_picker_open = self.ai.skill_picker_open;
 
         // Load available rules + skills (ignore errors — degrade to empty).
         let rules_cfg = AiRulesConfig::load_or_create().unwrap_or_default();
@@ -783,7 +783,7 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.ai_active_rule_ids.retain(|r| r != &rule_id);
+                            this.ai.active_rule_ids.retain(|r| r != &rule_id);
                             cx.notify();
                         }),
                     );
@@ -810,7 +810,7 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.ai_active_skill_ids.retain(|s| s != &skill_id);
+                            this.ai.active_skill_ids.retain(|s| s != &skill_id);
                             cx.notify();
                         }),
                     );
@@ -840,8 +840,8 @@ impl ArcadiaRoot {
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|this, _, _, cx| {
-                        this.ai_rule_picker_open = !this.ai_rule_picker_open;
-                        this.ai_skill_picker_open = false;
+                        this.ai.rule_picker_open = !this.ai.rule_picker_open;
+                        this.ai.skill_picker_open = false;
                         cx.notify();
                     }),
                 ),
@@ -873,15 +873,15 @@ impl ArcadiaRoot {
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|this, _, _, cx| {
-                        this.ai_skill_picker_open = !this.ai_skill_picker_open;
-                        this.ai_rule_picker_open = false;
+                        this.ai.skill_picker_open = !this.ai.skill_picker_open;
+                        this.ai.rule_picker_open = false;
                         cx.notify();
                     }),
                 ),
         );
 
         // "Stage Writes" toggle chip
-        let stage_writes = self.ai_stage_writes;
+        let stage_writes = self.ai.stage_writes;
         let (sw_bg, sw_fg) = if stage_writes {
             (accent, accent_fg)
         } else {
@@ -906,7 +906,7 @@ impl ArcadiaRoot {
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(|this, _, _, cx| {
-                        this.ai_stage_writes = !this.ai_stage_writes;
+                        this.ai.stage_writes = !this.ai.stage_writes;
                         cx.notify();
                     }),
                 ),
@@ -949,10 +949,10 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                if this.ai_active_rule_ids.contains(&rule_id) {
-                                    this.ai_active_rule_ids.retain(|r| r != &rule_id);
+                                if this.ai.active_rule_ids.contains(&rule_id) {
+                                    this.ai.active_rule_ids.retain(|r| r != &rule_id);
                                 } else {
-                                    this.ai_active_rule_ids.push(rule_id.clone());
+                                    this.ai.active_rule_ids.push(rule_id.clone());
                                 }
                                 cx.notify();
                             }),
@@ -996,10 +996,10 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                if this.ai_active_skill_ids.contains(&skill_id) {
-                                    this.ai_active_skill_ids.retain(|s| s != &skill_id);
+                                if this.ai.active_skill_ids.contains(&skill_id) {
+                                    this.ai.active_skill_ids.retain(|s| s != &skill_id);
                                 } else {
-                                    this.ai_active_skill_ids.push(skill_id.clone());
+                                    this.ai.active_skill_ids.push(skill_id.clone());
                                 }
                                 cx.notify();
                             }),
@@ -1020,11 +1020,11 @@ impl ArcadiaRoot {
     }
 
     pub fn ai_send_message(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let active_id = self.active_ai_chat_id;
+        let active_id = self.ai.active_chat_id;
 
         // Collect input
         let input = self
-            .ai_chats
+            .ai.chats
             .iter()
             .find(|c| c.id == active_id)
             .map(|c| c.input_draft.trim().to_string())
@@ -1035,18 +1035,18 @@ impl ArcadiaRoot {
         }
 
         // If already inferring on this chat, ignore.
-        if self.ai_stream_chat_id == Some(active_id) {
+        if self.ai.stream_chat_id == Some(active_id) {
             return;
         }
 
         // Build provider routing from active provider + selected model.
-        let provider = self.active_ai_provider_module.clone();
-        let model_id = self.ai_chat_model_id.clone();
+        let provider = self.ai.active_provider_module.clone();
+        let model_id = self.ai.chat_model_id.clone();
         let routing_result: Result<ProviderRouting, String> = match provider.as_str() {
             AI_LLAMA_CPP_MODULE_NAME => match model_id.as_deref() {
                 None => Err("No model selected. Choose a model from the top bar.".to_string()),
                 Some(id) => self
-                    .llama_cpp_models
+                    .ai.llama_cpp_models
                     .iter()
                     .find(|m| m.id == id)
                     .map(|m| ProviderRouting::LlamaCpp {
@@ -1061,7 +1061,7 @@ impl ArcadiaRoot {
                 match model_id.as_deref() {
                     None => Err("No model selected. Choose a model from the top bar.".to_string()),
                     Some(id) => self
-                        .ollama_models
+                        .ai.ollama_models
                         .iter()
                         .find(|m| m.id == id)
                         .map(|m| ProviderRouting::Ollama {
@@ -1074,7 +1074,7 @@ impl ArcadiaRoot {
             AI_OPENAI_MODULE_NAME => match model_id.as_deref() {
                 None => Err("No model selected. Choose a model from the top bar.".to_string()),
                 Some(id) => self
-                    .openai_providers
+                    .ai.openai_providers
                     .iter()
                     .find_map(|p| {
                         p.models.iter().find(|m| m.id == id).map(|m| {
@@ -1104,7 +1104,7 @@ impl ArcadiaRoot {
         // Resolve workspace context from cached entries (avoids a disk read per message).
         let workspace_context: Option<AiWorkspaceContext> =
             if self.is_module_enabled(WORKSPACE_MODULE_NAME) {
-                self.ai_chat_workspace_id.as_deref().and_then(|ws_id| {
+                self.ai.chat_workspace_id.as_deref().and_then(|ws_id| {
                     self.workspace_entries
                         .iter()
                         .find(|w| w.id == ws_id)
@@ -1115,7 +1115,7 @@ impl ArcadiaRoot {
             };
 
         // Push user message + clear draft. Track provider/model for session persistence.
-        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
+        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == active_id) {
             chat.messages.push(AiMessage {
                 role: AiMessageRole::User,
                 content: input.clone(),
@@ -1131,7 +1131,7 @@ impl ArcadiaRoot {
         let routing = match routing_result {
             Ok(r) => r,
             Err(msg) => {
-                if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
+                if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == active_id) {
                     chat.messages.push(AiMessage {
                         role: AiMessageRole::Assistant,
                         content: msg,
@@ -1144,9 +1144,9 @@ impl ArcadiaRoot {
         };
 
         // Build full message history.
-        let system = self.ai_default_system_prompt.clone();
+        let system = self.ai.default_system_prompt.clone();
         let history: Vec<(String, String)> = self
-            .ai_chats
+            .ai.chats
             .iter()
             .find(|c| c.id == active_id)
             .map(|c| {
@@ -1164,7 +1164,7 @@ impl ArcadiaRoot {
             .unwrap_or_default();
 
         // Placeholder assistant message (tokens stream into it).
-        if let Some(chat) = self.ai_chats.iter_mut().find(|c| c.id == active_id) {
+        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == active_id) {
             chat.messages.push(AiMessage {
                 role: AiMessageRole::Assistant,
                 content: String::new(),
@@ -1173,7 +1173,7 @@ impl ArcadiaRoot {
             chat.is_loading = true;
         }
 
-        self.ai_stream_chat_id = Some(active_id);
+        self.ai.stream_chat_id = Some(active_id);
 
         let tools = if workspace_context.is_some() {
             arcadia_core::modules::ai_tools::WORKSPACE_TOOLS.to_vec()
@@ -1181,7 +1181,7 @@ impl ArcadiaRoot {
             vec![]
         };
 
-        let runtime = self.ai_runtime.get_or_insert_with(AiRuntimeHandle::start);
+        let runtime = self.ai.runtime.get_or_insert_with(AiRuntimeHandle::start);
         let _ = runtime.request_tx.try_send(AiRuntimeRequest::Generate {
             routing,
             request: TextGenerationRequest {
@@ -1190,9 +1190,9 @@ impl ArcadiaRoot {
                 max_tokens: 512,
                 workspace_context,
                 tools,
-                active_rule_ids: self.ai_active_rule_ids.clone(),
-                active_skill_ids: self.ai_active_skill_ids.clone(),
-                stage_writes: self.ai_stage_writes,
+                active_rule_ids: self.ai.active_rule_ids.clone(),
+                active_skill_ids: self.ai.active_skill_ids.clone(),
+                stage_writes: self.ai.stage_writes,
             },
         });
 

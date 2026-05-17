@@ -160,13 +160,13 @@ impl Render for ArcadiaRoot {
                     raw_page_title
                 }
             } else if pid == "ai.chat" {
-                if self.ai_chats.is_empty() || self.ai_chat_show_dashboard {
+                if self.ai.chats.is_empty() || self.ai.chat_show_dashboard {
                     "Chat  ~  Dashboard".to_string()
                 } else {
                     let chat_title = self
-                        .ai_chats
+                        .ai.chats
                         .iter()
-                        .find(|c| c.id == self.active_ai_chat_id)
+                        .find(|c| c.id == self.ai.active_chat_id)
                         .map(|c| c.title.clone());
                     if let Some(title) = chat_title {
                         format!("Chat  ~  {title}")
@@ -175,9 +175,9 @@ impl Render for ArcadiaRoot {
                     }
                 }
             } else if pid == "ai.models" {
-                if let Some(ref model_id) = self.active_llama_cpp_model_id {
+                if let Some(ref model_id) = self.ai.active_llama_cpp_model_id {
                     let model_name = self
-                        .llama_cpp_models
+                        .ai.llama_cpp_models
                         .iter()
                         .find(|m| &m.id == model_id)
                         .map(|m| m.name.clone())
@@ -189,14 +189,14 @@ impl Render for ArcadiaRoot {
             } else if pid == "editor.main" {
                 #[cfg(feature = "gui")]
                 {
-                    if self.code_editor_show_dashboard || self.code_editor_tabs.is_empty() {
+                    if self.code_editor.show_dashboard || self.code_editor.tabs.is_empty() {
                         "Editor  ~  Dashboard".to_string()
                     } else {
                         let idx = self
-                            .active_code_editor_tab
-                            .min(self.code_editor_tabs.len().saturating_sub(1));
+                            .code_editor.active_tab
+                            .min(self.code_editor.tabs.len().saturating_sub(1));
                         let tab_title = self
-                            .code_editor_tabs
+                            .code_editor.tabs
                             .get(idx)
                             .map(|t| t.title.clone())
                             .unwrap_or_else(|| "untitled".to_string());
@@ -210,14 +210,14 @@ impl Render for ArcadiaRoot {
             } else if pid == "editor.visual" {
                 #[cfg(feature = "gui")]
                 {
-                    if self.visual_editor_show_dashboard || self.visual_editor_tabs.is_empty() {
+                    if self.visual_editor.show_dashboard || self.visual_editor.tabs.is_empty() {
                         "Blocks  ~  Dashboard".to_string()
                     } else {
                         let idx = self
-                            .active_visual_editor_tab
-                            .min(self.visual_editor_tabs.len().saturating_sub(1));
+                            .visual_editor.active_tab
+                            .min(self.visual_editor.tabs.len().saturating_sub(1));
                         let tab_title = self
-                            .visual_editor_tabs
+                            .visual_editor.tabs
                             .get(idx)
                             .map(|t| t.title.clone())
                             .unwrap_or_else(|| "untitled".to_string());
@@ -274,59 +274,59 @@ impl Render for ArcadiaRoot {
                         changed = true;
                     }
                     #[cfg(feature = "gui")]
-                    if this.code_editor_context_menu_open {
-                        this.code_editor_context_menu_open = false;
+                    if this.code_editor.context_menu_open {
+                        this.code_editor.context_menu_open = false;
                         changed = true;
                     }
                     #[cfg(feature = "gui")]
-                    if this.code_editor_workspace_picker_open {
-                        this.code_editor_workspace_picker_open = false;
+                    if this.code_editor.workspace_picker_open {
+                        this.code_editor.workspace_picker_open = false;
                         changed = true;
                     }
                     #[cfg(feature = "gui")]
-                    if this.visual_editor_workspace_picker_open {
-                        this.visual_editor_workspace_picker_open = false;
+                    if this.visual_editor.workspace_picker_open {
+                        this.visual_editor.workspace_picker_open = false;
                         changed = true;
                     }
                     #[cfg(feature = "gui")]
-                    if this.code_editor_undo_history_open {
-                        this.code_editor_undo_history_open = false;
+                    if this.code_editor.undo_history_open {
+                        this.code_editor.undo_history_open = false;
                         changed = true;
                     }
-                    if this.ai_context_menu_open {
-                        this.ai_context_menu_open = false;
+                    if this.ai.context_menu_open {
+                        this.ai.context_menu_open = false;
                         changed = true;
                     }
-                    if this.ai_chat_menu.is_some() {
-                        this.ai_chat_menu = None;
+                    if this.ai.chat_menu.is_some() {
+                        this.ai.chat_menu = None;
                         changed = true;
                     }
-                    if this.ai_session_menu.is_some() {
-                        this.ai_session_menu = None;
+                    if this.ai.session_menu.is_some() {
+                        this.ai.session_menu = None;
                         changed = true;
                     }
-                    if this.ai_session_rename.is_some() {
-                        this.ai_session_rename = None;
+                    if this.ai.session_rename.is_some() {
+                        this.ai.session_rename = None;
                         changed = true;
                     }
-                    if this.llama_cpp_provider_menu.is_some() {
-                        this.llama_cpp_provider_menu = None;
+                    if this.ai.llama_cpp_provider_menu.is_some() {
+                        this.ai.llama_cpp_provider_menu = None;
                         changed = true;
                     }
-                    if this.ollama_provider_menu.is_some() {
-                        this.ollama_provider_menu = None;
+                    if this.ai.ollama_provider_menu.is_some() {
+                        this.ai.ollama_provider_menu = None;
                         changed = true;
                     }
                     if this.settings_pin_context_menu.is_some() {
                         this.settings_pin_context_menu = None;
                         changed = true;
                     }
-                    if this.ai_chat_model_picker_open {
-                        this.ai_chat_model_picker_open = false;
+                    if this.ai.chat_model_picker_open {
+                        this.ai.chat_model_picker_open = false;
                         changed = true;
                     }
-                    if this.ai_chat_workspace_picker_open {
-                        this.ai_chat_workspace_picker_open = false;
+                    if this.ai.chat_workspace_picker_open {
+                        this.ai.chat_workspace_picker_open = false;
                         changed = true;
                     }
                     if this.color_picker_modal.is_some() {
@@ -450,7 +450,7 @@ impl ArcadiaRoot {
                 .child(div().text_color(text_color).child(label))
         };
 
-        if self.ai_chat_model_picker_open {
+        if self.ai.chat_model_picker_open {
             // (model_id, display_name, type_label, provider_module, icon_key)
             let all_models: Vec<(String, String, &'static str, String, &'static str)> = {
                 use arcadia_core::config::modules::{
@@ -459,7 +459,7 @@ impl ArcadiaRoot {
                     AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME,
                 };
                 let mut v = Vec::new();
-                for model in &self.llama_cpp_models {
+                for model in &self.ai.llama_cpp_models {
                     v.push((
                         model.id.clone(),
                         model.name.clone(),
@@ -468,7 +468,7 @@ impl ArcadiaRoot {
                         model.model_kind.icon_key(),
                     ));
                 }
-                for model in &self.ollama_models {
+                for model in &self.ai.ollama_models {
                     v.push((
                         model.id.clone(),
                         model.name.clone(),
@@ -477,7 +477,7 @@ impl ArcadiaRoot {
                         "ollama",
                     ));
                 }
-                for provider in &self.openai_providers {
+                for provider in &self.ai.openai_providers {
                     let type_label: &'static str = "OpenAI";
                     for model in &provider.models {
                         v.push((
@@ -498,7 +498,7 @@ impl ArcadiaRoot {
                         "apfel",
                     ));
                 }
-                for cli in &self.detected_cli_providers {
+                for cli in &self.ai.detected_cli_providers {
                     let (module, icon): (&'static str, &'static str) = match cli.binary.as_str() {
                         "claude" => (AI_EXEC_CLAUDE_MODULE_NAME, "claude"),
                         "codex" => (AI_EXEC_CODEX_MODULE_NAME, "codex"),
@@ -542,9 +542,9 @@ impl ArcadiaRoot {
                 ));
             } else {
                 for (model_id, model_name, type_label, provider_module, icon_key) in all_models {
-                    let is_active = self.active_ai_provider_module == provider_module
-                        && (self.ai_chat_model_id.as_deref() == Some(model_id.as_str())
-                            || (model_id == provider_module && self.ai_chat_model_id.is_none()));
+                    let is_active = self.ai.active_provider_module == provider_module
+                        && (self.ai.chat_model_id.as_deref() == Some(model_id.as_str())
+                            || (model_id == provider_module && self.ai.chat_model_id.is_none()));
                     let model_id2 = model_id.clone();
                     let provider_module2 = provider_module.clone();
                     let row_fg = if is_active {
@@ -587,14 +587,14 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 openframe::MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    this.active_ai_provider_module = provider_module2.clone();
-                                    this.ai_chat_model_id = if model_id2 == provider_module2 {
+                                    this.ai.active_provider_module = provider_module2.clone();
+                                    this.ai.chat_model_id = if model_id2 == provider_module2 {
                                         // CLI providers use module name as id — no sub-model needed
                                         None
                                     } else {
                                         Some(model_id2.clone())
                                     };
-                                    this.ai_chat_model_picker_open = false;
+                                    this.ai.chat_model_picker_open = false;
                                     cx.notify();
                                 }),
                             ),
@@ -602,7 +602,7 @@ impl ArcadiaRoot {
                 }
             }
             picker.into_any_element()
-        } else if self.ai_chat_workspace_picker_open {
+        } else if self.ai.chat_workspace_picker_open {
             let workspaces = arcadia_core::config::workspace::WorkspacesConfig::load_or_create()
                 .map(|cfg| cfg.workspaces)
                 .unwrap_or_default();
@@ -635,7 +635,7 @@ impl ArcadiaRoot {
                 );
             } else {
                 // "None" option to clear selection
-                let is_none = self.ai_chat_workspace_id.is_none();
+                let is_none = self.ai.chat_workspace_id.is_none();
                 picker = picker.child(
                     div()
                         .w_full()
@@ -654,14 +654,14 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             openframe::MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                this.ai_chat_workspace_id = None;
-                                this.ai_chat_workspace_picker_open = false;
+                                this.ai.chat_workspace_id = None;
+                                this.ai.chat_workspace_picker_open = false;
                                 cx.notify();
                             }),
                         ),
                 );
                 for ws in workspaces {
-                    let is_active = self.ai_chat_workspace_id.as_deref() == Some(ws.id.as_str());
+                    let is_active = self.ai.chat_workspace_id.as_deref() == Some(ws.id.as_str());
                     let ws_id = ws.id.clone();
                     let ws_path = ws.path.clone();
                     picker = picker.child(
@@ -695,9 +695,9 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 openframe::MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    this.ai_chat_workspace_id =
+                                    this.ai.chat_workspace_id =
                                         if is_active { None } else { Some(ws_id.clone()) };
-                                    this.ai_chat_workspace_picker_open = false;
+                                    this.ai.chat_workspace_picker_open = false;
                                     cx.notify();
                                 }),
                             ),
@@ -705,7 +705,7 @@ impl ArcadiaRoot {
                 }
             }
             picker.into_any_element()
-        } else if self.code_editor_context_menu_open {
+        } else if self.code_editor.context_menu_open {
             div()
                 .absolute()
                 .left(pos.x)
@@ -721,9 +721,9 @@ impl ArcadiaRoot {
                     menu_row("code", "New Editor".into(), text_color, text_color).on_mouse_down(
                         openframe::MouseButton::Left,
                         cx.listener(|this, _, window, cx| {
-                            let id = this.code_editor_next_id;
+                            let id = this.code_editor.next_id;
                             let title = format!("untitled-{id}");
-                            this.code_editor_tabs.push(CodeEditorTab {
+                            this.code_editor.tabs.push(CodeEditorTab {
                                 id,
                                 title,
                                 content: String::new(),
@@ -739,12 +739,12 @@ impl ArcadiaRoot {
                                 cached_lines: vec![],
                                 cached_line_byte_starts: vec![],
                             });
-                            this.active_code_editor_tab = this.code_editor_tabs.len() - 1;
-                            this.code_editor_next_id += 1;
+                            this.code_editor.active_tab = this.code_editor.tabs.len() - 1;
+                            this.code_editor.next_id += 1;
                             this.active_page_id = "editor.main".to_string();
                             this.sync_settings_hub_expanded_from_active_page();
-                            this.code_editor_context_menu_open = false;
-                            this.code_editor_focus.focus(window);
+                            this.code_editor.context_menu_open = false;
+                            this.code_editor.focus.focus(window);
                             cx.notify();
                         }),
                     ),
@@ -843,13 +843,13 @@ impl ArcadiaRoot {
                     )
                 }))
                 .into_any_element()
-        } else if self.code_editor_workspace_picker_open {
+        } else if self.code_editor.workspace_picker_open {
             let workspaces = arcadia_core::config::workspace::list_workspaces();
             let active_idx = self
-                .active_code_editor_tab
-                .min(self.code_editor_tabs.len().saturating_sub(1));
+                .code_editor.active_tab
+                .min(self.code_editor.tabs.len().saturating_sub(1));
             let current_path = self
-                .code_editor_tabs
+                .code_editor.tabs
                 .get(active_idx)
                 .and_then(|t| t.workspace_path.clone());
             let mut picker = div()
@@ -905,16 +905,16 @@ impl ArcadiaRoot {
                             openframe::MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
                                 let idx = this
-                                    .active_code_editor_tab
-                                    .min(this.code_editor_tabs.len().saturating_sub(1));
-                                if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                    .code_editor.active_tab
+                                    .min(this.code_editor.tabs.len().saturating_sub(1));
+                                if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                     tab.workspace_path = if is_active {
                                         None
                                     } else {
                                         Some(ws_path2.clone())
                                     };
                                 }
-                                this.code_editor_workspace_picker_open = false;
+                                this.code_editor.workspace_picker_open = false;
                                 cx.notify();
                             }),
                         ),
@@ -927,25 +927,25 @@ impl ArcadiaRoot {
                         openframe::MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
                             let idx = this
-                                .active_code_editor_tab
-                                .min(this.code_editor_tabs.len().saturating_sub(1));
-                            if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                .code_editor.active_tab
+                                .min(this.code_editor.tabs.len().saturating_sub(1));
+                            if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                 tab.workspace_path = None;
                             }
-                            this.code_editor_workspace_picker_open = false;
+                            this.code_editor.workspace_picker_open = false;
                             cx.notify();
                         }),
                     ),
                 );
             }
             picker.into_any_element()
-        } else if self.visual_editor_workspace_picker_open {
+        } else if self.visual_editor.workspace_picker_open {
             let workspaces = arcadia_core::config::workspace::list_workspaces();
             let active_idx = self
-                .active_visual_editor_tab
-                .min(self.visual_editor_tabs.len().saturating_sub(1));
+                .visual_editor.active_tab
+                .min(self.visual_editor.tabs.len().saturating_sub(1));
             let current_path = self
-                .visual_editor_tabs
+                .visual_editor.tabs
                 .get(active_idx)
                 .and_then(|t| t.workspace_path.clone());
             let mut picker = div()
@@ -1001,16 +1001,16 @@ impl ArcadiaRoot {
                             openframe::MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
                                 let idx = this
-                                    .active_visual_editor_tab
-                                    .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                    .visual_editor.active_tab
+                                    .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                     tab.workspace_path = if is_active {
                                         None
                                     } else {
                                         Some(ws_path2.clone())
                                     };
                                 }
-                                this.visual_editor_workspace_picker_open = false;
+                                this.visual_editor.workspace_picker_open = false;
                                 this.save_visual_editor_session();
                                 cx.notify();
                             }),
@@ -1024,12 +1024,12 @@ impl ArcadiaRoot {
                         openframe::MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
                             let idx = this
-                                .active_visual_editor_tab
-                                .min(this.visual_editor_tabs.len().saturating_sub(1));
-                            if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                .visual_editor.active_tab
+                                .min(this.visual_editor.tabs.len().saturating_sub(1));
+                            if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                 tab.workspace_path = None;
                             }
-                            this.visual_editor_workspace_picker_open = false;
+                            this.visual_editor.workspace_picker_open = false;
                             this.save_visual_editor_session();
                             cx.notify();
                         }),
@@ -1037,13 +1037,13 @@ impl ArcadiaRoot {
                 );
             }
             picker.into_any_element()
-        } else if self.code_editor_undo_history_open {
+        } else if self.code_editor.undo_history_open {
             let active_idx = self
-                .active_code_editor_tab
-                .min(self.code_editor_tabs.len().saturating_sub(1));
-            let tab_id = self.code_editor_tabs.get(active_idx).map(|t| t.id);
+                .code_editor.active_tab
+                .min(self.code_editor.tabs.len().saturating_sub(1));
+            let tab_id = self.code_editor.tabs.get(active_idx).map(|t| t.id);
             let (undo_rows, redo_rows): (Vec<String>, Vec<String>) = tab_id
-                .and_then(|id| self.code_editor_undo.get(&id))
+                .and_then(|id| self.code_editor.undo.get(&id))
                 .map(|u| (u.undo_previews(), u.redo_previews()))
                 .unwrap_or_default();
             let accent = crate::gui::theme::ui_accent(cx);
@@ -1095,7 +1095,7 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 openframe::MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    this.code_editor_undo_history_open = false;
+                                    this.code_editor.undo_history_open = false;
                                     this.editor_undo_jump(true, steps);
                                     cx.notify();
                                 }),
@@ -1128,7 +1128,7 @@ impl ArcadiaRoot {
                             .on_mouse_down(
                                 openframe::MouseButton::Left,
                                 cx.listener(move |this, _, _, cx| {
-                                    this.code_editor_undo_history_open = false;
+                                    this.code_editor.undo_history_open = false;
                                     this.editor_undo_jump(false, steps);
                                     cx.notify();
                                 }),
@@ -1137,7 +1137,7 @@ impl ArcadiaRoot {
                 }
             }
             menu.into_any_element()
-        } else if let Some(menu_pos) = self.llama_cpp_provider_menu {
+        } else if let Some(menu_pos) = self.ai.llama_cpp_provider_menu {
             div()
                 .absolute()
                 .left(menu_pos.x)
@@ -1152,8 +1152,8 @@ impl ArcadiaRoot {
                 .child(
                     menu_row("modules", "Create Model".into(), text_color, text_color)
                         .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, _, cx| {
-                            this.llama_cpp_provider_menu = None;
-                            this.llama_cpp_create_draft = Some(crate::gui::app::LlamaCppModelCreateDraft {
+                            this.ai.llama_cpp_provider_menu = None;
+                            this.ai.llama_cpp_create_draft = Some(crate::gui::app::LlamaCppModelCreateDraft {
                                 name: String::new(),
                                 path: String::new(),
                                 mmproj_path: String::new(),
@@ -1164,7 +1164,7 @@ impl ArcadiaRoot {
                         })),
                 )
                 .into_any_element()
-        } else if let Some(menu_pos) = self.ollama_provider_menu {
+        } else if let Some(menu_pos) = self.ai.ollama_provider_menu {
             div()
                 .absolute()
                 .left(menu_pos.x)
@@ -1179,12 +1179,12 @@ impl ArcadiaRoot {
                 .child(
                     menu_row("search", "Discover Models".into(), text_color, text_color)
                         .on_mouse_down(openframe::MouseButton::Left, cx.listener(|this, _, window, cx| {
-                            this.ollama_provider_menu = None;
+                            this.ai.ollama_provider_menu = None;
                             this.discover_ollama_models(window, cx);
                         })),
                 )
                 .into_any_element()
-        } else if self.ai_context_menu_open {
+        } else if self.ai.context_menu_open {
             div()
                 .absolute()
                 .left(pos.x)
@@ -1200,8 +1200,8 @@ impl ArcadiaRoot {
                     menu_row("message", "New Chat".into(), text_color, text_color).on_mouse_down(
                         openframe::MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
-                            let id = this.ai_next_id;
-                            this.ai_chats.push(AiChat {
+                            let id = this.ai.next_id;
+                            this.ai.chats.push(AiChat {
                                 id,
                                 title: format!("Chat {id}"),
                                 messages: vec![],
@@ -1212,17 +1212,17 @@ impl ArcadiaRoot {
                                 session_model_id: String::new(),
                                 workspace_id: None,
                             });
-                            this.active_ai_chat_id = id;
-                            this.ai_next_id += 1;
+                            this.ai.active_chat_id = id;
+                            this.ai.next_id += 1;
                             this.active_page_id = "ai.chat".to_string();
                             this.sync_settings_hub_expanded_from_active_page();
-                            this.ai_context_menu_open = false;
+                            this.ai.context_menu_open = false;
                             cx.notify();
                         }),
                     ),
                 )
                 .into_any_element()
-        } else if let Some((chat_id, chat_pos)) = self.ai_chat_menu {
+        } else if let Some((chat_id, chat_pos)) = self.ai.chat_menu {
             let danger = crate::gui::theme::ui_danger(cx, is_dark);
             div()
                 .absolute()
@@ -1239,12 +1239,12 @@ impl ArcadiaRoot {
                     menu_row("x", "Close Chat".into(), danger, danger).on_mouse_down(
                         openframe::MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.ai_chat_menu = None;
-                            this.ai_chats.retain(|c| c.id != chat_id);
-                            if !this.ai_chats.is_empty() {
-                                let last_id = this.ai_chats.last().map(|c| c.id).unwrap_or(0);
-                                if !this.ai_chats.iter().any(|c| c.id == this.active_ai_chat_id) {
-                                    this.active_ai_chat_id = last_id;
+                            this.ai.chat_menu = None;
+                            this.ai.chats.retain(|c| c.id != chat_id);
+                            if !this.ai.chats.is_empty() {
+                                let last_id = this.ai.chats.last().map(|c| c.id).unwrap_or(0);
+                                if !this.ai.chats.iter().any(|c| c.id == this.ai.active_chat_id) {
+                                    this.ai.active_chat_id = last_id;
                                 }
                             }
                             cx.notify();
@@ -1252,13 +1252,13 @@ impl ArcadiaRoot {
                     ),
                 )
                 .into_any_element()
-        } else if let Some((ref session_id, session_pos)) = self.ai_session_menu.clone() {
+        } else if let Some((ref session_id, session_pos)) = self.ai.session_menu.clone() {
             let session_id = session_id.clone();
             let session_id_del = session_id.clone();
             let danger = crate::gui::theme::ui_danger(cx, is_dark);
             // Find current title for rename pre-fill.
             let current_title = self
-                .ai_sessions
+                .ai.sessions
                 .iter()
                 .find(|s| s.id == session_id)
                 .map(|s| s.title.clone())
@@ -1278,10 +1278,10 @@ impl ArcadiaRoot {
                     menu_row("pencil", "Rename".into(), text_color, text_color).on_mouse_down(
                         openframe::MouseButton::Left,
                         cx.listener(move |this, _, window, cx| {
-                            this.ai_session_menu = None;
-                            this.ai_session_rename =
+                            this.ai.session_menu = None;
+                            this.ai.session_rename =
                                 Some((session_id.clone(), current_title.clone()));
-                            this.ai_rename_focus.focus(window);
+                            this.ai.rename_focus.focus(window);
                             cx.notify();
                         }),
                     ),
@@ -1290,22 +1290,22 @@ impl ArcadiaRoot {
                     menu_row("x", "Delete Chat".into(), danger, danger).on_mouse_down(
                         openframe::MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.ai_session_menu = None;
+                            this.ai.session_menu = None;
                             let _ = arcadia_core::modules::ai_chat_store::delete_session(
                                 &session_id_del,
                             );
-                            this.ai_chats
+                            this.ai.chats
                                 .retain(|c| c.session_id.as_deref() != Some(&session_id_del));
-                            if !this.ai_chats.is_empty()
-                                && !this.ai_chats.iter().any(|c| c.id == this.active_ai_chat_id)
+                            if !this.ai.chats.is_empty()
+                                && !this.ai.chats.iter().any(|c| c.id == this.ai.active_chat_id)
                             {
-                                this.active_ai_chat_id =
-                                    this.ai_chats.last().map(|c| c.id).unwrap_or(0);
+                                this.ai.active_chat_id =
+                                    this.ai.chats.last().map(|c| c.id).unwrap_or(0);
                             }
                             if let Ok(summaries) =
                                 arcadia_core::modules::ai_chat_store::list_sessions()
                             {
-                                this.ai_sessions = summaries
+                                this.ai.sessions = summaries
                                     .into_iter()
                                     .map(|s| crate::gui::app::AiSessionSummary {
                                         id: s.id,
@@ -1387,7 +1387,7 @@ impl ArcadiaRoot {
                     ),
                 )
                 .into_any_element()
-        } else if let Some((tab_idx, tab_pos)) = self.code_editor_tab_menu {
+        } else if let Some((tab_idx, tab_pos)) = self.code_editor.tab_menu {
             let danger = crate::gui::theme::ui_danger(cx, is_dark);
             div()
                 .absolute()
@@ -1404,23 +1404,23 @@ impl ArcadiaRoot {
                     menu_row("x", "Close Editor".into(), danger, danger).on_mouse_down(
                         openframe::MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.code_editor_tab_menu = None;
+                            this.code_editor.tab_menu = None;
                             let is_dirty = this
-                                .code_editor_tabs
+                                .code_editor.tabs
                                 .get(tab_idx)
                                 .map(|t| t.file_path.is_some() && t.content != t.saved_content)
                                 .unwrap_or(false);
                             if is_dirty {
-                                this.code_editor_close_confirm = Some(tab_idx);
+                                this.code_editor.close_confirm = Some(tab_idx);
                             } else {
-                                if tab_idx < this.code_editor_tabs.len() {
-                                    this.code_editor_tabs.remove(tab_idx);
-                                    if this.code_editor_tabs.is_empty() {
-                                        this.code_editor_show_dashboard = true;
+                                if tab_idx < this.code_editor.tabs.len() {
+                                    this.code_editor.tabs.remove(tab_idx);
+                                    if this.code_editor.tabs.is_empty() {
+                                        this.code_editor.show_dashboard = true;
                                     } else {
-                                        this.active_code_editor_tab = this
-                                            .active_code_editor_tab
-                                            .min(this.code_editor_tabs.len() - 1);
+                                        this.code_editor.active_tab = this
+                                            .code_editor.active_tab
+                                            .min(this.code_editor.tabs.len() - 1);
                                     }
                                 }
                                 this.save_editor_session();
@@ -1442,16 +1442,16 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> impl IntoElement {
-        let Some(tab_idx) = self.code_editor_close_confirm else {
+        let Some(tab_idx) = self.code_editor.close_confirm else {
             return div();
         };
         let filename = self
-            .code_editor_tabs
+            .code_editor.tabs
             .get(tab_idx)
             .map(|t| t.title.clone())
             .unwrap_or_else(|| "this file".to_string());
         let has_path = self
-            .code_editor_tabs
+            .code_editor.tabs
             .get(tab_idx)
             .and_then(|t| t.file_path.clone())
             .is_some();
@@ -1475,7 +1475,7 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
-                            this.code_editor_close_confirm = None;
+                            this.code_editor.close_confirm = None;
                             cx.notify();
                         }),
                     ),
@@ -1530,7 +1530,7 @@ impl ArcadiaRoot {
                                             .on_mouse_down(
                                                 MouseButton::Left,
                                                 cx.listener(|this, _, _, cx| {
-                                                    this.code_editor_close_confirm = None;
+                                                    this.code_editor.close_confirm = None;
                                                     cx.notify();
                                                 }),
                                             ),
@@ -1550,15 +1550,15 @@ impl ArcadiaRoot {
                                             .on_mouse_down(
                                                 MouseButton::Left,
                                                 cx.listener(move |this, _, _, cx| {
-                                                    this.code_editor_close_confirm = None;
-                                                    if tab_idx < this.code_editor_tabs.len() {
-                                                        this.code_editor_tabs.remove(tab_idx);
-                                                        if this.code_editor_tabs.is_empty() {
-                                                            this.code_editor_show_dashboard = true;
+                                                    this.code_editor.close_confirm = None;
+                                                    if tab_idx < this.code_editor.tabs.len() {
+                                                        this.code_editor.tabs.remove(tab_idx);
+                                                        if this.code_editor.tabs.is_empty() {
+                                                            this.code_editor.show_dashboard = true;
                                                         } else {
-                                                            this.active_code_editor_tab =
-                                                                this.active_code_editor_tab.min(
-                                                                    this.code_editor_tabs.len() - 1,
+                                                            this.code_editor.active_tab =
+                                                                this.code_editor.active_tab.min(
+                                                                    this.code_editor.tabs.len() - 1,
                                                                 );
                                                         }
                                                         this.save_editor_session();
@@ -1582,9 +1582,9 @@ impl ArcadiaRoot {
                                                 .on_mouse_down(
                                                     MouseButton::Left,
                                                     cx.listener(move |this, _, _, cx| {
-                                                        this.code_editor_close_confirm = None;
+                                                        this.code_editor.close_confirm = None;
                                                         if let Some(tab) =
-                                                            this.code_editor_tabs.get_mut(tab_idx)
+                                                            this.code_editor.tabs.get_mut(tab_idx)
                                                         {
                                                             if let Some(path) =
                                                                 tab.file_path.clone()
@@ -1597,16 +1597,16 @@ impl ArcadiaRoot {
                                                                     tab.content.clone();
                                                             }
                                                         }
-                                                        if tab_idx < this.code_editor_tabs.len() {
-                                                            this.code_editor_tabs.remove(tab_idx);
-                                                            if this.code_editor_tabs.is_empty() {
-                                                                this.code_editor_show_dashboard =
+                                                        if tab_idx < this.code_editor.tabs.len() {
+                                                            this.code_editor.tabs.remove(tab_idx);
+                                                            if this.code_editor.tabs.is_empty() {
+                                                                this.code_editor.show_dashboard =
                                                                     true;
                                                             } else {
-                                                                this.active_code_editor_tab = this
-                                                                    .active_code_editor_tab
+                                                                this.code_editor.active_tab = this
+                                                                    .code_editor.active_tab
                                                                     .min(
-                                                                        this.code_editor_tabs.len()
+                                                                        this.code_editor.tabs.len()
                                                                             - 1,
                                                                     );
                                                             }

@@ -51,19 +51,19 @@ impl ArcadiaRoot {
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
 
         // If a specific llama-cpp model is selected, show its detail view.
-        if let Some(model_id) = self.active_llama_cpp_model_id.clone() {
+        if let Some(model_id) = self.ai.active_llama_cpp_model_id.clone() {
             if let Some(model) = self
-                .llama_cpp_models
+                .ai.llama_cpp_models
                 .iter()
                 .find(|m| m.id == model_id)
                 .cloned()
             {
                 // Edit mode — delegate to edit form renderer.
-                if self.llama_cpp_edit_draft.is_some() {
+                if self.ai.llama_cpp_edit_draft.is_some() {
                     return self.llama_cpp_edit_model_form(window, cx, is_dark);
                 }
 
-                let is_delete_confirm = self.llama_cpp_delete_confirm;
+                let is_delete_confirm = self.ai.llama_cpp_delete_confirm;
                 let is_vision =
                     model.model_kind == arcadia_core::config::llama_cpp::LlamaCppModelKind::Vision;
                 let model_for_edit = model.clone();
@@ -186,7 +186,7 @@ impl ArcadiaRoot {
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
-                                        this.llama_cpp_edit_draft =
+                                        this.ai.llama_cpp_edit_draft =
                                             Some(LlamaCppModelCreateDraft {
                                                 name: model_for_edit.name.clone(),
                                                 path: model_for_edit.path.clone(),
@@ -197,7 +197,7 @@ impl ArcadiaRoot {
                                                 model_kind: model_for_edit.model_kind.clone(),
                                                 error: None,
                                             });
-                                        this.llama_cpp_delete_confirm = false;
+                                        this.ai.llama_cpp_delete_confirm = false;
                                         cx.notify();
                                     }),
                                 ),
@@ -222,10 +222,10 @@ impl ArcadiaRoot {
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     cx.listener(|this, _, _, cx| {
-                                        if this.llama_cpp_delete_confirm {
+                                        if this.ai.llama_cpp_delete_confirm {
                                             this.llama_cpp_delete_model(cx);
                                         } else {
-                                            this.llama_cpp_delete_confirm = true;
+                                            this.ai.llama_cpp_delete_confirm = true;
                                             cx.notify();
                                         }
                                     }),
@@ -238,14 +238,14 @@ impl ArcadiaRoot {
         }
 
         // OpenAI: create form early-return (takes priority over detail view).
-        if let Some(ref draft) = self.openai_create_draft.clone() {
+        if let Some(ref draft) = self.ai.openai_create_draft.clone() {
             return self.openai_provider_create_form(window, cx, is_dark, draft.clone()).into_any_element();
         }
 
         // OpenAI: provider detail / edit view early-return.
-        if let Some(provider_id) = self.active_openai_provider_id.clone() {
-            if let Some(provider) = self.openai_providers.iter().find(|p| p.id == provider_id).cloned() {
-                if self.openai_provider_edit_draft.is_some() {
+        if let Some(provider_id) = self.ai.active_openai_provider_id.clone() {
+            if let Some(provider) = self.ai.openai_providers.iter().find(|p| p.id == provider_id).cloned() {
+                if self.ai.openai_provider_edit_draft.is_some() {
                     return self.openai_provider_edit_form(window, cx, is_dark, provider.clone()).into_any_element();
                 }
                 return self.openai_provider_detail(window, cx, is_dark, provider).into_any_element();
@@ -253,7 +253,7 @@ impl ArcadiaRoot {
         }
 
         let providers = enabled_ai_providers(&self.module_rows);
-        let active_module = self.active_ai_provider_module.clone();
+        let active_module = self.ai.active_provider_module.clone();
 
         let mut root = div()
             .w_full()
@@ -328,7 +328,7 @@ impl ArcadiaRoot {
 
             let module_name = provider.module_name.to_string();
             let _is_active =
-                active_module == provider.module_name && self.active_llama_cpp_model_id.is_none();
+                active_module == provider.module_name && self.ai.active_llama_cpp_model_id.is_none();
             let pal = theme::nav_accent_palette(provider_accent(provider.module_name), is_dark);
             let card_border = pal.icon_idle;
             let glyph_key = provider_glyph(provider.module_name);
@@ -375,17 +375,17 @@ impl ArcadiaRoot {
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _, _, cx| {
-                        this.active_ai_provider_module = module_name_click.clone();
-                        this.active_llama_cpp_model_id = None;
-                        this.llama_cpp_edit_draft = None;
-                        this.llama_cpp_delete_confirm = false;
+                        this.ai.active_provider_module = module_name_click.clone();
+                        this.ai.active_llama_cpp_model_id = None;
+                        this.ai.llama_cpp_edit_draft = None;
+                        this.ai.llama_cpp_delete_confirm = false;
                         cx.notify();
                     }),
                 );
 
             // llama.cpp: show model list + Create Model button
             if provider.module_name == AI_LLAMA_CPP_MODULE_NAME {
-                if !self.llama_cpp_models.is_empty() {
+                if !self.ai.llama_cpp_models.is_empty() {
                     let mut model_list = div()
                         .flex()
                         .flex_col()
@@ -394,14 +394,14 @@ impl ArcadiaRoot {
                         .border_t_1()
                         .border_color(p.panel_border);
 
-                    for model in &self.llama_cpp_models {
+                    for model in &self.ai.llama_cpp_models {
                         let model_id = model.id.clone();
                         let model_id_hover = model_id.clone();
                         let name = model.name.clone();
                         let type_label = model.model_kind.label();
                         let type_icon = model.model_kind.icon_key();
                         let is_model_active =
-                            self.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
+                            self.ai.active_llama_cpp_model_id.as_deref() == Some(model.id.as_str());
                         let row_bg = if is_model_active {
                             pal.row_selected
                         } else {
@@ -464,11 +464,11 @@ impl ArcadiaRoot {
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
                                         cx.stop_propagation();
-                                        this.active_llama_cpp_model_id = Some(model_id_hover.clone());
-                                        this.active_ai_provider_module =
+                                        this.ai.active_llama_cpp_model_id = Some(model_id_hover.clone());
+                                        this.ai.active_provider_module =
                                             AI_LLAMA_CPP_MODULE_NAME.to_string();
-                                        this.llama_cpp_edit_draft = None;
-                                        this.llama_cpp_delete_confirm = false;
+                                        this.ai.llama_cpp_edit_draft = None;
+                                        this.ai.llama_cpp_delete_confirm = false;
                                         cx.notify();
                                     }),
                                 ),
@@ -478,7 +478,7 @@ impl ArcadiaRoot {
                     card = card.child(model_list);
                 }
 
-                let has_models = !self.llama_cpp_models.is_empty();
+                let has_models = !self.ai.llama_cpp_models.is_empty();
                 let create_btn = div()
                     .px_3()
                     .py_1()
@@ -494,7 +494,7 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
-                            this.llama_cpp_create_draft =
+                            this.ai.llama_cpp_create_draft =
                                 Some(crate::gui::app::LlamaCppModelCreateDraft {
                                     name: String::new(),
                                     path: String::new(),
@@ -520,7 +520,7 @@ impl ArcadiaRoot {
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(p.ui_subtext)
                                 .child(if has_models {
-                                    format!("{} model(s)", self.llama_cpp_models.len())
+                                    format!("{} model(s)", self.ai.llama_cpp_models.len())
                                 } else {
                                     "No models configured".to_string()
                                 }),
@@ -531,9 +531,9 @@ impl ArcadiaRoot {
 
             // Ollama: show discovered model list + Discover button
             if provider.module_name == AI_OLLAMA_MODULE_NAME {
-                let discovering = self.ollama_discovering;
-                let has_models = !self.ollama_models.is_empty();
-                let ollama_models = self.ollama_models.clone();
+                let discovering = self.ai.ollama_discovering;
+                let has_models = !self.ai.ollama_models.is_empty();
+                let ollama_models = self.ai.ollama_models.clone();
 
                 let discover_label = if discovering {
                     "Discovering…"
@@ -635,7 +635,7 @@ impl ArcadiaRoot {
 
             // OpenAI: show provider list + Add Provider button
             if provider.module_name == AI_OPENAI_MODULE_NAME {
-                let openai_providers = self.openai_providers.clone();
+                let openai_providers = self.ai.openai_providers.clone();
                 let has_providers = !openai_providers.is_empty();
 
                 if has_providers {
@@ -704,9 +704,9 @@ impl ArcadiaRoot {
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
-                                        this.active_openai_provider_id = Some(pid.clone());
-                                        this.openai_provider_edit_draft = None;
-                                        this.openai_provider_delete_confirm = false;
+                                        this.ai.active_openai_provider_id = Some(pid.clone());
+                                        this.ai.openai_provider_edit_draft = None;
+                                        this.ai.openai_provider_delete_confirm = false;
                                         cx.notify();
                                     }),
                                 ),
@@ -731,13 +731,13 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, _, _, cx| {
-                            this.openai_create_draft = Some(crate::gui::app::OpenAiProviderDraft {
+                            this.ai.openai_create_draft = Some(crate::gui::app::OpenAiProviderDraft {
                                 name: String::new(),
                                 api_key: String::new(),
                                 base_url: "https://api.openai.com".to_string(),
                                 error: None,
                             });
-                            this.active_openai_provider_id = None;
+                            this.ai.active_openai_provider_id = None;
                             cx.notify();
                         }),
                     );
@@ -793,7 +793,7 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let any_cli_active =
-            is_cli_provider(active_module) && self.active_llama_cpp_model_id.is_none();
+            is_cli_provider(active_module) && self.ai.active_llama_cpp_model_id.is_none();
         let cli_card_pal = if any_cli_active {
             theme::nav_accent_palette(provider_accent(active_module), is_dark)
         } else {
@@ -814,7 +814,7 @@ impl ArcadiaRoot {
             let binary = cli_binary_for_module(cli_provider.module_name).unwrap_or("");
             let name = cli_display_name(cli_provider.module_name);
             let detected = self
-                .detected_cli_providers
+                .ai.detected_cli_providers
                 .iter()
                 .find(|c| c.binary == binary)
                 .cloned();
@@ -851,8 +851,8 @@ impl ArcadiaRoot {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, _, _, cx| {
-                            this.active_ai_provider_module = mn_click.clone();
-                            this.ai_chat_model_id = None;
+                            this.ai.active_provider_module = mn_click.clone();
+                            this.ai.chat_model_id = None;
                             cx.notify();
                         }),
                     )
@@ -958,7 +958,7 @@ impl ArcadiaRoot {
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
         let pal = theme::nav_accent_palette("emerald", is_dark);
 
-        let is_delete_confirm = self.openai_provider_delete_confirm;
+        let is_delete_confirm = self.ai.openai_provider_delete_confirm;
         let delete_bg = if is_delete_confirm { p.danger } else { p.surface_elevated };
         let delete_fg = if is_delete_confirm { p.on_accent } else { p.danger };
         let delete_border = if is_delete_confirm { p.danger } else { p.border };
@@ -1147,14 +1147,14 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                this.openai_provider_edit_draft =
+                                this.ai.openai_provider_edit_draft =
                                     Some(crate::gui::app::OpenAiProviderDraft {
                                         name: prov_for_edit.name.clone(),
                                         api_key: prov_for_edit.api_key.clone(),
                                         base_url: prov_for_edit.base_url.clone(),
                                         error: None,
                                     });
-                                this.openai_provider_delete_confirm = false;
+                                this.ai.openai_provider_delete_confirm = false;
                                 cx.notify();
                             }),
                         ),
@@ -1175,10 +1175,10 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(|this, _, _, cx| {
-                                if this.openai_provider_delete_confirm {
+                                if this.ai.openai_provider_delete_confirm {
                                     this.openai_provider_delete(cx);
                                 } else {
-                                    this.openai_provider_delete_confirm = true;
+                                    this.ai.openai_provider_delete_confirm = true;
                                     cx.notify();
                                 }
                             }),
@@ -1225,17 +1225,17 @@ impl ArcadiaRoot {
 
         let (draft_ref, name_fh, api_key_fh, base_url_fh) = if is_create {
             (
-                self.openai_create_draft.as_ref(),
-                self.openai_create_name_focus.clone(),
-                self.openai_create_api_key_focus.clone(),
-                self.openai_create_base_url_focus.clone(),
+                self.ai.openai_create_draft.as_ref(),
+                self.ai.openai_create_name_focus.clone(),
+                self.ai.openai_create_api_key_focus.clone(),
+                self.ai.openai_create_base_url_focus.clone(),
             )
         } else {
             (
-                self.openai_provider_edit_draft.as_ref(),
-                self.openai_edit_name_focus.clone(),
-                self.openai_edit_api_key_focus.clone(),
-                self.openai_edit_base_url_focus.clone(),
+                self.ai.openai_provider_edit_draft.as_ref(),
+                self.ai.openai_edit_name_focus.clone(),
+                self.ai.openai_edit_api_key_focus.clone(),
+                self.ai.openai_edit_base_url_focus.clone(),
             )
         };
 
@@ -1315,11 +1315,11 @@ impl ArcadiaRoot {
                                         MouseButton::Left,
                                         cx.listener(move |this, _, window, cx| {
                                             if is_create {
-                                                if let Some(ref mut d) = this.openai_create_draft {
+                                                if let Some(ref mut d) = this.ai.openai_create_draft {
                                                     let _ = d;
                                                 }
                                             } else if let Some(ref mut d) =
-                                                this.openai_provider_edit_draft
+                                                this.ai.openai_provider_edit_draft
                                             {
                                                 let _ = d;
                                             }
@@ -1329,16 +1329,16 @@ impl ArcadiaRoot {
                                     )
                                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                                         let draft = if is_create {
-                                            this.openai_create_draft.as_mut()
+                                            this.ai.openai_create_draft.as_mut()
                                         } else {
-                                            this.openai_provider_edit_draft.as_mut()
+                                            this.ai.openai_provider_edit_draft.as_mut()
                                         };
                                         let Some(d) = draft else { return };
                                         let key = event.keystroke.key.as_str();
                                         let mods = event.keystroke.modifiers;
                                         if key == "escape" {
-                                            if is_create { this.openai_create_draft = None; }
-                                            else { this.openai_provider_edit_draft = None; }
+                                            if is_create { this.ai.openai_create_draft = None; }
+                                            else { this.ai.openai_provider_edit_draft = None; }
                                         } else if key == "backspace" {
                                             d.name.pop();
                                         } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
@@ -1385,16 +1385,16 @@ impl ArcadiaRoot {
                                     )
                                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                                         let draft = if is_create {
-                                            this.openai_create_draft.as_mut()
+                                            this.ai.openai_create_draft.as_mut()
                                         } else {
-                                            this.openai_provider_edit_draft.as_mut()
+                                            this.ai.openai_provider_edit_draft.as_mut()
                                         };
                                         let Some(d) = draft else { return };
                                         let key = event.keystroke.key.as_str();
                                         let mods = event.keystroke.modifiers;
                                         if key == "escape" {
-                                            if is_create { this.openai_create_draft = None; }
-                                            else { this.openai_provider_edit_draft = None; }
+                                            if is_create { this.ai.openai_create_draft = None; }
+                                            else { this.ai.openai_provider_edit_draft = None; }
                                         } else if key == "backspace" {
                                             d.api_key.pop();
                                         } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
@@ -1441,16 +1441,16 @@ impl ArcadiaRoot {
                                     )
                                     .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
                                         let draft = if is_create {
-                                            this.openai_create_draft.as_mut()
+                                            this.ai.openai_create_draft.as_mut()
                                         } else {
-                                            this.openai_provider_edit_draft.as_mut()
+                                            this.ai.openai_provider_edit_draft.as_mut()
                                         };
                                         let Some(d) = draft else { return };
                                         let key = event.keystroke.key.as_str();
                                         let mods = event.keystroke.modifiers;
                                         if key == "escape" {
-                                            if is_create { this.openai_create_draft = None; }
-                                            else { this.openai_provider_edit_draft = None; }
+                                            if is_create { this.ai.openai_create_draft = None; }
+                                            else { this.ai.openai_provider_edit_draft = None; }
                                         } else if key == "enter" {
                                             if is_create { this.openai_provider_save_create(cx); }
                                             else { this.openai_provider_save_edit(cx); }
@@ -1525,9 +1525,9 @@ impl ArcadiaRoot {
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
                                 if is_create {
-                                    this.openai_create_draft = None;
+                                    this.ai.openai_create_draft = None;
                                 } else {
-                                    this.openai_provider_edit_draft = None;
+                                    this.ai.openai_provider_edit_draft = None;
                                 }
                                 cx.notify();
                             }),

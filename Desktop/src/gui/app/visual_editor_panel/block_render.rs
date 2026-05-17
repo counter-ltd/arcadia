@@ -128,10 +128,10 @@ fn pill_on_accent(label: &str, cat: BlockCategory, is_dark: bool) -> AnyElement 
 /// Update selection + load the block's source line into the inspector draft.
 fn select(this: &mut ArcadiaRoot, path: Vec<usize>, span_start: usize, window: &mut openframe::Window) {
     let idx = this
-        .active_visual_editor_tab
-        .min(this.visual_editor_tabs.len().saturating_sub(1));
+        .visual_editor.active_tab
+        .min(this.visual_editor.tabs.len().saturating_sub(1));
     let line = this
-        .visual_editor_tabs
+        .visual_editor.tabs
         .get(idx)
         .map(|t| {
             let s = span_start.min(t.content.len());
@@ -139,10 +139,10 @@ fn select(this: &mut ArcadiaRoot, path: Vec<usize>, span_start: usize, window: &
             t.content[s..e].to_string()
         })
         .unwrap_or_default();
-    this.visual_editor_edit_caret = line.len();
-    this.visual_editor_edit_draft = line;
-    this.visual_editor_selected = Some(path);
-    this.visual_editor_input_focus.focus(window);
+    this.visual_editor.edit_caret = line.len();
+    this.visual_editor.edit_draft = line;
+    this.visual_editor.selected = Some(path);
+    this.visual_editor.input_focus.focus(window);
 }
 
 /// Render `block` and its subtree. `path` is the block's child-index path from

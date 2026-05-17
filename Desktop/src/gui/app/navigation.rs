@@ -3,7 +3,7 @@ use arcadia_core::config::permissions::{PermissionSubject, PermissionsConfig};
 use arcadia_core::config::ConfigFile as _;
 use arcadia_core::modules::ai::any_ai_provider_enabled;
 use arcadia_core::modules::python_registry;
-use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned};
+use arcadia_core::navigation::{self, NavigationGroupOwned, NavigationPageOwned, PageLayoutKind};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, Context, Div, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
@@ -66,6 +66,14 @@ impl NavPageRef<'_> {
         match self {
             NavPageRef::Static(p) => p.required_module,
             NavPageRef::Remote(p) => p.required_module.as_deref(),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn layout_kind(&self) -> PageLayoutKind {
+        match self {
+            NavPageRef::Static(p) => p.layout_kind,
+            NavPageRef::Remote(p) => p.layout_kind,
         }
     }
 }
@@ -183,7 +191,7 @@ impl ArcadiaRoot {
                 .settings_hub_page_ids_effective()
                 .iter()
                 .any(|p| *p == active.as_str());
-        for &pill_id in &["notification.main", "extensions.settings", "global.modules"] {
+        for &pill_id in navigation::TOP_BAR_PAGE_IDS {
             let should_expand = on_settings || active.as_str() == pill_id;
             let current = self.pill_expanded.get(pill_id).copied().unwrap_or(false);
             if should_expand != current {
@@ -278,28 +286,107 @@ impl ArcadiaRoot {
         if self.thin_client_nav_waiting_host() {
             return self.render_thin_client_waiting_panel(cx, is_dark);
         }
-        #[cfg(feature = "gui")]
-        if self.active_page_id.as_str() == "utility.shell" {
+
+        // Dynamic extension pages have no static PageLayoutKind entry — handle before the lookup.
+        let active = self.active_page_id.clone();
+        if let Some(mid) = navigation::parse_extension_token_settings_page_id(&active) {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.extension_token_settings_panel_for_module(window, cx, is_dark, mid));
+        }
+        if let Some(ext_id) = navigation::parse_extension_nav_page_id(&active) {
+            return div()
+                .w_full()
+                .p_6()
+                .child(self.extension_nav_panel(window, cx, is_dark, ext_id));
+        }
+
+        let layout_kind = navigation::page_by_id(active.as_str())
+            .map(|p| p.layout_kind)
+            .unwrap_or_default();
+
+        match layout_kind {
+            PageLayoutKind::SettingsHub => {
+                let hub_bg = theme::theme_palette(cx, is_dark).canvas;
+                let content = self.settings_hub_landing_panel(cx, is_dark);
+                return div().w_full().h_full().bg(hub_bg).p_8().child(content);
+            }
+            PageLayoutKind::Standard => {
+                let panel: Option<openframe::AnyElement> = match active.as_str() {
+                    "global.modules" => {
+                        Some(self.modules_panel(window, cx, is_dark).into_any_element())
+                    }
+                    "network.nodes" => Some(self.lan_nodes_panel(cx, is_dark).into_any_element()),
+                    "utility.services" => Some(self.services_panel(cx, is_dark).into_any_element()),
+                    "late.settings" => Some(
+                        self.late_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "extensions.settings" => Some(
+                        self.python_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "global.appearance" => Some(
+                        self.appearance_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "global.permissions" => Some(
+                        self.permissions_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "global.shortcuts" => {
+                        Some(self.shortcuts_panel(window, cx, is_dark).into_any_element())
+                    }
+                    "editor.settings" => Some(
+                        self.code_editor_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "global.workspaces" => Some(self.workspace_panel(window, cx, is_dark)),
+                    "ai.settings" => Some(
+                        self.ai_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "ai.models" => Some(self.ai_models_panel(window, cx, is_dark).into_any_element()),
+                    "ai.rules" => Some(self.ai_rules_panel(window, cx, is_dark).into_any_element()),
+                    "ai.skills" => Some(self.ai_skills_panel(window, cx, is_dark).into_any_element()),
+                    "notification.main" => Some(
+                        self.notification_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "notification.settings" => Some(
+                        self.notification_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    _ => None,
+                };
+                if let Some(content) = panel {
+                    return div().w_full().p_6().child(content);
+                }
+            }
+            PageLayoutKind::FullHeight => {}
+        }
+
+        // Full-height pages — each builds its own flex layout; no shared outer wrapper.
+        if active.as_str() == "utility.shell" {
+            #[cfg(feature = "gui")]
             return div()
                 .flex_1()
                 .h_full()
                 .min_h_0()
                 .child(self.shell_panel(window, cx));
-        }
-        #[cfg(all(feature = "ios-gui", not(feature = "gui")))]
-        if self.active_page_id.as_str() == "utility.shell" {
+            #[cfg(all(feature = "ios-gui", not(feature = "gui")))]
             return div()
                 .flex_1()
                 .h_full()
                 .min_h_0()
                 .child(self.ios_execute_shell_panel(window, cx));
         }
-        // Full-height / custom-layout pages — handled before the standard padded dispatcher.
-        if self.active_page_id.as_str() == "late.now_playing" {
+        if active.as_str() == "late.now_playing" {
             return self.render_late_now_playing(window, cx, is_dark);
         }
-        if self.active_page_id.as_str() == "ai.chat" {
-            let diff_open = self.ai_diff_panel_open && !self.ai_pending_edits.is_empty();
+        if active.as_str() == "ai.chat" {
+            let diff_open = self.ai.diff_panel_open && !self.ai.pending_edits.is_empty();
             let chat = self.ai_chat_panel(window, cx, is_dark);
             let mut row = div()
                 .flex_1()
@@ -314,100 +401,16 @@ impl ArcadiaRoot {
             }
             return row;
         }
-
-        // Dynamic extension-token settings pages (page IDs aren't in PAGE_DEFINITIONS).
-        let active = self.active_page_id.clone();
-        if let Some(mid) = navigation::parse_extension_token_settings_page_id(&active) {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.extension_token_settings_panel_for_module(window, cx, is_dark, mid));
-        }
-        // Dynamic extension nav pages declared via arcadia.register_nav_page().
-        if let Some(ext_id) = navigation::parse_extension_nav_page_id(&active) {
-            return div()
-                .w_full()
-                .p_6()
-                .child(self.extension_nav_panel(window, cx, is_dark, ext_id));
-        }
-
-        // Standard padded panels — add new pages here as new match arms.
-        // All arms share the same div().w_full().p_6() wrapper.
-        {
-            let panel: Option<openframe::AnyElement> = match self.active_page_id.as_str() {
-                "global.modules" => {
-                    Some(self.modules_panel(window, cx, is_dark).into_any_element())
-                }
-                "network.nodes" => Some(self.lan_nodes_panel(cx, is_dark).into_any_element()),
-                "utility.services" => Some(self.services_panel(cx, is_dark).into_any_element()),
-                "late.settings" => Some(
-                    self.late_settings_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "extensions.settings" => Some(
-                    self.python_settings_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "global.appearance" => Some(
-                    self.appearance_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "global.permissions" => Some(
-                    self.permissions_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "global.shortcuts" => {
-                    Some(self.shortcuts_panel(window, cx, is_dark).into_any_element())
-                }
-                "editor.settings" => Some(
-                    self.code_editor_settings_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "global.workspaces" => Some(self.workspace_panel(window, cx, is_dark)),
-                "ai.settings" => Some(
-                    self.ai_settings_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "ai.models" => Some(self.ai_models_panel(window, cx, is_dark).into_any_element()),
-                "ai.rules" => Some(self.ai_rules_panel(window, cx, is_dark).into_any_element()),
-                "ai.skills" => Some(self.ai_skills_panel(window, cx, is_dark).into_any_element()),
-                "notification.main" => Some(
-                    self.notification_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                "notification.settings" => Some(
-                    self.notification_settings_panel(window, cx, is_dark)
-                        .into_any_element(),
-                ),
-                navigation::SETTINGS_HUB_ROOT_PAGE_ID => Some(
-                    self.settings_hub_landing_panel(cx, is_dark)
-                        .into_any_element(),
-                ),
-                _ => None,
-            };
-            if let Some(content) = panel {
-                if self.active_page_id.as_str() == navigation::SETTINGS_HUB_ROOT_PAGE_ID {
-                    let hub_bg = theme::theme_palette(cx, is_dark).canvas;
-                    return div()
-                        .w_full()
-                        .h_full()
-                        .bg(hub_bg)
-                        .p_8()
-                        .child(content);
-                }
-                return div().w_full().p_6().child(content);
-            }
-        }
-        if self.active_page_id.as_str() == "editor.main" {
+        if active.as_str() == "editor.main" {
             let active_idx = self
-                .active_code_editor_tab
-                .min(self.code_editor_tabs.len().saturating_sub(1));
+                .code_editor.active_tab
+                .min(self.code_editor.tabs.len().saturating_sub(1));
             let ws_path = self
-                .code_editor_tabs
+                .code_editor.tabs
                 .get(active_idx)
                 .and_then(|t| t.workspace_path.clone())
                 .unwrap_or_default();
-            let show_explorer = self.code_editor_explorer_open && !ws_path.is_empty();
+            let show_explorer = self.code_editor.explorer_open && !ws_path.is_empty();
             let sidebar_bg = theme::explorer_sidebar_bg(is_dark);
             let border_color = theme::explorer_border(is_dark);
             let text_color = theme::explorer_text(is_dark);
@@ -420,7 +423,7 @@ impl ArcadiaRoot {
                 collect_explorer_entries(
                     &ws_path,
                     0,
-                    &self.code_editor_explorer_expanded,
+                    &self.code_editor.explorer_expanded,
                     false,
                     &mut flat,
                 );
@@ -450,7 +453,7 @@ impl ArcadiaRoot {
                 );
 
                 let active_file_path = self
-                    .code_editor_tabs
+                    .code_editor.tabs
                     .get(active_idx)
                     .and_then(|t| t.file_path.clone());
                 let active_row_bg = theme::explorer_active_row_bg(is_dark);
@@ -468,7 +471,7 @@ impl ArcadiaRoot {
                 } else {
                     for (full_path, name, is_dir, depth) in flat {
                         let full_path2 = full_path.clone();
-                        let is_expanded = self.code_editor_explorer_expanded.contains(&full_path);
+                        let is_expanded = self.code_editor.explorer_expanded.contains(&full_path);
                         let is_active_file =
                             !is_dir && active_file_path.as_deref() == Some(full_path.as_str());
                         let folder_icon = if is_expanded { "folder-open" } else { "folder" };
@@ -511,11 +514,11 @@ impl ArcadiaRoot {
                                 .on_mouse_down(
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
-                                        if this.code_editor_explorer_expanded.contains(&full_path2)
+                                        if this.code_editor.explorer_expanded.contains(&full_path2)
                                         {
-                                            this.code_editor_explorer_expanded.remove(&full_path2);
+                                            this.code_editor.explorer_expanded.remove(&full_path2);
                                         } else {
-                                            this.code_editor_explorer_expanded
+                                            this.code_editor.explorer_expanded
                                                 .insert(full_path2.clone());
                                         }
                                         cx.notify();
@@ -531,12 +534,12 @@ impl ArcadiaRoot {
                                     cx.listener(move |this, _, _, cx| {
                                         // Switch to existing tab if already open.
                                         if let Some(existing) =
-                                            this.code_editor_tabs.iter().position(|t| {
+                                            this.code_editor.tabs.iter().position(|t| {
                                                 t.file_path.as_deref() == Some(full_path2.as_str())
                                             })
                                         {
-                                            this.active_code_editor_tab = existing;
-                                            this.code_editor_show_dashboard = false;
+                                            this.code_editor.active_tab = existing;
+                                            this.code_editor.show_dashboard = false;
                                             cx.notify();
                                             return;
                                         }
@@ -550,9 +553,9 @@ impl ArcadiaRoot {
                                                 .map(|n| n.to_string_lossy().to_string())
                                                 .unwrap_or_else(|| full_path2.clone());
                                             let idx = this
-                                                .active_code_editor_tab
-                                                .min(this.code_editor_tabs.len().saturating_sub(1));
-                                            if let Some(tab) = this.code_editor_tabs.get_mut(idx) {
+                                                .code_editor.active_tab
+                                                .min(this.code_editor.tabs.len().saturating_sub(1));
+                                            if let Some(tab) = this.code_editor.tabs.get_mut(idx) {
                                                 tab.saved_content = text.clone();
                                                 tab.content = text;
                                                 tab.file_path = Some(full_path2.clone());
@@ -581,16 +584,16 @@ impl ArcadiaRoot {
                     .child(self.code_editor_panel(window, cx, is_dark)),
             );
         }
-        if self.active_page_id.as_str() == "editor.visual" {
+        if active.as_str() == "editor.visual" {
             let active_idx = self
-                .active_visual_editor_tab
-                .min(self.visual_editor_tabs.len().saturating_sub(1));
+                .visual_editor.active_tab
+                .min(self.visual_editor.tabs.len().saturating_sub(1));
             let ws_path = self
-                .visual_editor_tabs
+                .visual_editor.tabs
                 .get(active_idx)
                 .and_then(|t| t.workspace_path.clone())
                 .unwrap_or_default();
-            let show_explorer = self.visual_editor_explorer_open && !ws_path.is_empty();
+            let show_explorer = self.visual_editor.explorer_open && !ws_path.is_empty();
             let sidebar_bg = theme::explorer_sidebar_bg(is_dark);
             let border_color = theme::explorer_border(is_dark);
             let text_color = theme::explorer_text(is_dark);
@@ -602,7 +605,7 @@ impl ArcadiaRoot {
                 collect_explorer_entries(
                     &ws_path,
                     0,
-                    &self.visual_editor_explorer_expanded,
+                    &self.visual_editor.explorer_expanded,
                     true,
                     &mut flat,
                 );
@@ -631,7 +634,7 @@ impl ArcadiaRoot {
                 );
 
                 let active_file_path = self
-                    .visual_editor_tabs
+                    .visual_editor.tabs
                     .get(active_idx)
                     .and_then(|t| t.file_path.clone());
                 let active_row_bg = theme::explorer_active_row_bg(is_dark);
@@ -650,7 +653,7 @@ impl ArcadiaRoot {
                     for (full_path, name, is_dir, depth) in flat {
                         let full_path2 = full_path.clone();
                         let is_expanded =
-                            self.visual_editor_explorer_expanded.contains(&full_path);
+                            self.visual_editor.explorer_expanded.contains(&full_path);
                         let is_active_file =
                             !is_dir && active_file_path.as_deref() == Some(full_path.as_str());
                         let folder_icon = if is_expanded { "folder-open" } else { "folder" };
@@ -694,13 +697,13 @@ impl ArcadiaRoot {
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
                                         if this
-                                            .visual_editor_explorer_expanded
+                                            .visual_editor.explorer_expanded
                                             .contains(&full_path2)
                                         {
-                                            this.visual_editor_explorer_expanded
+                                            this.visual_editor.explorer_expanded
                                                 .remove(&full_path2);
                                         } else {
-                                            this.visual_editor_explorer_expanded
+                                            this.visual_editor.explorer_expanded
                                                 .insert(full_path2.clone());
                                         }
                                         cx.notify();
@@ -715,12 +718,12 @@ impl ArcadiaRoot {
                                     MouseButton::Left,
                                     cx.listener(move |this, _, _, cx| {
                                         if let Some(existing) =
-                                            this.visual_editor_tabs.iter().position(|t| {
+                                            this.visual_editor.tabs.iter().position(|t| {
                                                 t.file_path.as_deref() == Some(full_path2.as_str())
                                             })
                                         {
-                                            this.active_visual_editor_tab = existing;
-                                            this.visual_editor_show_dashboard = false;
+                                            this.visual_editor.active_tab = existing;
+                                            this.visual_editor.show_dashboard = false;
                                             cx.notify();
                                             return;
                                         }
@@ -730,9 +733,9 @@ impl ArcadiaRoot {
                                                 .map(|n| n.to_string_lossy().to_string())
                                                 .unwrap_or_else(|| full_path2.clone());
                                             let idx = this
-                                                .active_visual_editor_tab
-                                                .min(this.visual_editor_tabs.len().saturating_sub(1));
-                                            if let Some(tab) = this.visual_editor_tabs.get_mut(idx) {
+                                                .visual_editor.active_tab
+                                                .min(this.visual_editor.tabs.len().saturating_sub(1));
+                                            if let Some(tab) = this.visual_editor.tabs.get_mut(idx) {
                                                 tab.saved_content = text.clone();
                                                 tab.content = text;
                                                 tab.file_path = Some(full_path2.clone());
@@ -755,51 +758,49 @@ impl ArcadiaRoot {
                 .overflow_hidden()
                 .child(self.visual_editor_panel(window, cx, is_dark));
             let mut row = row.child(canvas);
-            if self.visual_editor_palette_open {
+            if self.visual_editor.palette_open {
                 let palette = self.visual_editor_palette_panel(cx, is_dark);
                 row = row.child(palette);
             }
             return row;
         }
-        {
-            let active_page = self
-                .active_page_if_visible()
-                .or_else(|| self.page_ref(self.effective_default_page()));
-            div()
-                .w_full()
-                .p_6()
-                .flex()
-                .flex_col()
-                .items_center()
-                .gap_3()
-                .py_16()
-                .child(
-                    div()
-                        .text_3xl()
-                        .font_weight(FontWeight::BOLD)
-                        .child(self.title.clone()),
-                )
-                .child(
-                    div()
-                        .text_2xl()
-                        .text_color(theme::ui_text(cx, is_dark))
-                        .child(
-                            active_page.map_or_else(
-                                || "Page".to_string(),
-                                |page| page.title().to_string(),
-                            ),
+        let active_page = self
+            .active_page_if_visible()
+            .or_else(|| self.page_ref(self.effective_default_page()));
+        div()
+            .w_full()
+            .p_6()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap_3()
+            .py_16()
+            .child(
+                div()
+                    .text_3xl()
+                    .font_weight(FontWeight::BOLD)
+                    .child(self.title.clone()),
+            )
+            .child(
+                div()
+                    .text_2xl()
+                    .text_color(theme::ui_text(cx, is_dark))
+                    .child(
+                        active_page.map_or_else(
+                            || "Page".to_string(),
+                            |page| page.title().to_string(),
                         ),
-                )
-                .child(
-                    div()
-                        .text_base()
-                        .text_color(theme::ui_subtext(cx, is_dark))
-                        .child(active_page.map_or_else(
-                            || "Page definition not found.".to_string(),
-                            |page| page.description().to_string(),
-                        )),
-                )
-        }
+                    ),
+            )
+            .child(
+                div()
+                    .text_base()
+                    .text_color(theme::ui_subtext(cx, is_dark))
+                    .child(active_page.map_or_else(
+                        || "Page definition not found.".to_string(),
+                        |page| page.description().to_string(),
+                    )),
+            )
     }
 
     /// Hub root (`global.settings`): grid of all nested settings pages from the registry.

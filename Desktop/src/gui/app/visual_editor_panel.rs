@@ -17,7 +17,7 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> AnyElement {
-        if self.visual_editor_tabs.is_empty() || self.visual_editor_show_dashboard {
+        if self.visual_editor.tabs.is_empty() || self.visual_editor.show_dashboard {
             self.visual_editor_dashboard(window, cx, is_dark)
         } else {
             self.visual_editor_canvas(window, cx, is_dark)

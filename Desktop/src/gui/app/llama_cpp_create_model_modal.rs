@@ -65,7 +65,7 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> AnyElement {
-        if self.llama_cpp_create_draft.is_none() {
+        if self.ai.llama_cpp_create_draft.is_none() {
             return div().into_any_element();
         }
 
@@ -73,16 +73,16 @@ impl ArcadiaRoot {
         let g = theme::glyph_snapshot(cx);
         let radius = g.map(|gg| gg.border_radius).unwrap_or(p.radius_md);
 
-        let name_focused = self.llama_cpp_create_name_focus.is_focused(window);
-        let path_focused = self.llama_cpp_create_path_focus.is_focused(window);
-        let mmproj_focused = self.llama_cpp_create_mmproj_focus.is_focused(window);
+        let name_focused = self.ai.llama_cpp_create_name_focus.is_focused(window);
+        let path_focused = self.ai.llama_cpp_create_path_focus.is_focused(window);
+        let mmproj_focused = self.ai.llama_cpp_create_mmproj_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
 
-        let name_fh = self.llama_cpp_create_name_focus.clone();
-        let path_fh = self.llama_cpp_create_path_focus.clone();
-        let mmproj_fh = self.llama_cpp_create_mmproj_focus.clone();
+        let name_fh = self.ai.llama_cpp_create_name_focus.clone();
+        let path_fh = self.ai.llama_cpp_create_path_focus.clone();
+        let mmproj_fh = self.ai.llama_cpp_create_mmproj_focus.clone();
 
-        let draft = self.llama_cpp_create_draft.clone().unwrap();
+        let draft = self.ai.llama_cpp_create_draft.clone().unwrap();
         let is_vision = draft.model_kind == LlamaCppModelKind::Vision;
 
         let modal_surface = g.map(|gg| gg.surface).unwrap_or(p.surface);
@@ -100,11 +100,11 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.llama_cpp_create_draft = None;
+                    this.ai.llama_cpp_create_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
                     if key == "backspace" {
                         d.name.pop();
                         cx.notify();
@@ -131,11 +131,11 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.llama_cpp_create_draft = None;
+                    this.ai.llama_cpp_create_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
                     if key == "backspace" {
                         d.path.pop();
                         cx.notify();
@@ -162,11 +162,11 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.llama_cpp_create_draft = None;
+                    this.ai.llama_cpp_create_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
                     if key == "backspace" {
                         d.mmproj_path.pop();
                         cx.notify();
@@ -228,7 +228,7 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
                                     d.model_kind = mt_clone.clone();
                                 }
                                 cx.notify();
@@ -255,7 +255,7 @@ impl ArcadiaRoot {
                     .bg(rgb(0x000000))
                     .opacity(0.3)
                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                        this.llama_cpp_create_draft = None;
+                        this.ai.llama_cpp_create_draft = None;
                         cx.notify();
                     })),
             )
@@ -348,7 +348,7 @@ impl ArcadiaRoot {
                                                                     if let Some(path) = paths.into_iter().next() {
                                                                         cx.update(|_, app| {
                                                                             this.update(app, |this, cx| {
-                                                                                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                                                                                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
                                                                                     d.path = path.to_string_lossy().to_string();
                                                                                     d.error = None;
                                                                                 }
@@ -425,7 +425,7 @@ impl ArcadiaRoot {
                                                                     if let Some(path) = paths.into_iter().next() {
                                                                         cx.update(|_, app| {
                                                                             this.update(app, |this, cx| {
-                                                                                if let Some(ref mut d) = this.llama_cpp_create_draft {
+                                                                                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
                                                                                     d.mmproj_path = path.to_string_lossy().to_string();
                                                                                     d.error = None;
                                                                                 }
@@ -461,7 +461,7 @@ impl ArcadiaRoot {
                                             .cursor_pointer()
                                             .child("Cancel")
                                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                                this.llama_cpp_create_draft = None;
+                                                this.ai.llama_cpp_create_draft = None;
                                                 cx.notify();
                                             })),
                                     )
@@ -492,7 +492,7 @@ impl ArcadiaRoot {
         cx: &mut Context<Self>,
         is_dark: bool,
     ) -> AnyElement {
-        let Some(draft) = self.llama_cpp_edit_draft.clone() else {
+        let Some(draft) = self.ai.llama_cpp_edit_draft.clone() else {
             return div().into_any_element();
         };
 
@@ -502,13 +502,13 @@ impl ArcadiaRoot {
         let is_glyph = g.is_some();
 
         let is_vision = draft.model_kind == LlamaCppModelKind::Vision;
-        let name_focused = self.llama_cpp_edit_name_focus.is_focused(window);
-        let path_focused = self.llama_cpp_edit_path_focus.is_focused(window);
-        let mmproj_focused = self.llama_cpp_edit_mmproj_focus.is_focused(window);
+        let name_focused = self.ai.llama_cpp_edit_name_focus.is_focused(window);
+        let path_focused = self.ai.llama_cpp_edit_path_focus.is_focused(window);
+        let mmproj_focused = self.ai.llama_cpp_edit_mmproj_focus.is_focused(window);
         let blink = self.text_caret_blink_visible;
-        let name_fh = self.llama_cpp_edit_name_focus.clone();
-        let path_fh = self.llama_cpp_edit_path_focus.clone();
-        let mmproj_fh = self.llama_cpp_edit_mmproj_focus.clone();
+        let name_fh = self.ai.llama_cpp_edit_name_focus.clone();
+        let path_fh = self.ai.llama_cpp_edit_path_focus.clone();
+        let mmproj_fh = self.ai.llama_cpp_edit_mmproj_focus.clone();
 
         let name_field = text_field(
             &draft.name,
@@ -522,11 +522,11 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.llama_cpp_edit_draft = None;
+                    this.ai.llama_cpp_edit_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
                     if key == "backspace" {
                         d.name.pop();
                         cx.notify();
@@ -553,11 +553,11 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.llama_cpp_edit_draft = None;
+                    this.ai.llama_cpp_edit_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
                     if key == "backspace" {
                         d.path.pop();
                         cx.notify();
@@ -584,11 +584,11 @@ impl ArcadiaRoot {
                 let key = event.keystroke.key.as_str();
                 let mods = event.keystroke.modifiers;
                 if key == "escape" {
-                    this.llama_cpp_edit_draft = None;
+                    this.ai.llama_cpp_edit_draft = None;
                     cx.notify();
                     return;
                 }
-                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
                     if key == "backspace" {
                         d.mmproj_path.pop();
                         cx.notify();
@@ -649,7 +649,7 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(move |this, _, _, cx| {
-                                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
                                     d.model_kind = mt_clone.clone();
                                 }
                                 cx.notify();
@@ -733,7 +733,7 @@ impl ArcadiaRoot {
                                                     if let Some(path) = paths.into_iter().next() {
                                                         cx.update(|_, app| {
                                                             this.update(app, |this, cx| {
-                                                                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                                                                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
                                                                     d.path = path.to_string_lossy().to_string();
                                                                     d.error = None;
                                                                 }
@@ -808,7 +808,7 @@ impl ArcadiaRoot {
                                                     if let Some(path) = paths.into_iter().next() {
                                                         cx.update(|_, app| {
                                                             this.update(app, |this, cx| {
-                                                                if let Some(ref mut d) = this.llama_cpp_edit_draft {
+                                                                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
                                                                     d.mmproj_path = path.to_string_lossy().to_string();
                                                                     d.error = None;
                                                                 }
@@ -843,7 +843,7 @@ impl ArcadiaRoot {
                             .cursor_pointer()
                             .child("Cancel")
                             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                this.llama_cpp_edit_draft = None;
+                                this.ai.llama_cpp_edit_draft = None;
                                 cx.notify();
                             })),
                     )
@@ -867,16 +867,16 @@ impl ArcadiaRoot {
     }
 
     pub fn llama_cpp_edit_model_save(&mut self, cx: &mut Context<Self>) {
-        let Some(model_id) = self.active_llama_cpp_model_id.clone() else {
+        let Some(model_id) = self.ai.active_llama_cpp_model_id.clone() else {
             return;
         };
-        let Some(draft) = self.llama_cpp_edit_draft.clone() else {
+        let Some(draft) = self.ai.llama_cpp_edit_draft.clone() else {
             return;
         };
 
         let name = draft.name.trim().to_string();
         if name.is_empty() {
-            if let Some(ref mut d) = self.llama_cpp_edit_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                 d.error = Some("Name is required.".to_string());
             }
             cx.notify();
@@ -885,14 +885,14 @@ impl ArcadiaRoot {
 
         let path = draft.path.trim().to_string();
         if path.is_empty() {
-            if let Some(ref mut d) = self.llama_cpp_edit_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                 d.error = Some("Model file path is required.".to_string());
             }
             cx.notify();
             return;
         }
         if !std::path::Path::new(&path).exists() {
-            if let Some(ref mut d) = self.llama_cpp_edit_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                 d.error = Some("Model file not found at that path.".to_string());
             }
             cx.notify();
@@ -902,14 +902,14 @@ impl ArcadiaRoot {
         let mmproj_path = if draft.model_kind == LlamaCppModelKind::Vision {
             let p = draft.mmproj_path.trim().to_string();
             if p.is_empty() {
-                if let Some(ref mut d) = self.llama_cpp_edit_draft {
+                if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                     d.error = Some("mmproj file path is required for Vision models.".to_string());
                 }
                 cx.notify();
                 return;
             }
             if !std::path::Path::new(&p).exists() {
-                if let Some(ref mut d) = self.llama_cpp_edit_draft {
+                if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                     d.error = Some("mmproj file not found at that path.".to_string());
                 }
                 cx.notify();
@@ -921,7 +921,7 @@ impl ArcadiaRoot {
         };
 
         let Ok(mut cfg) = LlamaCppConfig::load_or_create() else {
-            if let Some(ref mut d) = self.llama_cpp_edit_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                 d.error = Some("Could not load llama-cpp.toml".to_string());
             }
             cx.notify();
@@ -936,25 +936,25 @@ impl ArcadiaRoot {
         }
 
         if let Err(e) = cfg.save() {
-            if let Some(ref mut d) = self.llama_cpp_edit_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_edit_draft {
                 d.error = Some(format!("Save failed: {e}"));
             }
             cx.notify();
             return;
         }
 
-        if let Some(m) = self.llama_cpp_models.iter_mut().find(|m| m.id == model_id) {
+        if let Some(m) = self.ai.llama_cpp_models.iter_mut().find(|m| m.id == model_id) {
             m.name = name;
             m.model_kind = draft.model_kind;
             m.path = path;
             m.mmproj_path = mmproj_path;
         }
-        self.llama_cpp_edit_draft = None;
+        self.ai.llama_cpp_edit_draft = None;
         cx.notify();
     }
 
     pub fn llama_cpp_delete_model(&mut self, cx: &mut Context<Self>) {
-        let Some(model_id) = self.active_llama_cpp_model_id.clone() else {
+        let Some(model_id) = self.ai.active_llama_cpp_model_id.clone() else {
             return;
         };
 
@@ -966,20 +966,20 @@ impl ArcadiaRoot {
             return;
         }
 
-        self.llama_cpp_models.retain(|m| m.id != model_id);
-        self.active_llama_cpp_model_id = None;
-        self.llama_cpp_delete_confirm = false;
+        self.ai.llama_cpp_models.retain(|m| m.id != model_id);
+        self.ai.active_llama_cpp_model_id = None;
+        self.ai.llama_cpp_delete_confirm = false;
         cx.notify();
     }
 
     pub fn llama_cpp_create_model_save(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.llama_cpp_create_draft.clone() else {
+        let Some(draft) = self.ai.llama_cpp_create_draft.clone() else {
             return;
         };
 
         let name = draft.name.trim().to_string();
         if name.is_empty() {
-            if let Some(ref mut d) = self.llama_cpp_create_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                 d.error = Some("Name is required.".to_string());
             }
             cx.notify();
@@ -988,14 +988,14 @@ impl ArcadiaRoot {
 
         let path = draft.path.trim().to_string();
         if path.is_empty() {
-            if let Some(ref mut d) = self.llama_cpp_create_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                 d.error = Some("Model file path is required.".to_string());
             }
             cx.notify();
             return;
         }
         if !std::path::Path::new(&path).exists() {
-            if let Some(ref mut d) = self.llama_cpp_create_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                 d.error = Some("Model file not found at that path.".to_string());
             }
             cx.notify();
@@ -1007,14 +1007,14 @@ impl ArcadiaRoot {
         {
             let p = draft.mmproj_path.trim().to_string();
             if p.is_empty() {
-                if let Some(ref mut d) = self.llama_cpp_create_draft {
+                if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                     d.error = Some("mmproj file path is required for Vision models.".to_string());
                 }
                 cx.notify();
                 return;
             }
             if !std::path::Path::new(&p).exists() {
-                if let Some(ref mut d) = self.llama_cpp_create_draft {
+                if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                     d.error = Some("mmproj file not found at that path.".to_string());
                 }
                 cx.notify();
@@ -1026,7 +1026,7 @@ impl ArcadiaRoot {
         };
 
         let Ok(mut cfg) = LlamaCppConfig::load_or_create() else {
-            if let Some(ref mut d) = self.llama_cpp_create_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                 d.error = Some("Could not load llama-cpp.toml".to_string());
             }
             cx.notify();
@@ -1050,20 +1050,20 @@ impl ArcadiaRoot {
         cfg.models.push(model.clone());
 
         if let Err(e) = cfg.save() {
-            if let Some(ref mut d) = self.llama_cpp_create_draft {
+            if let Some(ref mut d) = self.ai.llama_cpp_create_draft {
                 d.error = Some(format!("Save failed: {e}"));
             }
             cx.notify();
             return;
         }
 
-        self.llama_cpp_models.push(model);
-        self.active_llama_cpp_model_id = Some(id);
-        self.active_ai_provider_module =
+        self.ai.llama_cpp_models.push(model);
+        self.ai.active_llama_cpp_model_id = Some(id);
+        self.ai.active_provider_module =
             arcadia_core::config::modules::AI_LLAMA_CPP_MODULE_NAME.to_string();
         self.active_page_id = "ai.models".to_string();
         self.sync_settings_hub_expanded_from_active_page();
-        self.llama_cpp_create_draft = None;
+        self.ai.llama_cpp_create_draft = None;
         cx.notify();
     }
 }
