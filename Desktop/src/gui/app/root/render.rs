@@ -329,6 +329,10 @@ impl Render for ArcadiaRoot {
                         this.ai.chat_workspace_picker_open = false;
                         changed = true;
                     }
+                    if this.ai.chat_context_viewer_open {
+                        this.ai.chat_context_viewer_open = false;
+                        changed = true;
+                    }
                     if this.color_picker_modal.is_some() {
                         this.color_picker_modal = None;
                         changed = true;
@@ -705,6 +709,9 @@ impl ArcadiaRoot {
                 }
             }
             picker.into_any_element()
+        } else if self.ai.chat_context_viewer_open {
+            self.render_ai_context_viewer(cx, is_dark, pos, bg_color, border_color, text_color)
+                .into_any_element()
         } else if self.code_editor.context_menu_open {
             div()
                 .absolute()
@@ -1433,6 +1440,254 @@ impl ArcadiaRoot {
         } else {
             div().into_any_element()
         }
+    }
+
+    fn render_ai_context_viewer(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        pos: openframe::Point<openframe::Pixels>,
+        bg_color: openframe::Rgba,
+        border_color: openframe::Rgba,
+        text_color: openframe::Rgba,
+    ) -> openframe::Stateful<openframe::Div> {
+        use arcadia_core::config::ai_rules::{all_rules, AiRulesConfig};
+        use arcadia_core::config::ai_skills::{all_skills, AiSkillsConfig};
+        use arcadia_core::modules::ai_tools::WORKSPACE_TOOLS;
+
+        let p = crate::gui::theme::theme_palette(cx, is_dark);
+        let radius = crate::gui::theme::ui_radius(cx);
+        let accent = crate::gui::theme::ui_accent(cx);
+        let meta_color = p.content_meta;
+
+        let active_id = self.ai.active_chat_id;
+
+        // Assemble system prompt preview.
+        let mut system_preview = self.ai.default_system_prompt.clone();
+
+        let rules_cfg = AiRulesConfig::load_or_create().unwrap_or_default();
+        let all_r = all_rules(&rules_cfg);
+        let skills_cfg = AiSkillsConfig::load_or_create().unwrap_or_default();
+        let all_s = all_skills(&skills_cfg);
+
+        for id in &self.ai.active_rule_ids {
+            if let Some(rule) = all_r.iter().find(|r| &r.id == id) {
+                system_preview.push_str(&format!("\n\n[Rule: {}]\n{}", rule.name, rule.system_fragment));
+            }
+        }
+        for id in &self.ai.active_skill_ids {
+            if let Some(skill) = all_s.iter().find(|s| &s.id == id) {
+                system_preview.push_str(&format!("\n\n[Skill: {}]\n{}", skill.name, skill.system_fragment));
+            }
+        }
+
+        if let Some(ws_id) = &self.ai.chat_workspace_id {
+            if let Ok(cfg) = arcadia_core::config::workspace::WorkspacesConfig::load_or_create() {
+                if let Some(ws) = cfg.workspaces.into_iter().find(|w| &w.id == ws_id) {
+                    let perms = self.workspace_entries.iter()
+                        .find(|e| e.id == ws.id)
+                        .map(|e| {
+                            let mut granted = Vec::new();
+                            if e.granted_permissions.iter().any(|p| p == "workspace.read") { granted.push("read"); }
+                            if e.granted_permissions.iter().any(|p| p == "workspace.write") { granted.push("write"); }
+                            if e.granted_permissions.iter().any(|p| p == "workspace.execute") { granted.push("execute"); }
+                            if granted.is_empty() { "none".to_string() } else { granted.join(", ") }
+                        })
+                        .unwrap_or_else(|| "none".to_string());
+                    system_preview.push_str(&format!(
+                        "\n\nYou are scoped to a workspace. Your working directory is: {}\nWorkspace name: {}\nGranted permissions: {}\nUse this path as the root for all file operations. You do not need to ask the user for the path — it is already set.\nWhen asked to explore, review, or work with code, immediately use list_files or read_file to examine the workspace contents rather than asking the user to specify files or directories.",
+                        ws.path, ws.label, perms
+                    ));
+                }
+            }
+        }
+
+        let messages = self.ai.chats.iter()
+            .find(|c| c.id == active_id)
+            .map(|c| c.messages.clone())
+            .unwrap_or_default();
+
+        let used_chars: usize = system_preview.len()
+            + messages.iter().map(|m| m.content.len()).sum::<usize>();
+        const CONTEXT_MAX_CHARS: usize = 512_000;
+        let chars_label = {
+            let fmt = |n: usize| -> String {
+                if n >= 1_000 { format!("{:.0}K", n as f32 / 1_000.0) } else { format!("{}", n) }
+            };
+            format!("{} / {}", fmt(used_chars), fmt(CONTEXT_MAX_CHARS))
+        };
+
+        let tool_names: Vec<&str> = if self.ai.chat_workspace_id.is_some()
+            && self.is_module_enabled(arcadia_core::config::modules::WORKSPACE_MODULE_NAME)
+        {
+            WORKSPACE_TOOLS.iter().map(|t| t.name).collect()
+        } else {
+            vec![]
+        };
+
+        let section_label = move |label: String| {
+            div()
+                .text_xs()
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(accent)
+                .pt_3()
+                .pb_1()
+                .child(label)
+        };
+
+        let divider_bar = move || {
+            div().w_full().h(px(1.)).bg(border_color).mb_2()
+        };
+
+        let mut content = div().flex().flex_col();
+
+        // Header
+        content = content.child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .pb_2()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(text_color)
+                                .child("Context"),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(meta_color)
+                                .child(chars_label),
+                        ),
+                )
+                .child(
+                    div()
+                        .px_1p5()
+                        .py_0p5()
+                        .rounded(px(radius))
+                        .cursor_pointer()
+                        .text_xs()
+                        .text_color(meta_color)
+                        .hover(move |s| s.bg(border_color))
+                        .child("×")
+                        .on_mouse_down(
+                            openframe::MouseButton::Left,
+                            cx.listener(|this, _, _, cx| {
+                                this.ai.chat_context_viewer_open = false;
+                                cx.notify();
+                            }),
+                        ),
+                ),
+        );
+
+        // System Prompt
+        let system_lines: Vec<String> = system_preview.lines().map(|l| l.to_string()).collect();
+        let system_empty = system_preview.is_empty();
+        content = content
+            .child(section_label("SYSTEM PROMPT".to_string()))
+            .child(divider_bar())
+            .child({
+                if system_empty {
+                    div().text_xs().text_color(meta_color).child("(empty)")
+                } else {
+                    let mut block = div().flex().flex_col().text_xs().text_color(text_color);
+                    for line in system_lines {
+                        block = block.child(div().child(if line.is_empty() { " ".to_string() } else { line }));
+                    }
+                    block
+                }
+            });
+
+        // Messages
+        let msg_count = messages.len();
+        content = content
+            .child(section_label(format!("MESSAGES  ({})", msg_count)))
+            .child(divider_bar());
+        if messages.is_empty() {
+            content = content.child(
+                div().text_xs().text_color(meta_color).child("No messages yet."),
+            );
+        } else {
+            let mut msgs_col = div().flex().flex_col().gap_2();
+            for msg in &messages {
+                use crate::gui::app::AiMessageRole;
+                let (role_label, role_color) = match msg.role {
+                    AiMessageRole::User => ("[User]", text_color),
+                    AiMessageRole::Assistant => ("[AI]", accent),
+                };
+                let preview = if msg.content.len() > 300 {
+                    format!("{}…", &msg.content[..300])
+                } else {
+                    msg.content.clone()
+                };
+                msgs_col = msgs_col.child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_0p5()
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(role_color)
+                                .child(role_label),
+                        )
+                        .child({
+                            let mut msg_block = div().flex().flex_col().text_xs().text_color(text_color);
+                            for line in preview.lines() {
+                                let l = line.to_string();
+                                msg_block = msg_block.child(div().child(if l.is_empty() { " ".to_string() } else { l }));
+                            }
+                            msg_block
+                        }),
+                );
+            }
+            content = content.child(msgs_col);
+        }
+
+        // Tools
+        if !tool_names.is_empty() {
+            content = content
+                .child(section_label("TOOLS".to_string()))
+                .child(divider_bar());
+            let mut tools_col = div().flex().flex_col().gap_0p5();
+            for name in &tool_names {
+                tools_col = tools_col.child(
+                    div().text_xs().text_color(text_color).child(format!("• {name}")),
+                );
+            }
+            content = content.child(tools_col);
+        }
+
+        div()
+            .id("ai-context-viewer")
+            .absolute()
+            .left(pos.x)
+            .top(pos.y)
+            .w(px(380.))
+            .max_h(px(480.))
+            .p_3()
+            .rounded_md()
+            .border_1()
+            .border_color(border_color)
+            .bg(bg_color)
+            .occlude()
+            .overflow_y_scroll()
+            .on_mouse_down(
+                openframe::MouseButton::Left,
+                cx.listener(|_, _, _, cx| {
+                    cx.stop_propagation();
+                }),
+            )
+            .child(content)
     }
 }
 

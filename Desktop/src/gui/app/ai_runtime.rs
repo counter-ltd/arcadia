@@ -240,7 +240,7 @@ fn prepare_system(request: &TextGenerationRequest) -> Result<PreparedSystem, Str
             perms.join(", ")
         };
         system = format!(
-            "{system}\n\nWorkspace: {label} ({path})\nGranted permissions: {perm_str}",
+            "{system}\n\nYou are scoped to a workspace. Your working directory is: {path}\nWorkspace name: {label}\nGranted permissions: {perm_str}\nUse this path as the root for all file operations. You do not need to ask the user for the path — it is already set.\nWhen asked to explore, review, or work with code, immediately use list_files or read_file to examine the workspace contents rather than asking the user to specify files or directories.",
             label = ctx.workspace_label,
             path = ctx.workspace_path,
         );

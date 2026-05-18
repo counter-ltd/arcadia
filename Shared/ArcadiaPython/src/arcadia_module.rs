@@ -692,19 +692,22 @@ fn overlay_hud_clear_sprite(extension_id: String) -> PyResult<()> {
     Ok(())
 }
 
-/// Request native vibrancy (NSVisualEffectView, Menu material) for `stacking`.
+/// Request native vibrancy (NSVisualEffectView) for `stacking`.
 /// `height_px` is the logical-pixel height of the vibrancy strip pinned to the top of the
 /// display — typically `menu_bar_height() - 3`. Currently only `"below_menu_bar"` is supported.
+/// `material` selects the NSVisualEffectMaterial: `"sidebar"` (default), `"menu"`, `"titlebar"`,
+/// `"hud"`, `"popover"`, `"fullscreen"`.
 #[pyfunction]
-#[pyo3(signature = (extension_id, height_px, stacking = None))]
+#[pyo3(signature = (extension_id, height_px, stacking = None, material = None))]
 fn overlay_hud_set_vibrancy(
     extension_id: String,
     height_px: f32,
     stacking: Option<String>,
+    material: Option<String>,
 ) -> PyResult<()> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
     let _ = stacking; // reserved for future multi-window vibrancy; currently always BMB
-    overlay_hud_sprite::set_vibrancy_for_owner(extension_id, height_px);
+    overlay_hud_sprite::set_vibrancy_for_owner(extension_id, height_px, material);
     Ok(())
 }
 

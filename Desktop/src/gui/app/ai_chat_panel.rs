@@ -12,14 +12,61 @@ use arcadia_core::modules::ai_exec_cli::cli_for_module;
 use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, SharedString, StatefulInteractiveElement, Styled, Window,
+    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, SharedString, StatefulInteractiveElement, Styled, Window,
 };
 
 use crate::gui::app::ai_runtime::{AiRuntimeHandle, AiRuntimeRequest, ProviderRouting};
 use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::{AiMessage, AiMessageRole, ArcadiaRoot};
 use crate::gui::theme;
+
+enum MsgSegment {
+    Text(String),
+    ToolCall { name: String, args: serde_json::Value },
+    PendingTool,
+}
+
+fn parse_msg_segments(content: &str) -> Vec<MsgSegment> {
+    let mut segments = Vec::new();
+    let mut remaining = content;
+    while let Some(block_start) = remaining.find("```json") {
+        let before = remaining[..block_start].trim_end();
+        if !before.is_empty() {
+            segments.push(MsgSegment::Text(before.to_string()));
+        }
+        let after_marker = &remaining[block_start + 7..];
+        if let Some(block_end) = after_marker.find("```") {
+            let json_str = after_marker[..block_end].trim();
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                if let Some(calls) = val["tool_calls"].as_array() {
+                    for call in calls {
+                        if let Some(name) = call["name"].as_str() {
+                            segments.push(MsgSegment::ToolCall {
+                                name: name.to_string(),
+                                args: call["arguments"].clone(),
+                            });
+                        }
+                    }
+                }
+            }
+            remaining = &after_marker[block_end + 3..];
+        } else {
+            // Unclosed block — still streaming; suppress raw JSON, show pending pill.
+            segments.push(MsgSegment::PendingTool);
+            remaining = "";
+            break;
+        }
+    }
+    let tail = remaining.trim_start_matches('\n').trim_end();
+    if !tail.is_empty() {
+        segments.push(MsgSegment::Text(tail.to_string()));
+    }
+    if segments.is_empty() {
+        segments.push(MsgSegment::Text(content.to_string()));
+    }
+    segments
+}
 
 
 impl ArcadiaRoot {
@@ -584,28 +631,119 @@ impl ArcadiaRoot {
                 );
                 (lerp_color(pal.row_selected, pal.icon_idle, 0.3), pal.icon_idle, pal.icon_active)
             };
-            let content = msg.content.clone();
 
-            let bubble = div()
-                .px_3()
-                .py_2()
-                .rounded(px(radius.min(12.0)))
-                .bg(bubble_bg)
-                .border_1()
-                .border_color(bubble_border)
-                .text_sm()
-                .text_color(text_col)
-                .max_w(px(540.))
-                .child(content);
+            for segment in parse_msg_segments(&msg.content) {
+                let (row_el, align_end): (AnyElement, bool) = match segment {
+                    MsgSegment::Text(text) => {
+                        let mut bubble = div()
+                            .px_3()
+                            .py_2()
+                            .rounded(px(radius.min(12.0)))
+                            .bg(bubble_bg)
+                            .border_1()
+                            .border_color(bubble_border)
+                            .text_sm()
+                            .text_color(text_col)
+                            .max_w(px(540.))
+                            .flex()
+                            .flex_col()
+                            .gap_0p5();
+                        for line in text.lines() {
+                            bubble = bubble.child(div().child(line.to_string()));
+                        }
+                        (bubble.into_any_element(), is_user)
+                    }
+                    MsgSegment::ToolCall { name, args } => {
+                        let mut tool_bubble = div()
+                            .px_3()
+                            .py_2()
+                            .rounded(px(radius.min(12.0)))
+                            .bg(p.badge_muted_bg)
+                            .border_1()
+                            .border_color(p.panel_border)
+                            .text_sm()
+                            .max_w(px(360.))
+                            .flex()
+                            .flex_col()
+                            .gap_0p5();
+                        tool_bubble = tool_bubble.child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_1p5()
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(p.badge_muted_fg)
+                                        .child("⚙"),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(p.content_title)
+                                        .child(name),
+                                ),
+                        );
+                        if let Some(obj) = args.as_object() {
+                            for (key, val) in obj {
+                                let val_str = match val {
+                                    serde_json::Value::String(s) => s.clone(),
+                                    other => other.to_string(),
+                                };
+                                tool_bubble = tool_bubble.child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .gap_1()
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(p.content_meta)
+                                                .child(format!("{}:", key)),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(p.badge_muted_fg)
+                                                .child(val_str),
+                                        ),
+                                );
+                            }
+                        }
+                        (tool_bubble.into_any_element(), false)
+                    }
+                    MsgSegment::PendingTool => {
+                        let pill = div()
+                            .px_3()
+                            .py_2()
+                            .rounded(px(radius.min(12.0)))
+                            .bg(p.badge_muted_bg)
+                            .border_1()
+                            .border_color(p.panel_border)
+                            .text_sm()
+                            .text_color(p.badge_muted_fg)
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1p5()
+                            .child(div().text_xs().child("⚙"))
+                            .child(div().text_xs().child("Calling tool…"));
+                        (pill.into_any_element(), false)
+                    }
+                };
 
-            msg_col = msg_col.child(
-                div()
-                    .w_full()
-                    .flex()
-                    .flex_row()
-                    .when(is_user, |d| d.justify_end())
-                    .child(bubble),
-            );
+                msg_col = msg_col.child(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_row()
+                        .when(align_end, |d| d.justify_end())
+                        .child(row_el),
+                );
+            }
         }
 
         // Loading indicator: distinguish model-load phase (empty assistant placeholder)

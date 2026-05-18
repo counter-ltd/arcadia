@@ -196,13 +196,14 @@ fn poll_overlay_vibrancy(async_app: &mut AsyncApp) {
 
     let want_vibrancy = overlay_hud_sprite::has_any_vibrancy();
     let height_px = overlay_hud_sprite::vibrancy_height_px();
+    let material = overlay_hud_sprite::vibrancy_material();
     OVERLAY_VIBRANCY_BMB.store(want_vibrancy, Ordering::Release);
 
     let handle = OVERLAY_HANDLE_BMB.lock().ok().and_then(|g| *g);
     if let Some(handle) = handle {
         let _ = async_app.update(move |app| {
             let _ = handle.update(app, |_root, window, _| -> Result<(), ()> {
-                window.set_vibrancy(want_vibrancy, height_px);
+                window.set_vibrancy(want_vibrancy, height_px, material.as_deref());
                 Ok(())
             });
         });

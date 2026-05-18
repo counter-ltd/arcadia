@@ -452,6 +452,8 @@ pub struct AiUiState {
     pub chat_model_picker_open: bool,
     pub chat_workspace_id: Option<String>,
     pub chat_workspace_picker_open: bool,
+    /// Whether the context viewer popover is open.
+    pub chat_context_viewer_open: bool,
     pub runtime: Option<ai_runtime::AiRuntimeHandle>,
     pub stream_chat_id: Option<usize>,
     pub poll_task_started: bool,

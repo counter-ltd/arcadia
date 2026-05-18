@@ -480,6 +480,7 @@ impl ArcadiaRoot {
                 chat_model_picker_open: false,
                 chat_workspace_id: None,
                 chat_workspace_picker_open: false,
+                chat_context_viewer_open: false,
                 runtime: None,
                 stream_chat_id: None,
                 poll_task_started: false,

@@ -175,6 +175,7 @@ pub fn clone_if_newer_than(
 
 struct VibrancyEntry {
     height_px: f32,
+    material: Option<String>,
 }
 
 struct VibrancyInner {
@@ -219,12 +220,25 @@ pub fn vibrancy_height_px() -> f32 {
         .unwrap_or(0.0)
 }
 
+/// Material string of the owner with the greatest `height_px`, or `None` when no owners active.
+pub fn vibrancy_material() -> Option<String> {
+    vibrancy_state()
+        .lock()
+        .ok()
+        .and_then(|g| {
+            g.owners
+                .values()
+                .max_by(|a, b| a.height_px.partial_cmp(&b.height_px).unwrap_or(std::cmp::Ordering::Equal))
+                .and_then(|e| e.material.clone())
+        })
+}
+
 /// Register `owner` as wanting native vibrancy at `height_px` logical pixels.
 /// Always bumps version so the overlay backend re-applies even if already active
-/// (height may have changed).
-pub fn set_vibrancy_for_owner(owner: String, height_px: f32) {
+/// (height or material may have changed).
+pub fn set_vibrancy_for_owner(owner: String, height_px: f32, material: Option<String>) {
     if let Ok(mut g) = vibrancy_state().lock() {
-        g.owners.insert(owner, VibrancyEntry { height_px });
+        g.owners.insert(owner, VibrancyEntry { height_px, material });
         g.version = g.version.wrapping_add(1);
     }
 }

@@ -1,8 +1,8 @@
 use arcadia_core::config::ConfigFile as _;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, Styled, Window,
+    canvas, div, point, px, rgb, Context, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, PathBuilder, Styled, Window,
 };
 
 use arcadia_core::modules;
@@ -163,6 +163,123 @@ impl ArcadiaRoot {
                                             cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
                                                 this.ai.chat_workspace_picker_open = !this.ai.chat_workspace_picker_open;
                                                 this.ai.chat_model_picker_open = false;
+                                                #[cfg(feature = "gui")]
+                                                { this.context_menu_position = event.position; }
+                                                #[cfg(not(feature = "gui"))]
+                                                let _ = event;
+                                                cx.stop_propagation();
+                                                cx.notify();
+                                            }),
+                                        )
+                                } else {
+                                    div()
+                                }
+                            })
+                            .child({
+                                if self.active_page_id.as_str() == "ai.chat"
+                                    && !self.ai.chat_show_dashboard
+                                    && !self.ai.chats.is_empty()
+                                {
+                                    // Estimate context fill ratio (chars / 512K chars ≈ 128K tokens).
+                                    let active_id = self.ai.active_chat_id;
+                                    let msg_chars: usize = self.ai.chats.iter()
+                                        .find(|c| c.id == active_id)
+                                        .map(|c| c.messages.iter().map(|m| m.content.len()).sum())
+                                        .unwrap_or(0);
+                                    let system_chars = self.ai.default_system_prompt.len();
+                                    let rules_chars: usize = {
+                                        use arcadia_core::config::ai_rules::{all_rules, AiRulesConfig};
+                                        let cfg = AiRulesConfig::load_or_create().unwrap_or_default();
+                                        let all_r = all_rules(&cfg);
+                                        self.ai.active_rule_ids.iter()
+                                            .filter_map(|id| all_r.iter().find(|r| &r.id == id))
+                                            .map(|r| r.system_fragment.len())
+                                            .sum()
+                                    };
+                                    let skills_chars: usize = {
+                                        use arcadia_core::config::ai_skills::{all_skills, AiSkillsConfig};
+                                        let cfg = AiSkillsConfig::load_or_create().unwrap_or_default();
+                                        let all_s = all_skills(&cfg);
+                                        self.ai.active_skill_ids.iter()
+                                            .filter_map(|id| all_s.iter().find(|s| &s.id == id))
+                                            .map(|s| s.system_fragment.len())
+                                            .sum()
+                                    };
+                                    let total_chars = (msg_chars + system_chars + rules_chars + skills_chars) as f32;
+                                    let fill_ratio = (total_chars / 512_000.0_f32).clamp(0.0, 1.0);
+
+                                    let track_color = {
+                                        let mut c = action_pill_tc;
+                                        c.a *= 0.3;
+                                        c
+                                    };
+                                    let fill_color = theme::ui_accent(cx);
+                                    let context_viewer_open = self.ai.chat_context_viewer_open;
+                                    let btn_bg = if context_viewer_open { fill_color } else { action_pill_bg };
+                                    let btn_tc = if context_viewer_open { theme::ui_accent_fg(cx) } else { action_pill_tc };
+
+                                    let ring = canvas(
+                                        |_, _, _| {},
+                                        move |bounds, _, window, _| {
+                                            let ox = f32::from(bounds.origin.x);
+                                            let oy = f32::from(bounds.origin.y);
+                                            let cx_f = ox + 7.0;
+                                            let cy_f = oy + 7.0;
+                                            let r = 4.5_f32;
+
+                                            // Track — two semicircles to form a full ring.
+                                            {
+                                                let mut pb = PathBuilder::stroke(px(1.5));
+                                                pb.move_to(point(px(cx_f), px(cy_f - r)));
+                                                pb.arc_to(point(px(r), px(r)), px(0.0), false, true, point(px(cx_f), px(cy_f + r)));
+                                                pb.arc_to(point(px(r), px(r)), px(0.0), false, true, point(px(cx_f), px(cy_f - r)));
+                                                if let Ok(path) = pb.build() {
+                                                    window.paint_path(path, track_color);
+                                                }
+                                            }
+
+                                            // Fill arc — clockwise from 12 o'clock.
+                                            if fill_ratio > 0.005 {
+                                                let mut pb = PathBuilder::stroke(px(1.5));
+                                                pb.move_to(point(px(cx_f), px(cy_f - r)));
+                                                if fill_ratio >= 0.995 {
+                                                    pb.arc_to(point(px(r), px(r)), px(0.0), false, true, point(px(cx_f), px(cy_f + r)));
+                                                    pb.arc_to(point(px(r), px(r)), px(0.0), false, true, point(px(cx_f), px(cy_f - r)));
+                                                } else {
+                                                    let angle = fill_ratio * std::f32::consts::TAU;
+                                                    let end_x = cx_f + r * angle.sin();
+                                                    let end_y = cy_f - r * angle.cos();
+                                                    pb.arc_to(point(px(r), px(r)), px(0.0), fill_ratio > 0.5, true, point(px(end_x), px(end_y)));
+                                                }
+                                                if let Ok(path) = pb.build() {
+                                                    window.paint_path(path, fill_color);
+                                                }
+                                            }
+                                        },
+                                    )
+                                    .w(px(14.))
+                                    .h(px(14.));
+
+                                    div()
+                                        .px_2()
+                                        .py_0p5()
+                                        .rounded(px(radius))
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .bg(btn_bg)
+                                        .text_color(btn_tc)
+                                        .flex()
+                                        .items_center()
+                                        .gap_1p5()
+                                        .hover(move |style| style.bg(action_pill_hover))
+                                        .child(ring)
+                                        .child("Context")
+                                        .on_mouse_down(
+                                            openframe::MouseButton::Left,
+                                            cx.listener(|this, event: &openframe::MouseDownEvent, _, cx| {
+                                                this.ai.chat_context_viewer_open = !this.ai.chat_context_viewer_open;
+                                                this.ai.chat_model_picker_open = false;
+                                                this.ai.chat_workspace_picker_open = false;
                                                 #[cfg(feature = "gui")]
                                                 { this.context_menu_position = event.position; }
                                                 #[cfg(not(feature = "gui"))]
