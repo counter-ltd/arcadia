@@ -12,8 +12,8 @@ pub const NAME: &str = "python-host";
 pub fn ensure_native_companions_for_loaded_extension(extension_id: &str) {
     let declares_overlay = python_registry::list_modules()
         .into_iter()
-        .find(|(n, _, _, _, _, _)| n == extension_id)
-        .map(|(_, _, _, _, perms, _)| perms.iter().any(|p| p == "overlay.hud"))
+        .find(|(n, _, _, _, _, _, _)| n == extension_id)
+        .map(|(_, _, _, _, perms, _, _)| perms.iter().any(|p| p == "overlay.hud"))
         .unwrap_or(false);
     if !declares_overlay {
         return;
@@ -70,7 +70,7 @@ fn list(args: &[&str], _context: &ExecutionContext) -> String {
 
     if !modules.is_empty() {
         lines.push("Python modules:".to_string());
-        for (name, version, description, enabled, _perms, _plats) in &modules {
+        for (name, version, description, enabled, _perms, _plats, _tags) in &modules {
             let state = if *enabled { "enabled" } else { "disabled" };
             lines.push(format!("  {name} v{version} [{state}] — {description}"));
         }

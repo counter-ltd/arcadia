@@ -94,7 +94,7 @@ impl ArcadiaRoot {
 
         // Python extensions
         let py_rows = python_registry::list_modules();
-        for (ext_id, _, _, enabled, _, _) in &py_rows {
+        for (ext_id, _, _, enabled, _, _, _) in &py_rows {
             if !enabled {
                 continue;
             }

@@ -71,12 +71,14 @@ fn sync_extensions(dir: &Path) -> Result<(), String> {
         // crash mid-load.
         let declared_permissions = parse_declared_permissions(&ext.path).unwrap_or_default();
         let declared_platforms = parse_declared_platforms(&ext.path).unwrap_or_default();
+        let declared_tags = parse_declared_tags(&ext.path).unwrap_or_default();
         python_registry::register_discovered(
             ext.id.clone(),
             ext.path.clone(),
             persisted_enabled,
             declared_permissions,
             declared_platforms,
+            declared_tags,
         );
         if persisted_enabled {
             if python_registry::extension_body_loaded(&ext.id) {
@@ -252,6 +254,43 @@ fn parse_declared_platforms(path: &Path) -> Option<Vec<String>> {
     Some(out)
 }
 
+/// Naive scanner for `tags=[ "beta", "code-editor", … ]` inside the first `register_module(...)`
+/// call. Same limitations as [`parse_declared_permissions`].
+fn parse_declared_tags(path: &Path) -> Option<Vec<String>> {
+    let code = std::fs::read_to_string(path).ok()?;
+    let anchor = code.find("register_module(")?;
+    let after_anchor = &code[anchor..];
+    let Some(kw) = after_anchor.find("tags") else {
+        return Some(Vec::new());
+    };
+    let after_kw = &after_anchor[kw..];
+    let bracket_open = after_kw.find('[')?;
+    let bracket_close = after_kw[bracket_open..].find(']')?;
+    let inner = &after_kw[bracket_open + 1..bracket_open + bracket_close];
+
+    let mut out = Vec::new();
+    let mut chars = inner.char_indices();
+    while let Some((i, c)) = chars.next() {
+        if c == '"' || c == '\'' {
+            let quote = c;
+            let start = i + 1;
+            let mut end = start;
+            let mut closed = false;
+            for (j, cc) in chars.by_ref() {
+                if cc == quote {
+                    end = j;
+                    closed = true;
+                    break;
+                }
+            }
+            if closed && end > start {
+                out.push(inner[start..end].to_string());
+            }
+        }
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,6 +384,35 @@ arcadia.register_module(
         );
         let plats = parse_declared_platforms(&path).unwrap();
         assert!(plats.is_empty());
+    }
+
+    #[test]
+    fn parse_declared_tags_kwarg() {
+        let path = write_tmp(
+            "ext_with_tags.py",
+            r#"import arcadia
+arcadia.register_module(
+    name="test-ext",
+    version="1.0.0",
+    description="...",
+    tags=["beta", "code-editor"],
+)
+"#,
+        );
+        let tags = parse_declared_tags(&path).unwrap();
+        assert_eq!(tags, vec!["beta", "code-editor"]);
+    }
+
+    #[test]
+    fn parse_declared_tags_missing_kwarg() {
+        let path = write_tmp(
+            "ext_no_tags.py",
+            r#"import arcadia
+arcadia.register_module(name="test-ext2", version="0.1.0", description="...")
+"#,
+        );
+        let tags = parse_declared_tags(&path).unwrap();
+        assert!(tags.is_empty());
     }
 
     #[test]

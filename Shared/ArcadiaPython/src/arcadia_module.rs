@@ -77,13 +77,14 @@ fn glyph_from_fields(
 }
 
 #[pyfunction]
-#[pyo3(signature = (name, version, description, permissions=None, platforms=None))]
+#[pyo3(signature = (name, version, description, permissions=None, platforms=None, tags=None))]
 fn register_module(
     name: String,
     version: String,
     description: String,
     permissions: Option<Vec<String>>,
     platforms: Option<Vec<String>>,
+    tags: Option<Vec<String>>,
 ) {
     python_registry::register_module(
         name,
@@ -91,6 +92,7 @@ fn register_module(
         description,
         permissions.unwrap_or_default(),
         platforms.unwrap_or_default(),
+        tags.unwrap_or_default(),
     );
 }
 

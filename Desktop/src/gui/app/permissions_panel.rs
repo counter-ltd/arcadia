@@ -400,10 +400,10 @@ impl ArcadiaRoot {
         let py_catalog_nonempty = self
             .python_extension_rows
             .iter()
-            .any(|(_, _, _, enabled, perms, _)| *enabled && !perms.is_empty());
+            .any(|(_, _, _, enabled, perms, _, _)| *enabled && !perms.is_empty());
 
         let mut py_children: Vec<AnyElement> = Vec::new();
-        for (name, _ver, _desc, enabled, perms, _platforms) in &self.python_extension_rows {
+        for (name, _ver, _desc, enabled, perms, _platforms, _tags) in &self.python_extension_rows {
             if !enabled || perms.is_empty() {
                 continue;
             }

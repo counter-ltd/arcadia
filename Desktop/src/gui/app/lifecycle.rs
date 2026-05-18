@@ -39,6 +39,27 @@ use super::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use super::{AiUiState, CodeEditorTab, CodeEditorUiState, LateUiState, ShellMode, TerminalInstance, VisualEditorTab, VisualEditorUiState};
 
+/// Merge author-declared tags with auto-derived platform display tags.
+/// Platform strings from `supported_platforms` become human-readable chips ("macOS", "Linux", …)
+/// and are appended after declared tags, deduplicating any overlap.
+fn display_tags_for(declared: &[String], platforms: &[String]) -> Vec<String> {
+    let mut tags = declared.to_vec();
+    for p in platforms {
+        let label = match p.as_str() {
+            "macos"   => "macOS",
+            "windows" => "Windows",
+            "linux"   => "Linux",
+            "ios"     => "iOS",
+            other     => other,
+        };
+        let s = label.to_string();
+        if !tags.contains(&s) {
+            tags.push(s);
+        }
+    }
+    tags
+}
+
 /// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
 /// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
 fn fetch_ollama_tags(
@@ -730,7 +751,13 @@ impl ArcadiaRoot {
             // Startup may co-enable native modules (e.g. `overlay` for HUD extensions).
             root.reload_modules();
             root.python_extension_rows = {
-                let mut rows = arcadia_core::modules::python_registry::list_modules();
+                let mut rows: Vec<_> = arcadia_core::modules::python_registry::list_modules()
+                    .into_iter()
+                    .map(|(name, ver, desc, enabled, perms, plats, tags)| {
+                        let display = display_tags_for(&tags, &plats);
+                        (name, ver, desc, enabled, perms, plats, display)
+                    })
+                    .collect();
                 rows.sort_by(|a, b| a.0.cmp(&b.0));
                 rows
             };
@@ -817,7 +844,13 @@ impl ArcadiaRoot {
 
     pub fn reload_extension_state(&mut self, cx: &mut Context<Self>) {
         self.python_extension_rows = {
-            let mut rows = arcadia_core::modules::python_registry::list_modules();
+            let mut rows: Vec<_> = arcadia_core::modules::python_registry::list_modules()
+                .into_iter()
+                .map(|(name, ver, desc, enabled, perms, plats, tags)| {
+                    let display = display_tags_for(&tags, &plats);
+                    (name, ver, desc, enabled, perms, plats, display)
+                })
+                .collect();
             rows.sort_by(|a, b| a.0.cmp(&b.0));
             rows
         };
@@ -957,7 +990,13 @@ impl ArcadiaRoot {
             }
             self.python_host_started = true;
             self.python_extension_rows = {
-                let mut rows = arcadia_core::modules::python_registry::list_modules();
+                let mut rows: Vec<_> = arcadia_core::modules::python_registry::list_modules()
+                    .into_iter()
+                    .map(|(name, ver, desc, enabled, perms, plats, tags)| {
+                        let display = display_tags_for(&tags, &plats);
+                        (name, ver, desc, enabled, perms, plats, display)
+                    })
+                    .collect();
                 rows.sort_by(|a, b| a.0.cmp(&b.0));
                 rows
             };

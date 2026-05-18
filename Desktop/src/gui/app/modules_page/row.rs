@@ -24,8 +24,6 @@ impl ArcadiaRoot {
         let description = manifest
             .map(|m| m.description)
             .unwrap_or("No manifest description.");
-        let state = if enabled { "Enabled" } else { "Disabled" };
-
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
         let is_glyph = g_snap.is_some();
@@ -34,12 +32,6 @@ impl ArcadiaRoot {
         let title_c = p.content_title;
         let meta_c = p.content_meta;
         let desc_c = p.content_body;
-
-        let (badge_bg, badge_fg) = if enabled {
-            (p.accent, p.on_accent)
-        } else {
-            (p.surface_elevated, p.ui_subtext)
-        };
 
         let row = div()
             .w_full()
@@ -82,18 +74,6 @@ impl ArcadiaRoot {
                                             .text_xs()
                                             .text_color(meta_c)
                                             .child(format!("v{version}")),
-                                    )
-                                    .child(
-                                        div()
-                                            .px_2()
-                                            .py_0p5()
-                                            .when(!is_glyph, |d| d.rounded_full())
-                                            .rounded(px(radius.min(12.0)))
-                                            .text_xs()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .bg(badge_bg)
-                                            .text_color(badge_fg)
-                                            .child(state),
                                     ),
                             )
                             .child(div().text_xs().text_color(desc_c).child(description))
@@ -164,7 +144,7 @@ impl ArcadiaRoot {
                     .text_xs()
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(if enabled { p.accent } else { p.ui_subtext })
-                    .child(if enabled { "ON" } else { "OFF" }),
+                    .child(if enabled { "Enabled" } else { "Disabled" }),
             )
             .child(if enabled {
                 div()

@@ -573,7 +573,7 @@ pub struct ArcadiaRoot {
     pub workspace_create_path_focus: FocusHandle,
     pub module_rows: Vec<(String, bool)>,
     /// (name, version, description, enabled) — refreshed after python-host loads extensions.
-    pub python_extension_rows: Vec<(String, String, String, bool, Vec<String>, Vec<String>)>,
+    pub python_extension_rows: Vec<(String, String, String, bool, Vec<String>, Vec<String>, Vec<String>)>,
     /// Set once `PythonExtensionHost::start` has been called so `reload_modules` can start the
     /// host on-demand when python-host is enabled at runtime rather than at startup.
     pub python_host_started: bool,

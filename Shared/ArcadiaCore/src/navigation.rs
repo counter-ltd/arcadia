@@ -581,8 +581,8 @@ fn build_extension_token_settings_page_owned(module_id: &str) -> NavigationPageO
     let title = humanize_extension_module_id(module_id);
     let description = python_registry::list_modules()
         .into_iter()
-        .find(|(n, _, _, _, _, _)| n == module_id)
-        .and_then(|(_, _, d, _, _, _)| {
+        .find(|(n, _, _, _, _, _, _)| n == module_id)
+        .and_then(|(_, _, d, _, _, _, _)| {
             let t = d.trim();
             if t.is_empty() || t == "(not loaded)" {
                 None

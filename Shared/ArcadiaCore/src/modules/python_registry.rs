@@ -23,6 +23,8 @@ pub struct PythonModuleInfo {
     pub required_permissions: Vec<String>,
     /// Empty = all platforms. Otherwise whitelist of `macos` / `windows` / `linux` / `ios` / `unknown`.
     pub supported_platforms: Vec<String>,
+    /// Author-declared tags, e.g. `["beta", "code-editor"]`. Empty = no tags declared.
+    pub tags: Vec<String>,
     /// On-disk source for this extension — populated by `register_discovered` so the host can
     /// call `load_extension(path)` when the user toggles a stub on.
     pub path: Option<PathBuf>,
@@ -212,12 +214,14 @@ pub fn register_module(
     description: String,
     required_permissions: Vec<String>,
     supported_platforms: Vec<String>,
+    tags: Vec<String>,
 ) {
     if let Ok(mut reg) = registry().lock() {
         let prev = reg.modules.iter().find(|m| m.name == name);
         let was_enabled = prev.map(|m| m.enabled);
         let was_perms = prev.map(|m| m.required_permissions.clone());
         let was_plat = prev.map(|m| m.supported_platforms.clone());
+        let was_tags = prev.map(|m| m.tags.clone());
         let was_path = prev.and_then(|m| m.path.clone());
         reg.modules.retain(|m| m.name != name);
         let perms = if required_permissions.is_empty() {
@@ -229,6 +233,11 @@ pub fn register_module(
             was_plat.unwrap_or_default()
         } else {
             supported_platforms
+        };
+        let tags = if tags.is_empty() {
+            was_tags.unwrap_or_default()
+        } else {
+            tags
         };
         // Default to `false` for first-ever registration. The previous behaviour of
         // `unwrap_or(true)` auto-enabled every extension dropped into `~/Arcadia/Extensions/`
@@ -242,6 +251,7 @@ pub fn register_module(
             enabled: was_enabled.unwrap_or(false),
             required_permissions: perms,
             supported_platforms: platforms,
+            tags,
             path: was_path,
             loaded: true,
         });
@@ -290,6 +300,7 @@ pub fn register_discovered(
     persisted_enabled: bool,
     declared_permissions: Vec<String>,
     declared_platforms: Vec<String>,
+    declared_tags: Vec<String>,
 ) {
     if id.is_empty() {
         return;
@@ -314,6 +325,9 @@ pub fn register_discovered(
             if !existing.loaded && !declared_platforms.is_empty() {
                 existing.supported_platforms = declared_platforms;
             }
+            if !existing.loaded && !declared_tags.is_empty() {
+                existing.tags = declared_tags;
+            }
             // Update stub metadata if the body hasn't set it yet.
             if !existing.loaded {
                 if existing.version == "0.0.0" && !stub_version.is_empty() {
@@ -334,6 +348,7 @@ pub fn register_discovered(
             enabled: persisted_enabled,
             required_permissions: declared_permissions,
             supported_platforms: declared_platforms,
+            tags: declared_tags,
             path: Some(path),
             loaded: false,
         });
@@ -976,7 +991,7 @@ pub fn reload() -> Result<(), String> {
     }
 }
 
-pub fn list_modules() -> Vec<(String, String, String, bool, Vec<String>, Vec<String>)> {
+pub fn list_modules() -> Vec<(String, String, String, bool, Vec<String>, Vec<String>, Vec<String>)> {
     let Ok(reg) = registry().lock() else {
         return Vec::new();
     };
@@ -990,6 +1005,7 @@ pub fn list_modules() -> Vec<(String, String, String, bool, Vec<String>, Vec<Str
                 m.enabled,
                 m.required_permissions.clone(),
                 m.supported_platforms.clone(),
+                m.tags.clone(),
             )
         })
         .collect()

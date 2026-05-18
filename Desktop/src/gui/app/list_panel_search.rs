@@ -100,13 +100,12 @@ impl ArcadiaRoot {
                 }),
             )
             .child(if text.is_empty() {
-                if focused && blink {
-                    div()
-                        .text_color(title_c)
-                        .child(TEXT_INPUT_CARET_CHAR.to_string())
+                let display = if focused && blink {
+                    format!("{placeholder}{TEXT_INPUT_CARET_CHAR}")
                 } else {
-                    div().text_color(meta_c).child(placeholder)
-                }
+                    placeholder.to_string()
+                };
+                div().text_color(meta_c).child(display)
             } else {
                 div().child(text_with_trailing_caret(text, focused, blink))
             })

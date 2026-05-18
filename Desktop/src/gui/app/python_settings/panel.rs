@@ -50,8 +50,10 @@ impl ArcadiaRoot {
 
         let filtered: Vec<_> = all_rows
             .into_iter()
-            .filter(|(name, version, description, _, _, _)| {
-                list_panel_row_matches(&q, name, &[version.as_str(), description.as_str()])
+            .filter(|(name, version, description, _, _, _, tags)| {
+                let mut extras = vec![version.as_str(), description.as_str()];
+                extras.extend(tags.iter().map(String::as_str));
+                list_panel_row_matches(&q, name, &extras)
             })
             .collect();
 
@@ -97,7 +99,7 @@ impl ArcadiaRoot {
                 .flex_col()
                 .gap_3()
                 .children(filtered.into_iter().map(
-                    |(name, version, description, enabled, _, platforms)| {
+                    |(name, version, description, enabled, _, platforms, tags)| {
                         let runtime_supported =
                             supports_runtime_platform_owned(platforms.as_slice());
                         Self::python_extension_row(
@@ -109,6 +111,7 @@ impl ArcadiaRoot {
                             is_dark,
                             panel_radius,
                             runtime_supported,
+                            tags,
                         )
                     },
                 ))
@@ -167,17 +170,11 @@ impl ArcadiaRoot {
         is_dark: bool,
         border_radius: f32,
         runtime_supported: bool,
+        tags: Vec<String>,
     ) -> AnyElement {
         let p = theme::theme_palette(cx, is_dark);
         let is_glyph = theme::glyph_snapshot(cx).is_some();
-        let state_label = if enabled { "Enabled" } else { "Disabled" };
         let r_track = border_radius.min(8.0_f32).max(0.0);
-
-        let (badge_bg, badge_fg) = if enabled {
-            (p.accent, p.on_accent)
-        } else {
-            (p.surface_elevated, p.ui_subtext)
-        };
 
         let row_inner = div()
             .w_full()
@@ -232,18 +229,17 @@ impl ArcadiaRoot {
                                             .text_color(p.content_meta)
                                             .child(format!("v{version}")),
                                     )
-                                    .child(
+                                    .children(tags.iter().map(|tag| {
                                         div()
                                             .px_2()
                                             .py_0p5()
                                             .when(!is_glyph, |d| d.rounded_full())
                                             .rounded(px(border_radius.min(12.0)))
                                             .text_xs()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .bg(badge_bg)
-                                            .text_color(badge_fg)
-                                            .child(state_label),
-                                    ),
+                                            .bg(p.surface_elevated)
+                                            .text_color(p.ui_subtext)
+                                            .child(tag.clone())
+                                    })),
                             )
                             .child(
                                 div()
@@ -274,7 +270,7 @@ impl ArcadiaRoot {
                             .text_xs()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(if enabled { p.accent } else { p.ui_subtext })
-                            .child(if enabled { "ON" } else { "OFF" }),
+                            .child(if enabled { "Enabled" } else { "Disabled" }),
                     )
                     .child(if enabled {
                         div()
