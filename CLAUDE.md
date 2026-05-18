@@ -4,6 +4,8 @@
 
 Multi-platform runtime and shell: one Rust core (`Shared/ArcadiaCore`) consumed by a single GPUI-style UI layer (`Libraries/OpenFrame`) rendered on three surfaces — desktop (`Desktop/` GUI feature), iOS (Metal-hosted OpenFrame via `--features ios-gui`), and a headless CLI. The core owns all logic; the UI layer renders; the surfaces only initialize and dispatch input.
 
+**Arcadia is a permission and privacy control layer.** Giving the user full, visible control over every permission and privacy-sensitive capability is the core purpose of the app. Every OS capability the app touches is represented in `PERMISSION_REGISTRY` and gated on it — see "OS capabilities outside the permission system" under What Not to Do. This is not an add-on; it is what Arcadia is for.
+
 **Key invariant:** if you find yourself writing the same logic in more than one place, it belongs in `arcadia-core` (logic) or `gui/app/` (presentation) — not in surface entrypoints.
 
 ---
@@ -375,6 +377,27 @@ Command::new("sh").arg("-c").arg(model_supplied_cmd).output()
 ```
 
 **Rule:** Any execution of user- or model-supplied shell commands must go through `sandboxed_exec()` in `ai_sandbox.rs`. The allowlist there is the single gate. Do not bypass it.
+
+### OS capabilities outside the permission system
+
+**Arcadia is a permission and privacy control layer.** Giving the user full, visible control over every permission and privacy-sensitive capability is the entire point of the app. The permission system (`PERMISSION_REGISTRY`) is not a feature *of* Arcadia — it *is* Arcadia. Therefore: **every OS capability the app touches is represented in `PERMISSION_REGISTRY`, by definition.** There is no such thing as a correct ungated OS-capability call.
+
+```rust
+// BAD — CGWindowListCopyWindowInfo silently requires macOS Screen Recording.
+// Nothing in PERMISSION_REGISTRY represents it → the user has no visibility
+// or control over a privacy-sensitive capability the app just used. This
+// defeats the product's entire purpose.
+let windows = unsafe { CGWindowListCopyWindowInfo(ON_SCREEN_ONLY, 0) };
+
+// GOOD — the capability lives in the permission system.
+// 1. PERMISSION_REGISTRY entry (config/permissions.rs), with `system_grant`
+//    when an OS-level grant flow is involved.
+// 2. The call site checks the permission before invoking the OS API.
+// 3. The GUI exposes the toggle (+ Grant/Revoke for the OS grant), so the
+//    user sees and controls it.
+```
+
+**Rule:** Any OS API that depends on a system-level permission or touches a privacy-sensitive capability — macOS Accessibility, Screen Recording, Camera, Microphone, Location, Input Monitoring, Automation, Full Disk Access, Contacts, Calendar, etc. — MUST be represented by an entry in `PERMISSION_REGISTRY` (`Shared/ArcadiaCore/src/config/permissions.rs`) and gated on it. Add the permission first; set `system_grant` (add a `SystemGrant` variant if none fits) when an OS grant flow is needed. Calling such an API ungated is not a missed checklist item — it is a direct violation of what Arcadia exists to do. If a capability cannot be registered and surfaced to the user, the app does not use it.
 
 ### HTTP calls without timeouts
 

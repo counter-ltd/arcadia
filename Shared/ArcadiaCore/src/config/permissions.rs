@@ -13,11 +13,37 @@ const FILE_NAME: &str = "permissions.toml";
 pub const SCHEMA_VERSION: u32 = 2;
 
 /// An OS-level grant a permission also depends on, beyond Arcadia's own toggle.
-/// The host surface can launch the OS grant flow for these via `platform::prompt_system_grant`.
+/// The host surface launches the OS grant flow for these via `platform::prompt_system_grant`
+/// and reports current state via `platform::is_system_grant_active`. Each variant maps to a
+/// macOS Privacy & Security settings pane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SystemGrant {
-    /// Assistive-access grant: read/drive other apps' UI. macOS → Accessibility settings pane.
+    /// Assistive access: read / drive other apps' UI.
     Accessibility,
+    /// Capture screen contents / window geometry of other apps.
+    ScreenRecording,
+    /// Capture from the camera.
+    Camera,
+    /// Capture from the microphone.
+    Microphone,
+    /// Observe keyboard / mouse input system-wide.
+    InputMonitoring,
+    /// Read device location.
+    Location,
+    /// Send Apple Events to control other apps.
+    Automation,
+    /// Read files in protected locations system-wide.
+    FullDiskAccess,
+    /// Read the address book.
+    Contacts,
+    /// Read / write calendar events.
+    Calendars,
+    /// Read the photo library.
+    Photos,
+    /// Read / write reminders.
+    Reminders,
+    /// Use Bluetooth.
+    Bluetooth,
 }
 
 /// Stable permission ids (see product plan / AGENTS).
@@ -128,9 +154,93 @@ pub const PERMISSION_REGISTRY: &[PermissionDefinition] = &[
     PermissionDefinition {
         id: "system.accessibility",
         title: "Accessibility (AX)",
-        description: "Read other apps' UI geometry via the macOS Accessibility API — focused-app menu extent and system status-item boundaries. Requires the OS-level Accessibility grant in System Settings.",
+        description: "Read and drive other apps' UI via the macOS Accessibility API — focused-app menu extent, status-item boundaries, assistive control. Needs the OS Accessibility grant.",
         default_global: false,
         system_grant: Some(SystemGrant::Accessibility),
+    },
+    PermissionDefinition {
+        id: "system.screen_recording",
+        title: "Screen Recording",
+        description: "Capture screen contents and other apps' window geometry. Needs the OS Screen Recording grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::ScreenRecording),
+    },
+    PermissionDefinition {
+        id: "system.camera",
+        title: "Camera",
+        description: "Capture video from the camera. Needs the OS Camera grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Camera),
+    },
+    PermissionDefinition {
+        id: "system.microphone",
+        title: "Microphone",
+        description: "Capture audio from the microphone. Needs the OS Microphone grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Microphone),
+    },
+    PermissionDefinition {
+        id: "system.input_monitoring",
+        title: "Input Monitoring",
+        description: "Observe keyboard and mouse input system-wide. Needs the OS Input Monitoring grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::InputMonitoring),
+    },
+    PermissionDefinition {
+        id: "system.location",
+        title: "Location",
+        description: "Read the device's location. Needs the OS Location Services grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Location),
+    },
+    PermissionDefinition {
+        id: "system.automation",
+        title: "Automation",
+        description: "Send Apple Events to control other applications. Needs the OS Automation grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Automation),
+    },
+    PermissionDefinition {
+        id: "system.full_disk_access",
+        title: "Full Disk Access",
+        description: "Read files in OS-protected locations system-wide. Needs the OS Full Disk Access grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::FullDiskAccess),
+    },
+    PermissionDefinition {
+        id: "system.contacts",
+        title: "Contacts",
+        description: "Read the system address book. Needs the OS Contacts grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Contacts),
+    },
+    PermissionDefinition {
+        id: "system.calendars",
+        title: "Calendars",
+        description: "Read and write calendar events. Needs the OS Calendars grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Calendars),
+    },
+    PermissionDefinition {
+        id: "system.photos",
+        title: "Photos",
+        description: "Read the system photo library. Needs the OS Photos grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Photos),
+    },
+    PermissionDefinition {
+        id: "system.reminders",
+        title: "Reminders",
+        description: "Read and write reminders. Needs the OS Reminders grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Reminders),
+    },
+    PermissionDefinition {
+        id: "system.bluetooth",
+        title: "Bluetooth",
+        description: "Communicate with Bluetooth devices. Needs the OS Bluetooth grant.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Bluetooth),
     },
     PermissionDefinition {
         id: "overlay.hud",

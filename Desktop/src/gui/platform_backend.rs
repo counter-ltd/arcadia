@@ -28,6 +28,12 @@ extern "C" {
     fn AXIsProcessTrusted() -> bool;
 }
 
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGPreflightScreenCaptureAccess() -> bool;
+}
+
 pub struct DesktopPlatformBackend {
     /// `(left_end, right_start)` in NSScreen logical points on notch Macs; `None` on non-notch.
     notch_section_widths: Option<(f32, f32)>,
@@ -114,11 +120,11 @@ impl PlatformBackend for DesktopPlatformBackend {
         #[cfg(target_os = "macos")]
         {
             match grant {
-                SystemGrant::Accessibility => {
-                    prompt_accessibility();
-                    true
-                }
+                // Accessibility additionally shows the system consent dialog.
+                SystemGrant::Accessibility => prompt_accessibility(),
+                other => open_privacy_pane(privacy_anchor(other)),
             }
+            true
         }
         #[cfg(not(target_os = "macos"))]
         {
@@ -130,8 +136,14 @@ impl PlatformBackend for DesktopPlatformBackend {
     fn is_system_grant_active(&self, grant: SystemGrant) -> bool {
         #[cfg(target_os = "macos")]
         {
+            // Only the cheap, dependency-free checks are wired. The rest report `false`
+            // (the GUI then shows "Grant"); a real check needs the per-capability API
+            // (AVCaptureDevice, CLLocationManager, …) and should be added when a feature
+            // actually consumes that permission.
             match grant {
-                SystemGrant::Accessibility => unsafe { AXIsProcessTrusted() },
+                SystemGrant::Accessibility   => unsafe { AXIsProcessTrusted() },
+                SystemGrant::ScreenRecording => unsafe { CGPreflightScreenCaptureAccess() },
+                _ => false,
             }
         }
         #[cfg(not(target_os = "macos"))]
@@ -140,6 +152,36 @@ impl PlatformBackend for DesktopPlatformBackend {
             false
         }
     }
+}
+
+/// macOS Privacy & Security settings-pane anchor for each system grant.
+#[cfg(target_os = "macos")]
+fn privacy_anchor(grant: SystemGrant) -> &'static str {
+    match grant {
+        SystemGrant::Accessibility   => "Privacy_Accessibility",
+        SystemGrant::ScreenRecording => "Privacy_ScreenCapture",
+        SystemGrant::Camera          => "Privacy_Camera",
+        SystemGrant::Microphone      => "Privacy_Microphone",
+        SystemGrant::InputMonitoring => "Privacy_ListenEvent",
+        SystemGrant::Location        => "Privacy_LocationServices",
+        SystemGrant::Automation      => "Privacy_Automation",
+        SystemGrant::FullDiskAccess  => "Privacy_AllFiles",
+        SystemGrant::Contacts        => "Privacy_Contacts",
+        SystemGrant::Calendars       => "Privacy_Calendars",
+        SystemGrant::Photos          => "Privacy_Photos",
+        SystemGrant::Reminders       => "Privacy_Reminders",
+        SystemGrant::Bluetooth       => "Privacy_Bluetooth",
+    }
+}
+
+/// Open a macOS Privacy & Security settings pane so the user can flip the OS grant.
+#[cfg(target_os = "macos")]
+fn open_privacy_pane(anchor: &str) {
+    let _ = std::process::Command::new("open")
+        .arg(format!(
+            "x-apple.systempreferences:com.apple.preference.security?{anchor}"
+        ))
+        .spawn();
 }
 
 /// macOS Accessibility settings flow. `AXIsProcessTrustedWithOptions` with the prompt option
@@ -188,9 +230,7 @@ fn prompt_accessibility() {
         }
     }
 
-    let _ = std::process::Command::new("open")
-        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-        .spawn();
+    open_privacy_pane("Privacy_Accessibility");
 }
 
 // ── AX boundary helpers (macOS only) ─────────────────────────────────────────

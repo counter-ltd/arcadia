@@ -53,6 +53,7 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 14. **Is my file over 400 lines?** → Plan a split into submodules before the PR. Files over 600 lines are blocked. (Exception: generated or test files.)
 15. **Am I returning `None` or a fallback when a user-visible operation fails?** → Return `Err(String)` with a specific message instead. The UI layer must show the error, not silently degrade.
 16. **Did I add, rename, or change a feature (module, page, command, type, config field)?** → Update the corresponding `Documentation/Features/*.md` file. The mapping is in `CLAUDE.md` under "Documentation Maintenance".
+17. **Am I calling an OS API that needs a system-level permission or touches a privacy-sensitive capability (Accessibility, Screen Recording, Camera, Microphone, Location, Input Monitoring, Automation, Full Disk Access, …)?** → It MUST be represented in `PERMISSION_REGISTRY` and gated on it. Arcadia is a permission/privacy control layer — surfacing every such capability to the user is the whole point of the app, not an optional gate. Add the permission first, gate the call, set `system_grant` (add a `SystemGrant` variant if none fits) when an OS grant flow is involved. If a capability cannot be registered and surfaced, the app does not use it.
 
 ---
 
@@ -74,4 +75,5 @@ Full reference (architecture, patterns, anti-patterns, build, gotchas) is in `CL
 - [ ] No `expect()` or `unwrap()` in production paths (outside `#[cfg(test)]`) — use `Result` / `Option` with user-visible error messages
 - [ ] No file in `Shared/ArcadiaCore/src/modules/` or `Desktop/src/gui/app/` exceeds 600 lines without a documented split plan
 - [ ] New AI provider routes do not carry credentials in `ProviderRouting` — the inference thread loads config directly
+- [ ] Every OS API needing a system permission or touching a privacy-sensitive capability (Accessibility, Screen Recording, Camera, Mic, Location, Input Monitoring, Automation, Full Disk Access, …) is represented in `PERMISSION_REGISTRY` and gated on it — Arcadia gates all permissions; no OS capability is used ungated
 - [ ] `Documentation/Features/*.md` updated for any changed module, page, command, config field, or type (see mapping in `CLAUDE.md` § Documentation Maintenance)
