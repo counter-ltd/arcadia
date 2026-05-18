@@ -3,13 +3,9 @@ name: Core Tests
 on:
   push:
     branches:
-      - development
-      - main
       - stable
   pull_request:
     branches:
-      - development
-      - main
       - stable
 
 jobs:

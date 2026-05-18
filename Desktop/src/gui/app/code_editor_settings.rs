@@ -401,7 +401,7 @@ impl ArcadiaRoot {
         let input_radius = panel_radius.min(8.0);
         let editing = self.code_editor.char_width_editing;
         let focused = self.code_editor.char_width_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
+        let blink = window.caret_blink_visible();
         let draft = self.code_editor.char_width_draft.clone();
         let cw_focus = self.code_editor.char_width_focus.clone();
 

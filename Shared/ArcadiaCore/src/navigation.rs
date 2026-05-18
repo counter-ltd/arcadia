@@ -40,6 +40,10 @@ pub struct NavigationPageDefinition {
     /// Content area layout contract — drives wrapper selection in the render path.
     #[serde(default)]
     pub layout_kind: PageLayoutKind,
+    /// When true, the page handles Cmd+G natively (e.g. code editor Go-to-line) and the
+    /// platform goto bar must not intercept that chord on this page.
+    #[serde(default)]
+    pub blocks_platform_goto: bool,
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -82,6 +86,8 @@ pub struct NavigationPageOwned {
     pub required_module: Option<String>,
     #[serde(default)]
     pub layout_kind: PageLayoutKind,
+    #[serde(default)]
+    pub blocks_platform_goto: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -167,6 +173,7 @@ impl NavigationRegistryOwned {
                 accent: decl.accent.clone(),
                 required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),
                 layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
             });
             if let Some(group) = self.groups.iter_mut().find(|g| g.id == decl.group_id) {
                 if !group.pages.contains(&page_id) {
@@ -205,6 +212,7 @@ impl From<&NavigationPageDefinition> for NavigationPageOwned {
             accent: p.accent.to_string(),
             required_module: p.required_module.map(|s| s.to_string()),
             layout_kind: p.layout_kind,
+            blocks_platform_goto: p.blocks_platform_goto,
         }
     }
 }
@@ -232,6 +240,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "emerald",
         required_module: Some(TERMINAL_MODULE_NAME),
         layout_kind: PageLayoutKind::FullHeight,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "utility.services",
@@ -244,6 +253,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         // `SERVICE_DEFINITIONS` targets this page id and has its required module enabled.
         required_module: None,
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.logs",
@@ -254,6 +264,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "sky",
         required_module: None,
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.settings",
@@ -264,6 +275,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "indigo",
         required_module: None,
         layout_kind: PageLayoutKind::SettingsHub,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.modules",
@@ -274,6 +286,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "fuchsia",
         required_module: None,
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.appearance",
@@ -284,6 +297,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "indigo",
         required_module: None,
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.permissions",
@@ -294,6 +308,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "indigo",
         required_module: None,
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.shortcuts",
@@ -304,6 +319,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "indigo",
         required_module: None,
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "global.workspaces",
@@ -314,6 +330,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "emerald",
         required_module: Some(WORKSPACE_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "network.nodes",
@@ -324,6 +341,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "cyan",
         required_module: Some(LAN_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "late.now_playing",
@@ -334,6 +352,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
         layout_kind: PageLayoutKind::FullHeight,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "late.experimental",
@@ -344,6 +363,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "late.settings",
@@ -354,6 +374,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(LATE_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "extensions.settings",
@@ -364,6 +385,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "indigo",
         required_module: Some(PYTHON_HOST_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "editor.main",
@@ -374,6 +396,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "sky",
         required_module: Some(CODE_EDITOR_MODULE_NAME),
         layout_kind: PageLayoutKind::FullHeight,
+        blocks_platform_goto: true,
     },
     NavigationPageDefinition {
         id: "editor.settings",
@@ -384,6 +407,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "sky",
         required_module: Some(CODE_EDITOR_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "editor.visual",
@@ -394,6 +418,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "sky",
         required_module: Some(VISUAL_EDITOR_MODULE_NAME),
         layout_kind: PageLayoutKind::FullHeight,
+        blocks_platform_goto: true,
     },
     NavigationPageDefinition {
         id: "ai.chat",
@@ -404,6 +429,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
         layout_kind: PageLayoutKind::FullHeight,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "ai.settings",
@@ -414,6 +440,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "ai.models",
@@ -424,6 +451,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some(AI_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "ai.rules",
@@ -434,6 +462,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some("ai-rules"),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "ai.skills",
@@ -444,6 +473,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "violet",
         required_module: Some("ai-skills"),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "notification.main",
@@ -454,6 +484,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "amber",
         required_module: Some(NOTIFICATION_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
     NavigationPageDefinition {
         id: "notification.settings",
@@ -464,6 +495,7 @@ pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
         accent: "amber",
         required_module: Some(NOTIFICATION_MODULE_NAME),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     },
 ];
 
@@ -610,6 +642,7 @@ fn build_extension_token_settings_page_owned(module_id: &str) -> NavigationPageO
         accent: extension_token_settings_page_accent(module_id).to_string(),
         required_module: Some(PYTHON_HOST_MODULE_NAME.to_string()),
         layout_kind: PageLayoutKind::Standard,
+        blocks_platform_goto: false,
     }
 }
 

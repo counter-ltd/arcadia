@@ -12,12 +12,12 @@ use arcadia_core::modules::ai_exec_cli::cli_for_module;
 use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, SharedString, StatefulInteractiveElement, Styled, Window,
+    div, px, rgb, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, ParentElement, SharedString, StatefulInteractiveElement, Styled,
+    Window,
 };
 
 use crate::gui::app::ai_runtime::{AiRuntimeHandle, AiRuntimeRequest, ProviderRouting};
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::{AiMessage, AiMessageRole, ArcadiaRoot};
 use crate::gui::theme;
 
@@ -592,7 +592,6 @@ impl ArcadiaRoot {
         let p = theme::theme_palette(cx, is_dark);
         let g_snap = theme::glyph_snapshot(cx);
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
-        let blink = self.text_caret_blink_visible;
         let is_focused = self.ai.input_focus.is_focused(window);
         let active_id = self.ai.active_chat_id;
 
@@ -790,6 +789,7 @@ impl ArcadiaRoot {
         }
 
         // Input area
+        let weak = cx.weak_entity();
         let input_area = div()
             .flex_shrink_0()
             .w_full()
@@ -798,57 +798,43 @@ impl ArcadiaRoot {
             .border_t_1()
             .border_color(p.panel_border)
             .child(
-                div()
-                    .w_full()
-                    .min_h(px(36.))
-                    .px_3()
-                    .py_2()
-                    .rounded(px(radius.min(8.0)))
-                    .border_1()
-                    .border_color(border_col)
-                    .bg(p.panel_bg)
-                    .text_sm()
-                    .text_color(p.content_body)
-                    .cursor_text()
-                    .track_focus(&self.ai.input_focus)
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|_, _, window, _| {
-                            let _ = window;
-                        }),
-                    )
-                    .on_key_down(cx.listener(move |this, ev: &KeyDownEvent, window, cx| {
-                        let key = &ev.keystroke.key;
-                        if key == "escape" {
-                            return;
-                        }
-                        if key == "enter" && !ev.keystroke.modifiers.shift {
-                            this.ai_send_message(window, cx);
-                            return;
-                        }
-                        let chat = this.ai.chats.iter_mut().find(|c| c.id == active_id);
-                        let Some(chat) = chat else { return };
-                        if key == "backspace" {
-                            chat.input_draft.pop();
-                        } else if !ev.keystroke.modifiers.platform
-                            && !ev.keystroke.modifiers.control
-                            && !ev.keystroke.modifiers.alt
-                            && !ev.keystroke.modifiers.function
-                        {
-                            if let Some(kc) = &ev.keystroke.key_char {
-                                chat.input_draft.push_str(kc);
-                            }
+                text_input(
+                    "ai-chat-input",
+                    window,
+                    weak,
+                    &draft,
+                    "Message…",
+                    &self.ai.input_focus,
+                    p.content_body,
+                    p.content_meta,
+                    move |this, new_text, cx| {
+                        if let Some(chat) = this.ai.chats.iter_mut().find(|c| c.id == active_id) {
+                            chat.input_draft = new_text;
                         }
                         cx.notify();
-                    }))
-                    .child(if draft.is_empty() && !is_focused {
-                        div().text_color(p.content_meta).child("Message…")
-                    } else {
-                        div().child(text_with_trailing_caret(&draft, is_focused, blink))
-                    }),
+                    },
+                )
+                .w_full()
+                .min_h(px(36.))
+                .px_3()
+                .py_2()
+                .rounded(px(radius.min(8.0)))
+                .border_1()
+                .border_color(border_col)
+                .bg(p.panel_bg)
+                .text_sm()
+                .cursor_text()
+                .on_key_down(cx.listener(move |this, ev: &KeyDownEvent, window, cx| {
+                    let key = &ev.keystroke.key;
+                    if key == "escape" {
+                        return;
+                    }
+                    if key == "enter" && !ev.keystroke.modifiers.shift {
+                        this.ai_send_message(window, cx);
+                        cx.notify();
+                    }
+                })),
             );
-
-        self.ensure_text_caret_blink_task(window, cx);
 
         let strip = self.ai_rules_skills_strip(cx, is_dark);
 

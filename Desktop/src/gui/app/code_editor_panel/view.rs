@@ -31,7 +31,7 @@ impl ArcadiaRoot {
             .clone()
             .or_else(|| detect_language(&tab_title));
         let focused = self.code_editor.focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
+        let blink = window.caret_blink_visible();
 
         // Rebuild highlight + decoration caches (and line caches) only when content changed.
         if self.code_editor.tabs[idx].highlight_dirty {

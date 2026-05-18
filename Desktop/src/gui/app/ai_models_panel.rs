@@ -6,11 +6,10 @@ use arcadia_core::modules::ai::{
 };
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, Styled, Window,
+    div, px, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, ParentElement, Styled, Window,
 };
 
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::app::LlamaCppModelCreateDraft;
 use crate::gui::theme::{self, render_icon, GLYPH_PANEL_CONTENT_MAX_W_PX};
@@ -1221,7 +1220,6 @@ impl ArcadiaRoot {
         let g_snap = theme::glyph_snapshot(cx);
         let is_glyph = g_snap.is_some();
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
-        let blink = self.text_caret_blink_visible;
 
         let (draft_ref, name_fh, api_key_fh, base_url_fh) = if is_create {
             (
@@ -1250,18 +1248,10 @@ impl ArcadiaRoot {
         let api_key_focused = api_key_fh.is_focused(window);
         let base_url_focused = base_url_fh.is_focused(window);
 
-        let api_key_display = if api_key_val.is_empty() {
-            text_with_trailing_caret("", api_key_focused, blink)
-        } else {
-            text_with_trailing_caret(&api_key_val, api_key_focused, blink)
-        };
-
         let title = if is_create { "Add Provider" } else { "Edit Provider" };
         let save_label = if is_create { "Create" } else { "Save" };
 
-        let name_fh2 = name_fh.clone();
-        let api_key_fh2 = api_key_fh.clone();
-        let base_url_fh2 = base_url_fh.clone();
+        let weak = cx.weak_entity();
 
         let mut form = div()
             .w_full()
@@ -1300,55 +1290,40 @@ impl ArcadiaRoot {
                                     .child("NAME"),
                             )
                             .child(
-                                div()
-                                    .flex_1()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded(px(radius.min(8.0)))
-                                    .bg(p.surface_elevated)
-                                    .border_1()
-                                    .border_color(if name_focused { p.accent } else { p.border })
-                                    .text_sm()
-                                    .text_color(p.content_title)
-                                    .track_focus(&name_fh2)
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(move |this, _, window, cx| {
-                                            if is_create {
-                                                if let Some(ref mut d) = this.ai.openai_create_draft {
-                                                    let _ = d;
-                                                }
-                                            } else if let Some(ref mut d) =
-                                                this.ai.openai_provider_edit_draft
-                                            {
-                                                let _ = d;
-                                            }
-                                            name_fh.focus(window);
-                                            cx.notify();
-                                        }),
-                                    )
-                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                text_input(
+                                    "openai-form-name",
+                                    window,
+                                    weak.clone(),
+                                    &name_val,
+                                    "Provider name…",
+                                    &name_fh,
+                                    p.content_title,
+                                    p.ui_subtext,
+                                    move |this, new_text, cx| {
                                         let draft = if is_create {
                                             this.ai.openai_create_draft.as_mut()
                                         } else {
                                             this.ai.openai_provider_edit_draft.as_mut()
                                         };
-                                        let Some(d) = draft else { return };
-                                        let key = event.keystroke.key.as_str();
-                                        let mods = event.keystroke.modifiers;
-                                        if key == "escape" {
-                                            if is_create { this.ai.openai_create_draft = None; }
-                                            else { this.ai.openai_provider_edit_draft = None; }
-                                        } else if key == "backspace" {
-                                            d.name.pop();
-                                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                                            if let Some(kc) = &event.keystroke.key_char {
-                                                d.name.push_str(kc);
-                                            }
-                                        }
+                                        if let Some(d) = draft { d.name = new_text; }
                                         cx.notify();
-                                    }))
-                                    .child(text_with_trailing_caret(&name_val, name_focused, blink)),
+                                    },
+                                )
+                                .flex_1()
+                                .px_3()
+                                .py_2()
+                                .rounded(px(radius.min(8.0)))
+                                .bg(p.surface_elevated)
+                                .border_1()
+                                .border_color(if name_focused { p.accent } else { p.border })
+                                .text_sm()
+                                .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                    if event.keystroke.key == "escape" {
+                                        if is_create { this.ai.openai_create_draft = None; }
+                                        else { this.ai.openai_provider_edit_draft = None; }
+                                        cx.notify();
+                                    }
+                                })),
                             ),
                     )
                     // API Key field
@@ -1365,46 +1340,40 @@ impl ArcadiaRoot {
                                     .child("API KEY"),
                             )
                             .child(
-                                div()
-                                    .flex_1()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded(px(radius.min(8.0)))
-                                    .bg(p.surface_elevated)
-                                    .border_1()
-                                    .border_color(if api_key_focused { p.accent } else { p.border })
-                                    .text_sm()
-                                    .text_color(p.content_title)
-                                    .track_focus(&api_key_fh2)
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(move |_, _, window, cx| {
-                                            api_key_fh.focus(window);
-                                            cx.notify();
-                                        }),
-                                    )
-                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                text_input(
+                                    "openai-form-api-key",
+                                    window,
+                                    weak.clone(),
+                                    &api_key_val,
+                                    "sk-…",
+                                    &api_key_fh,
+                                    p.content_title,
+                                    p.ui_subtext,
+                                    move |this, new_text, cx| {
                                         let draft = if is_create {
                                             this.ai.openai_create_draft.as_mut()
                                         } else {
                                             this.ai.openai_provider_edit_draft.as_mut()
                                         };
-                                        let Some(d) = draft else { return };
-                                        let key = event.keystroke.key.as_str();
-                                        let mods = event.keystroke.modifiers;
-                                        if key == "escape" {
-                                            if is_create { this.ai.openai_create_draft = None; }
-                                            else { this.ai.openai_provider_edit_draft = None; }
-                                        } else if key == "backspace" {
-                                            d.api_key.pop();
-                                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                                            if let Some(kc) = &event.keystroke.key_char {
-                                                d.api_key.push_str(kc);
-                                            }
-                                        }
+                                        if let Some(d) = draft { d.api_key = new_text; }
                                         cx.notify();
-                                    }))
-                                    .child(api_key_display),
+                                    },
+                                )
+                                .flex_1()
+                                .px_3()
+                                .py_2()
+                                .rounded(px(radius.min(8.0)))
+                                .bg(p.surface_elevated)
+                                .border_1()
+                                .border_color(if api_key_focused { p.accent } else { p.border })
+                                .text_sm()
+                                .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                    if event.keystroke.key == "escape" {
+                                        if is_create { this.ai.openai_create_draft = None; }
+                                        else { this.ai.openai_provider_edit_draft = None; }
+                                        cx.notify();
+                                    }
+                                })),
                             ),
                     )
                     // Base URL field
@@ -1421,54 +1390,47 @@ impl ArcadiaRoot {
                                     .child("BASE URL"),
                             )
                             .child(
-                                div()
-                                    .flex_1()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded(px(radius.min(8.0)))
-                                    .bg(p.surface_elevated)
-                                    .border_1()
-                                    .border_color(if base_url_focused { p.accent } else { p.border })
-                                    .text_sm()
-                                    .text_color(p.content_title)
-                                    .track_focus(&base_url_fh2)
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(move |_, _, window, cx| {
-                                            base_url_fh.focus(window);
-                                            cx.notify();
-                                        }),
-                                    )
-                                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                text_input(
+                                    "openai-form-base-url",
+                                    window,
+                                    weak.clone(),
+                                    &base_url_val,
+                                    "https://api.openai.com",
+                                    &base_url_fh,
+                                    p.content_title,
+                                    p.ui_subtext,
+                                    move |this, new_text, cx| {
                                         let draft = if is_create {
                                             this.ai.openai_create_draft.as_mut()
                                         } else {
                                             this.ai.openai_provider_edit_draft.as_mut()
                                         };
-                                        let Some(d) = draft else { return };
-                                        let key = event.keystroke.key.as_str();
-                                        let mods = event.keystroke.modifiers;
-                                        if key == "escape" {
+                                        if let Some(d) = draft { d.base_url = new_text; }
+                                        cx.notify();
+                                    },
+                                )
+                                .flex_1()
+                                .px_3()
+                                .py_2()
+                                .rounded(px(radius.min(8.0)))
+                                .bg(p.surface_elevated)
+                                .border_1()
+                                .border_color(if base_url_focused { p.accent } else { p.border })
+                                .text_sm()
+                                .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                                    match event.keystroke.key.as_str() {
+                                        "escape" => {
                                             if is_create { this.ai.openai_create_draft = None; }
                                             else { this.ai.openai_provider_edit_draft = None; }
-                                        } else if key == "enter" {
+                                            cx.notify();
+                                        }
+                                        "enter" => {
                                             if is_create { this.openai_provider_save_create(cx); }
                                             else { this.openai_provider_save_edit(cx); }
-                                            return;
-                                        } else if key == "backspace" {
-                                            d.base_url.pop();
-                                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                                            if let Some(kc) = &event.keystroke.key_char {
-                                                d.base_url.push_str(kc);
-                                            }
                                         }
-                                        cx.notify();
-                                    }))
-                                    .child(text_with_trailing_caret(
-                                        &base_url_val,
-                                        base_url_focused,
-                                        blink,
-                                    )),
+                                        _ => {}
+                                    }
+                                })),
                             ),
                     ),
             );

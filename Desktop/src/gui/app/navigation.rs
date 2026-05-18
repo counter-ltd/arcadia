@@ -76,6 +76,13 @@ impl NavPageRef<'_> {
             NavPageRef::Remote(p) => p.layout_kind,
         }
     }
+
+    pub fn blocks_platform_goto(&self) -> bool {
+        match self {
+            NavPageRef::Static(p) => p.blocks_platform_goto,
+            NavPageRef::Remote(p) => p.blocks_platform_goto,
+        }
+    }
 }
 
 impl NavGroupRef<'_> {
@@ -1054,6 +1061,37 @@ impl ArcadiaRoot {
         } else {
             None
         }
+    }
+
+    /// Returns (id, title) pairs for visible pages whose id or title contains `input` (case-insensitive).
+    /// Empty input returns all visible pages.
+    pub fn goto_page_suggestions(&self, input: &str) -> Vec<(String, String)> {
+        let q = input.to_lowercase();
+        let pages: Vec<_> = if let Some(nav) = self.navigation_registry() {
+            nav.pages
+                .iter()
+                .filter(|p| {
+                    self.is_page_visible(&p.id)
+                        && (q.is_empty()
+                            || p.id.to_lowercase().contains(&q)
+                            || p.title.to_lowercase().contains(&q))
+                })
+                .map(|p| (p.id.clone(), p.title.clone()))
+                .collect()
+        } else {
+            use arcadia_core::navigation::PAGE_DEFINITIONS;
+            PAGE_DEFINITIONS
+                .iter()
+                .filter(|p| {
+                    self.is_page_visible(p.id)
+                        && (q.is_empty()
+                            || p.id.to_lowercase().contains(&q)
+                            || p.title.to_lowercase().contains(&q))
+                })
+                .map(|p| (p.id.to_string(), p.title.to_string()))
+                .collect()
+        };
+        pages
     }
 
     pub fn ensure_valid_navigation_selection(&mut self) {

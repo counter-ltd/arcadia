@@ -1,6 +1,5 @@
 //! Shared extension token editor (persisted under `extension_tokens/`).
 
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 use arcadia_core::modules::python_registry::{
@@ -10,9 +9,8 @@ use arcadia_core::modules::python_registry::{
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, gradient_slider_with_weak, parse_gradient_stops, parse_hex_color, px, rgb,
-    slider_with_weak, stops_to_json, AnyElement, Context, FontWeight,
-    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Rgba, SharedString,
-    Styled, Window,
+    slider_with_weak, stops_to_json, text_input, AnyElement, Context, FontWeight, InteractiveElement,
+    IntoElement, KeyDownEvent, MouseButton, ParentElement, Rgba, SharedString, Styled, Window,
 };
 
 fn token_edit_rgba(display: &str, default_s: &str) -> Rgba {
@@ -472,76 +470,59 @@ impl ArcadiaRoot {
                             }))
                             .into_any_element()
                     } else if is_editing {
-                        let show_caret = ext_token_focus.is_focused(window) && is_editing;
-                        let blink = self.text_caret_blink_visible;
-                        div()
-                            .px_3()
-                            .py_2()
-                            .rounded(px(panel_radius))
-                            .bg(input_bg)
-                            .border_1()
-                            .border_color(input_border)
-                            .text_sm()
-                            .text_color(header_color)
-                            .track_focus(&ext_token_focus)
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(move |this, _, window, _| {
-                                    this.extension_token_focus.focus(window);
-                                }),
-                            )
-                            .child(div().child(text_with_trailing_caret(
-                                display_val.as_str(),
-                                show_caret,
-                                blink,
-                            )))
-                            .on_key_down(cx.listener({
-                                let m = row_module.clone();
-                                let k = row_key.clone();
-                                let default_for_esc = row_default.clone();
-                                move |this, event: &KeyDownEvent, _, cx| {
-                                    let key_ev = event.keystroke.key.as_str();
-                                    let mods = event.keystroke.modifiers;
-                                    if key_ev == "enter" || key_ev == "return" {
-                                        this.flush_extension_token_edit(m.clone(), k.clone(), cx);
-                                        this.extension_token_editing = None;
-                                        cx.notify();
-                                        return;
-                                    }
-                                    if key_ev == "escape" {
-                                        let file = arcadia_core::config::extension_tokens::load_module_tokens(&m)
-                                            .unwrap_or_default();
-                                        let v = arcadia_core::config::extension_tokens::merged_display_for_key(
-                                            &k,
-                                            &default_for_esc,
-                                            &file,
-                                        );
-                                        this.extension_token_values.insert((m.clone(), k.clone()), v);
-                                        this.extension_token_editing = None;
-                                        cx.notify();
-                                        return;
-                                    }
-                                    let pair = (m.clone(), k.clone());
-                                    let entry = this.extension_token_values.entry(pair.clone()).or_insert_with(String::new);
-                                    if key_ev == "backspace" {
-                                        entry.pop();
-                                        cx.notify();
-                                    } else if key_ev == "space" {
-                                        entry.push(' ');
-                                        cx.notify();
-                                    } else if !mods.control
-                                        && !mods.alt
-                                        && !mods.platform
-                                        && !mods.function
-                                    {
-                                        if let Some(ch) = &event.keystroke.key_char {
-                                            entry.push_str(ch);
-                                            cx.notify();
-                                        }
-                                    }
+                        let weak_edit = cx.weak_entity();
+                        let m_edit = row_module.clone();
+                        let k_edit = row_key.clone();
+                        let default_for_esc = row_default.clone();
+                        text_input(
+                            SharedString::from(format!("ext-token-edit-{}-{}", row_module, row_key)),
+                            window,
+                            weak_edit,
+                            &display_val,
+                            "",
+                            &ext_token_focus,
+                            header_color,
+                            header_color,
+                            {
+                                let m = m_edit.clone();
+                                let k = k_edit.clone();
+                                move |this, new_text, cx| {
+                                    this.extension_token_values.insert((m.clone(), k.clone()), new_text);
+                                    cx.notify();
                                 }
-                            }))
-                            .into_any_element()
+                            },
+                        )
+                        .px_3()
+                        .py_2()
+                        .rounded(px(panel_radius))
+                        .bg(input_bg)
+                        .border_1()
+                        .border_color(input_border)
+                        .text_sm()
+                        .on_key_down(cx.listener({
+                            let m = m_edit.clone();
+                            let k = k_edit.clone();
+                            move |this, event: &KeyDownEvent, _, cx| {
+                                let key_ev = event.keystroke.key.as_str();
+                                if key_ev == "enter" || key_ev == "return" {
+                                    this.flush_extension_token_edit(m.clone(), k.clone(), cx);
+                                    this.extension_token_editing = None;
+                                    cx.notify();
+                                } else if key_ev == "escape" {
+                                    let file = arcadia_core::config::extension_tokens::load_module_tokens(&m)
+                                        .unwrap_or_default();
+                                    let v = arcadia_core::config::extension_tokens::merged_display_for_key(
+                                        &k,
+                                        &default_for_esc,
+                                        &file,
+                                    );
+                                    this.extension_token_values.insert((m.clone(), k.clone()), v);
+                                    this.extension_token_editing = None;
+                                    cx.notify();
+                                }
+                            }
+                        }))
+                        .into_any_element()
                     } else {
                         div()
                             .px_3()

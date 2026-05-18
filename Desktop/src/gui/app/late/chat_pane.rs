@@ -1,11 +1,10 @@
 use openframe::{
-    div, px, rgb, Context, Element, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, StatefulInteractiveElement, Styled, Window,
+    div, px, rgb, text_input, Context, Element, InteractiveElement, IntoElement, KeyDownEvent,
+    MouseButton, ParentElement, StatefulInteractiveElement, Styled, Window,
 };
 
 use arcadia_core::modules::late::{send_ws, state, LateMessage};
 
-use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -115,12 +114,13 @@ impl ArcadiaRoot {
     ) -> impl IntoElement {
         let input_text = self.late.compose_text.clone();
         let room = self.late.active_room;
-        let compose_focused = self.late.compose_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
 
         let compose_border = theme::ui_border(cx, is_dark);
         let compose_input_bg = theme::ui_surface(cx, is_dark);
         let compose_radius = theme::ui_radius(cx);
+        let text_c = theme::module_title_text(is_dark);
+        let meta_c = theme::module_meta_text(is_dark);
+        let weak = cx.weak_entity();
         div()
             .px_3()
             .py_2()
@@ -131,66 +131,42 @@ impl ArcadiaRoot {
             .gap_2()
             .items_center()
             .child(
-                div()
-                    .flex_1()
-                    .px_3()
-                    .py_2()
-                    .rounded(px(compose_radius))
-                    .bg(compose_input_bg)
-                    .border_1()
-                    .border_color(compose_border)
-                    .text_sm()
-                    .text_color(theme::module_title_text(is_dark))
-                    .track_focus(&self.late.compose_focus)
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|this, _, window, _| {
-                            this.late.compose_focus.focus(window);
-                        }),
-                    )
-                    .child(if input_text.is_empty() {
-                        if compose_focused && blink {
-                            div()
-                                .text_color(theme::module_title_text(is_dark))
-                                .child(TEXT_INPUT_CARET_CHAR.to_string())
-                        } else {
-                            div()
-                                .text_color(theme::module_meta_text(is_dark))
-                                .child("Type a message…")
-                        }
-                    } else {
-                        div().child(text_with_trailing_caret(
-                            input_text.as_str(),
-                            compose_focused,
-                            blink,
-                        ))
-                    })
-                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
-                        let key = event.keystroke.key.as_str();
-                        let mods = event.keystroke.modifiers;
-                        if key == "backspace" {
-                            this.late.compose_text.pop();
-                            cx.notify();
-                        } else if key == "enter" || key == "return" {
-                            let body = this.late.compose_text.trim().to_string();
-                            if !body.is_empty() {
-                                send_ws(format!(
-                                    r#"{{"type":"send","room_id":{room},"body":{}}}"#,
-                                    serde_json::json!(body)
-                                ));
-                                this.late.compose_text.clear();
-                                cx.notify();
-                            }
-                        } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                            if let Some(key_char) = &event.keystroke.key_char {
-                                this.late.compose_text.push_str(key_char);
-                                cx.notify();
-                            }
-                        } else if key == "space" {
-                            this.late.compose_text.push(' ');
+                text_input(
+                    "late-compose",
+                    window,
+                    weak,
+                    &input_text,
+                    "Type a message…",
+                    &self.late.compose_focus,
+                    text_c,
+                    meta_c,
+                    |this, new_text, cx| {
+                        this.late.compose_text = new_text;
+                        cx.notify();
+                    },
+                )
+                .flex_1()
+                .px_3()
+                .py_2()
+                .rounded(px(compose_radius))
+                .bg(compose_input_bg)
+                .border_1()
+                .border_color(compose_border)
+                .text_sm()
+                .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
+                    let key = event.keystroke.key.as_str();
+                    if key == "enter" || key == "return" {
+                        let body = this.late.compose_text.trim().to_string();
+                        if !body.is_empty() {
+                            send_ws(format!(
+                                r#"{{"type":"send","room_id":{room},"body":{}}}"#,
+                                serde_json::json!(body)
+                            ));
+                            this.late.compose_text.clear();
                             cx.notify();
                         }
-                    })),
+                    }
+                })),
             )
             .child(
                 div()

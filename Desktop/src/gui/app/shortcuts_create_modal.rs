@@ -6,13 +6,12 @@ use arcadia_core::navigation;
 use arcadia_core::shortcuts::{KeyChordSpec, ShortcutAction, ShortcutTrigger};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, Styled, Window,
+    div, px, rgb, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, ParentElement, Styled, Window,
 };
 
 use super::shortcuts::sync_os_global_hotkeys;
 use super::{ArcadiaRoot, ShortcutCreateActionKind, ShortcutCreateTriggerKind};
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
 use crate::gui::theme;
 use crate::gui::theme::palette::ThemePalette;
 
@@ -108,50 +107,6 @@ fn toggle_btn(
         .into_any_element()
 }
 
-fn text_field(
-    value: &str,
-    placeholder: &'static str,
-    focused: bool,
-    blink: bool,
-    focus_handle: openframe::FocusHandle,
-    p: ThemePalette,
-    radius: f32,
-    on_key_down: impl Fn(&mut ArcadiaRoot, &KeyDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>)
-        + 'static,
-    cx: &mut Context<ArcadiaRoot>,
-) -> AnyElement {
-    let fh = focus_handle.clone();
-    let content: String = if value.is_empty() && !focused {
-        placeholder.to_string()
-    } else {
-        text_with_trailing_caret(value, focused, blink)
-    };
-    let text_color = if value.is_empty() && !focused {
-        p.ui_subtext
-    } else {
-        p.content_title
-    };
-    div()
-        .w_full()
-        .px_3()
-        .py_2()
-        .rounded(px(radius.min(8.0)))
-        .bg(p.surface_elevated)
-        .border_1()
-        .border_color(if focused { p.accent } else { p.border })
-        .text_sm()
-        .text_color(text_color)
-        .track_focus(&focus_handle)
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(move |_, _, window, _| {
-                fh.focus(window);
-            }),
-        )
-        .on_key_down(cx.listener(on_key_down))
-        .child(content)
-        .into_any_element()
-}
 
 impl ArcadiaRoot {
     pub fn shortcut_create_modal(
@@ -172,7 +127,6 @@ impl ArcadiaRoot {
         let label_focused = self.shortcut_create_label_focus.is_focused(window);
         let token_focused = self.shortcut_create_token_focus.is_focused(window);
         let args_focused = self.shortcut_create_args_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
 
         let label_fh = self.shortcut_create_label_focus.clone();
         let token_fh = self.shortcut_create_token_focus.clone();
@@ -436,6 +390,8 @@ impl ArcadiaRoot {
             cx,
         );
 
+        let weak = cx.weak_entity();
+
         // --- Action-specific section ---
         let selected_page = draft.action_page_id.clone();
         let action_section: AnyElement = if action_kind == ShortcutCreateActionKind::Navigate {
@@ -513,35 +469,28 @@ impl ArcadiaRoot {
                                 .text_color(p.ui_subtext)
                                 .child("Command token"),
                         )
-                        .child(text_field(
+                        .child(text_input(
+                            "shortcut-create-token",
+                            window,
+                            weak.clone(),
                             &draft.action_command_token,
                             "e.g. shell.execute",
-                            token_focused,
-                            blink,
-                            label_fh_t,
-                            p,
-                            radius,
-                            |this, event, _, cx| {
-                                let key = event.keystroke.key.as_str();
-                                let mods = event.keystroke.modifiers;
-                                if let Some(ref mut d) = this.shortcut_create_draft {
-                                    if key == "backspace" {
-                                        d.action_command_token.pop();
-                                        cx.notify();
-                                    } else if !mods.control
-                                        && !mods.alt
-                                        && !mods.platform
-                                        && !mods.function
-                                    {
-                                        if let Some(kc) = &event.keystroke.key_char {
-                                            d.action_command_token.push_str(kc);
-                                            cx.notify();
-                                        }
-                                    }
-                                }
+                            &label_fh_t,
+                            p.content_title,
+                            p.ui_subtext,
+                            |this, new_text, cx| {
+                                if let Some(ref mut d) = this.shortcut_create_draft { d.action_command_token = new_text; }
+                                cx.notify();
                             },
-                            cx,
-                        )),
+                        )
+                        .w_full()
+                        .px_3()
+                        .py_2()
+                        .rounded(px(radius.min(8.0)))
+                        .bg(p.surface_elevated)
+                        .border_1()
+                        .border_color(if token_focused { p.accent } else { p.border })
+                        .text_sm()),
                 )
                 .child(
                     div()
@@ -554,38 +503,28 @@ impl ArcadiaRoot {
                                 .text_color(p.ui_subtext)
                                 .child("Args (space-separated, optional)"),
                         )
-                        .child(text_field(
+                        .child(text_input(
+                            "shortcut-create-args",
+                            window,
+                            weak.clone(),
                             &draft.action_command_args,
                             "arg1 arg2 …",
-                            args_focused,
-                            blink,
-                            label_fh_a,
-                            p,
-                            radius,
-                            |this, event, _, cx| {
-                                let key = event.keystroke.key.as_str();
-                                let mods = event.keystroke.modifiers;
-                                if let Some(ref mut d) = this.shortcut_create_draft {
-                                    if key == "backspace" {
-                                        d.action_command_args.pop();
-                                        cx.notify();
-                                    } else if key == "space" {
-                                        d.action_command_args.push(' ');
-                                        cx.notify();
-                                    } else if !mods.control
-                                        && !mods.alt
-                                        && !mods.platform
-                                        && !mods.function
-                                    {
-                                        if let Some(kc) = &event.keystroke.key_char {
-                                            d.action_command_args.push_str(kc);
-                                            cx.notify();
-                                        }
-                                    }
-                                }
+                            &label_fh_a,
+                            p.content_title,
+                            p.ui_subtext,
+                            |this, new_text, cx| {
+                                if let Some(ref mut d) = this.shortcut_create_draft { d.action_command_args = new_text; }
+                                cx.notify();
                             },
-                            cx,
-                        )),
+                        )
+                        .w_full()
+                        .px_3()
+                        .py_2()
+                        .rounded(px(radius.min(8.0)))
+                        .bg(p.surface_elevated)
+                        .border_1()
+                        .border_color(if args_focused { p.accent } else { p.border })
+                        .text_sm()),
                 )
                 .into_any_element()
         };
@@ -603,36 +542,37 @@ impl ArcadiaRoot {
         let modal_border = g.map(|gg| gg.border).unwrap_or(p.border);
 
         // --- Label field ---
-        let label_field = text_field(
+        let label_field = text_input(
+            "shortcut-create-label",
+            window,
+            weak.clone(),
             &draft.label,
             "Shortcut label…",
-            label_focused,
-            blink,
-            label_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.shortcut_create_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.shortcut_create_draft {
-                    if key == "backspace" {
-                        d.label.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.label.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &label_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.shortcut_create_draft { d.label = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if label_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.shortcut_create_draft = None;
+                this.shortcut_draft_recording_chord = false;
+                this.shortcut_draft_recording_seq = false;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
         div()
             .absolute()

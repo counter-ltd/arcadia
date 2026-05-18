@@ -8,8 +8,9 @@ use openframe::prelude::FluentBuilder as _;
 #[cfg(feature = "gui")]
 use openframe::AnyElement;
 use openframe::{
-    div, px, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    Render, StatefulInteractiveElement, Styled, Window, WindowAppearance,
+    anchored, div, px, AnchoredPositionMode, Context, Corner, FontWeight, InteractiveElement,
+    IntoElement, MouseButton, ParentElement, Render, StatefulInteractiveElement, Styled, Window,
+    WindowAppearance,
 };
 
 use crate::gui::app::navigation::NavGroupRef;
@@ -71,8 +72,6 @@ impl Render for ArcadiaRoot {
         self.sync_peer_remote_exec_side_effects(window, cx);
         #[cfg(all(feature = "gui", not(target_os = "ios")))]
         crate::gui::app::shortcuts::poll_global_hotkey_events(self, window, cx);
-        #[cfg(any(feature = "gui", feature = "ios-gui"))]
-        self.ensure_text_caret_blink_task(window, cx);
         #[cfg(any(feature = "gui", feature = "ios-gui"))]
         self.ensure_remote_revision_poll_task(window, cx);
         self.ensure_lan_poll_task(window, cx);
@@ -422,6 +421,7 @@ impl Render for ArcadiaRoot {
                     div().into_any_element()
                 }
             })
+            .child(self.render_goto_suggestions_overlay(cx, is_dark))
     }
 }
 
@@ -1875,5 +1875,97 @@ impl ArcadiaRoot {
                             ),
                     ),
             )
+    }
+}
+
+impl ArcadiaRoot {
+    fn render_goto_suggestions_overlay(
+        &self,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+    ) -> impl IntoElement {
+        if !self.goto_bar_open {
+            return div().into_any_element();
+        }
+        let suggestions = self.goto_page_suggestions(&self.goto_bar_input);
+        if suggestions.is_empty() {
+            return div().into_any_element();
+        }
+
+        let pos = self.goto_bar_anchor;
+        let radius = crate::gui::theme::ui_radius(cx);
+        let bg = crate::gui::theme::action_pill_bg(cx, is_dark);
+        let border_c = crate::gui::theme::ui_accent(cx);
+        let tc = crate::gui::theme::action_pill_text(cx, is_dark);
+        let meta_c = crate::gui::theme::ui_subtext(cx, is_dark);
+        let hover_bg = crate::gui::theme::action_pill_hover_bg(cx, is_dark);
+        let accent_c = crate::gui::theme::ui_accent(cx);
+        let accent_fg = crate::gui::theme::ui_accent_fg(cx);
+        let sel = self.goto_bar_selected_idx;
+
+        let rows: Vec<_> = suggestions
+            .into_iter()
+            .enumerate()
+            .map(|(i, (id, title))| {
+                let id_c = id.clone();
+                let is_selected = sel == Some(i);
+                let row_bg = if is_selected { accent_c } else { bg };
+                let row_fg = if is_selected { accent_fg } else { tc };
+                let row_meta = if is_selected { accent_fg } else { meta_c };
+                div()
+                    .w_full()
+                    .px_2()
+                    .py_1()
+                    .rounded(px((radius - 2.0).max(2.0)))
+                    .bg(row_bg)
+                    .flex()
+                    .flex_col()
+                    .cursor_pointer()
+                    .hover(move |s| if !is_selected { s.bg(hover_bg) } else { s })
+                    .child(div().text_xs().text_color(row_fg).child(title))
+                    .child(div().text_xs().text_color(row_meta).child(id))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.goto_bar_open = false;
+                            this.goto_bar_input.clear();
+                            this.goto_bar_selected_idx = None;
+                            if this.is_page_visible(&id_c) {
+                                this.active_page_id = id_c.clone();
+                                this.sync_settings_hub_expanded_from_active_page();
+                                this.ensure_valid_navigation_selection();
+                            }
+                            cx.notify();
+                        }),
+                    )
+            })
+            .collect();
+
+        anchored()
+            .position(pos)
+            .anchor(Corner::TopLeft)
+            .position_mode(AnchoredPositionMode::Window)
+            .snap_to_window_with_margin(px(8.0))
+            .child(
+                div()
+                    .min_w(px(220.0))
+                    .max_w(px(320.0))
+                    .p_1()
+                    .rounded(px(radius))
+                    .bg(bg)
+                    .border_1()
+                    .border_color(border_c)
+                    .occlude()
+                    .flex()
+                    .flex_col()
+                    .gap_0p5()
+                    .text_xs()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|_, _, _, cx| cx.stop_propagation()),
+                    )
+                    .children(rows),
+            )
+            .into_any_element()
     }
 }

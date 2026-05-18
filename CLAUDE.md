@@ -210,6 +210,18 @@ Surface entrypoints must NOT:
 - Add per-module booleans (`shell_enabled`, `net_enabled`) — query dynamically via `is_module_enabled(name)`.
 - Duplicate navigation structure that already exists in `navigation.rs`.
 
+### Fix framework-level behaviour in OpenFrame, not in widget code
+
+If something is wrong with how the UI framework itself behaves — focus management, event dispatch, input handling, cursor, layout primitives — fix it in `Libraries/OpenFrame/src/`. Do **not** work around it by patching every call site in `Desktop/src/gui/app/`.
+
+Examples of things that belong in OpenFrame:
+- Clearing focus when a mouse-down lands on a non-focusable element (`window.rs` `dispatch_mouse_event`)
+- Tab-stop ordering, focus-next / focus-prev traversal
+- Placeholder rendering, caret blink timing
+- Scroll momentum, hit-test edge cases
+
+If you find yourself adding the same `window.blur()` call (or equivalent) to every widget's `on_mouse_down`, stop — that is a sign the fix belongs one layer down in OpenFrame.
+
 ---
 
 ## How to Add Things

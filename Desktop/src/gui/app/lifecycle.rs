@@ -284,6 +284,7 @@ impl ArcadiaRoot {
         let openai_create_api_key_focus = cx.focus_handle();
         let openai_create_base_url_focus = cx.focus_handle();
         let command_bar_focus = cx.focus_handle();
+        let goto_bar_focus = cx.focus_handle();
         let notification_max_count_focus = cx.focus_handle();
         let notification_unread_count =
             arcadia_core::config::notifications::NotificationsConfig::load_or_create()
@@ -620,8 +621,6 @@ impl ArcadiaRoot {
                 settings_username_focus: late_settings_username_focus,
                 settings_default_room_focus: late_settings_default_room_focus,
             },
-            text_caret_blink_visible: true,
-            text_caret_blink_task_started: false,
             splash_elapsed_ms: 0.0,
             splash_tick_started: false,
             sidebar_visible: true,
@@ -698,6 +697,12 @@ impl ArcadiaRoot {
             command_bar_open: false,
             command_bar_input: String::new(),
             command_bar_focus,
+            goto_bar_open: false,
+            goto_bar_command: "page".to_string(),
+            goto_bar_input: String::new(),
+            goto_bar_focus,
+            goto_bar_selected_idx: None,
+            goto_bar_anchor: openframe::Point::default(),
             notification_unread_count,
             notification_settings_feedback: String::new(),
             notification_max_count_draft: String::new(),
@@ -1045,7 +1050,7 @@ impl ArcadiaRoot {
         self.terminal_kill_menu = None;
     }
 
-    // NOTE: ensure_ai_poll_task, ensure_lan_poll_task, and ensure_text_caret_blink_task share
+    // NOTE: ensure_ai_poll_task and ensure_lan_poll_task share
     // an identical spawn_in → loop → Timer → should_stop pattern. Extracting a generic helper
     // requires careful GPUI async-closure typing; left as a TODO for a dedicated refactor pass.
     pub fn ensure_ai_poll_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1575,60 +1580,6 @@ impl ArcadiaRoot {
         .detach();
     }
 
-    #[cfg(any(feature = "gui", feature = "ios-gui"))]
-    pub(crate) fn any_text_input_focused(&self, window: &Window, cx: &Context<Self>) -> bool {
-        self.shell_focus.contains_focused(window, cx)
-            || self.ai.input_focus.contains_focused(window, cx)
-            || self.late.compose_focus.contains_focused(window, cx)
-            || self.late.settings_server_url_focus.contains_focused(window, cx)
-            || self.late.settings_username_focus.contains_focused(window, cx)
-            || self.late.settings_default_room_focus.contains_focused(window, cx)
-            || self.extension_token_focus.contains_focused(window, cx)
-            || self.modules_search_focus.contains_focused(window, cx)
-            || self.extensions_search_focus.contains_focused(window, cx)
-            || self.permissions_search_focus.contains_focused(window, cx)
-            || self.shortcuts_search_focus.contains_focused(window, cx)
-            || self.workspace_search_focus.contains_focused(window, cx)
-            || self
-                .shortcut_create_label_focus
-                .contains_focused(window, cx)
-            || self
-                .shortcut_create_token_focus
-                .contains_focused(window, cx)
-            || self.shortcut_create_args_focus.contains_focused(window, cx)
-            || self.code_editor.focus.contains_focused(window, cx)
-            || self
-                .code_editor.char_width_focus
-                .contains_focused(window, cx)
-            || self.ai.openai_edit_name_focus.contains_focused(window, cx)
-            || self.ai.openai_edit_api_key_focus.contains_focused(window, cx)
-            || self.ai.openai_edit_base_url_focus.contains_focused(window, cx)
-            || self.ai.openai_create_name_focus.contains_focused(window, cx)
-            || self.ai.openai_create_api_key_focus.contains_focused(window, cx)
-            || self.ai.openai_create_base_url_focus.contains_focused(window, cx)
-            || self
-                .ai.llama_cpp_create_name_focus
-                .contains_focused(window, cx)
-            || self
-                .ai.llama_cpp_create_path_focus
-                .contains_focused(window, cx)
-            || self
-                .ai.llama_cpp_create_mmproj_focus
-                .contains_focused(window, cx)
-            || self.ai.llama_cpp_edit_name_focus.contains_focused(window, cx)
-            || self.ai.llama_cpp_edit_path_focus.contains_focused(window, cx)
-            || self
-                .ai.llama_cpp_edit_mmproj_focus
-                .contains_focused(window, cx)
-            || self
-                .workspace_create_label_focus
-                .contains_focused(window, cx)
-            || self
-                .workspace_create_path_focus
-                .contains_focused(window, cx)
-            || self.visual_editor.input_focus.contains_focused(window, cx)
-    }
-
     /// Tick the nav caret fade-in/out animations using the arcadia animation engine's easing
     /// functions. Returns `true` while any animation is still running (caller should request
     /// another animation frame).
@@ -2092,42 +2043,6 @@ impl ArcadiaRoot {
             from_x: f32::from(from_x),
             to_x: f32::from(to_x),
         });
-    }
-
-    #[cfg(any(feature = "gui", feature = "ios-gui"))]
-    pub fn ensure_text_caret_blink_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.text_caret_blink_task_started {
-            return;
-        }
-        self.text_caret_blink_task_started = true;
-        cx.spawn_in(
-            window,
-            move |view: openframe::WeakEntity<ArcadiaRoot>,
-                  cx: &mut openframe::AsyncWindowContext| {
-                let mut cx = cx.clone();
-                async move {
-                    loop {
-                        Timer::after(Duration::from_millis(500)).await;
-                        let should_stop = cx
-                            .update(|window, app| {
-                                view.update(app, |this, cx| {
-                                    this.text_caret_blink_visible = !this.text_caret_blink_visible;
-                                    if this.any_text_input_focused(window, cx) {
-                                        cx.notify();
-                                    }
-                                    false
-                                })
-                                .unwrap_or(true)
-                            })
-                            .unwrap_or(true);
-                        if should_stop {
-                            break;
-                        }
-                    }
-                }
-            },
-        )
-        .detach();
     }
 
     #[cfg(any(feature = "gui", feature = "ios-gui"))]

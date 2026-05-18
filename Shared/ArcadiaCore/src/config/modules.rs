@@ -69,6 +69,7 @@ pub const AI_EXEC_GEMINI_MODULE_NAME: &str = "ai-provider-exec-gemini";
 pub const AI_EXEC_AIDER_MODULE_NAME: &str = "ai-provider-exec-aider";
 pub const AI_APFEL_MODULE_NAME: &str = "ai-provider-apfel";
 pub const NOTIFICATION_MODULE_NAME: &str = "notification";
+pub const GOTO_MODULE_NAME: &str = "goto";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]
@@ -431,6 +432,17 @@ pub static MODULE_REGISTRY: &[ModuleManifest] = &[
         glyph: "notification",
         version: "0.1.0",
         description: "In-app notification centre. Modules and extensions can post alerts; each source requires an explicit notifications.send grant.",
+        accent: "",
+        required_modules: &[],
+        required_permissions: &[],
+        workspace_permissions: &[],
+        supported_platforms: &[],
+    },
+    ModuleManifest {
+        name: GOTO_MODULE_NAME,
+        glyph: "goto",
+        version: "0.1.0",
+        description: "Keyboard-driven navigation. Cmd+G opens the goto bar; goto.page <id> resolves pages from the CLI.",
         accent: "",
         required_modules: &[],
         required_permissions: &[],

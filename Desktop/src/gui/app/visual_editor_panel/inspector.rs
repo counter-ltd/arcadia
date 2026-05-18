@@ -152,7 +152,7 @@ impl ArcadiaRoot {
         }
 
         let focused = self.visual_editor.input_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
+        let blink = window.caret_blink_visible();
         let caret = self
             .visual_editor.edit_caret
             .min(self.visual_editor.edit_draft.len());

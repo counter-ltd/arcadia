@@ -1,13 +1,12 @@
 use arcadia_core::config::ConfigFile as _;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    canvas, div, point, px, rgb, Context, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, PathBuilder, Styled, Window,
+    canvas, div, point, px, rgb, text_input, Context, InteractiveElement, IntoElement,
+    KeyDownEvent, ParentElement, PathBuilder, Styled, Window,
 };
 
 use arcadia_core::modules;
 
-use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 #[cfg(feature = "gui")]
 use crate::gui::app::ShellMode;
@@ -1070,6 +1069,7 @@ impl ArcadiaRoot {
                             .flex()
                             .items_center()
                             .gap_2()
+                            .child(self.render_top_bar_goto_bar(window, cx, is_dark, radius))
                             .child(self.render_top_bar_command_bar(window, cx, is_dark, radius))
                             .children(self.top_bar_page_ids_effective().into_iter().filter_map(
                                 |page_id| {
@@ -1154,6 +1154,142 @@ impl ArcadiaRoot {
             })
     }
 
+    pub(crate) fn render_top_bar_goto_bar(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+        is_dark: bool,
+        radius: f32,
+    ) -> impl IntoElement {
+        if !self.goto_bar_open {
+            return div();
+        }
+
+        let text = self.goto_bar_input.clone();
+        let cmd = self.goto_bar_command.clone();
+        let bg = theme::action_pill_bg(cx, is_dark);
+        let border_c = theme::ui_accent(cx);
+        let tc = theme::action_pill_text(cx, is_dark);
+        let meta_c = theme::ui_subtext(cx, is_dark);
+        let weak = cx.weak_entity();
+        let weak2 = cx.weak_entity();
+
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .px_2()
+            .py_0p5()
+            .rounded(px(radius))
+            .bg(bg)
+            .border_1()
+            .border_color(border_c)
+            .min_w(px(220.))
+            .text_xs()
+            .text_color(tc)
+            .child(
+                canvas(
+                    move |bounds, _window, cx| {
+                        let _ = weak2.update(cx, |this, ctx| {
+                            let new_x = bounds.origin.x;
+                            // bounds is h_full inside the pill's content area.
+                            // new_y = content_bottom + py_0p5 bottom (2px) + 4px gap = +6px
+                            let new_y = bounds.origin.y + bounds.size.height + openframe::px(6.0);
+                            let dx = (f32::from(this.goto_bar_anchor.x) - f32::from(new_x)).abs();
+                            let dy = (f32::from(this.goto_bar_anchor.y) - f32::from(new_y)).abs();
+                            if dx > 0.5 || dy > 0.5 {
+                                this.goto_bar_anchor = openframe::point(new_x, new_y);
+                                ctx.notify();
+                            }
+                        });
+                    },
+                    |_, _, _, _| {},
+                )
+                .w_0()
+                .h_full(),
+            )
+            .child(div().text_color(meta_c).child(format!("goto.{cmd}")))
+            .child(div().text_color(meta_c).child(" "))
+            .child(
+                text_input(
+                    "goto-bar-input",
+                    window,
+                    weak,
+                    &text,
+                    "page id…",
+                    &self.goto_bar_focus,
+                    tc,
+                    meta_c,
+                    |this, new_text, cx| {
+                        this.goto_bar_input = new_text;
+                        this.goto_bar_selected_idx = None;
+                        cx.notify();
+                    },
+                )
+                .on_key_down(cx.listener(
+                    move |this, event: &KeyDownEvent, window: &mut Window, cx| {
+                        let key = event.keystroke.key.as_str();
+                        let suggestions = this.goto_page_suggestions(&this.goto_bar_input.clone());
+                        let count = suggestions.len();
+                        match key {
+                            "escape" => {
+                                this.goto_bar_open = false;
+                                this.goto_bar_input.clear();
+                                this.goto_bar_selected_idx = None;
+                                cx.notify();
+                            }
+                            "enter" => {
+                                let target = if let Some(idx) = this.goto_bar_selected_idx {
+                                    suggestions.get(idx).map(|(id, _)| id.clone())
+                                } else {
+                                    let typed = this.goto_bar_input.trim().to_string();
+                                    if typed.is_empty() { None } else { Some(typed) }
+                                };
+                                this.goto_bar_open = false;
+                                this.goto_bar_input.clear();
+                                this.goto_bar_selected_idx = None;
+                                if let Some(id) = target {
+                                    if this.is_page_visible(&id) {
+                                        this.active_page_id = id;
+                                        this.sync_settings_hub_expanded_from_active_page();
+                                        this.ensure_valid_navigation_selection();
+                                    }
+                                }
+                                cx.notify();
+                            }
+                            "tab" if count > 0 => {
+                                let next = match this.goto_bar_selected_idx {
+                                    None => 0,
+                                    Some(i) => (i + 1) % count,
+                                };
+                                this.goto_bar_selected_idx = Some(next);
+                                cx.notify();
+                            }
+                            "down" if count > 0 => {
+                                let next = match this.goto_bar_selected_idx {
+                                    None => 0,
+                                    Some(i) => (i + 1) % count,
+                                };
+                                this.goto_bar_selected_idx = Some(next);
+                                cx.notify();
+                            }
+                            "up" if count > 0 => {
+                                let prev = match this.goto_bar_selected_idx {
+                                    None => count.saturating_sub(1),
+                                    Some(0) => count.saturating_sub(1),
+                                    Some(i) => i - 1,
+                                };
+                                this.goto_bar_selected_idx = Some(prev);
+                                cx.notify();
+                            }
+                            _ => {}
+                        }
+                        let _ = window;
+                    },
+                )),
+            )
+    }
+
     pub(crate) fn render_top_bar_command_bar(
         &self,
         window: &Window,
@@ -1165,14 +1301,12 @@ impl ArcadiaRoot {
             return div();
         }
 
-        let focused = self.command_bar_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
         let text = self.command_bar_input.clone();
-        let fh = self.command_bar_focus.clone();
         let bg = theme::action_pill_bg(cx, is_dark);
         let border_c = theme::ui_accent(cx);
         let tc = theme::action_pill_text(cx, is_dark);
         let meta_c = theme::ui_subtext(cx, is_dark);
+        let weak = cx.weak_entity();
 
         div()
             .flex()
@@ -1186,58 +1320,45 @@ impl ArcadiaRoot {
             .min_w(px(200.))
             .text_xs()
             .text_color(tc)
-            .track_focus(&self.command_bar_focus)
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |_, _, window, _| {
-                    fh.focus(window);
-                }),
-            )
-            .child(if text.is_empty() {
-                if focused && blink {
-                    div()
-                        .text_color(tc)
-                        .child(TEXT_INPUT_CARET_CHAR.to_string())
-                } else {
-                    div().text_color(meta_c).child("Internal command…")
-                }
-            } else {
-                div().child(text_with_trailing_caret(&text, focused, blink))
-            })
-            .on_key_down(
-                cx.listener(|this, event: &KeyDownEvent, window: &mut Window, cx| {
-                    let key = event.keystroke.key.as_str();
-                    let mods = event.keystroke.modifiers;
-                    match key {
-                        "escape" => {
-                            this.command_bar_open = false;
-                            this.command_bar_input.clear();
-                            cx.notify();
-                        }
-                        "enter" => {
-                            let cmd = this.command_bar_input.trim().to_string();
-                            this.command_bar_open = false;
-                            this.command_bar_input.clear();
-                            if !cmd.is_empty() {
-                                let ctx = this.execution_context();
-                                let _ = modules::execute_command("shell.internal", &[&cmd], &ctx);
-                            }
-                            cx.notify();
-                        }
-                        "backspace" => {
-                            this.command_bar_input.pop();
-                            cx.notify();
-                        }
-                        _ if !mods.control && !mods.alt && !mods.platform && !mods.function => {
-                            if let Some(ch) = &event.keystroke.key_char {
-                                this.command_bar_input.push_str(ch);
+            .child(
+                text_input(
+                    "command-bar-input",
+                    window,
+                    weak,
+                    &text,
+                    "Internal command…",
+                    &self.command_bar_focus,
+                    tc,
+                    meta_c,
+                    |this, new_text, cx| {
+                        this.command_bar_input = new_text;
+                        cx.notify();
+                    },
+                )
+                .on_key_down(
+                    cx.listener(|this, event: &KeyDownEvent, window: &mut Window, cx| {
+                        let key = event.keystroke.key.as_str();
+                        match key {
+                            "escape" => {
+                                this.command_bar_open = false;
+                                this.command_bar_input.clear();
                                 cx.notify();
                             }
+                            "enter" => {
+                                let cmd = this.command_bar_input.trim().to_string();
+                                this.command_bar_open = false;
+                                this.command_bar_input.clear();
+                                if !cmd.is_empty() {
+                                    let ctx = this.execution_context();
+                                    let _ = modules::execute_command("shell.internal", &[&cmd], &ctx);
+                                }
+                                cx.notify();
+                            }
+                            _ => {}
                         }
-                        _ => {}
-                    }
-                    let _ = window;
-                }),
+                        let _ = window;
+                    }),
+                ),
             )
     }
 }

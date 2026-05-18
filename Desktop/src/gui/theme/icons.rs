@@ -34,6 +34,7 @@ pub fn icon_path(glyph_key: &str) -> &'static str {
         "pin-fill" => "icons/pin-fill.svg",
         "code" => "icons/modules.svg",
         "modules" => "icons/modules.svg",
+        "goto" => "icons/goto.svg",
         "shortcuts" => "icons/shortcuts.svg",
         "message" => "icons/message.svg",
         "animation" => "icons/animation.svg",

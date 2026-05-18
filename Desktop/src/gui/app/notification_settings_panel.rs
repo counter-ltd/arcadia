@@ -6,11 +6,10 @@ use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::python_registry;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, Styled, Window,
+    div, px, text_input, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    ParentElement, Styled, Window,
 };
 
-use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -108,9 +107,6 @@ impl ArcadiaRoot {
         }
 
         sources.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let max_count_focused = self.notification_max_count_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
 
         div()
             .w_full()
@@ -310,63 +306,33 @@ impl ArcadiaRoot {
                             .flex_row()
                             .gap_3()
                             .items_center()
-                            .child(
-                                div()
-                                    .id("notif-max-count")
-                                    .w(px(120.))
-                                    .px_3()
-                                    .py_2()
-                                    .rounded(px(radius))
-                                    .bg(input_bg)
-                                    .border_1()
-                                    .border_color(input_border)
-                                    .text_sm()
-                                    .text_color(text_c)
-                                    .track_focus(&self.notification_max_count_focus)
-                                    .on_mouse_down(
-                                        MouseButton::Left,
-                                        cx.listener(|this, _, window, _| {
-                                            this.notification_max_count_focus.focus(window);
-                                        }),
-                                    )
-                                    .child(if max_count_draft.is_empty() {
-                                        if max_count_focused && blink {
-                                            div()
-                                                .text_color(text_c)
-                                                .child(TEXT_INPUT_CARET_CHAR.to_string())
-                                        } else {
-                                            div()
-                                                .text_color(subtext_c)
-                                                .child(current_max.to_string())
-                                        }
-                                    } else {
-                                        div().child(text_with_trailing_caret(
-                                            max_count_draft.as_str(),
-                                            max_count_focused,
-                                            blink,
-                                        ))
-                                    })
-                                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                                        let key = event.keystroke.key.as_str();
-                                        let mods = event.keystroke.modifiers;
-                                        if key == "backspace" {
-                                            this.notification_max_count_draft.pop();
-                                            cx.notify();
-                                        } else if !mods.control
-                                            && !mods.alt
-                                            && !mods.platform
-                                            && !mods.function
-                                        {
-                                            if let Some(ch) = &event.keystroke.key_char {
-                                                if ch.chars().all(|c| c.is_ascii_digit()) {
-                                                    this.notification_max_count_draft
-                                                        .push_str(ch);
-                                                    cx.notify();
-                                                }
-                                            }
-                                        }
-                                    })),
-                            )
+                            .child({
+                                let weak = cx.weak_entity();
+                                let placeholder = current_max.to_string();
+                                text_input(
+                                    "notif-max-count",
+                                    window,
+                                    weak,
+                                    &max_count_draft,
+                                    &placeholder,
+                                    &self.notification_max_count_focus,
+                                    text_c,
+                                    subtext_c,
+                                    |this, new_text, cx| {
+                                        let filtered: String = new_text.chars().filter(|c| c.is_ascii_digit()).collect();
+                                        this.notification_max_count_draft = filtered;
+                                        cx.notify();
+                                    },
+                                )
+                                .w(px(120.))
+                                .px_3()
+                                .py_2()
+                                .rounded(px(radius))
+                                .bg(input_bg)
+                                .border_1()
+                                .border_color(input_border)
+                                .text_sm()
+                            })
                             .child(
                                 div()
                                     .cursor_pointer()

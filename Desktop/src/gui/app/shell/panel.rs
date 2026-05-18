@@ -111,23 +111,24 @@ impl ArcadiaRoot {
                         div()
                             .text_sm()
                             .text_color(theme::ui_text(cx, is_dark))
-                            .child(self.shell_input_with_cursor(is_focused)),
+                            .child(self.shell_input_with_cursor(is_focused, window)),
                     ),
             )
     }
 
-    pub(crate) fn shell_input_with_cursor(&self, is_focused: bool) -> String {
+    pub(crate) fn shell_input_with_cursor(&self, is_focused: bool, window: &Window) -> String {
         let term = self.active_terminal();
         let chars = term.shell_input.chars().collect::<Vec<_>>();
         let cursor = term.shell_cursor.min(chars.len());
         let mut out = String::with_capacity(chars.len() + 1);
+        let blink = window.caret_blink_visible();
         for (idx, ch) in chars.iter().enumerate() {
-            if idx == cursor && is_focused && self.text_caret_blink_visible {
+            if idx == cursor && is_focused && blink {
                 out.push(TEXT_INPUT_CARET_CHAR);
             }
             out.push(*ch);
         }
-        if cursor == chars.len() && is_focused && self.text_caret_blink_visible {
+        if cursor == chars.len() && is_focused && blink {
             out.push(TEXT_INPUT_CARET_CHAR);
         }
         out

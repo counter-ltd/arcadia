@@ -58,7 +58,7 @@ use std::time::Instant;
 use arcadia_core::modules::python_registry::{DecorationRect, HighlightSpan, StyleInfo};
 use arcadia_core::navigation::NavigationRegistryOwned;
 use arcadia_core::shortcuts::KeyChordSpec;
-use openframe::{Bounds, FocusHandle, Pixels, ScrollHandle, SharedString, Subscription};
+use openframe::{Bounds, FocusHandle, Pixels, Point, ScrollHandle, SharedString, Subscription};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -607,9 +607,6 @@ pub struct ArcadiaRoot {
     #[cfg(feature = "gui")]
     pub shell_focus: FocusHandle,
     pub late: LateUiState,
-    /// Shared blink phase for focused single-line text fields (shell, compose, settings inputs).
-    pub text_caret_blink_visible: bool,
-    pub text_caret_blink_task_started: bool,
     pub splash_elapsed_ms: f32,
     pub splash_tick_started: bool,
     pub sidebar_visible: bool,
@@ -694,6 +691,16 @@ pub struct ArcadiaRoot {
     pub command_bar_open: bool,
     pub command_bar_input: String,
     pub command_bar_focus: FocusHandle,
+    /// When true, the goto bar is open in the top bar (Cmd+G).
+    pub goto_bar_open: bool,
+    /// Active goto subcommand — "page" for goto.page, extensible for future subcommands.
+    pub goto_bar_command: String,
+    pub goto_bar_input: String,
+    pub goto_bar_focus: FocusHandle,
+    /// Index of the highlighted suggestion in the dropdown (None = no selection).
+    pub goto_bar_selected_idx: Option<usize>,
+    /// Window-space anchor for the goto suggestions overlay — set when the bar opens.
+    pub goto_bar_anchor: Point<Pixels>,
     /// Cached unread notification count for badge display on the Notifications pill.
     pub notification_unread_count: usize,
     /// Feedback line displayed at the bottom of the notification settings panel.

@@ -4,59 +4,12 @@ use arcadia_core::config::llama_cpp::{LlamaCppConfig, LlamaCppModel, LlamaCppMod
 use arcadia_core::config::ConfigFile;
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, AnyElement, Context, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
-    MouseButton, ParentElement, PathPromptOptions, Styled, Window,
+    div, px, rgb, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, ParentElement, PathPromptOptions, Styled, Window,
 };
 
 use super::ArcadiaRoot;
-use crate::gui::app::text_input_caret::text_with_trailing_caret;
-use crate::gui::theme::palette::ThemePalette;
 use crate::gui::theme::{self, render_icon};
-
-fn text_field(
-    value: &str,
-    placeholder: &'static str,
-    focused: bool,
-    blink: bool,
-    focus_handle: openframe::FocusHandle,
-    p: ThemePalette,
-    radius: f32,
-    on_key_down: impl Fn(&mut ArcadiaRoot, &KeyDownEvent, &mut openframe::Window, &mut Context<ArcadiaRoot>)
-        + 'static,
-    cx: &mut Context<ArcadiaRoot>,
-) -> AnyElement {
-    let fh = focus_handle.clone();
-    let content: String = if value.is_empty() && !focused {
-        placeholder.to_string()
-    } else {
-        text_with_trailing_caret(value, focused, blink)
-    };
-    let text_color = if value.is_empty() && !focused {
-        p.ui_subtext
-    } else {
-        p.content_title
-    };
-    div()
-        .w_full()
-        .px_3()
-        .py_2()
-        .rounded(px(radius.min(8.0)))
-        .bg(p.surface_elevated)
-        .border_1()
-        .border_color(if focused { p.accent } else { p.border })
-        .text_sm()
-        .text_color(text_color)
-        .track_focus(&focus_handle)
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(move |_, _, window, _| {
-                fh.focus(window);
-            }),
-        )
-        .on_key_down(cx.listener(on_key_down))
-        .child(content)
-        .into_any_element()
-}
 
 impl ArcadiaRoot {
     pub fn llama_cpp_create_model_modal(
@@ -76,7 +29,6 @@ impl ArcadiaRoot {
         let name_focused = self.ai.llama_cpp_create_name_focus.is_focused(window);
         let path_focused = self.ai.llama_cpp_create_path_focus.is_focused(window);
         let mmproj_focused = self.ai.llama_cpp_create_mmproj_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
 
         let name_fh = self.ai.llama_cpp_create_name_focus.clone();
         let path_fh = self.ai.llama_cpp_create_path_focus.clone();
@@ -88,98 +40,97 @@ impl ArcadiaRoot {
         let modal_surface = g.map(|gg| gg.surface).unwrap_or(p.surface);
         let modal_border = g.map(|gg| gg.border).unwrap_or(p.border);
 
-        let name_field = text_field(
+        let weak = cx.weak_entity();
+
+        let name_field = text_input(
+            "llama-create-name",
+            window,
+            weak.clone(),
             &draft.name,
             "Model name…",
-            name_focused,
-            blink,
-            name_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.ai.llama_cpp_create_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
-                    if key == "backspace" {
-                        d.name.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.name.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &name_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.ai.llama_cpp_create_draft { d.name = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if name_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.ai.llama_cpp_create_draft = None;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
-        let path_field = text_field(
+        let path_field = text_input(
+            "llama-create-path",
+            window,
+            weak.clone(),
             &draft.path,
             "/path/to/model.gguf…",
-            path_focused,
-            blink,
-            path_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.ai.llama_cpp_create_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
-                    if key == "backspace" {
-                        d.path.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.path.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &path_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.ai.llama_cpp_create_draft { d.path = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if path_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.ai.llama_cpp_create_draft = None;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
-        let mmproj_field = text_field(
+        let mmproj_field = text_input(
+            "llama-create-mmproj",
+            window,
+            weak.clone(),
             &draft.mmproj_path,
             "/path/to/mmproj.gguf…",
-            mmproj_focused,
-            blink,
-            mmproj_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.ai.llama_cpp_create_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.ai.llama_cpp_create_draft {
-                    if key == "backspace" {
-                        d.mmproj_path.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.mmproj_path.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &mmproj_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.ai.llama_cpp_create_draft { d.mmproj_path = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if mmproj_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.ai.llama_cpp_create_draft = None;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
         let error_el = draft.error.as_ref().map(|e| {
             div()
@@ -505,103 +456,100 @@ impl ArcadiaRoot {
         let name_focused = self.ai.llama_cpp_edit_name_focus.is_focused(window);
         let path_focused = self.ai.llama_cpp_edit_path_focus.is_focused(window);
         let mmproj_focused = self.ai.llama_cpp_edit_mmproj_focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
         let name_fh = self.ai.llama_cpp_edit_name_focus.clone();
         let path_fh = self.ai.llama_cpp_edit_path_focus.clone();
         let mmproj_fh = self.ai.llama_cpp_edit_mmproj_focus.clone();
+        let weak = cx.weak_entity();
 
-        let name_field = text_field(
+        let name_field = text_input(
+            "llama-edit-name",
+            window,
+            weak.clone(),
             &draft.name,
             "Model name…",
-            name_focused,
-            blink,
-            name_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.ai.llama_cpp_edit_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
-                    if key == "backspace" {
-                        d.name.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.name.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &name_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft { d.name = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if name_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.ai.llama_cpp_edit_draft = None;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
-        let path_field = text_field(
+        let path_field = text_input(
+            "llama-edit-path",
+            window,
+            weak.clone(),
             &draft.path,
             "/path/to/model.gguf…",
-            path_focused,
-            blink,
-            path_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.ai.llama_cpp_edit_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
-                    if key == "backspace" {
-                        d.path.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.path.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &path_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft { d.path = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if path_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.ai.llama_cpp_edit_draft = None;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
-        let mmproj_field = text_field(
+        let mmproj_field = text_input(
+            "llama-edit-mmproj",
+            window,
+            weak.clone(),
             &draft.mmproj_path,
             "/path/to/mmproj.gguf…",
-            mmproj_focused,
-            blink,
-            mmproj_fh,
-            p,
-            radius,
-            |this, event, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
-                if key == "escape" {
-                    this.ai.llama_cpp_edit_draft = None;
-                    cx.notify();
-                    return;
-                }
-                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft {
-                    if key == "backspace" {
-                        d.mmproj_path.pop();
-                        cx.notify();
-                    } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                        if let Some(kc) = &event.keystroke.key_char {
-                            d.mmproj_path.push_str(kc);
-                            cx.notify();
-                        }
-                    }
-                }
+            &mmproj_fh,
+            p.content_title,
+            p.ui_subtext,
+            |this, new_text, cx| {
+                if let Some(ref mut d) = this.ai.llama_cpp_edit_draft { d.mmproj_path = new_text; }
+                cx.notify();
             },
-            cx,
-        );
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius.min(8.0)))
+        .bg(p.surface_elevated)
+        .border_1()
+        .border_color(if mmproj_focused { p.accent } else { p.border })
+        .text_sm()
+        .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+            if event.keystroke.key == "escape" {
+                this.ai.llama_cpp_edit_draft = None;
+                cx.notify();
+            }
+        }))
+        .into_any_element();
 
         let error_el = draft.error.as_ref().map(|e| {
             div()

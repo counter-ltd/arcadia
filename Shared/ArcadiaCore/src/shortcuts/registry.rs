@@ -1,6 +1,6 @@
 //! Static shortcut definitions compiled into core.
 
-use crate::config::modules::TERMINAL_MODULE_NAME;
+use crate::config::modules::{GOTO_MODULE_NAME, TERMINAL_MODULE_NAME};
 
 use super::model::{
     ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic, ShortcutTriggerStatic,
@@ -246,4 +246,27 @@ pub static SHORTCUT_DEFINITIONS: &[ShortcutDefinition] = &[
         true,
         "editor.redo"
     ),
+    ShortcutDefinition {
+        id: "goto:open",
+        label: "Open goto bar",
+        owner: "goto",
+        required_registry_module: Some(GOTO_MODULE_NAME),
+        scope: ShortcutScopeStatic::ArcadiaWide,
+        visibility: ShortcutVisibility::Both,
+        priority: 90,
+        consumes: true,
+        bypass_text_focus: false,
+        system_wide: false,
+        triggers: &[ShortcutTriggerStatic::Chord {
+            key: "g",
+            control: false,
+            alt: false,
+            shift: false,
+            platform: true,
+            function: false,
+        }],
+        actions: &[ShortcutActionStatic::UiControl {
+            control_id: "goto.open_page",
+        }],
+    },
 ];

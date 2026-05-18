@@ -1,11 +1,7 @@
 //! Search field shared by Modules and Extensions list panels.
 
-use openframe::{
-    div, px, Context, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement,
-    Styled, Window,
-};
+use openframe::{px, text_input, Context, IntoElement, Styled, Window};
 
-use crate::gui::app::text_input_caret::{text_with_trailing_caret, TEXT_INPUT_CARET_CHAR};
 use crate::gui::app::ArcadiaRoot;
 use crate::gui::theme;
 
@@ -78,40 +74,26 @@ impl ArcadiaRoot {
         let title_c = theme::module_title_text(is_dark);
         let meta_c = theme::module_meta_text(is_dark);
 
-        let fh = focus.clone();
-        let focused = focus.is_focused(window);
-        let blink = self.text_caret_blink_visible;
+        let weak = cx.weak_entity();
 
-        div()
-            .w_full()
-            .px_3()
-            .py_2()
-            .rounded(px(radius))
-            .bg(input_bg)
-            .border_1()
-            .border_color(input_border)
-            .text_sm()
-            .text_color(title_c)
-            .track_focus(focus)
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |_, _, window, _| {
-                    fh.focus(window);
-                }),
-            )
-            .child(if text.is_empty() {
-                let display = if focused && blink {
-                    format!("{placeholder}{TEXT_INPUT_CARET_CHAR}")
-                } else {
-                    placeholder.to_string()
-                };
-                div().text_color(meta_c).child(display)
-            } else {
-                div().child(text_with_trailing_caret(text, focused, blink))
-            })
-            .on_key_down(cx.listener(move |this, event: &KeyDownEvent, _, cx| {
-                let key = event.keystroke.key.as_str();
-                let mods = event.keystroke.modifiers;
+        text_input(
+            match kind {
+                ListPanelSearchKind::Modules => "list-search-modules",
+                ListPanelSearchKind::Extensions => "list-search-extensions",
+                ListPanelSearchKind::Permissions => "list-search-permissions",
+                ListPanelSearchKind::Shortcuts => "list-search-shortcuts",
+                ListPanelSearchKind::Workspaces => "list-search-workspaces",
+                ListPanelSearchKind::Rules => "list-search-rules",
+                ListPanelSearchKind::Skills => "list-search-skills",
+            },
+            window,
+            weak,
+            text,
+            placeholder,
+            focus,
+            title_c,
+            meta_c,
+            move |this, new_text, cx| {
                 let buf = match kind {
                     ListPanelSearchKind::Modules => &mut this.modules_search_query,
                     ListPanelSearchKind::Extensions => &mut this.extensions_search_query,
@@ -121,18 +103,17 @@ impl ArcadiaRoot {
                     ListPanelSearchKind::Rules => &mut this.rules_search_query,
                     ListPanelSearchKind::Skills => &mut this.skills_search_query,
                 };
-                if key == "backspace" {
-                    buf.pop();
-                    cx.notify();
-                } else if !mods.control && !mods.alt && !mods.platform && !mods.function {
-                    if let Some(key_char) = &event.keystroke.key_char {
-                        buf.push_str(key_char);
-                        cx.notify();
-                    }
-                } else if key == "space" {
-                    buf.push(' ');
-                    cx.notify();
-                }
-            }))
+                *buf = new_text;
+                cx.notify();
+            },
+        )
+        .w_full()
+        .px_3()
+        .py_2()
+        .rounded(px(radius))
+        .bg(input_bg)
+        .border_1()
+        .border_color(input_border)
+        .text_sm()
     }
 }

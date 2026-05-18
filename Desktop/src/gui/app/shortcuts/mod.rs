@@ -30,7 +30,7 @@ use arcadia_core::shortcuts::{
     self, EffectiveMergedShortcut, KeyChordSpec, ShortcutAction, ShortcutScope, ShortcutTrigger,
     ShortcutVisibility,
 };
-use openframe::{Context, KeyDownEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Window};
+use openframe::{self, Context, KeyDownEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Window};
 
 use super::ArcadiaRoot;
 
@@ -104,6 +104,9 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
         return true;
     }
     if this.command_bar_focus.contains_focused(window, cx) {
+        return true;
+    }
+    if this.goto_bar_focus.contains_focused(window, cx) {
         return true;
     }
     if this
@@ -316,9 +319,36 @@ impl ArcadiaRoot {
                     self.command_bar_focus.focus(window);
                 }
             }
+            "goto.open_page" => {
+                let blocks = self
+                    .page_ref(&self.active_page_id.clone())
+                    .map(|p| p.blocks_platform_goto())
+                    .unwrap_or(false);
+                if !blocks {
+                    if self.goto_bar_open {
+                        self.goto_bar_open = false;
+                        self.goto_bar_input.clear();
+                    } else {
+                        self.goto_bar_open = true;
+                        self.goto_bar_command = "page".to_string();
+                        self.goto_bar_input.clear();
+                        // Initial rough estimate; canvas prepaint in render_top_bar_goto_bar
+                        // refines this to the pill's exact x on the next frame.
+                        let sz = window.viewport_size();
+                        let vw = f32::from(sz.width);
+                        self.goto_bar_anchor = openframe::point(
+                            openframe::px(vw / 2.0 - 110.0),
+                            openframe::px(42.0),
+                        );
+                        self.goto_bar_focus.focus(window);
+                    }
+                }
+            }
             "arcadia.dismiss_overlays" => {
                 self.command_bar_open = false;
                 self.command_bar_input.clear();
+                self.goto_bar_open = false;
+                self.goto_bar_input.clear();
                 self.app_menu_open = false;
                 self.session_route_menu_open = false;
                 #[cfg(feature = "gui")]
