@@ -18,6 +18,7 @@ use std::sync::Mutex;
 
 use arcadia_core::modules::overlay::{self, OverlayBackend, OverlayStackingToken};
 use arcadia_core::modules::overlay_hud_sprite;
+use arcadia_core::modules::platform as core_platform;
 use openframe::{AnyWindowHandle, AsyncApp};
 
 // ── HUD window ────────────────────────────────────────────────────────────────
@@ -185,7 +186,7 @@ fn poll_overlay_sprite_refresh(async_app: &AsyncApp) {
     let _ = async_app.refresh();
 }
 
-/// Toggle `NSVisualEffectView` on the BMB window when the vibrancy owner set changes.
+/// Toggle `NSVisualEffectView` sections on the BMB window when the vibrancy owner set changes.
 fn poll_overlay_vibrancy(async_app: &mut AsyncApp) {
     let v = overlay_hud_sprite::vibrancy_version();
     let prev = VIBRANCY_REFRESHED_AT_VERSION.load(Ordering::Acquire);
@@ -195,22 +196,38 @@ fn poll_overlay_vibrancy(async_app: &mut AsyncApp) {
     VIBRANCY_REFRESHED_AT_VERSION.store(v, Ordering::Release);
 
     let want_vibrancy = overlay_hud_sprite::has_any_vibrancy();
-    let height_px = overlay_hud_sprite::vibrancy_height_px();
-    let material = overlay_hud_sprite::vibrancy_material();
     OVERLAY_VIBRANCY_BMB.store(want_vibrancy, Ordering::Release);
+
+    // Resolve logical screen width for None x_start/x_end entries.
+    let screen_w_logical = core_platform::primary_screen_size()
+        .map(|s| s.width as f32 / s.scale_factor)
+        .unwrap_or(1280.0);
+
+    // Build concrete sections: resolve None edges, sort by x_start.
+    let mut sections: Vec<(f32, f32, f32, String)> = overlay_hud_sprite::vibrancy_sections()
+        .into_iter()
+        .map(|(x0, x1, h, mat)| {
+            (
+                x0.unwrap_or(0.0),
+                x1.unwrap_or(screen_w_logical),
+                h,
+                mat.unwrap_or_else(|| "sidebar".to_string()),
+            )
+        })
+        .collect();
+    sections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
     let handle = OVERLAY_HANDLE_BMB.lock().ok().and_then(|g| *g);
     if let Some(handle) = handle {
         let _ = async_app.update(move |app| {
             let _ = handle.update(app, |_root, window, _| -> Result<(), ()> {
-                window.set_vibrancy(want_vibrancy, height_px, material.as_deref());
+                window.set_vibrancy_sections(&sections);
                 Ok(())
             });
         });
     }
 
-    // Also ensure the BMB window is visible/invisible based on combined state.
-    // (sprite refresh may not have fired if only vibrancy changed)
+    // Ensure BMB window visibility matches combined state.
     let bmb_has =
         overlay_hud_sprite::has_sprites_for_stacking(OverlayStackingToken::BelowMenuBar) || want_vibrancy;
     let bmb_visible = OVERLAY_VISIBLE_BMB.load(Ordering::Relaxed);

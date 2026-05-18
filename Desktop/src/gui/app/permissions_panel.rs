@@ -1,6 +1,6 @@
 use arcadia_core::config::modules::MODULE_REGISTRY;
 use arcadia_core::config::permissions::{
-    permission_definition, PermissionSubject, PermissionsConfig, PERMISSION_REGISTRY,
+    permission_definition, PermissionSubject, PermissionsConfig, SystemGrant, PERMISSION_REGISTRY,
 };
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules;
@@ -67,6 +67,49 @@ fn perm_toggle_switch(
     }
 }
 
+/// macOS-only button that opens the OS permission flow for `system_grant`. Shows "Grant" when
+/// the OS grant is missing and "Revoke" (opens the same settings pane to disable) when active.
+/// Returns `None` when the permission needs no OS grant, or when not on macOS.
+fn perm_invoke_button(
+    system_grant: Option<SystemGrant>,
+    r_track: f32,
+    p: &theme::palette::ThemePalette,
+    cx: &mut Context<ArcadiaRoot>,
+) -> Option<AnyElement> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    let grant = system_grant?;
+    let active = modules::platform::is_system_grant_active(grant);
+    let (label, color) = if active {
+        ("Revoke", p.danger)
+    } else {
+        ("Grant", p.accent)
+    };
+    Some(
+        div()
+            .px_2()
+            .h_6()
+            .flex()
+            .items_center()
+            .rounded(px(r_track))
+            .border_1()
+            .border_color(color)
+            .cursor_pointer()
+            .text_xs()
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(color)
+            .child(label)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |_this, _, _, _cx| {
+                    modules::platform::prompt_system_grant(grant);
+                }),
+            )
+            .into_any_element(),
+    )
+}
+
 impl ArcadiaRoot {
     pub fn permissions_panel(
         &mut self,
@@ -106,6 +149,7 @@ impl ArcadiaRoot {
             let on = pc.global_allowed(def.id);
             let id_c = id.clone();
             let toggle = perm_toggle_switch(on, is_glyph, r_track, &p);
+            let invoke = perm_invoke_button(def.system_grant, r_track, &p, cx);
 
             let row_inner = div()
                 .w_full()
@@ -120,6 +164,8 @@ impl ArcadiaRoot {
                         .flex()
                         .flex_col()
                         .gap_1()
+                        .flex_1()
+                        .min_w_0()
                         .child(
                             div()
                                 .text_sm()
@@ -133,6 +179,13 @@ impl ArcadiaRoot {
                         }),
                 )
                 .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .flex_shrink_0()
+                        .when_some(invoke, |d, b| d.child(b))
+                        .child(
                     div()
                         .flex()
                         .items_center()
@@ -159,6 +212,7 @@ impl ArcadiaRoot {
                                 cx.notify();
                             }),
                         ),
+                ),
                 );
 
             global_children.push(
@@ -240,6 +294,7 @@ impl ArcadiaRoot {
                 let granted =
                     pc.subject_grants(&PermissionSubject::module(mod_for_grant.clone()), pid);
                 let def = permission_definition(pid);
+                let invoke = perm_invoke_button(def.and_then(|d| d.system_grant), r_track, &p, cx);
                 let row_title = def.map(|d| d.title).unwrap_or(pid);
                 let row_desc = def.map(|d| d.description).unwrap_or("");
                 let toggle = perm_toggle_switch(granted, is_glyph, r_track, &p);
@@ -257,6 +312,8 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_1()
+                            .flex_1()
+                            .min_w_0()
                             .child(
                                 div()
                                     .text_sm()
@@ -284,6 +341,13 @@ impl ArcadiaRoot {
                             .flex()
                             .items_center()
                             .gap_2()
+                            .flex_shrink_0()
+                        .when_some(invoke, |d, b| d.child(b))
+                            .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
                             .cursor_pointer()
                             .child(
                                 div()
@@ -306,6 +370,7 @@ impl ArcadiaRoot {
                                     cx.notify();
                                 }),
                             ),
+                    ),
                     );
 
                 module_children.push(
@@ -392,6 +457,7 @@ impl ArcadiaRoot {
                 let granted =
                     pc.subject_grants(&PermissionSubject::python(ext_c.clone()), pid.as_str());
                 let def = permission_definition(pid.as_str());
+                let invoke = perm_invoke_button(def.and_then(|d| d.system_grant), r_track, &p, cx);
                 let row_title = def.map(|d| d.title).unwrap_or(pid.as_str());
                 let row_desc = def.map(|d| d.description).unwrap_or("");
                 let toggle = perm_toggle_switch(granted, is_glyph, r_track, &p);
@@ -409,6 +475,8 @@ impl ArcadiaRoot {
                             .flex()
                             .flex_col()
                             .gap_1()
+                            .flex_1()
+                            .min_w_0()
                             .child(
                                 div()
                                     .text_sm()
@@ -436,6 +504,13 @@ impl ArcadiaRoot {
                             .flex()
                             .items_center()
                             .gap_2()
+                            .flex_shrink_0()
+                        .when_some(invoke, |d, b| d.child(b))
+                            .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
                             .cursor_pointer()
                             .child(
                                 div()
@@ -458,6 +533,7 @@ impl ArcadiaRoot {
                                     cx.notify();
                                 }),
                             ),
+                    ),
                     );
 
                 py_children.push(

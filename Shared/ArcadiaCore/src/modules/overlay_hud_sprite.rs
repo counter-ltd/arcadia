@@ -176,6 +176,8 @@ pub fn clone_if_newer_than(
 struct VibrancyEntry {
     height_px: f32,
     material: Option<String>,
+    /// Horizontal sections in logical points. Empty = full width. Each tuple is (x_start, x_end).
+    x_ranges: Vec<(f32, f32)>,
 }
 
 struct VibrancyInner {
@@ -234,13 +236,41 @@ pub fn vibrancy_material() -> Option<String> {
 }
 
 /// Register `owner` as wanting native vibrancy at `height_px` logical pixels.
-/// Always bumps version so the overlay backend re-applies even if already active
-/// (height or material may have changed).
-pub fn set_vibrancy_for_owner(owner: String, height_px: f32, material: Option<String>) {
+/// `x_ranges` is a list of `(x_start, x_end)` in logical points; empty = full width.
+/// Passing multiple ranges atomically registers multiple horizontal sections per owner.
+/// Always bumps version so the overlay backend re-applies even if already active.
+pub fn set_vibrancy_for_owner(
+    owner: String,
+    height_px: f32,
+    material: Option<String>,
+    x_ranges: Vec<(f32, f32)>,
+) {
     if let Ok(mut g) = vibrancy_state().lock() {
-        g.owners.insert(owner, VibrancyEntry { height_px, material });
+        g.owners.insert(owner, VibrancyEntry { height_px, material, x_ranges });
         g.version = g.version.wrapping_add(1);
     }
+}
+
+/// Clone all active vibrancy sections as `(x_start, x_end, height_px, material)`.
+/// Entries with empty `x_ranges` contribute a single full-width entry with `x_start=None, x_end=None`.
+/// The overlay backend resolves `None` to the screen edges.
+pub fn vibrancy_sections() -> Vec<(Option<f32>, Option<f32>, f32, Option<String>)> {
+    vibrancy_state()
+        .lock()
+        .map(|g| {
+            let mut result = Vec::new();
+            for e in g.owners.values() {
+                if e.x_ranges.is_empty() {
+                    result.push((None, None, e.height_px, e.material.clone()));
+                } else {
+                    for &(x0, x1) in &e.x_ranges {
+                        result.push((Some(x0), Some(x1), e.height_px, e.material.clone()));
+                    }
+                }
+            }
+            result
+        })
+        .unwrap_or_default()
 }
 
 /// Remove `owner`'s vibrancy request. No-op if not registered.

@@ -12,6 +12,14 @@ use crate::config::{write_config_toml, ConfigFile};
 const FILE_NAME: &str = "permissions.toml";
 pub const SCHEMA_VERSION: u32 = 2;
 
+/// An OS-level grant a permission also depends on, beyond Arcadia's own toggle.
+/// The host surface can launch the OS grant flow for these via `platform::prompt_system_grant`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemGrant {
+    /// Assistive-access grant: read/drive other apps' UI. macOS → Accessibility settings pane.
+    Accessibility,
+}
+
 /// Stable permission ids (see product plan / AGENTS).
 #[derive(Debug, Clone, Copy)]
 pub struct PermissionDefinition {
@@ -20,6 +28,9 @@ pub struct PermissionDefinition {
     pub description: &'static str,
     /// Default for global toggle when key missing from disk.
     pub default_global: bool,
+    /// OS-level grant this permission also needs. `Some(_)` → the GUI shows a button that
+    /// launches the OS grant flow. `None` → Arcadia's toggle is the only gate.
+    pub system_grant: Option<SystemGrant>,
 }
 
 pub const PERMISSION_REGISTRY: &[PermissionDefinition] = &[
@@ -28,102 +39,126 @@ pub const PERMISSION_REGISTRY: &[PermissionDefinition] = &[
         title: "LAN access",
         description: "Discovery, peer I/O, and LAN module commands (multicast, pairing, etc.).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "session.remote_route",
         title: "Remote routing",
         description: "Run commands on a peer host via --net:as lan:… (Arcadia remote control).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "shell.run",
         title: "Shell commands",
         description: "Spawn local subprocesses (shell.execute).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "shell.bridge",
         title: "Shell bridge",
         description: "Host/runtime bridge (shell.internal).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "surface.read",
         title: "Surface read",
         description: "Read UI mirror state (surface.snapshot, surface.revision).",
         default_global: true,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "surface.control",
         title: "Surface control",
         description: "Mutate mirrored UI / module toggles (surface.patch).",
         default_global: true,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "late.outbound",
         title: "Late.sh network",
         description: "Connect and interact with late.sh (WebSocket, credentials, chat).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "python.host",
         title: "Python host",
         description: "Load or reload extensions from disk (python-host.reload).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "python.extension_toggle",
         title: "Extension enable",
         description: "Enable or disable Python extensions.",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "input.capture",
         title: "Input capture",
         description: "Reserved for future input capture / injection policy (global gate).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "tray.create",
         title: "Tray / menu-bar icons",
         description: "Create and update menu-bar (macOS) or system-tray (Windows/Linux) icons.",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "cursor.global_position",
         title: "Global cursor position",
         description: "Read the OS-global mouse cursor position even when Arcadia is not focused (macOS: Accessibility; same device-query gate as global mouse buttons).",
         default_global: false,
+        system_grant: Some(SystemGrant::Accessibility),
     },
     PermissionDefinition {
         id: "cursor.global_mouse_buttons",
         title: "Global mouse buttons",
         description: "Read whether the primary mouse buttons are pressed anywhere on the OS, even when Arcadia is not focused (macOS: Accessibility; same gate as global cursor position).",
         default_global: false,
+        system_grant: Some(SystemGrant::Accessibility),
+    },
+    PermissionDefinition {
+        id: "system.accessibility",
+        title: "Accessibility (AX)",
+        description: "Read other apps' UI geometry via the macOS Accessibility API — focused-app menu extent and system status-item boundaries. Requires the OS-level Accessibility grant in System Settings.",
+        default_global: false,
+        system_grant: Some(SystemGrant::Accessibility),
     },
     PermissionDefinition {
         id: "overlay.hud",
         title: "HUD overlay window",
         description: "Create and control the shared always-on-top transparent overlay window (non-interactive / pass-through in v1).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "overlay.system_ui",
         title: "Overlay system-UI tier",
         description: "Allow overlay.set-stacking system_ui (higher stacking tier; best-effort per OS).",
         default_global: false,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "notifications.receive",
         title: "Receive notifications",
         description: "Allow the notification module to store and display in-app notifications.",
         default_global: true,
+        system_grant: None,
     },
     PermissionDefinition {
         id: "notifications.send",
         title: "Send notifications",
         description: "Allow a module or extension to post notifications via notification.post. Grant per-source in the Notifications settings.",
         default_global: false,
+        system_grant: None,
     },
 ];
 

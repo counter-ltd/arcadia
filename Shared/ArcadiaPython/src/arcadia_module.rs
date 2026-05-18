@@ -697,17 +697,27 @@ fn overlay_hud_clear_sprite(extension_id: String) -> PyResult<()> {
 /// display — typically `menu_bar_height() - 3`. Currently only `"below_menu_bar"` is supported.
 /// `material` selects the NSVisualEffectMaterial: `"sidebar"` (default), `"menu"`, `"titlebar"`,
 /// `"hud"`, `"popover"`, `"fullscreen"`.
+/// `x_ranges` is an optional list of `(x_start, x_end)` logical-point pairs. When provided,
+/// each range gets its own `NSVisualEffectView` column. Empty / omitted = full-width single view.
+/// Registering multiple ranges in a single call is atomic — no intermediate states are visible
+/// to the overlay backend, unlike making separate per-section calls.
 #[pyfunction]
-#[pyo3(signature = (extension_id, height_px, stacking = None, material = None))]
+#[pyo3(signature = (extension_id, height_px, stacking = None, material = None, x_ranges = None))]
 fn overlay_hud_set_vibrancy(
     extension_id: String,
     height_px: f32,
     stacking: Option<String>,
     material: Option<String>,
+    x_ranges: Option<Vec<(f32, f32)>>,
 ) -> PyResult<()> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
     let _ = stacking; // reserved for future multi-window vibrancy; currently always BMB
-    overlay_hud_sprite::set_vibrancy_for_owner(extension_id, height_px, material);
+    overlay_hud_sprite::set_vibrancy_for_owner(
+        extension_id,
+        height_px,
+        material,
+        x_ranges.unwrap_or_default(),
+    );
     Ok(())
 }
 
@@ -717,6 +727,68 @@ fn overlay_hud_clear_vibrancy(extension_id: String) -> PyResult<()> {
     ensure_python_permission(&extension_id, "overlay.hud")?;
     overlay_hud_sprite::clear_vibrancy_for_owner(&extension_id);
     Ok(())
+}
+
+/// On notch-equipped Macs returns `(left_section_end_x, right_section_start_x)` in logical
+/// points. Returns `None` on non-notch Macs and non-macOS platforms.
+/// Gated on `overlay.hud`.
+#[pyfunction]
+fn menu_bar_notch_widths(extension_id: String) -> PyResult<Option<(f32, f32)>> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    Ok(core_platform::menu_bar_notch_widths())
+}
+
+/// `true` when Mission Control / Exposé is the active space. Always `false` on non-macOS.
+/// Gated on `overlay.hud`.
+#[pyfunction]
+fn is_mission_control_active(extension_id: String) -> PyResult<bool> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    Ok(core_platform::is_mission_control_active())
+}
+
+/// Register a zero-argument callback fired each time the active macOS space changes (including
+/// Mission Control open / close). Call `is_mission_control_active` inside the callback to
+/// distinguish entry from exit.  One handler per `extension_id`; re-calling replaces it.
+/// Gated on `overlay.hud`.
+#[pyfunction]
+fn register_space_change_handler(extension_id: String, callback: PyObject) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    let ext_id = extension_id.clone();
+    let callback = Arc::new(callback);
+    let cb: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+        if !python_registry::extension_enabled(&ext_id) {
+            return;
+        }
+        let _scope = python_scope::PythonExtensionScope::enter(ext_id.clone());
+        let h = Arc::clone(&callback);
+        Python::with_gil(|py| {
+            if let Err(e) = h.call0(py) {
+                eprintln!("space_change_handler({ext_id}) error: {e}");
+            }
+        });
+    });
+    core_platform::register_space_change_handler(extension_id, cb);
+    Ok(())
+}
+
+/// Remove the space-change handler registered for `extension_id`. No-op if none registered.
+#[pyfunction]
+fn unregister_space_change_handler(extension_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "overlay.hud")?;
+    core_platform::unregister_space_change_handler(&extension_id);
+    Ok(())
+}
+
+/// Returns `(left_frac, right_frac)` — fractions of logical screen width in [0, 1] — by
+/// querying the macOS Accessibility API for the focused app's menu items (left boundary) and
+/// ControlCenter / SystemUIServer's status items (right boundary).
+/// Returns `None` when the OS-level Accessibility grant is not given.
+/// Results change when the frontmost app changes. Call each time before rebuilding sections.
+/// Gated on `system.accessibility`.
+#[pyfunction]
+fn menu_bar_content_widths(extension_id: String) -> PyResult<Option<(f32, f32)>> {
+    ensure_python_permission(&extension_id, "system.accessibility")?;
+    Ok(core_platform::menu_bar_content_widths())
 }
 
 /// Start a tween. `callback(t: float)` is called on the Python timer lane every ~16 ms with
@@ -1112,6 +1184,11 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(screen_size, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_display_size, m)?)?;
     m.add_function(wrap_pyfunction!(menu_bar_height, m)?)?;
+    m.add_function(wrap_pyfunction!(menu_bar_notch_widths, m)?)?;
+    m.add_function(wrap_pyfunction!(menu_bar_content_widths, m)?)?;
+    m.add_function(wrap_pyfunction!(is_mission_control_active, m)?)?;
+    m.add_function(wrap_pyfunction!(register_space_change_handler, m)?)?;
+    m.add_function(wrap_pyfunction!(unregister_space_change_handler, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_set_sprite, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_clear_sprite, m)?)?;
     m.add_function(wrap_pyfunction!(overlay_hud_set_vibrancy, m)?)?;

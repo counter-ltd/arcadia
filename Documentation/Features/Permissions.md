@@ -61,6 +61,14 @@ Modules declare the global permissions they require via `required_permissions` i
 
 ---
 
+## OS-level grants
+
+Some permissions also depend on a grant the OS owns, beyond Arcadia's own toggle. `PermissionDefinition.system_grant` tags these (`SystemGrant` enum in `config/permissions.rs`). Currently `SystemGrant::Accessibility` covers `system.accessibility`, `cursor.global_position`, and `cursor.global_mouse_buttons` — all need the macOS Accessibility grant.
+
+When a permission has a `system_grant`, the permissions panel renders a button (macOS only) next to its toggle. The label depends on the live OS state from `platform::is_system_grant_active`: **Grant** when the OS grant is missing, **Revoke** when it is active. Both call `platform::prompt_system_grant`, which the desktop backend handles by showing the macOS Accessibility consent dialog (`AXIsProcessTrustedWithOptions`, a no-op once trusted) and opening the Privacy → Accessibility settings pane so the user can flip the grant either direction. Arcadia's toggle and the OS grant are independent gates — both must be satisfied.
+
+---
+
 ## Workspace permissions vs global permissions
 
 | Layer | Storage | Scope |
