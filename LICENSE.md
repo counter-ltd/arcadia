@@ -1,4 +1,4 @@
-Arcadia Community License (ACL) v1.6
+Arcadia Community License (ACL) v1.7
 Copyright (c) 2026 anti.ltd
 
 Canonical Version
@@ -637,6 +637,48 @@ of the Software:
     explanation must be specific to the decision and sufficient for the
     affected user to understand why it was made.
 
+19. Anti-Appropriation and Competitive Replication
+
+    You may not use the Software, its source code, architecture,
+    interfaces, behavior, documentation, assets, or implementation
+    details for the purpose of recreating, reproducing, or developing a
+    substantially similar closed-source, proprietary, or commercial
+    product or service that competes with the Software or with projects
+    developed by the copyright holder.
+
+    This restriction applies regardless of:
+    - whether copying is literal, modified, translated, restructured, or
+      partially rewritten;
+    - whether the resulting work is source-compatible, behaviorally
+      similar, API-compatible, or functionally equivalent;
+    - whether the Software is used directly, indirectly, as reference
+      material, or as a basis for reverse engineering or implementation
+      guidance; or
+    - whether the resulting work incorporates portions of the Software's
+      code.
+
+    Access to the Software does not grant permission to appropriate its
+    design, implementation strategy, internal architecture, or creative
+    expression for use in proprietary or commercial systems.
+
+    Any use of the Software as a reference implementation for a
+    proprietary, closed-source, or revenue-generating competing system
+    constitutes a material breach of this license. Breach of this
+    condition carries no cure window. Rights terminate immediately.
+
+    Creators of proprietary or paid software products that substantially
+    inspired, motivated, or were recreated by this Software receive no
+    special exemption, implied permission, or equitable consideration
+    under this license. Retaliatory appropriation, source copying, or
+    competitive reuse is expressly prohibited.
+
+    If You have legal concerns regarding this condition, contact:
+      junk@anti.ltd
+      spam@anti.ltd
+
+    The copyright holder reserves all rights to pursue enforcement to
+    the maximum extent permitted under applicable law.
+
 Interpretation and Spirit
 
 This license is to be interpreted in accordance with its stated
@@ -688,6 +730,8 @@ automatic termination of all rights:
 - breach of the Commercial Use and Profit Restriction (Condition 4);
 - breach of the No Sale of Derivatives condition (Condition 4a);
 - breach of the Anti-Evasion clause (Condition 5);
+- breach of the Anti-Appropriation and Competitive Replication clause
+  (Condition 19);
 - initiation of patent litigation in violation of Condition 11;
 - any willful or deliberate breach of any condition.
 
