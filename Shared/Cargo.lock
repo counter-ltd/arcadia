@@ -56,6 +56,7 @@ dependencies = [
  "arcadia-core",
  "serde_json",
  "wasmi",
+ "wat",
 ]
 
 [[package]]
@@ -2054,6 +2055,7 @@ checksum = "30538cae9a794215f490b532df01c557e2e2bfac92569482554acd0992a102ea"
 dependencies = [
  "bitflags",
  "indexmap",
+ "semver",
 ]
 
 [[package]]

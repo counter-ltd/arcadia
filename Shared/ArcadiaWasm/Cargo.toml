@@ -9,3 +9,6 @@ license = "MIT"
 arcadia-core = { path = "../ArcadiaCore" }
 wasmi = "1"
 serde_json = "1"
+
+[dev-dependencies]
+wat = "1"

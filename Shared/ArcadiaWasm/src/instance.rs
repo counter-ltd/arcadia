@@ -281,3 +281,76 @@ fn read_caller_str(caller: &Caller<'_, HostState>, ptr: i32, len: i32) -> String
     }
     String::from_utf8_lossy(&buf).into_owned()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Minimal valid module implementing the ABI: a bump allocator and a `dispatch`
+    /// that writes "ok" at offset 8 and returns the packed pointer.
+    const OK_MODULE_WAT: &str = r#"
+        (module
+          (memory (export "memory") 1)
+          (global $bump (mut i32) (i32.const 1024))
+          (func (export "arcadia_abi_version") (result i32) (i32.const 1))
+          (func (export "arcadia_alloc") (param $len i32) (result i32)
+            (local $p i32)
+            (local.set $p (global.get $bump))
+            (global.set $bump (i32.add (global.get $bump) (local.get $len)))
+            (local.get $p))
+          (func (export "arcadia_dealloc") (param i32 i32))
+          (func (export "arcadia_dispatch") (param i32 i32 i32 i32) (result i64)
+            (i32.store8 (i32.const 8) (i32.const 111))
+            (i32.store8 (i32.const 9) (i32.const 107))
+            (i64.or (i64.shl (i64.const 8) (i64.const 32)) (i64.const 2))))
+    "#;
+
+    /// Same shape but declares ABI version 99 — must be rejected.
+    const BAD_ABI_WAT: &str = r#"
+        (module
+          (memory (export "memory") 1)
+          (func (export "arcadia_abi_version") (result i32) (i32.const 99))
+          (func (export "arcadia_alloc") (param i32) (result i32) (i32.const 0))
+          (func (export "arcadia_dealloc") (param i32 i32))
+          (func (export "arcadia_dispatch") (param i32 i32 i32 i32) (result i64)
+            (i64.const 0)))
+    "#;
+
+    #[test]
+    fn instantiate_and_dispatch_round_trip() {
+        let wasm = wat::parse_str(OK_MODULE_WAT).expect("WAT must compile");
+        let mut module = match LoadedModule::instantiate(&wasm, "test-mod", &[]) {
+            Ok(m) => m,
+            Err(e) => panic!("module must instantiate: {e}"),
+        };
+        let out = module
+            .dispatch("greet", &["World".to_string()])
+            .expect("dispatch must succeed");
+        assert_eq!(out, "ok");
+    }
+
+    #[test]
+    fn rejects_non_wasm_bytes() {
+        assert!(LoadedModule::instantiate(b"not a wasm module", "x", &[]).is_err());
+    }
+
+    #[test]
+    fn rejects_abi_version_mismatch() {
+        let wasm = wat::parse_str(BAD_ABI_WAT).expect("WAT must compile");
+        match LoadedModule::instantiate(&wasm, "bad", &[]) {
+            Ok(_) => panic!("ABI mismatch must be rejected"),
+            Err(e) => assert!(e.contains("ABI version"), "unexpected error: {e}"),
+        }
+    }
+
+    #[test]
+    fn rejects_module_missing_required_export() {
+        // No `arcadia_dispatch` export.
+        let wat = r#"(module (memory (export "memory") 1)
+            (func (export "arcadia_abi_version") (result i32) (i32.const 1))
+            (func (export "arcadia_alloc") (param i32) (result i32) (i32.const 0))
+            (func (export "arcadia_dealloc") (param i32 i32)))"#;
+        let wasm = wat::parse_str(wat).expect("WAT must compile");
+        assert!(LoadedModule::instantiate(&wasm, "incomplete", &[]).is_err());
+    }
+}

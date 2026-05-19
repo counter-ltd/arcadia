@@ -27,6 +27,10 @@ impl ArcadiaRoot {
                 format!("Grant permissions for extension '{extension}'?"),
                 missing.join(", "),
             ),
+            PendingPermissionGrant::WasmModule { module, missing } => (
+                format!("Grant permissions for WASM module '{module}'?"),
+                missing.join(", "),
+            ),
         };
 
         div()
@@ -170,6 +174,29 @@ impl ArcadiaRoot {
                                                             &ctx,
                                                         );
                                                         this.reload_extension_state(cx);
+                                                    }
+                                                    PendingPermissionGrant::WasmModule {
+                                                        module,
+                                                        missing,
+                                                    } => {
+                                                        if let Ok(mut pc) =
+                                                            PermissionsConfig::load_or_create()
+                                                        {
+                                                            let subj = PermissionSubject::wasm(
+                                                                module.clone(),
+                                                            );
+                                                            let _ = pc.ensure_effective_grants(
+                                                                &subj, &missing,
+                                                            );
+                                                            let _ = pc.save();
+                                                        }
+                                                        let ctx = this.execution_context();
+                                                        let _ = modules::execute_command(
+                                                            "wasm-host.module-enable",
+                                                            &[module.as_str()],
+                                                            &ctx,
+                                                        );
+                                                        this.reload_wasm_state(cx);
                                                     }
                                                 }
                                                     this.pending_permission_grant = None;

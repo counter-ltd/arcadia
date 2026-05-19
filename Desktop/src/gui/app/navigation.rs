@@ -334,6 +334,10 @@ impl ArcadiaRoot {
                         self.python_settings_panel(window, cx, is_dark)
                             .into_any_element(),
                     ),
+                    "wasm-modules.settings" => Some(
+                        self.wasm_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
                     "global.appearance" => Some(
                         self.appearance_panel(window, cx, is_dark)
                             .into_any_element(),

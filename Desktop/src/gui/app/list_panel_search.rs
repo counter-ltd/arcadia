@@ -9,6 +9,7 @@ use crate::gui::theme;
 pub(crate) enum ListPanelSearchKind {
     Modules,
     Extensions,
+    WasmModules,
     Permissions,
     Shortcuts,
     Workspaces,
@@ -41,6 +42,9 @@ impl ArcadiaRoot {
             ListPanelSearchKind::Extensions => {
                 (&self.extensions_search_query, &self.extensions_search_focus)
             }
+            ListPanelSearchKind::WasmModules => {
+                (&self.wasm_search_query, &self.wasm_search_focus)
+            }
             ListPanelSearchKind::Permissions => (
                 &self.permissions_search_query,
                 &self.permissions_search_focus,
@@ -57,6 +61,7 @@ impl ArcadiaRoot {
         let placeholder = match kind {
             ListPanelSearchKind::Modules => "Search modules…",
             ListPanelSearchKind::Extensions => "Search extensions…",
+            ListPanelSearchKind::WasmModules => "Search WASM modules…",
             ListPanelSearchKind::Permissions => "Search permissions…",
             ListPanelSearchKind::Shortcuts => "Search shortcuts…",
             ListPanelSearchKind::Workspaces => "Search workspaces…",
@@ -80,6 +85,7 @@ impl ArcadiaRoot {
             match kind {
                 ListPanelSearchKind::Modules => "list-search-modules",
                 ListPanelSearchKind::Extensions => "list-search-extensions",
+                ListPanelSearchKind::WasmModules => "list-search-wasm-modules",
                 ListPanelSearchKind::Permissions => "list-search-permissions",
                 ListPanelSearchKind::Shortcuts => "list-search-shortcuts",
                 ListPanelSearchKind::Workspaces => "list-search-workspaces",
@@ -97,6 +103,7 @@ impl ArcadiaRoot {
                 let buf = match kind {
                     ListPanelSearchKind::Modules => &mut this.modules_search_query,
                     ListPanelSearchKind::Extensions => &mut this.extensions_search_query,
+                    ListPanelSearchKind::WasmModules => &mut this.wasm_search_query,
                     ListPanelSearchKind::Permissions => &mut this.permissions_search_query,
                     ListPanelSearchKind::Shortcuts => &mut this.shortcuts_search_query,
                     ListPanelSearchKind::Workspaces => &mut this.workspace_search_query,

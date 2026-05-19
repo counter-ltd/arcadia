@@ -177,7 +177,12 @@ impl Extension for ShellExtension {
     fn nav_placement(&self) -> Option<NavPlacement> {
         Some(NavPlacement {
             global_pages: &["global.settings"],
-            top_bar_pages: &["extensions.settings", "global.modules", "notification.main"],
+            top_bar_pages: &[
+                "extensions.settings",
+                "wasm-modules.settings",
+                "global.modules",
+                "notification.main",
+            ],
             settings_hub_pages: &[
                 "global.permissions",
                 "global.shortcuts",
