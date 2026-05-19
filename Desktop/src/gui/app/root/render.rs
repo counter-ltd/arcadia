@@ -116,7 +116,7 @@ impl Render for ArcadiaRoot {
         }
         let visible_groups = self.visible_groups_effective();
         let fallback_group = NavGroupRef::Static(
-            navigation::group_by_id(navigation::DEFAULT_GROUP_ID)
+            navigation::group_by_id(*navigation::DEFAULT_GROUP_ID)
                 .unwrap_or(&navigation::GROUP_DEFINITIONS[0]),
         );
         let active_group = visible_groups

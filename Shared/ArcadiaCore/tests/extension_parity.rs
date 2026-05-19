@@ -180,10 +180,10 @@ fn collector_nav_matches_legacy() {
     let placement = collected
         .nav_placement()
         .expect("the shell extension must supply a nav placement");
-    assert_eq!(placement.global_pages, GLOBAL_PAGE_IDS, "global_pages");
-    assert_eq!(placement.top_bar_pages, TOP_BAR_PAGE_IDS, "top_bar_pages");
+    assert_eq!(placement.global_pages, *GLOBAL_PAGE_IDS, "global_pages");
+    assert_eq!(placement.top_bar_pages, *TOP_BAR_PAGE_IDS, "top_bar_pages");
     assert_eq!(
-        placement.settings_hub_pages, SETTINGS_HUB_PAGE_IDS,
+        placement.settings_hub_pages, *SETTINGS_HUB_PAGE_IDS,
         "settings_hub_pages"
     );
 }
