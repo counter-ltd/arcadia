@@ -4,7 +4,7 @@ use std::io;
 
 use crate::config::workspace::WorkspacePermissionDef;
 use crate::config::{write_config_toml, ConfigFile};
-use crate::platform::{PlatformInfo, PLATFORM_LINUX, PLATFORM_MACOS, PLATFORM_WINDOWS};
+use crate::platform::PlatformInfo;
 
 /// OS id from [`crate::platform::PlatformInfo::name`]: `macos`, `windows`, `linux`, `ios`, `unknown`.
 pub fn runtime_platform_id() -> &'static str {
@@ -90,366 +90,66 @@ pub struct ModuleManifest {
     pub supported_platforms: &'static [&'static str],
 }
 
-// Single source of truth for modules and their metadata.
-pub static MODULE_REGISTRY: &[ModuleManifest] = &[
+// ─── Module registry ────────────────────────────────────────────────────────
+//
+// MODULE_REGISTRY is built from the extension collector: every module declares
+// its own manifest via its `Extension` impl. The owned manifest strings are
+// leaked into `&'static` so the registry keeps the original `ModuleManifest`
+// type and every consumer is unchanged. The leak is a one-time process-lifetime
+// cost — the registry never goes away.
+
+use std::sync::LazyLock;
+
+fn leak_str(s: String) -> &'static str {
+    s.leak()
+}
+
+fn leak_strs(v: Vec<String>) -> &'static [&'static str] {
+    let leaked: Vec<&'static str> = v.into_iter().map(leak_str).collect();
+    leaked.leak()
+}
+
+fn leak_workspace_permissions(
+    v: Vec<crate::extension::OwnedWorkspacePermissionDef>,
+) -> &'static [WorkspacePermissionDef] {
+    let leaked: Vec<WorkspacePermissionDef> = v
+        .into_iter()
+        .map(|w| WorkspacePermissionDef {
+            id: leak_str(w.id),
+            title: leak_str(w.title),
+            description: leak_str(w.description),
+            default_granted: w.default_granted,
+        })
+        .collect();
+    leaked.leak()
+}
+
+fn leak_manifest(o: crate::extension::OwnedModuleManifest) -> ModuleManifest {
     ModuleManifest {
-        name: ANIMATION_MODULE_NAME,
-        glyph: "animation",
-        version: "0.1.0",
-        description: "Shared tween engine for modules and extensions. One 16 ms driver loop services all running animations.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: LAN_MODULE_NAME,
-        glyph: "network",
-        version: "1.0.0",
-        description: "Local network discovery and peer communication.",
-        accent: "",
-        required_modules: &[NET_MODULE_NAME],
-        required_permissions: &["network.lan"],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: NET_MODULE_NAME,
-        glyph: "network",
-        version: "1.0.0",
-        description: "Shared networking foundation for routed module commands.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: SURFACE_MODULE_NAME,
-        glyph: "surface",
-        version: "0.1.0",
-        description: "Generic UI snapshot (surface.snapshot) and patches (surface.patch); extend patches for new surfaces.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["surface.read", "surface.control"],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: REMOTE_SESSION_MODULE_NAME,
-        glyph: "network",
-        version: "0.1.0",
-        description: "Permission to route execute_command over LAN (net_as: lan:…); transcript/mirror are automatic on hosts.",
-        accent: "",
-        required_modules: &[NET_MODULE_NAME, LAN_MODULE_NAME],
-        required_permissions: &["session.remote_route"],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: TERMINAL_MODULE_NAME,
-        glyph: "terminal",
-        version: "1.0.0",
-        description: "Interactive terminal command execution for Arcadia surfaces.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["shell.run", "shell.bridge"],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: TERMINAL_MOTD_MODULE_NAME,
-        glyph: "terminal",
-        version: "1.0.0",
-        description: "Fastfetch-style banner when opening the Arcadia terminal (requires terminal).",
-        accent: "",
-        required_modules: &[TERMINAL_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: LATE_MODULE_NAME,
-        glyph: "coffee",
-        version: "0.1.0",
-        description: "Real-time chat rooms, music stream, reactions, and social features.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["late.outbound"],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: PYTHON_HOST_MODULE_NAME,
-        glyph: "python",
-        version: "0.1.0",
-        description: "Python extension loader. Scans ~/Arcadia/Extensions/ for .py files and registers their commands.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["python.host", "python.extension_toggle"],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: PERMISSIONS_MODULE_NAME,
-        glyph: "permissions",
-        version: "0.1.0",
-        description: "Permission catalog, grants, and headless permit/list commands.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: TRAY_MODULE_NAME,
-        glyph: "tray",
-        version: "0.1.0",
-        description: "Menu-bar (macOS) and system-tray (Windows/Linux) icons with dynamic images and menus.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["tray.create"],
-        workspace_permissions: &[],
-        supported_platforms: &[PLATFORM_MACOS, PLATFORM_WINDOWS, PLATFORM_LINUX],
-    },
-    ModuleManifest {
-        name: CURSOR_MODULE_NAME,
-        glyph: "cursor",
-        version: "0.1.0",
-        description: "OS-global cursor position and primary display size for extensions that track input.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["cursor.global_position"],
-        workspace_permissions: &[],
-        supported_platforms: &[PLATFORM_MACOS, PLATFORM_WINDOWS, PLATFORM_LINUX],
-    },
-    ModuleManifest {
-        name: OVERLAY_MODULE_NAME,
-        glyph: "overlay",
-        version: "0.1.0",
-        description: "Single always-on-top transparent HUD window for overlays (pointer pass-through v1).",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &["overlay.hud"],
-        workspace_permissions: &[],
-        supported_platforms: &[PLATFORM_MACOS, PLATFORM_WINDOWS, PLATFORM_LINUX],
-    },
-    ModuleManifest {
-        name: WORKSPACE_MODULE_NAME,
-        glyph: "workspaces",
-        version: "0.1.0",
-        description: "Workspace directory registry with scoped file and execution permissions.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[
-            WorkspacePermissionDef {
-                id: "workspace.read",
-                title: "File read",
-                description: "Read files within this workspace.",
-                default_granted: true,
-            },
-            WorkspacePermissionDef {
-                id: "workspace.write",
-                title: "File write",
-                description: "Create, modify, and delete files.",
-                default_granted: false,
-            },
-            WorkspacePermissionDef {
-                id: "workspace.execute",
-                title: "Command execution",
-                description: "Run commands scoped to this workspace.",
-                default_granted: false,
-            },
-        ],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: CODE_EDITOR_MODULE_NAME,
-        glyph: "file-code",
-        version: "0.1.0",
-        description: "Code editor with per-file tabs in the sidebar.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: VISUAL_EDITOR_MODULE_NAME,
-        glyph: "blocks",
-        version: "0.1.0",
-        description: "Scratch-style visual block editor for Python, with per-file tabs in the sidebar.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_MODULE_NAME,
-        glyph: "ai-provider",
-        version: "0.1.0",
-        description: "AI chat interface. Requires an AI provider module to be enabled.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[
-            WorkspacePermissionDef {
-                id: "workspace.ai_read",
-                title: "File read (AI)",
-                description: "Allow the AI to read files via @mention and read_file tool.",
-                default_granted: false,
-            },
-            WorkspacePermissionDef {
-                id: "workspace.ai_write",
-                title: "File write (AI)",
-                description: "Allow the AI to create and modify files via write_file tool.",
-                default_granted: false,
-            },
-            WorkspacePermissionDef {
-                id: "workspace.ai_execute",
-                title: "Command execution (AI)",
-                description: "Allow the AI to run allowlisted commands via run_command tool.",
-                default_granted: false,
-            },
-        ],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_LLAMA_CPP_MODULE_NAME,
-        glyph: "llama-cpp",
-        version: "0.1.0",
-        description: "llama.cpp local inference provider for the AI chat module.",
-        accent: "amber",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_OLLAMA_MODULE_NAME,
-        glyph: "ollama",
-        version: "0.1.0",
-        description: "Ollama local inference provider for the AI chat module.",
-        accent: "cyan",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_OPENAI_MODULE_NAME,
-        glyph: "openai",
-        version: "0.1.0",
-        description: "OpenAI API provider for the AI chat module.",
-        accent: "emerald",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_RULES_MODULE_NAME,
-        glyph: "ai-rule",
-        version: "0.1.0",
-        description: "AI Rules — per-chat constraints: forbidden tools, response format, persona. Adds a configuration page to the AI sidebar.",
-        accent: "",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_SKILLS_MODULE_NAME,
-        glyph: "ai-skill",
-        version: "0.1.0",
-        description: "AI Skills — named behaviours: system prompt fragments, tool allowlists, parameter overrides. Adds a configuration page to the AI sidebar.",
-        accent: "",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_EXEC_CLAUDE_MODULE_NAME,
-        glyph: "claude",
-        version: "0.1.0",
-        description: "Claude CLI provider — uses the installed `claude` binary with a Claude Pro subscription. No API key required.",
-        accent: "orange",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_EXEC_CODEX_MODULE_NAME,
-        glyph: "codex",
-        version: "0.1.0",
-        description: "Codex CLI provider — uses the installed `codex` binary with a ChatGPT Plus subscription. No API key required.",
-        accent: "cyan",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_EXEC_GEMINI_MODULE_NAME,
-        glyph: "gemini",
-        version: "0.1.0",
-        description: "Gemini CLI provider — uses the installed `gemini` binary with a Gemini Advanced subscription. No API key required.",
-        accent: "sky",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_EXEC_AIDER_MODULE_NAME,
-        glyph: "aider",
-        version: "0.1.0",
-        description: "Aider CLI provider — uses the installed `aider` binary with its own configured backend.",
-        accent: "emerald",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: AI_APFEL_MODULE_NAME,
-        glyph: "apfel",
-        version: "0.1.0",
-        description: "Apple Intelligence provider — on-device inference via the macOS Foundation Models framework. No API key, no network required.",
-        accent: "indigo",
-        required_modules: &[AI_MODULE_NAME],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[PLATFORM_MACOS],
-    },
-    ModuleManifest {
-        name: NOTIFICATION_MODULE_NAME,
-        glyph: "notification",
-        version: "0.1.0",
-        description: "In-app notification centre. Modules and extensions can post alerts; each source requires an explicit notifications.send grant.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-    ModuleManifest {
-        name: GOTO_MODULE_NAME,
-        glyph: "goto",
-        version: "0.1.0",
-        description: "Keyboard-driven navigation. Cmd+G opens the goto bar; goto.page <id> resolves pages from the CLI.",
-        accent: "",
-        required_modules: &[],
-        required_permissions: &[],
-        workspace_permissions: &[],
-        supported_platforms: &[],
-    },
-];
+        name: leak_str(o.name),
+        glyph: leak_str(o.glyph),
+        version: leak_str(o.version),
+        description: leak_str(o.description),
+        accent: leak_str(o.accent),
+        required_modules: leak_strs(o.required_modules),
+        required_permissions: leak_strs(o.required_permissions),
+        workspace_permissions: leak_workspace_permissions(o.workspace_permissions),
+        supported_platforms: leak_strs(o.supported_platforms),
+    }
+}
+
+/// Single source of truth for modules and their metadata — built once from
+/// every self-registered extension. Replaces the former hand-written array.
+pub static MODULE_REGISTRY: LazyLock<Vec<ModuleManifest>> = LazyLock::new(|| {
+    let providers = crate::extension::provider::default_providers();
+    let collected = crate::extension::collector::collect(&providers)
+        .expect("extension collector must produce a valid module set");
+    collected
+        .module_manifests()
+        .into_iter()
+        .map(leak_manifest)
+        .collect()
+});
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModulesConfig {
@@ -830,7 +530,7 @@ mod tests {
         };
         let changed = cfg.merge_defaults();
         assert!(changed);
-        for manifest in MODULE_REGISTRY {
+        for manifest in MODULE_REGISTRY.iter() {
             assert!(
                 cfg.modules.contains_key(manifest.name),
                 "merge_defaults must add missing module '{}'",
@@ -848,7 +548,7 @@ mod tests {
     #[test]
     fn all_manifest_required_permissions_exist_in_catalog() {
         use crate::config::permissions::is_known_permission_id;
-        for m in MODULE_REGISTRY {
+        for m in MODULE_REGISTRY.iter() {
             for pid in m.required_permissions {
                 assert!(
                     is_known_permission_id(pid),

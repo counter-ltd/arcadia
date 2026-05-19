@@ -46,6 +46,13 @@ pub trait Extension: Send + Sync {
         ModuleSource::BuiltIn
     }
 
+    /// Whether this extension is a toggleable module that belongs in the module
+    /// registry. The app shell returns `false` — it contributes navigation and
+    /// permissions but is not a user-facing module.
+    fn is_registry_module(&self) -> bool {
+        true
+    }
+
     /// `module.verb` commands this extension dispatches.
     fn commands(&self) -> Vec<OwnedModuleCommand> {
         Vec::new()

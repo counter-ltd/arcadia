@@ -162,6 +162,10 @@ impl Extension for ShellExtension {
         }
     }
 
+    fn is_registry_module(&self) -> bool {
+        false
+    }
+
     fn nav_pages(&self) -> &'static [NavigationPageDefinition] {
         SHELL_PAGES
     }

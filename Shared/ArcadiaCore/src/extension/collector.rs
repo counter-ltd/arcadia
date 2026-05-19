@@ -76,6 +76,16 @@ impl CollectedExtensions {
         self.extensions.iter().map(|e| e.manifest()).collect()
     }
 
+    /// Manifests of registry modules only — excludes non-module extensions like
+    /// the app shell. This is the runtime equivalent of the old `MODULE_REGISTRY`.
+    pub fn module_manifests(&self) -> Vec<OwnedModuleManifest> {
+        self.extensions
+            .iter()
+            .filter(|e| e.is_registry_module())
+            .map(|e| e.manifest())
+            .collect()
+    }
+
     /// Module names in dependency order.
     pub fn module_names(&self) -> Vec<String> {
         self.extensions.iter().map(|e| e.manifest().name).collect()
