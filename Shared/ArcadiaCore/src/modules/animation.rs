@@ -1,238 +1,94 @@
-//! Single-driver tween engine shared by native modules and Python extensions.
+//! Animation module — the runtime wrapper around the [`opentween`] engine.
 //!
-//! One 16 ms interval drives all running tweens — no per-animation timer overhead.
-//! Callers receive a normalized eased `t ∈ [0.0, 1.0]` in their `on_tick` callback.
-//! The driver starts lazily on the first [`tween`] or [`tween_with_completion`] call.
+//! The tween engine itself lives in the standalone `opentween` crate (no GUI
+//! deps, no threads, no globals). This module owns one process-wide
+//! [`AnimationEngine`] instance and a 16 ms driver thread that steps it — the
+//! runtime concern that does *not* belong in a reusable crate.
+//!
+//! Easing curves, interpolation helpers, and the engine types are re-exported
+//! so existing `animation::Easing` / `animation::tween` call sites are unchanged.
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
+use opentween::{AnimationEngine, CompleteFn};
+
+use crate::extension::{Extension, OwnedModuleCommand, OwnedModuleManifest};
 use crate::modules::{ExecutionContext, ModuleCommand};
 use crate::scheduling;
 
+pub use opentween::{apply_easing, lerp_f32, lerp_rgba, lerp_u8, shake_offset, Easing, TweenId};
+
 pub const NAME: &str = "animation";
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+// ─── Engine + driver state ──────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TweenId(pub u64);
+static ENGINE: OnceLock<Mutex<AnimationEngine>> = OnceLock::new();
 
-#[derive(Debug, Clone, Copy)]
-pub enum Easing {
-    Linear,
-    EaseOutCubic,
-    EaseInCubic,
-    EaseInOutCubic,
-    EaseOutElastic,
+fn engine() -> &'static Mutex<AnimationEngine> {
+    ENGINE.get_or_init(|| Mutex::new(AnimationEngine::new()))
 }
 
-impl Easing {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "linear" => Some(Easing::Linear),
-            "ease_out_cubic" => Some(Easing::EaseOutCubic),
-            "ease_in_cubic" => Some(Easing::EaseInCubic),
-            "ease_in_out_cubic" => Some(Easing::EaseInOutCubic),
-            "ease_out_elastic" => Some(Easing::EaseOutElastic),
-            _ => None,
-        }
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Easing::Linear => "linear",
-            Easing::EaseOutCubic => "ease_out_cubic",
-            Easing::EaseInCubic => "ease_in_cubic",
-            Easing::EaseInOutCubic => "ease_in_out_cubic",
-            Easing::EaseOutElastic => "ease_out_elastic",
-        }
-    }
+struct DriverState {
+    started: bool,
+    task_id: Option<scheduling::TaskId>,
 }
 
-// ─── Math utilities ───────────────────────────────────────────────────────────
+static DRIVER: OnceLock<Mutex<DriverState>> = OnceLock::new();
 
-pub fn lerp_f32(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
-}
-
-pub fn lerp_u8(a: u8, b: u8, t: f32) -> u8 {
-    (a as f32 + (b as f32 - a as f32) * t).round() as u8
-}
-
-/// Lerp each channel of an RGBA `[u8; 4]` value.
-pub fn lerp_rgba(a: [u8; 4], b: [u8; 4], t: f32) -> [u8; 4] {
-    [
-        lerp_u8(a[0], b[0], t),
-        lerp_u8(a[1], b[1], t),
-        lerp_u8(a[2], b[2], t),
-        lerp_u8(a[3], b[3], t),
-    ]
-}
-
-/// Map raw `t ∈ [0.0, 1.0]` through the chosen easing curve.
-pub fn apply_easing(easing: Easing, t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    match easing {
-        Easing::Linear => t,
-        Easing::EaseOutCubic => 1.0 - (1.0 - t).powi(3),
-        Easing::EaseInCubic => t * t * t,
-        Easing::EaseInOutCubic => {
-            if t < 0.5 {
-                4.0 * t * t * t
-            } else {
-                1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
-            }
-        }
-        Easing::EaseOutElastic => {
-            if t == 0.0 || t == 1.0 {
-                return t;
-            }
-            let c4 = (2.0 * std::f32::consts::PI) / 3.0;
-            2.0_f32.powf(-10.0 * t) * ((t * 10.0 - 10.75) * c4).sin() + 1.0
-        }
-    }
-}
-
-// ─── Engine internals ─────────────────────────────────────────────────────────
-
-struct TweenEntry {
-    start_instant: Instant,
-    duration_ms: u64,
-    easing: Easing,
-    on_tick: Arc<dyn Fn(f32) + Send + Sync + 'static>,
-    on_complete: Option<Box<dyn FnOnce() + Send + 'static>>,
-    owner_extension: Option<String>,
-}
-
-struct EngineInner {
-    tweens: BTreeMap<TweenId, TweenEntry>,
-    next_id: u64,
-    driver_started: bool,
-    driver_task_id: Option<scheduling::TaskId>,
-}
-
-static ENGINE: OnceLock<Mutex<EngineInner>> = OnceLock::new();
-
-fn engine() -> &'static Mutex<EngineInner> {
-    ENGINE.get_or_init(|| {
-        Mutex::new(EngineInner {
-            tweens: BTreeMap::new(),
-            next_id: 1,
-            driver_started: false,
-            driver_task_id: None,
+fn driver() -> &'static Mutex<DriverState> {
+    DRIVER.get_or_init(|| {
+        Mutex::new(DriverState {
+            started: false,
+            task_id: None,
         })
     })
 }
 
+/// Start the 16 ms driver if it is not already running. Idempotent.
 fn ensure_driver() {
-    let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    if inner.driver_started {
+    let mut state = driver().lock().unwrap_or_else(|e| e.into_inner());
+    if state.started {
         return;
     }
-    inner.driver_started = true;
-    drop(inner);
+    state.started = true;
+    drop(state);
     let id = scheduling::spawn_interval_on_lane(
         scheduling::TaskLane::Default,
         Duration::from_millis(16),
-        tick,
+        drive,
     );
-    engine()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .driver_task_id = Some(id);
+    driver().lock().unwrap_or_else(|e| e.into_inner()).task_id = Some(id);
 }
 
-fn tick() {
-    let now = Instant::now();
-
-    // Phase 1: snapshot callbacks and mark completions — lock held briefly.
-    let ticks: Vec<(Arc<dyn Fn(f32) + Send + Sync>, f32)>;
-    let completed: Vec<TweenId>;
-    {
-        let inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-        let mut t_list = Vec::new();
-        let mut done = Vec::new();
-        for (id, entry) in &inner.tweens {
-            let raw_t = if entry.duration_ms == 0 {
-                1.0
-            } else {
-                (now.duration_since(entry.start_instant).as_millis() as f32
-                    / entry.duration_ms as f32)
-                    .min(1.0)
-            };
-            let eased_t = apply_easing(entry.easing, raw_t);
-            t_list.push((Arc::clone(&entry.on_tick), eased_t));
-            if raw_t >= 1.0 {
-                done.push(*id);
-            }
-        }
-        ticks = t_list;
-        completed = done;
-    }
-
-    // Phase 2: fire on_tick callbacks without holding the lock so callers can call back into the
-    // engine (e.g. chain a new tween on completion).
-    for (cb, t) in ticks {
-        cb(t);
-    }
-
-    // Phase 3: extract on_complete closures — brief lock.
-    let complete_cbs: Vec<Box<dyn FnOnce() + Send + 'static>>;
-    {
-        let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-        complete_cbs = completed
-            .into_iter()
-            .filter_map(|id| inner.tweens.remove(&id).and_then(|e| e.on_complete))
-            .collect();
-    }
-
-    // Phase 4: fire on_complete without holding the lock.
-    for cb in complete_cbs {
-        cb();
-    }
-
-    // Phase 5: stop the recurring driver when all tweens have finished.
-    let cancel_id = {
-        let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-        if inner.tweens.is_empty() {
-            inner.driver_started = false;
-            inner.driver_task_id.take()
+/// One driver step: advance the engine, fire callbacks, stop when idle.
+fn drive() {
+    // Step the engine; collect callbacks. Lock released before firing them.
+    let outcome = engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .advance(Instant::now());
+    // Callbacks may chain new tweens — fire them with no lock held.
+    outcome.dispatch();
+    // Re-check emptiness *after* callbacks ran so a chained tween keeps the
+    // driver alive. Lock order is always driver → engine.
+    let stop_id = {
+        let mut state = driver().lock().unwrap_or_else(|e| e.into_inner());
+        if engine().lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
+            state.started = false;
+            state.task_id.take()
         } else {
             None
         }
     };
-    if let Some(id) = cancel_id {
+    if let Some(id) = stop_id {
         scheduling::cancel(id);
     }
 }
 
-// ─── Shake helper ─────────────────────────────────────────────────────────────
+// ─── Public API (stable wrappers over the owned engine) ─────────────────────
 
-/// Compute a pixel offset for a decaying oscillation ("shake") effect.
-///
-/// - `t`: progress `0.0 → 1.0` over the shake duration (raw, not eased).
-/// - `amplitude`: peak displacement in pixels (e.g. `3.0`).
-/// - `cycles`: number of full oscillations over the duration (e.g. `3.0`).
-///
-/// Returns a signed pixel offset. Apply to `ml()` / `mt()` on the element being shaken.
-/// The amplitude decays linearly to zero at `t = 1.0` so the element settles cleanly.
-///
-/// # Example
-/// ```
-/// // In tick_caret_anims, drive shake_t 0→1 over 500 ms (no easing — raw time ratio):
-/// let offset = animation::shake_offset(self.bell_shake_t, 3.0, 3.0);
-/// // Then pass offset to the render function and apply as .ml(px(offset))
-/// ```
-pub fn shake_offset(t: f32, amplitude: f32, cycles: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    (t * cycles * 2.0 * std::f32::consts::PI).sin() * amplitude * (1.0 - t)
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/// Start a tween. `on_tick` receives eased `t ∈ [0.0, 1.0]` every ~16 ms until completion.
-/// The driver is started on the first call; subsequent calls share the same interval.
+/// Start a tween. `on_tick` receives eased `t ∈ [0, 1]` every ~16 ms until done.
 pub fn tween(
     duration_ms: u64,
     easing: Easing,
@@ -241,80 +97,78 @@ pub fn tween(
     tween_with_completion(duration_ms, easing, on_tick, None, None)
 }
 
-/// Like [`tween`] but fires `on_complete` once after the last `on_tick(1.0)` call.
-/// `owner_extension` is set by Python bindings so [`cancel_all_for_extension`] can scope cancels.
+/// Like [`tween`] but fires `on_complete` once after the final tick.
+/// `owner_extension` scopes [`cancel_all_for_extension`].
 pub fn tween_with_completion(
     duration_ms: u64,
     easing: Easing,
     on_tick: impl Fn(f32) + Send + Sync + 'static,
-    on_complete: Option<Box<dyn FnOnce() + Send + 'static>>,
+    on_complete: Option<CompleteFn>,
     owner_extension: Option<String>,
 ) -> TweenId {
     ensure_driver();
-    let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    let id = TweenId(inner.next_id);
-    inner.next_id += 1;
-    inner.tweens.insert(
-        id,
-        TweenEntry {
-            start_instant: Instant::now(),
-            duration_ms,
-            easing,
-            on_tick: Arc::new(on_tick),
-            on_complete,
-            owner_extension,
-        },
-    );
-    id
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .start_with_completion(duration_ms, easing, on_tick, on_complete, owner_extension)
 }
 
 pub fn cancel(id: TweenId) {
-    let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    inner.tweens.remove(&id);
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .cancel(id);
 }
 
 pub fn is_running(id: TweenId) -> bool {
-    let inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    inner.tweens.contains_key(&id)
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .is_running(id)
 }
 
 pub fn cancel_all() {
-    let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    inner.tweens.clear();
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .cancel_all();
 }
 
-/// Cancel all tweens owned by `ext_id`. Called when a Python extension is unloaded.
+/// Cancel all tweens owned by `ext_id`. Called when a Python extension unloads.
 pub fn cancel_all_for_extension(ext_id: &str) {
-    let mut inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    inner
-        .tweens
-        .retain(|_, e| e.owner_extension.as_deref() != Some(ext_id));
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .cancel_all_for_owner(ext_id);
 }
 
 pub fn running_count() -> usize {
-    let inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    inner.tweens.len()
+    engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .running_count()
 }
 
-// ─── Module commands ──────────────────────────────────────────────────────────
+// ─── Module commands ────────────────────────────────────────────────────────
 
 fn cmd_list(_args: &[&str], _ctx: &ExecutionContext) -> String {
-    let inner = engine().lock().unwrap_or_else(|e| e.into_inner());
-    if inner.tweens.is_empty() {
+    let now = Instant::now();
+    let snap = engine()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .snapshot(now);
+    if snap.is_empty() {
         return "[]".to_string();
     }
-    let now = Instant::now();
-    let entries: Vec<_> = inner
-        .tweens
+    let entries: Vec<_> = snap
         .iter()
-        .map(|(id, e)| {
-            let elapsed_ms = now.duration_since(e.start_instant).as_millis();
+        .map(|s| {
             serde_json::json!({
-                "id": id.0,
-                "elapsed_ms": elapsed_ms,
-                "duration_ms": e.duration_ms,
-                "easing": e.easing.name(),
-                "owner": e.owner_extension.as_deref().unwrap_or("native"),
+                "id": s.id,
+                "elapsed_ms": s.elapsed_ms,
+                "duration_ms": s.duration_ms,
+                "easing": s.easing,
+                "owner": s.owner.as_deref().unwrap_or("native"),
             })
         })
         .collect();
@@ -368,7 +222,36 @@ pub fn commands() -> &'static [ModuleCommand] {
     ]
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+#[derive(Default)]
+pub struct AnimationExtension;
+
+impl Extension for AnimationExtension {
+    fn manifest(&self) -> OwnedModuleManifest {
+        OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "animation".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Shared tween engine for modules and extensions. One 16 ms driver loop services all running animations."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(AnimationExtension);
 
 #[cfg(test)]
 mod tests {
@@ -386,84 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn lerp_f32_midpoint() {
-        assert!((lerp_f32(0.0, 10.0, 0.5) - 5.0).abs() < 0.001);
-        assert_eq!(lerp_f32(0.0, 10.0, 0.0), 0.0);
-        assert_eq!(lerp_f32(0.0, 10.0, 1.0), 10.0);
-    }
-
-    #[test]
-    fn lerp_u8_full_range() {
-        assert_eq!(lerp_u8(0, 255, 0.0), 0);
-        assert_eq!(lerp_u8(0, 255, 1.0), 255);
-        assert_eq!(lerp_u8(0, 100, 0.5), 50);
-    }
-
-    #[test]
-    fn lerp_rgba_identity() {
-        let c = [255u8, 128, 64, 200];
-        assert_eq!(lerp_rgba(c, c, 0.5), c);
-    }
-
-    #[test]
-    fn apply_easing_boundary_values() {
-        for easing in [
-            Easing::Linear,
-            Easing::EaseOutCubic,
-            Easing::EaseInCubic,
-            Easing::EaseInOutCubic,
-            Easing::EaseOutElastic,
-        ] {
-            let t0 = apply_easing(easing, 0.0);
-            let t1 = apply_easing(easing, 1.0);
-            assert!(
-                t0.abs() < 0.001,
-                "{:?} at t=0 should be ~0, got {t0}",
-                easing
-            );
-            assert!(
-                (t1 - 1.0).abs() < 0.001,
-                "{:?} at t=1 should be ~1, got {t1}",
-                easing
-            );
-        }
-    }
-
-    #[test]
-    fn easing_monotonic_in_midrange() {
-        for easing in [Easing::Linear, Easing::EaseOutCubic, Easing::EaseInCubic] {
-            let t_mid = apply_easing(easing, 0.5);
-            assert!(
-                t_mid > 0.0 && t_mid < 1.0,
-                "{:?} midpoint {t_mid} must be in (0,1)",
-                easing
-            );
-        }
-    }
-
-    #[test]
-    fn tween_fires_on_tick() {
-        with_clean_state(|| {
-            let counter = Arc::new(AtomicU32::new(0));
-            let c2 = Arc::clone(&counter);
-            // duration_ms = 0 → raw_t = 1.0 immediately (instant-complete path)
-            let id = tween(0, Easing::Linear, move |_t| {
-                c2.fetch_add(1, Ordering::Relaxed);
-            });
-            tick();
-            assert!(
-                !is_running(id),
-                "tween must complete after elapsed > duration"
-            );
-            assert!(
-                counter.load(Ordering::Relaxed) > 0,
-                "on_tick must have fired"
-            );
-        });
-    }
-
-    #[test]
-    fn cancel_removes_tween() {
+    fn tween_registers_and_cancels() {
         with_clean_state(|| {
             let id = tween(10_000, Easing::Linear, |_| {});
             assert!(is_running(id));
@@ -491,46 +297,14 @@ mod tests {
     }
 
     #[test]
-    fn on_complete_fires_exactly_once() {
+    fn running_count_tracks_active_tweens() {
         with_clean_state(|| {
-            let fired = Arc::new(AtomicU32::new(0));
-            let f2 = Arc::clone(&fired);
-            tween_with_completion(
-                0,
-                Easing::Linear,
-                |_| {},
-                Some(Box::new(move || {
-                    f2.fetch_add(1, Ordering::Relaxed);
-                })),
-                None,
-            );
-            tick();
-            assert_eq!(
-                fired.load(Ordering::Relaxed),
-                1,
-                "on_complete must fire once"
-            );
-            tick();
-            assert_eq!(
-                fired.load(Ordering::Relaxed),
-                1,
-                "on_complete must not fire again"
-            );
+            assert_eq!(running_count(), 0);
+            let a = tween(10_000, Easing::Linear, |_| {});
+            let b = tween(10_000, Easing::Linear, |_| {});
+            assert_eq!(running_count(), 2);
+            cancel(a);
+            cancel(b);
         });
-    }
-
-    #[test]
-    fn easing_from_str_round_trips() {
-        for name in [
-            "linear",
-            "ease_out_cubic",
-            "ease_in_cubic",
-            "ease_in_out_cubic",
-            "ease_out_elastic",
-        ] {
-            let e = Easing::from_str(name).unwrap_or_else(|| panic!("missing easing: {name}"));
-            assert_eq!(e.name(), name);
-        }
-        assert!(Easing::from_str("bogus").is_none());
     }
 }

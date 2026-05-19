@@ -101,12 +101,13 @@ fn collector_matches_legacy_for_migrated_modules() {
     }
 }
 
-/// Modules intentionally not yet migrated to the Extension system.
-/// `animation` is held back deliberately — it is being reworked separately.
-const MIGRATION_EXCLUSIONS: &[&str] = &["animation"];
+/// Modules intentionally not migrated to the Extension system. Empty — every
+/// legacy module is now collector-backed. Kept as the hook for any future
+/// deliberate exclusion.
+const MIGRATION_EXCLUSIONS: &[&str] = &[];
 
 #[test]
-fn collector_covers_all_legacy_modules_except_exclusions() {
+fn collector_covers_all_legacy_modules() {
     let providers = default_providers();
     let collected = collect(&providers).expect("collector must produce a valid extension set");
     let collected_names: Vec<String> = collected.module_names();

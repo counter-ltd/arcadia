@@ -29,6 +29,7 @@ version = "0.1.0"
 dependencies = [
  "inventory",
  "notify-rust",
+ "opentween",
  "serde",
  "serde_json",
  "toml",
@@ -963,6 +964,10 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "opentween"
+version = "0.1.0"
 
 [[package]]
 name = "ordered-stream"

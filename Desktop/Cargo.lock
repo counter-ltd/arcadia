@@ -112,6 +112,7 @@ version = "0.1.0"
 dependencies = [
  "inventory",
  "notify-rust",
+ "opentween",
  "serde",
  "serde_json",
  "toml 0.8.23",
@@ -4511,6 +4512,10 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "opentween"
+version = "0.1.0"
 
 [[package]]
 name = "option-ext"

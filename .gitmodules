@@ -4,3 +4,6 @@
 [submodule "Extensions"]
 	path = Extensions
 	url = git@github-counter:counter-ltd/arcadia-haven.git
+[submodule "Libraries/OpenTween-Rust"]
+	path = Libraries/OpenTween-Rust
+	url = git@github-counter:counter-ltd/opentween-rust.git
