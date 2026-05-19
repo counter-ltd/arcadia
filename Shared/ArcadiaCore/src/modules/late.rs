@@ -1363,6 +1363,46 @@ impl crate::extension::Extension for LateExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[
+            NavigationPageDefinition {
+                id: "late.now_playing",
+                title: "Social",
+                description: "Live chat, now playing, votes, visualizer, and bonsai in one view.",
+                glyph: "coffee",
+                system_image: "cup.and.saucer.fill",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::FullHeight,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "late.experimental",
+                title: "Experimental",
+                description: "Profile, notifications, RSS, articles, showcase, games, artboard, work profiles, DMs, and chips.",
+                glyph: "flask",
+                system_image: "flask.fill",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "late.settings",
+                title: "Social Settings",
+                description: "Configure server URL, credentials, and connection preferences.",
+                glyph: "coffee",
+                system_image: "cup.and.saucer.fill",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+        ];
+        PAGES
+    }
 }
 
 crate::register_extension!(LateExtension);

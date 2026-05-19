@@ -235,6 +235,22 @@ impl crate::extension::Extension for PythonHostExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "extensions.settings",
+            title: "Extensions",
+            description: "Enable or disable Python extensions loaded from ~/Arcadia/Extensions/.",
+            glyph: "extensions",
+            system_image: "flask.fill",
+            accent: "indigo",
+            required_module: Some(NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
 }
 
 crate::register_extension!(PythonHostExtension);

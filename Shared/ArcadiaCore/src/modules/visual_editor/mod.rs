@@ -31,6 +31,22 @@ impl crate::extension::Extension for VisualEditorExtension {
             api_exports: Vec::new(),
         }
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "editor.visual",
+            title: "Blocks",
+            description: "Scratch-style visual block editor for Python. Each open file appears as a tab in the sidebar.",
+            glyph: "blocks",
+            system_image: "square.grid.2x2",
+            accent: "sky",
+            required_module: Some(NAME),
+            layout_kind: PageLayoutKind::FullHeight,
+            blocks_platform_goto: true,
+        }];
+        PAGES
+    }
 }
 
 crate::register_extension!(VisualEditorExtension);

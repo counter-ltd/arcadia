@@ -15,6 +15,7 @@
 pub mod api;
 pub mod collector;
 pub mod provider;
+pub mod shell;
 pub mod types;
 
 pub use types::{

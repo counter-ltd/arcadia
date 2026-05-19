@@ -18,6 +18,11 @@ use arcadia_core::config::modules::{ModuleManifest, MODULE_REGISTRY};
 use arcadia_core::extension::collector::collect;
 use arcadia_core::extension::provider::default_providers;
 use arcadia_core::extension::OwnedModuleManifest;
+use arcadia_core::navigation::{
+    GROUP_DEFINITIONS, GLOBAL_PAGE_IDS, PAGE_DEFINITIONS, SETTINGS_HUB_PAGE_IDS,
+    TOP_BAR_PAGE_IDS,
+};
+use std::collections::BTreeMap;
 
 /// True when an owned manifest matches the legacy static manifest field-for-field.
 fn manifests_match(owned: &OwnedModuleManifest, legacy: &ModuleManifest) -> Result<(), String> {
@@ -77,12 +82,20 @@ fn manifests_match(owned: &OwnedModuleManifest, legacy: &ModuleManifest) -> Resu
     }
 }
 
+/// Extensions that are not `MODULE_REGISTRY` modules — the app shell owns
+/// navigation-frame contributions but is not a toggleable module.
+const NON_MODULE_EXTENSIONS: &[&str] = &["arcadia-shell"];
+
 #[test]
 fn collector_matches_legacy_for_migrated_modules() {
     let providers = default_providers();
     let collected = collect(&providers).expect("collector must produce a valid extension set");
 
     for manifest in collected.manifests() {
+        // The app shell is an extension but not a MODULE_REGISTRY module.
+        if NON_MODULE_EXTENSIONS.contains(&manifest.name.as_str()) {
+            continue;
+        }
         let legacy = MODULE_REGISTRY
             .iter()
             .find(|m| m.name == manifest.name)
@@ -122,5 +135,52 @@ fn collector_covers_all_legacy_modules() {
     assert!(
         missing.is_empty(),
         "modules still only in MODULE_REGISTRY, not yet migrated: {missing:?}"
+    );
+}
+
+#[test]
+fn collector_nav_matches_legacy() {
+    let providers = default_providers();
+    let collected = collect(&providers).expect("collector must produce a valid extension set");
+
+    // Pages — same set, identical field-for-field (compared via serialized form).
+    let got_pages: BTreeMap<String, serde_json::Value> = collected
+        .nav_pages()
+        .iter()
+        .map(|p| (p.id.to_string(), serde_json::to_value(p).unwrap()))
+        .collect();
+    let want_pages: BTreeMap<String, serde_json::Value> = PAGE_DEFINITIONS
+        .iter()
+        .map(|p| (p.id.to_string(), serde_json::to_value(p).unwrap()))
+        .collect();
+    assert_eq!(
+        got_pages, want_pages,
+        "collector nav pages diverge from PAGE_DEFINITIONS"
+    );
+
+    // Groups — same set, identical.
+    let got_groups: BTreeMap<String, serde_json::Value> = collected
+        .nav_groups()
+        .iter()
+        .map(|g| (g.id.to_string(), serde_json::to_value(g).unwrap()))
+        .collect();
+    let want_groups: BTreeMap<String, serde_json::Value> = GROUP_DEFINITIONS
+        .iter()
+        .map(|g| (g.id.to_string(), serde_json::to_value(g).unwrap()))
+        .collect();
+    assert_eq!(
+        got_groups, want_groups,
+        "collector nav groups diverge from GROUP_DEFINITIONS"
+    );
+
+    // Placement frame.
+    let placement = collected
+        .nav_placement()
+        .expect("the shell extension must supply a nav placement");
+    assert_eq!(placement.global_pages, GLOBAL_PAGE_IDS, "global_pages");
+    assert_eq!(placement.top_bar_pages, TOP_BAR_PAGE_IDS, "top_bar_pages");
+    assert_eq!(
+        placement.settings_hub_pages, SETTINGS_HUB_PAGE_IDS,
+        "settings_hub_pages"
     );
 }

@@ -143,6 +143,22 @@ impl crate::extension::Extension for TerminalExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "utility.shell",
+            title: "Terminal",
+            description: "Run and manage terminal commands.",
+            glyph: "terminal",
+            system_image: "terminal",
+            accent: "emerald",
+            required_module: Some(crate::config::modules::TERMINAL_MODULE_NAME),
+            layout_kind: PageLayoutKind::FullHeight,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
 }
 
 crate::register_extension!(TerminalExtension);

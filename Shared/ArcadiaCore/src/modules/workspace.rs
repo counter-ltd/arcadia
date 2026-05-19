@@ -207,6 +207,22 @@ impl crate::extension::Extension for WorkspaceExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "global.workspaces",
+            title: "Workspaces",
+            description: "Register project directories and grant scoped file and execution permissions.",
+            glyph: "workspaces",
+            system_image: "folder",
+            accent: "emerald",
+            required_module: Some(NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
 }
 
 crate::register_extension!(WorkspaceExtension);

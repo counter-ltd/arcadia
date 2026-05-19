@@ -227,6 +227,35 @@ impl crate::extension::Extension for NotificationExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[
+            NavigationPageDefinition {
+                id: "notification.main",
+                title: "Notifications",
+                description: "In-app notification centre. View and dismiss alerts from modules and extensions.",
+                glyph: "notification",
+                system_image: "bell",
+                accent: "amber",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "notification.settings",
+                title: "Notifications",
+                description: "Configure notification storage, per-source send permissions, and display preferences.",
+                glyph: "notification",
+                system_image: "bell.badge",
+                accent: "amber",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+        ];
+        PAGES
+    }
 }
 
 crate::register_extension!(NotificationExtension);

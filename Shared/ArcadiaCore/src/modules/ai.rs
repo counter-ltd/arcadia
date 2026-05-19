@@ -162,6 +162,46 @@ impl crate::extension::Extension for AiExtension {
             api_exports: Vec::new(),
         }
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[
+            NavigationPageDefinition {
+                id: "ai.chat",
+                title: "Chat",
+                description: "AI chat sessions. Each conversation appears as a sub-item in the sidebar.",
+                glyph: "message",
+                system_image: "message",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::FullHeight,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "ai.settings",
+                title: "AI",
+                description: "AI module preferences — default system prompt and provider configuration.",
+                glyph: "ai-provider",
+                system_image: "message",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "ai.models",
+                title: "Models",
+                description: "Configure and manage AI model providers.",
+                glyph: "ai-model",
+                system_image: "cpu",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+        ];
+        PAGES
+    }
 }
 
 crate::register_extension!(AiExtension);

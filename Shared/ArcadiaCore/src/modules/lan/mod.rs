@@ -215,6 +215,22 @@ impl crate::extension::Extension for LanExtension {
     fn services(&self) -> &'static [crate::services::ServiceDefinition] {
         LAN_SERVICES
     }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "network.nodes",
+            title: "Nodes",
+            description: "Discover LAN peers and manage pairing with lan.scan / lan.node.",
+            glyph: "nodes",
+            system_image: "wifi",
+            accent: "cyan",
+            required_module: Some(NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
 }
 
 crate::register_extension!(LanExtension);

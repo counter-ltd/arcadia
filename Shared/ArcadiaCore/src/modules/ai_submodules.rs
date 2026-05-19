@@ -44,23 +44,74 @@ macro_rules! ai_submodule {
     };
 }
 
-ai_submodule!(
-    AiRulesExtension,
-    crate::config::modules::AI_RULES_MODULE_NAME,
-    "ai-rule",
-    "",
-    Vec::new(),
-    "AI Rules — per-chat constraints: forbidden tools, response format, persona. Adds a configuration page to the AI sidebar."
-);
+// AiRulesExtension / AiSkillsExtension are hand-written rather than macro-built
+// because they each contribute a navigation page to the AI sidebar.
 
-ai_submodule!(
-    AiSkillsExtension,
-    crate::config::modules::AI_SKILLS_MODULE_NAME,
-    "ai-skill",
-    "",
-    Vec::new(),
-    "AI Skills — named behaviours: system prompt fragments, tool allowlists, parameter overrides. Adds a configuration page to the AI sidebar."
-);
+#[derive(Default)]
+pub struct AiRulesExtension;
+
+impl Extension for AiRulesExtension {
+    fn manifest(&self) -> OwnedModuleManifest {
+        ai_submodule_manifest(
+            crate::config::modules::AI_RULES_MODULE_NAME,
+            "ai-rule",
+            "AI Rules — per-chat constraints: forbidden tools, response format, persona. Adds a configuration page to the AI sidebar.",
+            "",
+            Vec::new(),
+        )
+    }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "ai.rules",
+            title: "Rules",
+            description: "Configure AI rules — per-chat constraints, forbidden tools, response format.",
+            glyph: "ai-rule",
+            system_image: "wrench.and.screwdriver",
+            accent: "violet",
+            required_module: Some(crate::config::modules::AI_RULES_MODULE_NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
+}
+
+crate::register_extension!(AiRulesExtension);
+
+#[derive(Default)]
+pub struct AiSkillsExtension;
+
+impl Extension for AiSkillsExtension {
+    fn manifest(&self) -> OwnedModuleManifest {
+        ai_submodule_manifest(
+            crate::config::modules::AI_SKILLS_MODULE_NAME,
+            "ai-skill",
+            "AI Skills — named behaviours: system prompt fragments, tool allowlists, parameter overrides. Adds a configuration page to the AI sidebar.",
+            "",
+            Vec::new(),
+        )
+    }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "ai.skills",
+            title: "Skills",
+            description: "Configure AI skills — named behaviours with system prompt fragments and tool allowlists.",
+            glyph: "ai-skill",
+            system_image: "flask",
+            accent: "violet",
+            required_module: Some(crate::config::modules::AI_SKILLS_MODULE_NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
+}
+
+crate::register_extension!(AiSkillsExtension);
 
 ai_submodule!(
     AiExecClaudeExtension,
