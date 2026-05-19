@@ -1336,3 +1336,33 @@ fn cmd_login(args: &[&str], _ctx: &ExecutionContext) -> String {
         Err(e) => format!("error: token received but failed to save late.toml: {e}"),
     }
 }
+
+#[derive(Default)]
+pub struct LateExtension;
+
+impl crate::extension::Extension for LateExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "coffee".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Real-time chat rooms, music stream, reactions, and social features."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["late.outbound".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(LateExtension);

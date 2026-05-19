@@ -185,3 +185,47 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+#[derive(Default)]
+pub struct LanExtension;
+
+impl crate::extension::Extension for LanExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "network".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Local network discovery and peer communication.".to_string(),
+            accent: String::new(),
+            required_modules: vec![crate::config::modules::NET_MODULE_NAME.to_string()],
+            required_permissions: vec!["network.lan".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+
+    fn services(&self) -> Vec<crate::extension::OwnedService> {
+        vec![crate::extension::OwnedService {
+            id: "lan.discovery".to_string(),
+            page_id: "utility.services".to_string(),
+            title: "LAN Discovery".to_string(),
+            description:
+                "Auto-advertises this node and discovers Arcadia peers on UDP broadcast."
+                    .to_string(),
+            required_module: NAME.to_string(),
+            glyph: "nodes".to_string(),
+            system_image: "wifi".to_string(),
+            accent: "cyan".to_string(),
+        }]
+    }
+}
+
+crate::register_extension!(LanExtension);

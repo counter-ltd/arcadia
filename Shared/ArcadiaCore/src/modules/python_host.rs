@@ -204,3 +204,37 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+#[derive(Default)]
+pub struct PythonHostExtension;
+
+impl crate::extension::Extension for PythonHostExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "python".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Python extension loader. Scans ~/Arcadia/Extensions/ for .py files and registers their commands."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec![
+                "python.host".to_string(),
+                "python.extension_toggle".to_string(),
+            ],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(PythonHostExtension);

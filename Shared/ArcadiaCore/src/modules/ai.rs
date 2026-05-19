@@ -118,3 +118,50 @@ pub fn provider_display_name(module_name: &str) -> Option<&'static str> {
         .find(|p| p.module_name == module_name)
         .map(|p| p.display_name)
 }
+
+#[derive(Default)]
+pub struct AiExtension;
+
+impl crate::extension::Extension for AiExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        use crate::extension::OwnedWorkspacePermissionDef;
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "ai-provider".to_string(),
+            version: "0.1.0".to_string(),
+            description: "AI chat interface. Requires an AI provider module to be enabled."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: vec![
+                OwnedWorkspacePermissionDef {
+                    id: "workspace.ai_read".to_string(),
+                    title: "File read (AI)".to_string(),
+                    description:
+                        "Allow the AI to read files via @mention and read_file tool."
+                            .to_string(),
+                    default_granted: false,
+                },
+                OwnedWorkspacePermissionDef {
+                    id: "workspace.ai_write".to_string(),
+                    title: "File write (AI)".to_string(),
+                    description: "Allow the AI to create and modify files via write_file tool."
+                        .to_string(),
+                    default_granted: false,
+                },
+                OwnedWorkspacePermissionDef {
+                    id: "workspace.ai_execute".to_string(),
+                    title: "Command execution (AI)".to_string(),
+                    description: "Allow the AI to run allowlisted commands via run_command tool."
+                        .to_string(),
+                    default_granted: false,
+                },
+            ],
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+}
+
+crate::register_extension!(AiExtension);
