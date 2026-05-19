@@ -504,7 +504,7 @@ mod tests {
     #[test]
     fn all_pages_with_required_module_exist_in_registry() {
         use crate::config::modules::ModulesConfig;
-        for page in PAGE_DEFINITIONS {
+        for page in PAGE_DEFINITIONS.iter() {
             if let Some(module_name) = page.required_module {
                 assert!(
                     ModulesConfig::manifest_for(module_name).is_some(),
@@ -518,7 +518,7 @@ mod tests {
 
     #[test]
     fn all_group_pages_exist_in_page_definitions() {
-        for group in GROUP_DEFINITIONS {
+        for group in GROUP_DEFINITIONS.iter() {
             for page_id in group.pages {
                 assert!(
                     page_by_id(page_id).is_some(),
@@ -533,22 +533,24 @@ mod tests {
     #[test]
     fn default_page_exists() {
         assert!(
-            page_by_id(DEFAULT_PAGE_ID).is_some(),
-            "DEFAULT_PAGE_ID '{DEFAULT_PAGE_ID}' not in PAGE_DEFINITIONS"
+            page_by_id(*DEFAULT_PAGE_ID).is_some(),
+            "DEFAULT_PAGE_ID '{}' not in PAGE_DEFINITIONS",
+            *DEFAULT_PAGE_ID
         );
     }
 
     #[test]
     fn default_group_exists() {
         assert!(
-            group_by_id(DEFAULT_GROUP_ID).is_some(),
-            "DEFAULT_GROUP_ID '{DEFAULT_GROUP_ID}' not in GROUP_DEFINITIONS"
+            group_by_id(*DEFAULT_GROUP_ID).is_some(),
+            "DEFAULT_GROUP_ID '{}' not in GROUP_DEFINITIONS",
+            *DEFAULT_GROUP_ID
         );
     }
 
     #[test]
     fn all_global_page_ids_exist_in_definitions() {
-        for page_id in GLOBAL_PAGE_IDS {
+        for page_id in GLOBAL_PAGE_IDS.iter() {
             assert!(
                 page_by_id(page_id).is_some(),
                 "GLOBAL_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"
@@ -558,7 +560,7 @@ mod tests {
 
     #[test]
     fn all_top_bar_page_ids_exist_in_definitions() {
-        for page_id in TOP_BAR_PAGE_IDS {
+        for page_id in TOP_BAR_PAGE_IDS.iter() {
             assert!(
                 page_by_id(page_id).is_some(),
                 "TOP_BAR_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"
@@ -568,7 +570,7 @@ mod tests {
 
     #[test]
     fn top_bar_pages_disjoint_from_global_pages() {
-        for page_id in TOP_BAR_PAGE_IDS {
+        for page_id in TOP_BAR_PAGE_IDS.iter() {
             assert!(
                 !GLOBAL_PAGE_IDS.contains(page_id),
                 "page '{page_id}' is in both TOP_BAR_PAGE_IDS and GLOBAL_PAGE_IDS"
@@ -596,7 +598,7 @@ mod tests {
 
     #[test]
     fn all_settings_hub_page_ids_exist_in_definitions() {
-        for page_id in SETTINGS_HUB_PAGE_IDS {
+        for page_id in SETTINGS_HUB_PAGE_IDS.iter() {
             assert!(
                 page_by_id(page_id).is_some(),
                 "SETTINGS_HUB_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"

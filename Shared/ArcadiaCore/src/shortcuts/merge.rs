@@ -52,7 +52,7 @@ fn apply_sequence_override(
 
 fn gather_module_gated_static(cfg: &ModulesConfig) -> Vec<EffectiveMergedShortcut> {
     let mut out = Vec::new();
-    for def in SHORTCUT_DEFINITIONS {
+    for def in SHORTCUT_DEFINITIONS.iter() {
         if let Some(m) = def.required_registry_module {
             if !module_enabled(cfg, m) {
                 continue;
@@ -292,7 +292,7 @@ pub fn touch_swipe_edge_matches(
 
 /// Validates every static shortcut page id exists (call from tests / CI).
 pub fn validate_static_shortcut_page_ids() -> Result<(), String> {
-    for def in SHORTCUT_DEFINITIONS {
+    for def in SHORTCUT_DEFINITIONS.iter() {
         if let ShortcutScopeStatic::Pages(ids) = def.scope {
             for page_id in ids {
                 if navigation::page_by_id(page_id).is_none() {
