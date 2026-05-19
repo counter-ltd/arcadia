@@ -32,7 +32,7 @@ In-depth guides live under [`Documentation/`](Documentation/). Use this as the m
 
 ## License
 
-Arcadia is released under the **Arcadia Community License (ACL) v1.7** ([`LICENSE.md`](LICENSE.md)).
+Arcadia is released under the **Arcadia Community License (ACL) v1.8** ([`LICENSE.md`](LICENSE.md)).
 
 In short: the software is meant for **people** — personal, educational, research, accessibility, and community use — with **attribution** and rules that keep the **core** improvements open when distributed. **Large corporations** and **profit-focused commercialization of Arcadia itself** (or selling Arcadia-targeted extensions without permission) are out of scope unless the copyright holder grants written permission. Education and learning get a broad, explicit welcome. The full text defines thresholds, conditions, and philosophy; **do not rely on this paragraph alone** for compliance.
 
