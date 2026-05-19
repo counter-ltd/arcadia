@@ -1,15 +1,15 @@
-//! Owned contribution types for the extension system.
+//! Contribution types for the extension system.
 //!
-//! Built-in Rust modules have `&'static` data; future `Modules/`-directory modules
-//! (loaded at runtime) cannot. The `Extension` trait therefore returns **owned**
-//! values — built-ins clone their statics, runtime modules produce them directly.
-//! Retrofitting owned returns later would touch every module, so the contract is
-//! owned from the start.
+//! Identity (`manifest`) and commands are returned **owned** — a runtime
+//! `Modules/`-directory extension must be able to produce them. Navigation,
+//! permissions, shortcuts, and services are returned as `&'static` slices of
+//! the existing static types: only built-in modules contribute those, and
+//! runtime modules feed them through dedicated conversion paths (as the Python
+//! host already does for its pages).
 
 use std::sync::Arc;
 
 use crate::modules::{ExecutionContext, ModuleCommand};
-use crate::navigation::PageLayoutKind;
 
 /// Where an extension came from. Built-ins are always loaded; runtime modules
 /// follow the Python discover → stub → enable → body lifecycle.
@@ -87,51 +87,22 @@ impl OwnedModuleCommand {
     }
 }
 
-/// Owned mirror of [`crate::navigation::NavigationPageDefinition`].
-#[derive(Debug, Clone)]
-pub struct OwnedNavPage {
-    pub id: String,
-    pub title: String,
-    pub description: String,
-    pub glyph: String,
-    pub system_image: String,
-    pub accent: String,
-    pub required_module: Option<String>,
-    pub layout_kind: PageLayoutKind,
-    pub blocks_platform_goto: bool,
-}
-
-/// Owned mirror of [`crate::services::ServiceDefinition`] metadata. Runtime control
-/// hooks (start/stop) are addressed by command token, not `fn` pointers, so this
-/// type stays serializable and boundary-safe.
-#[derive(Debug, Clone)]
-pub struct OwnedService {
-    pub id: String,
-    pub page_id: String,
-    pub title: String,
-    pub description: String,
-    pub required_module: String,
-    pub glyph: String,
-    pub system_image: String,
-    pub accent: String,
-}
-
-/// Owned mirror of [`crate::config::permissions::PermissionDefinition`]. `system_grant`
-/// is carried as its serialized key — the catalog resolves it to a `SystemGrant`.
-#[derive(Debug, Clone)]
-pub struct OwnedPermission {
-    pub id: String,
-    pub title: String,
-    pub description: String,
-    pub default_global: bool,
-    pub system_grant: Option<String>,
-}
-
-/// Owned shortcut contribution. The JSON spec mirrors the Python extension
-/// `register_shortcut_json` payload so both extension systems share a format.
-#[derive(Debug, Clone)]
-pub struct OwnedShortcut {
-    pub json: String,
+/// Navigation structure owned by the app shell — the placement lists and
+/// defaults that are not tied to any single module. Only the `ShellExtension`
+/// returns this; module extensions contribute pages and leave it `None`.
+///
+/// Built-in data, so `&'static` slices: runtime modules contribute pages, not
+/// the navigation frame.
+#[derive(Debug, Clone, Copy)]
+pub struct NavPlacement {
+    /// Pages shown in the sidebar's global section.
+    pub global_pages: &'static [&'static str],
+    /// Pages rendered as compact top-bar controls.
+    pub top_bar_pages: &'static [&'static str],
+    /// Pages nested under the sidebar Settings hub.
+    pub settings_hub_pages: &'static [&'static str],
+    pub default_group: &'static str,
+    pub default_page: &'static str,
 }
 
 /// An icon a module ships. `bytes` is raw SVG/PNG; `key` is the glyph lookup name.

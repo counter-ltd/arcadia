@@ -18,16 +18,24 @@ pub mod provider;
 pub mod types;
 
 pub use types::{
-    ApiContract, CommandHandler, ModuleSource, OwnedIcon, OwnedModuleCommand,
-    OwnedModuleManifest, OwnedNavPage, OwnedPermission, OwnedService, OwnedShortcut,
-    OwnedWorkspacePermissionDef,
+    ApiContract, CommandHandler, ModuleSource, NavPlacement, OwnedIcon, OwnedModuleCommand,
+    OwnedModuleManifest, OwnedWorkspacePermissionDef,
 };
+
+use crate::config::permissions::PermissionDefinition;
+use crate::navigation::{NavigationGroupDefinition, NavigationPageDefinition};
+use crate::services::ServiceDefinition;
+use crate::shortcuts::ShortcutDefinition;
 
 /// A self-contained unit of app functionality. Implemented by built-in Rust
 /// modules and by the host shims for runtime-loaded modules / Python extensions.
 ///
 /// Every method except [`Extension::manifest`] has an empty default — a module
 /// implements only the contribution kinds it actually provides.
+///
+/// Identity and commands are owned (a runtime module must produce them);
+/// navigation, permissions, shortcuts, and services are `&'static` slices —
+/// only built-in modules contribute those.
 pub trait Extension: Send + Sync {
     /// Identity, metadata, dependencies, and exported APIs. Required.
     fn manifest(&self) -> OwnedModuleManifest;
@@ -43,23 +51,34 @@ pub trait Extension: Send + Sync {
     }
 
     /// Navigation pages this extension contributes.
-    fn nav_pages(&self) -> Vec<OwnedNavPage> {
-        Vec::new()
+    fn nav_pages(&self) -> &'static [NavigationPageDefinition] {
+        &[]
+    }
+
+    /// Navigation groups this extension contributes (typically only the shell).
+    fn nav_groups(&self) -> &'static [NavigationGroupDefinition] {
+        &[]
+    }
+
+    /// Navigation frame — placement lists and defaults. Only the app shell
+    /// returns `Some`; module extensions leave it `None`.
+    fn nav_placement(&self) -> Option<NavPlacement> {
+        None
     }
 
     /// Long-running services advertised on the Services page.
-    fn services(&self) -> Vec<OwnedService> {
-        Vec::new()
+    fn services(&self) -> &'static [ServiceDefinition] {
+        &[]
     }
 
     /// Permission catalog entries this extension owns.
-    fn permissions(&self) -> Vec<OwnedPermission> {
-        Vec::new()
+    fn permissions(&self) -> &'static [PermissionDefinition] {
+        &[]
     }
 
     /// Keyboard shortcut contributions.
-    fn shortcuts(&self) -> Vec<OwnedShortcut> {
-        Vec::new()
+    fn shortcuts(&self) -> &'static [ShortcutDefinition] {
+        &[]
     }
 
     /// Icons/glyphs this extension ships.

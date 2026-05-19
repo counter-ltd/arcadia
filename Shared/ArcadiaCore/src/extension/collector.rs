@@ -8,7 +8,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::provider::ExtensionProvider;
-use super::{Extension, OwnedModuleManifest};
+use super::{Extension, NavPlacement, OwnedModuleManifest};
+use crate::config::permissions::PermissionDefinition;
+use crate::navigation::{NavigationGroupDefinition, NavigationPageDefinition};
+use crate::services::ServiceDefinition;
+use crate::shortcuts::ShortcutDefinition;
 
 /// A validation failure produced by [`collect`]. All variants are fatal —
 /// the app cannot run with an inconsistent extension set.
@@ -75,6 +79,52 @@ impl CollectedExtensions {
     /// Module names in dependency order.
     pub fn module_names(&self) -> Vec<String> {
         self.extensions.iter().map(|e| e.manifest().name).collect()
+    }
+
+    /// All navigation pages contributed across every collected extension.
+    pub fn nav_pages(&self) -> Vec<&'static NavigationPageDefinition> {
+        self.extensions
+            .iter()
+            .flat_map(|e| e.nav_pages().iter())
+            .collect()
+    }
+
+    /// All navigation groups contributed across every collected extension.
+    pub fn nav_groups(&self) -> Vec<&'static NavigationGroupDefinition> {
+        self.extensions
+            .iter()
+            .flat_map(|e| e.nav_groups().iter())
+            .collect()
+    }
+
+    /// The navigation frame (placement lists + defaults). Provided by the app
+    /// shell; the first extension to declare one wins.
+    pub fn nav_placement(&self) -> Option<NavPlacement> {
+        self.extensions.iter().find_map(|e| e.nav_placement())
+    }
+
+    /// All permission catalog entries contributed across every collected extension.
+    pub fn permissions(&self) -> Vec<&'static PermissionDefinition> {
+        self.extensions
+            .iter()
+            .flat_map(|e| e.permissions().iter())
+            .collect()
+    }
+
+    /// All keyboard shortcuts contributed across every collected extension.
+    pub fn shortcuts(&self) -> Vec<&'static ShortcutDefinition> {
+        self.extensions
+            .iter()
+            .flat_map(|e| e.shortcuts().iter())
+            .collect()
+    }
+
+    /// All services advertised across every collected extension.
+    pub fn services(&self) -> Vec<&'static ServiceDefinition> {
+        self.extensions
+            .iter()
+            .flat_map(|e| e.services().iter())
+            .collect()
     }
 
     /// `(module, missing_dependency)` pairs where a collected module declares a

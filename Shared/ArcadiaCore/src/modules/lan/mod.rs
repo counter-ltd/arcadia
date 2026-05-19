@@ -212,20 +212,51 @@ impl crate::extension::Extension for LanExtension {
             .collect()
     }
 
-    fn services(&self) -> Vec<crate::extension::OwnedService> {
-        vec![crate::extension::OwnedService {
-            id: "lan.discovery".to_string(),
-            page_id: "utility.services".to_string(),
-            title: "LAN Discovery".to_string(),
-            description:
-                "Auto-advertises this node and discovers Arcadia peers on UDP broadcast."
-                    .to_string(),
-            required_module: NAME.to_string(),
-            glyph: "nodes".to_string(),
-            system_image: "wifi".to_string(),
-            accent: "cyan".to_string(),
-        }]
+    fn services(&self) -> &'static [crate::services::ServiceDefinition] {
+        LAN_SERVICES
     }
 }
 
 crate::register_extension!(LanExtension);
+
+// ─── Service registration ───────────────────────────────────────────────────
+
+fn svc_status() -> crate::services::ServiceRuntimeStatus {
+    let info = lan_service_info();
+    let detail = if info.running {
+        format!("UDP :{} · {}", info.port, info.hostname)
+    } else {
+        format!("UDP :{} · stopped", info.port)
+    };
+    crate::services::ServiceRuntimeStatus {
+        running: Some(info.running),
+        detail,
+    }
+}
+
+fn svc_start() -> Result<(), String> {
+    start_service()
+}
+
+fn svc_stop() {
+    stop_service();
+}
+
+/// LAN discovery service, advertised on the Services page.
+static LAN_SERVICES: &[crate::services::ServiceDefinition] =
+    &[crate::services::ServiceDefinition {
+        id: "lan.discovery",
+        page_id: "utility.services",
+        title: "LAN Discovery",
+        description: "Auto-advertises this node and discovers Arcadia peers on UDP broadcast.",
+        required_module: NAME,
+        glyph: "nodes",
+        system_image: "wifi",
+        accent: "cyan",
+        controls: crate::services::ServiceControls {
+            status_detail: Some(svc_status),
+            start: Some(svc_start),
+            stop: Some(svc_stop),
+            port_for_collision: Some(|| lan_service_info().port),
+        },
+    }];
