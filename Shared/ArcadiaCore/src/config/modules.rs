@@ -70,6 +70,7 @@ pub const AI_EXEC_AIDER_MODULE_NAME: &str = "ai-provider-exec-aider";
 pub const AI_APFEL_MODULE_NAME: &str = "ai-provider-apfel";
 pub const NOTIFICATION_MODULE_NAME: &str = "notification";
 pub const GOTO_MODULE_NAME: &str = "goto";
+pub const WASM_HOST_MODULE_NAME: &str = "wasm-host";
 const FILE_NAME: &str = "modules.toml";
 
 #[derive(Debug, Clone, Copy)]

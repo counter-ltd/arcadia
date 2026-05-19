@@ -1,0 +1,13 @@
+[package]
+name = "hello-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "MVP example Arcadia WASM module"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = "s"
+lto = true

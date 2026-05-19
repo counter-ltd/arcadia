@@ -22,6 +22,8 @@ pub mod permissions;
 pub mod platform;
 pub mod python_host;
 pub mod python_registry;
+pub mod wasm_host;
+pub mod wasm_registry;
 pub mod remote_mirror;
 pub mod remote_session;
 pub mod shell;
@@ -194,6 +196,9 @@ pub fn enabled_command_tokens() -> Vec<String> {
             tokens.push(token);
         }
     }
+    for (token, _) in wasm_registry::list_commands() {
+        tokens.push(token);
+    }
     tokens
 }
 
@@ -303,7 +308,11 @@ pub fn execute_command(
         return Ok(Some((command.run)(args, context)));
     }
 
-    match python_registry::try_dispatch(token, args)? {
+    // Dispatch order: native modules → Python extensions → WASM modules.
+    if let Some(s) = python_registry::try_dispatch(token, args)? {
+        return Ok(Some(s));
+    }
+    match wasm_registry::try_dispatch(token, args)? {
         Some(s) => Ok(Some(s)),
         None => Ok(None),
     }
@@ -359,6 +368,9 @@ pub fn all_command_entries() -> Vec<(String, String)> {
         if python_registry::extension_command_supported_at_runtime(token.as_str()) {
             entries.push((token, description));
         }
+    }
+    for (token, description) in wasm_registry::list_commands() {
+        entries.push((token, description));
     }
     entries
 }

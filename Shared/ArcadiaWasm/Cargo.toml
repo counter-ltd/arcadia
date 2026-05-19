@@ -1,0 +1,11 @@
+[package]
+name = "arcadia-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WASM module host for Arcadia — loads .wasm modules and bridges them into arcadia-core"
+license = "MIT"
+
+[dependencies]
+arcadia-core = { path = "../ArcadiaCore" }
+wasmi = "1"
+serde_json = "1"

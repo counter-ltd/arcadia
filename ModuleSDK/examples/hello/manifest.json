@@ -1,0 +1,1 @@
+{"name":"hello-wasm","version":"0.1.0","description":"MVP example WASM module.","abi_version":1,"commands":[{"verb":"greet","description":"Greet someone: hello-wasm.greet <name>"}]}
