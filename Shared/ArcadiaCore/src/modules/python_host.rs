@@ -251,6 +251,27 @@ impl crate::extension::Extension for PythonHostExtension {
         }];
         PAGES
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "python.host",
+                title: "Python host",
+                description: "Load or reload extensions from disk (python-host.reload).",
+                default_global: false,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "python.extension_toggle",
+                title: "Extension enable",
+                description: "Enable or disable Python extensions.",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
 }
 
 crate::register_extension!(PythonHostExtension);

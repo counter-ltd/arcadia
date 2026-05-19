@@ -231,6 +231,18 @@ impl crate::extension::Extension for LanExtension {
         }];
         PAGES
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "network.lan",
+            title: "LAN access",
+            description: "Discovery, peer I/O, and LAN module commands (multicast, pairing, etc.).",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
 }
 
 crate::register_extension!(LanExtension);

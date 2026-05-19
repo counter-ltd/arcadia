@@ -256,6 +256,27 @@ impl crate::extension::Extension for OverlayExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "overlay.hud",
+                title: "HUD overlay window",
+                description: "Create and control the shared always-on-top transparent overlay window (non-interactive / pass-through in v1).",
+                default_global: false,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "overlay.system_ui",
+                title: "Overlay system-UI tier",
+                description: "Allow overlay.set-stacking system_ui (higher stacking tier; best-effort per OS).",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
 }
 
 crate::register_extension!(OverlayExtension);

@@ -256,6 +256,27 @@ impl crate::extension::Extension for NotificationExtension {
         ];
         PAGES
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "notifications.receive",
+                title: "Receive notifications",
+                description: "Allow the notification module to store and display in-app notifications.",
+                default_global: true,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "notifications.send",
+                title: "Send notifications",
+                description: "Allow a module or extension to post notifications via notification.post. Grant per-source in the Notifications settings.",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
 }
 
 crate::register_extension!(NotificationExtension);

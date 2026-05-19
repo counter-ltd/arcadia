@@ -1403,6 +1403,18 @@ impl crate::extension::Extension for LateExtension {
         ];
         PAGES
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "late.outbound",
+            title: "Late.sh network",
+            description: "Connect and interact with late.sh (WebSocket, credentials, chat).",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
 }
 
 crate::register_extension!(LateExtension);

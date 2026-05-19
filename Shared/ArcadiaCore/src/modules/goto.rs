@@ -47,6 +47,37 @@ impl Extension for GotoExtension {
     fn commands(&self) -> Vec<OwnedModuleCommand> {
         commands().iter().map(OwnedModuleCommand::from_static).collect()
     }
+
+    fn shortcuts(&self) -> &'static [crate::shortcuts::ShortcutDefinition] {
+        use crate::shortcuts::{
+            ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic, ShortcutTriggerStatic,
+            ShortcutVisibility,
+        };
+        static SHORTCUTS: &[ShortcutDefinition] = &[ShortcutDefinition {
+            id: "goto:open",
+            label: "Open goto bar",
+            owner: "goto",
+            required_registry_module: Some(NAME),
+            scope: ShortcutScopeStatic::ArcadiaWide,
+            visibility: ShortcutVisibility::Both,
+            priority: 90,
+            consumes: true,
+            bypass_text_focus: false,
+            system_wide: false,
+            triggers: &[ShortcutTriggerStatic::Chord {
+                key: "g",
+                control: false,
+                alt: false,
+                shift: false,
+                platform: true,
+                function: false,
+            }],
+            actions: &[ShortcutActionStatic::UiControl {
+                control_id: "goto.open_page",
+            }],
+        }];
+        SHORTCUTS
+    }
 }
 
 crate::register_extension!(GotoExtension);

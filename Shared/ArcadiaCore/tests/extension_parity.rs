@@ -15,6 +15,9 @@
 //!   `MODULE_REGISTRY` can be deleted (Phase 4).
 
 use arcadia_core::config::modules::{ModuleManifest, MODULE_REGISTRY};
+use arcadia_core::config::permissions::{PermissionDefinition, PERMISSION_REGISTRY};
+use arcadia_core::services::SERVICE_DEFINITIONS;
+use arcadia_core::shortcuts::SHORTCUT_DEFINITIONS;
 use arcadia_core::extension::collector::collect;
 use arcadia_core::extension::provider::default_providers;
 use arcadia_core::extension::OwnedModuleManifest;
@@ -182,5 +185,75 @@ fn collector_nav_matches_legacy() {
     assert_eq!(
         placement.settings_hub_pages, SETTINGS_HUB_PAGE_IDS,
         "settings_hub_pages"
+    );
+}
+
+#[test]
+fn collector_permissions_match_legacy() {
+    let providers = default_providers();
+    let collected = collect(&providers).expect("collector must produce a valid extension set");
+
+    let key = |p: &PermissionDefinition| {
+        (
+            p.title.to_string(),
+            p.description.to_string(),
+            p.default_global,
+            p.system_grant,
+        )
+    };
+    let got: BTreeMap<String, _> = collected
+        .permissions()
+        .iter()
+        .map(|p| (p.id.to_string(), key(p)))
+        .collect();
+    let want: BTreeMap<String, _> = PERMISSION_REGISTRY
+        .iter()
+        .map(|p| (p.id.to_string(), key(p)))
+        .collect();
+    assert_eq!(
+        got, want,
+        "collector permissions diverge from PERMISSION_REGISTRY"
+    );
+}
+
+#[test]
+fn collector_shortcuts_match_legacy() {
+    let providers = default_providers();
+    let collected = collect(&providers).expect("collector must produce a valid extension set");
+
+    let got: BTreeMap<String, String> = collected
+        .shortcuts()
+        .iter()
+        .map(|s| (s.id.to_string(), format!("{s:?}")))
+        .collect();
+    let want: BTreeMap<String, String> = SHORTCUT_DEFINITIONS
+        .iter()
+        .map(|s| (s.id.to_string(), format!("{s:?}")))
+        .collect();
+    assert_eq!(
+        got, want,
+        "collector shortcuts diverge from SHORTCUT_DEFINITIONS"
+    );
+}
+
+#[test]
+fn collector_services_match_legacy() {
+    let providers = default_providers();
+    let collected = collect(&providers).expect("collector must produce a valid extension set");
+
+    // ServiceDefinition serializes its metadata; runtime control fn pointers are
+    // `#[serde(skip)]`, so this compares the descriptor fields.
+    let got: BTreeMap<String, serde_json::Value> = collected
+        .services()
+        .iter()
+        .map(|s| (s.id.to_string(), serde_json::to_value(s).unwrap()))
+        .collect();
+    let want: BTreeMap<String, serde_json::Value> = SERVICE_DEFINITIONS
+        .iter()
+        .map(|s| (s.id.to_string(), serde_json::to_value(s).unwrap()))
+        .collect();
+    assert_eq!(
+        got, want,
+        "collector services diverge from SERVICE_DEFINITIONS"
     );
 }

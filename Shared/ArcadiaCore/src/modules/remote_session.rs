@@ -30,6 +30,18 @@ impl Extension for RemoteSessionExtension {
             api_exports: Vec::new(),
         }
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "session.remote_route",
+            title: "Remote routing",
+            description: "Run commands on a peer host via --net:as lan:… (Arcadia remote control).",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
 }
 
 crate::register_extension!(RemoteSessionExtension);

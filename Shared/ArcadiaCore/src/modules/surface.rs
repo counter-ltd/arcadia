@@ -325,6 +325,27 @@ impl crate::extension::Extension for SurfaceExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "surface.read",
+                title: "Surface read",
+                description: "Read UI mirror state (surface.snapshot, surface.revision).",
+                default_global: true,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "surface.control",
+                title: "Surface control",
+                description: "Mutate mirrored UI / module toggles (surface.patch).",
+                default_global: true,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
 }
 
 crate::register_extension!(SurfaceExtension);

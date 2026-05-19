@@ -122,6 +122,27 @@ impl crate::extension::Extension for CursorExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::{PermissionDefinition, SystemGrant};
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "cursor.global_position",
+                title: "Global cursor position",
+                description: "Read the OS-global mouse cursor position even when Arcadia is not focused (macOS: Accessibility; same device-query gate as global mouse buttons).",
+                default_global: false,
+                system_grant: Some(SystemGrant::Accessibility),
+            },
+            PermissionDefinition {
+                id: "cursor.global_mouse_buttons",
+                title: "Global mouse buttons",
+                description: "Read whether the primary mouse buttons are pressed anywhere on the OS, even when Arcadia is not focused (macOS: Accessibility; same gate as global cursor position).",
+                default_global: false,
+                system_grant: Some(SystemGrant::Accessibility),
+            },
+        ];
+        PERMS
+    }
 }
 
 crate::register_extension!(CursorExtension);

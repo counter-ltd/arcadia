@@ -489,6 +489,18 @@ impl crate::extension::Extension for TrayExtension {
             .map(crate::extension::OwnedModuleCommand::from_static)
             .collect()
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "tray.create",
+            title: "Tray / menu-bar icons",
+            description: "Create and update menu-bar (macOS) or system-tray (Windows/Linux) icons.",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
 }
 
 crate::register_extension!(TrayExtension);

@@ -188,6 +188,223 @@ impl Extension for ShellExtension {
             default_page: "global.settings",
         })
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::{PermissionDefinition, SystemGrant};
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "input.capture",
+                title: "Input capture",
+                description: "Reserved for future input capture / injection policy (global gate).",
+                default_global: false,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "system.accessibility",
+                title: "Accessibility (AX)",
+                description: "Read and drive other apps' UI via the macOS Accessibility API — focused-app menu extent, status-item boundaries, assistive control. Needs the OS Accessibility grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Accessibility),
+            },
+            PermissionDefinition {
+                id: "system.screen_recording",
+                title: "Screen Recording",
+                description: "Capture screen contents and other apps' window geometry. Needs the OS Screen Recording grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::ScreenRecording),
+            },
+            PermissionDefinition {
+                id: "system.camera",
+                title: "Camera",
+                description: "Capture video from the camera. Needs the OS Camera grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Camera),
+            },
+            PermissionDefinition {
+                id: "system.microphone",
+                title: "Microphone",
+                description: "Capture audio from the microphone. Needs the OS Microphone grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Microphone),
+            },
+            PermissionDefinition {
+                id: "system.input_monitoring",
+                title: "Input Monitoring",
+                description: "Observe keyboard and mouse input system-wide. Needs the OS Input Monitoring grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::InputMonitoring),
+            },
+            PermissionDefinition {
+                id: "system.location",
+                title: "Location",
+                description: "Read the device's location. Needs the OS Location Services grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Location),
+            },
+            PermissionDefinition {
+                id: "system.automation",
+                title: "Automation",
+                description: "Send Apple Events to control other applications. Needs the OS Automation grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Automation),
+            },
+            PermissionDefinition {
+                id: "system.full_disk_access",
+                title: "Full Disk Access",
+                description: "Read files in OS-protected locations system-wide. Needs the OS Full Disk Access grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::FullDiskAccess),
+            },
+            PermissionDefinition {
+                id: "system.contacts",
+                title: "Contacts",
+                description: "Read the system address book. Needs the OS Contacts grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Contacts),
+            },
+            PermissionDefinition {
+                id: "system.calendars",
+                title: "Calendars",
+                description: "Read and write calendar events. Needs the OS Calendars grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Calendars),
+            },
+            PermissionDefinition {
+                id: "system.photos",
+                title: "Photos",
+                description: "Read the system photo library. Needs the OS Photos grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Photos),
+            },
+            PermissionDefinition {
+                id: "system.reminders",
+                title: "Reminders",
+                description: "Read and write reminders. Needs the OS Reminders grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Reminders),
+            },
+            PermissionDefinition {
+                id: "system.bluetooth",
+                title: "Bluetooth",
+                description: "Communicate with Bluetooth devices. Needs the OS Bluetooth grant.",
+                default_global: false,
+                system_grant: Some(SystemGrant::Bluetooth),
+            },
+        ];
+        PERMS
+    }
+
+    fn shortcuts(&self) -> &'static [crate::shortcuts::ShortcutDefinition] {
+        use crate::shortcuts::{
+            ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic, ShortcutTriggerStatic,
+            ShortcutTriggerStaticChord, ShortcutVisibility,
+        };
+        static SHORTCUTS: &[ShortcutDefinition] = &[
+            ShortcutDefinition {
+                id: "arcadia:dismiss-overlays",
+                label: "Dismiss menus and modal overlays",
+                owner: "arcadia",
+                required_registry_module: None,
+                scope: ShortcutScopeStatic::ArcadiaWide,
+                visibility: ShortcutVisibility::Both,
+                priority: 100,
+                consumes: true,
+                bypass_text_focus: true,
+                system_wide: false,
+                triggers: &[ShortcutTriggerStatic::Chord {
+                    key: "escape",
+                    control: false,
+                    alt: false,
+                    shift: false,
+                    platform: false,
+                    function: false,
+                }],
+                actions: &[ShortcutActionStatic::UiControl {
+                    control_id: "arcadia.dismiss_overlays",
+                }],
+            },
+            ShortcutDefinition {
+                id: "arcadia:os-global-modules",
+                label: "OS-global — Modules (requires consent in Shortcuts settings)",
+                owner: "arcadia",
+                required_registry_module: None,
+                scope: ShortcutScopeStatic::ArcadiaWide,
+                visibility: ShortcutVisibility::GlobalPrefsOnly,
+                priority: 8,
+                consumes: false,
+                bypass_text_focus: false,
+                system_wide: true,
+                triggers: &[ShortcutTriggerStatic::Chord {
+                    key: "m",
+                    control: true,
+                    alt: true,
+                    shift: true,
+                    platform: true,
+                    function: false,
+                }],
+                actions: &[ShortcutActionStatic::Navigate {
+                    page_id: "global.modules",
+                }],
+            },
+            ShortcutDefinition {
+                id: "demo:sequence-modules",
+                label: "Sample chord sequence — Modules",
+                owner: "arcadia",
+                required_registry_module: None,
+                scope: ShortcutScopeStatic::ArcadiaWide,
+                visibility: ShortcutVisibility::GlobalPrefsOnly,
+                priority: 5,
+                consumes: true,
+                bypass_text_focus: false,
+                system_wide: false,
+                triggers: &[ShortcutTriggerStatic::Sequence(&[
+                    ShortcutTriggerStaticChord {
+                        key: "comma",
+                        control: false,
+                        alt: false,
+                        shift: false,
+                        platform: true,
+                        function: false,
+                    },
+                    ShortcutTriggerStaticChord {
+                        key: "m",
+                        control: false,
+                        alt: false,
+                        shift: false,
+                        platform: true,
+                        function: false,
+                    },
+                ])],
+                actions: &[ShortcutActionStatic::Navigate {
+                    page_id: "global.modules",
+                }],
+            },
+            ShortcutDefinition {
+                id: "arcadia:command-bar",
+                label: "Open command bar",
+                owner: "arcadia",
+                required_registry_module: None,
+                scope: ShortcutScopeStatic::ArcadiaWide,
+                visibility: ShortcutVisibility::Both,
+                priority: 95,
+                consumes: true,
+                bypass_text_focus: false,
+                system_wide: false,
+                triggers: &[ShortcutTriggerStatic::Chord {
+                    key: "~",
+                    control: false,
+                    alt: false,
+                    shift: false,
+                    platform: false,
+                    function: false,
+                }],
+                actions: &[ShortcutActionStatic::UiControl {
+                    control_id: "arcadia.toggle_command_bar",
+                }],
+            },
+        ];
+        SHORTCUTS
+    }
 }
 
 crate::register_extension!(ShellExtension);

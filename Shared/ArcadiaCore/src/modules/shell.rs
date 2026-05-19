@@ -159,6 +159,58 @@ impl crate::extension::Extension for TerminalExtension {
         }];
         PAGES
     }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "shell.run",
+                title: "Shell commands",
+                description: "Spawn local subprocesses (shell.execute).",
+                default_global: false,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "shell.bridge",
+                title: "Shell bridge",
+                description: "Host/runtime bridge (shell.internal).",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
+
+    fn shortcuts(&self) -> &'static [crate::shortcuts::ShortcutDefinition] {
+        use crate::shortcuts::{
+            ShortcutActionStatic, ShortcutDefinition, ShortcutScopeStatic, ShortcutTriggerStatic,
+            ShortcutVisibility,
+        };
+        static SHORTCUTS: &[ShortcutDefinition] = &[ShortcutDefinition {
+            id: "terminal:toggle-shell-mode",
+            label: "Toggle shell execution mode (generic vs internal)",
+            owner: "terminal",
+            required_registry_module: Some(crate::config::modules::TERMINAL_MODULE_NAME),
+            scope: ShortcutScopeStatic::Pages(&["utility.shell"]),
+            visibility: ShortcutVisibility::Both,
+            priority: 90,
+            consumes: true,
+            bypass_text_focus: false,
+            system_wide: false,
+            triggers: &[ShortcutTriggerStatic::Chord {
+                key: "tab",
+                control: false,
+                alt: false,
+                shift: true,
+                platform: false,
+                function: false,
+            }],
+            actions: &[ShortcutActionStatic::UiControl {
+                control_id: "terminal.toggle_shell_mode",
+            }],
+        }];
+        SHORTCUTS
+    }
 }
 
 crate::register_extension!(TerminalExtension);
