@@ -16,8 +16,6 @@ use super::{Extension, OwnedModuleManifest};
 pub enum CollectError {
     /// Two extensions registered the same module name.
     DuplicateModule(String),
-    /// `module` declares a dependency on `missing`, which no provider supplied.
-    MissingDependency { module: String, missing: String },
     /// A dependency cycle involving these modules (sorted).
     DependencyCycle(Vec<String>),
     /// Two modules export the same `name@version` API contract.
@@ -29,9 +27,6 @@ impl std::fmt::Display for CollectError {
         match self {
             CollectError::DuplicateModule(name) => {
                 write!(f, "duplicate module '{name}'")
-            }
-            CollectError::MissingDependency { module, missing } => {
-                write!(f, "module '{module}' requires missing module '{missing}'")
             }
             CollectError::DependencyCycle(cycle) => {
                 write!(f, "dependency cycle among modules: {}", cycle.join(", "))
@@ -81,6 +76,24 @@ impl CollectedExtensions {
     pub fn module_names(&self) -> Vec<String> {
         self.extensions.iter().map(|e| e.manifest().name).collect()
     }
+
+    /// `(module, missing_dependency)` pairs where a collected module declares a
+    /// dependency that no collected module provides. Empty for a complete set.
+    /// During migration this is expected to be non-empty (deps on not-yet-migrated
+    /// modules); Phase 4 asserts it is empty once `MODULE_REGISTRY` is retired.
+    pub fn unmet_dependencies(&self) -> Vec<(String, String)> {
+        let names: BTreeSet<String> =
+            self.extensions.iter().map(|e| e.manifest().name).collect();
+        let mut unmet = Vec::new();
+        for m in self.manifests() {
+            for dep in &m.required_modules {
+                if !names.contains(dep) {
+                    unmet.push((m.name.clone(), dep.clone()));
+                }
+            }
+        }
+        unmet
+    }
 }
 
 /// Gather extensions from `providers`, validate, and dependency-order them.
@@ -96,7 +109,6 @@ pub fn collect(
         extensions.iter().map(|e| e.manifest()).collect();
 
     check_duplicates(&manifests)?;
-    check_dependencies(&manifests)?;
     check_api_exports(&manifests)?;
     let order = topo_order(&manifests)?;
 
@@ -128,21 +140,6 @@ fn check_duplicates(manifests: &[OwnedModuleManifest]) -> Result<(), CollectErro
     Ok(())
 }
 
-fn check_dependencies(manifests: &[OwnedModuleManifest]) -> Result<(), CollectError> {
-    let names: BTreeSet<&str> = manifests.iter().map(|m| m.name.as_str()).collect();
-    for m in manifests {
-        for dep in &m.required_modules {
-            if !names.contains(dep.as_str()) {
-                return Err(CollectError::MissingDependency {
-                    module: m.name.clone(),
-                    missing: dep.clone(),
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
 fn check_api_exports(manifests: &[OwnedModuleManifest]) -> Result<(), CollectError> {
     let mut owners: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for m in manifests {
@@ -161,6 +158,11 @@ fn check_api_exports(manifests: &[OwnedModuleManifest]) -> Result<(), CollectErr
 }
 
 /// Kahn's algorithm. Returns module names so each appears after its dependencies.
+///
+/// Dependencies not present in `manifests` are treated as already-satisfied — a
+/// partial extension set during migration legitimately references not-yet-migrated
+/// modules. Completeness is checked separately by
+/// [`CollectedExtensions::unmet_dependencies`].
 fn topo_order(manifests: &[OwnedModuleManifest]) -> Result<Vec<String>, CollectError> {
     let mut deps: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for m in manifests {
@@ -168,6 +170,7 @@ fn topo_order(manifests: &[OwnedModuleManifest]) -> Result<Vec<String>, CollectE
             .or_default()
             .extend(m.required_modules.iter().cloned());
     }
+    let present: BTreeSet<String> = deps.keys().cloned().collect();
 
     let mut order = Vec::with_capacity(deps.len());
     // BTreeMap iteration is sorted → deterministic output.
@@ -176,7 +179,9 @@ fn topo_order(manifests: &[OwnedModuleManifest]) -> Result<Vec<String>, CollectE
         let ready: Vec<String> = deps
             .iter()
             .filter(|(name, d)| {
-                !resolved.contains(*name) && d.iter().all(|x| resolved.contains(x))
+                !resolved.contains(*name)
+                    && d.iter()
+                        .all(|x| !present.contains(x) || resolved.contains(x))
             })
             .map(|(name, _)| name.clone())
             .collect();
@@ -271,14 +276,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_dependency() {
-        let err = run(vec![manifest("a", &["ghost"])]).unwrap_err();
+    fn tolerates_dangling_dependency_but_reports_it() {
+        // A partial migration set may depend on a not-yet-migrated module.
+        let c = run(vec![manifest("a", &["ghost"])]).expect("dangling dep must not fail collect");
         assert_eq!(
-            err,
-            CollectError::MissingDependency {
-                module: "a".to_string(),
-                missing: "ghost".to_string()
-            }
+            c.unmet_dependencies(),
+            vec![("a".to_string(), "ghost".to_string())]
         );
     }
 

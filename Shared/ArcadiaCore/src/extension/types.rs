@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use crate::modules::ExecutionContext;
+use crate::modules::{ExecutionContext, ModuleCommand};
 use crate::navigation::PageLayoutKind;
 
 /// Where an extension came from. Built-ins are always loaded; runtime modules
@@ -67,6 +67,24 @@ pub struct OwnedModuleCommand {
     pub description: String,
     pub required_permissions: Vec<String>,
     pub run: CommandHandler,
+}
+
+impl OwnedModuleCommand {
+    /// Wrap a built-in module's static [`ModuleCommand`] as an owned command.
+    /// The `run` function pointer is reused as-is — only the metadata is cloned.
+    pub fn from_static(cmd: &ModuleCommand) -> Self {
+        let run = cmd.run;
+        OwnedModuleCommand {
+            name: cmd.name.to_string(),
+            description: cmd.description.to_string(),
+            required_permissions: cmd
+                .required_permissions
+                .iter()
+                .map(|p| p.to_string())
+                .collect(),
+            run: Arc::new(move |args, ctx| run(args, ctx)),
+        }
+    }
 }
 
 /// Owned mirror of [`crate::navigation::NavigationPageDefinition`].
