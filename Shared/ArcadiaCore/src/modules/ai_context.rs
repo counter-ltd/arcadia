@@ -1,4 +1,4 @@
-use crate::modules::ai_types::AiWorkspaceContext;
+use crate::ai_types::AiWorkspaceContext;
 
 /// Extract `@path` file mentions from user message text.
 pub fn parse_file_mentions(text: &str) -> Vec<String> {

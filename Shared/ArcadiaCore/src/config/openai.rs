@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::ConfigFile;
-use crate::modules::ai_types::AiModelKind;
+use crate::ai_types::AiModelKind;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OpenAiModel {

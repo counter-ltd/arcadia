@@ -1,3 +1,4 @@
+pub mod ai_types;
 pub mod capabilities;
 pub mod config;
 pub mod extension;

@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::modules::ai_types::TextGenerationRequest;
+use crate::ai_types::TextGenerationRequest;
 
 /// A CLI AI provider detected on PATH at startup.
 #[derive(Clone, Debug)]

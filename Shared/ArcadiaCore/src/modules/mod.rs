@@ -5,7 +5,6 @@ pub mod ai_exec_cli;
 pub mod ai_sandbox;
 pub mod ai_submodules;
 pub mod ai_tools;
-pub mod ai_types;
 pub mod animation;
 pub mod code_editor;
 pub mod goto;

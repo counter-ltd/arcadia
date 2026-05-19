@@ -9,7 +9,7 @@ use arcadia_core::config::{
 };
 use arcadia_core::modules::ai_context;
 use arcadia_core::modules::ai_tools;
-use arcadia_core::modules::ai_types::TextGenerationRequest;
+use arcadia_core::ai_types::TextGenerationRequest;
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(120);
 

@@ -1,5 +1,5 @@
 use arcadia_core::modules::ai_sandbox;
-use arcadia_core::modules::ai_types::AiWorkspaceContext;
+use arcadia_core::ai_types::AiWorkspaceContext;
 use openframe::{
     div, px, rgba, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
     ParentElement, StatefulInteractiveElement, Styled,
