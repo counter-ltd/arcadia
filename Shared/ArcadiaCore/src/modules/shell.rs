@@ -137,11 +137,8 @@ impl crate::extension::Extension for TerminalExtension {
         }
     }
 
-    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
         commands()
-            .iter()
-            .map(crate::extension::OwnedModuleCommand::from_static)
-            .collect()
     }
 
     fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {

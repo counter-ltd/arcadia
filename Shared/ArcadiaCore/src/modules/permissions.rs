@@ -185,11 +185,8 @@ impl crate::extension::Extension for PermissionsExtension {
         }
     }
 
-    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
         commands()
-            .iter()
-            .map(crate::extension::OwnedModuleCommand::from_static)
-            .collect()
     }
 }
 

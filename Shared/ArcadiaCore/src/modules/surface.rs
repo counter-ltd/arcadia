@@ -319,11 +319,8 @@ impl crate::extension::Extension for SurfaceExtension {
         }
     }
 
-    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
         commands()
-            .iter()
-            .map(crate::extension::OwnedModuleCommand::from_static)
-            .collect()
     }
 
     fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {

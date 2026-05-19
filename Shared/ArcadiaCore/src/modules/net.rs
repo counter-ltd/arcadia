@@ -1,4 +1,4 @@
-use crate::extension::{Extension, OwnedModuleCommand, OwnedModuleManifest};
+use crate::extension::{Extension, OwnedModuleManifest};
 use crate::modules::{ExecutionContext, ModuleCommand};
 
 pub const NAME: &str = "net";
@@ -47,8 +47,8 @@ impl Extension for NetExtension {
         }
     }
 
-    fn commands(&self) -> Vec<OwnedModuleCommand> {
-        commands().iter().map(OwnedModuleCommand::from_static).collect()
+    fn commands(&self) -> &'static [ModuleCommand] {
+        commands()
     }
 }
 

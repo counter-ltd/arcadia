@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use opentween::{AnimationEngine, CompleteFn};
 
-use crate::extension::{Extension, OwnedModuleCommand, OwnedModuleManifest};
+use crate::extension::{Extension, OwnedModuleManifest};
 use crate::modules::{ExecutionContext, ModuleCommand};
 use crate::scheduling;
 
@@ -243,11 +243,8 @@ impl Extension for AnimationExtension {
         }
     }
 
-    fn commands(&self) -> Vec<OwnedModuleCommand> {
+    fn commands(&self) -> &'static [ModuleCommand] {
         commands()
-            .iter()
-            .map(OwnedModuleCommand::from_static)
-            .collect()
     }
 }
 

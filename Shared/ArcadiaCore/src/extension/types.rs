@@ -1,15 +1,11 @@
 //! Contribution types for the extension system.
 //!
-//! Identity (`manifest`) and commands are returned **owned** — a runtime
-//! `Modules/`-directory extension must be able to produce them. Navigation,
-//! permissions, shortcuts, and services are returned as `&'static` slices of
-//! the existing static types: only built-in modules contribute those, and
-//! runtime modules feed them through dedicated conversion paths (as the Python
-//! host already does for its pages).
-
-use std::sync::Arc;
-
-use crate::modules::{ExecutionContext, ModuleCommand};
+//! Identity (`manifest`) is returned **owned** — a runtime `Modules/`-directory
+//! extension must be able to produce it. Commands, navigation, permissions,
+//! shortcuts, and services are returned as `&'static` slices of the existing
+//! static types: only built-in modules contribute those, and runtime modules
+//! feed them through dedicated conversion paths (as the Python host already
+//! does for its commands and pages).
 
 /// Where an extension came from. Built-ins are always loaded; runtime modules
 /// follow the Python discover → stub → enable → body lifecycle.
@@ -53,38 +49,6 @@ pub struct OwnedModuleManifest {
     pub supported_platforms: Vec<String>,
     /// Named+versioned APIs this module registers into the `ApiRegistry`.
     pub api_exports: Vec<ApiContract>,
-}
-
-/// Command handler. A built-in passes a plain `fn` coerced into the `Arc`;
-/// a runtime module supplies a closure that bridges to its loaded code.
-pub type CommandHandler =
-    Arc<dyn Fn(&[&str], &ExecutionContext) -> String + Send + Sync>;
-
-/// Owned mirror of [`crate::modules::ModuleCommand`].
-#[derive(Clone)]
-pub struct OwnedModuleCommand {
-    pub name: String,
-    pub description: String,
-    pub required_permissions: Vec<String>,
-    pub run: CommandHandler,
-}
-
-impl OwnedModuleCommand {
-    /// Wrap a built-in module's static [`ModuleCommand`] as an owned command.
-    /// The `run` function pointer is reused as-is — only the metadata is cloned.
-    pub fn from_static(cmd: &ModuleCommand) -> Self {
-        let run = cmd.run;
-        OwnedModuleCommand {
-            name: cmd.name.to_string(),
-            description: cmd.description.to_string(),
-            required_permissions: cmd
-                .required_permissions
-                .iter()
-                .map(|p| p.to_string())
-                .collect(),
-            run: Arc::new(move |args, ctx| run(args, ctx)),
-        }
-    }
 }
 
 /// Navigation structure owned by the app shell — the placement lists and

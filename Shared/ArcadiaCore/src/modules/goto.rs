@@ -1,4 +1,4 @@
-use crate::extension::{Extension, OwnedModuleCommand, OwnedModuleManifest};
+use crate::extension::{Extension, OwnedModuleManifest};
 use crate::navigation;
 
 use super::{ExecutionContext, ModuleCommand};
@@ -44,8 +44,8 @@ impl Extension for GotoExtension {
         }
     }
 
-    fn commands(&self) -> Vec<OwnedModuleCommand> {
-        commands().iter().map(OwnedModuleCommand::from_static).collect()
+    fn commands(&self) -> &'static [ModuleCommand] {
+        commands()
     }
 
     fn shortcuts(&self) -> &'static [crate::shortcuts::ShortcutDefinition] {

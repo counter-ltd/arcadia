@@ -19,11 +19,12 @@ pub mod shell;
 pub mod types;
 
 pub use types::{
-    ApiContract, CommandHandler, ModuleSource, NavPlacement, OwnedIcon, OwnedModuleCommand,
-    OwnedModuleManifest, OwnedWorkspacePermissionDef,
+    ApiContract, ModuleSource, NavPlacement, OwnedIcon, OwnedModuleManifest,
+    OwnedWorkspacePermissionDef,
 };
 
 use crate::config::permissions::PermissionDefinition;
+use crate::modules::ModuleCommand;
 use crate::navigation::{NavigationGroupDefinition, NavigationPageDefinition};
 use crate::services::ServiceDefinition;
 use crate::shortcuts::ShortcutDefinition;
@@ -54,8 +55,8 @@ pub trait Extension: Send + Sync {
     }
 
     /// `module.verb` commands this extension dispatches.
-    fn commands(&self) -> Vec<OwnedModuleCommand> {
-        Vec::new()
+    fn commands(&self) -> &'static [ModuleCommand] {
+        &[]
     }
 
     /// Navigation pages this extension contributes.

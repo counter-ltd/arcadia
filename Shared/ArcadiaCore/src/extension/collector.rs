@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::provider::ExtensionProvider;
 use super::{Extension, NavPlacement, OwnedModuleManifest};
 use crate::config::permissions::PermissionDefinition;
+use crate::modules::ModuleCommand;
 use crate::navigation::{NavigationGroupDefinition, NavigationPageDefinition};
 use crate::services::ServiceDefinition;
 use crate::shortcuts::ShortcutDefinition;
@@ -89,6 +90,16 @@ impl CollectedExtensions {
     /// Module names in dependency order.
     pub fn module_names(&self) -> Vec<String> {
         self.extensions.iter().map(|e| e.manifest().name).collect()
+    }
+
+    /// `(registry module name, commands)` for every extension that exposes
+    /// commands. The dispatcher keys these by command-token namespace.
+    pub fn command_sets(&self) -> Vec<(String, &'static [ModuleCommand])> {
+        self.extensions
+            .iter()
+            .map(|e| (e.manifest().name, e.commands()))
+            .filter(|(_, cmds)| !cmds.is_empty())
+            .collect()
     }
 
     /// All navigation pages contributed across every collected extension.
