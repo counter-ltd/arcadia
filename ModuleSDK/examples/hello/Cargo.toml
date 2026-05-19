@@ -8,6 +8,9 @@ license = "MIT"
 [lib]
 crate-type = ["cdylib"]
 
+[dependencies]
+arcadia-module-sdk = { path = "../../arcadia-module-sdk" }
+
 [profile.release]
 opt-level = "s"
 lto = true

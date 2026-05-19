@@ -48,6 +48,9 @@ pub struct ExecutionContext {
     /// When set (e.g. Python extension on the stack), native command permission checks also
     /// accept matching grants on `python:<this id>` for the same permission ids.
     pub invoking_python_extension: Option<String>,
+    /// When set (a WASM module called `host_execute_command`), native command permission
+    /// checks also accept matching grants on `wasm:<this id>`.
+    pub invoking_wasm_module: Option<String>,
 }
 
 pub struct ModuleCommand {
@@ -145,6 +148,12 @@ fn ensure_command_permissions(
         if let Some(ext) = context.invoking_python_extension.as_deref() {
             let py = PermissionSubject::python(ext.to_string());
             if cfg.effective_allowed(&py, pid) {
+                continue;
+            }
+        }
+        if let Some(module) = context.invoking_wasm_module.as_deref() {
+            let wasm = PermissionSubject::wasm(module.to_string());
+            if cfg.effective_allowed(&wasm, pid) {
                 continue;
             }
         }

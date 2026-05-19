@@ -29,8 +29,11 @@ pub fn start(modules_dir: PathBuf) {
     sync_modules(&modules_dir);
 }
 
-/// Scan `modules_dir` for `.wasm` files, register each as a stub, and instantiate any that
-/// are persisted-enabled in `ModulesConfig.module_state`.
+/// Scan `modules_dir` and register each module as a stub, instantiating any that are
+/// persisted-enabled in `ModulesConfig.module_state`.
+///
+/// Two layouts are supported: a loose `Modules/<name>.wasm`, and a folder bundle
+/// `Modules/<name>/module.wasm` (with an optional sibling `Modules/<name>/Assets/`).
 pub fn sync_modules(modules_dir: &Path) {
     let entries = match std::fs::read_dir(modules_dir) {
         Ok(e) => e,
@@ -40,44 +43,61 @@ pub fn sync_modules(modules_dir: &Path) {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("wasm") {
+        let wasm_path = if path.is_dir() {
+            // Folder bundle: Modules/<name>/module.wasm
+            let candidate = path.join("module.wasm");
+            if candidate.is_file() {
+                candidate
+            } else {
+                continue;
+            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("wasm") {
+            path
+        } else {
             continue;
+        };
+        register_from_wasm(&wasm_path, cfg.as_ref());
+    }
+}
+
+/// Read one `.wasm`, register it as a stub, and instantiate it if persisted-enabled.
+fn register_from_wasm(wasm_path: &Path, cfg: Option<&ModulesConfig>) {
+    let bytes = match std::fs::read(wasm_path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("wasm-host: failed to read {}: {e}", wasm_path.display());
+            return;
         }
-        let bytes = match std::fs::read(&path) {
-            Ok(b) => b,
-            Err(e) => {
-                eprintln!("wasm-host: failed to read {}: {e}", path.display());
-                continue;
-            }
-        };
-        let manifest = match wasm_manifest::parse(&bytes) {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!("wasm-host: {} has no valid manifest: {e}", path.display());
-                continue;
-            }
-        };
-        let enabled = cfg
-            .as_ref()
-            .map(|c| c.runtime_module_enabled(&manifest.name))
-            .unwrap_or(false);
+    };
+    let manifest = match wasm_manifest::parse(&bytes) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!(
+                "wasm-host: {} has no valid manifest: {e}",
+                wasm_path.display()
+            );
+            return;
+        }
+    };
+    let enabled = cfg
+        .map(|c| c.runtime_module_enabled(&manifest.name))
+        .unwrap_or(false);
 
-        wasm_registry::register_discovered(
-            manifest.name.clone(),
-            path.clone(),
-            enabled,
-            manifest.version.clone(),
-            manifest.description.clone(),
-            manifest.required_permissions.clone(),
-            manifest.supported_platforms.clone(),
-            manifest.tags.clone(),
-            manifest.abi_version,
-        );
+    wasm_registry::register_discovered(
+        manifest.name.clone(),
+        wasm_path.to_path_buf(),
+        enabled,
+        manifest.version.clone(),
+        manifest.description.clone(),
+        manifest.required_permissions.clone(),
+        manifest.supported_platforms.clone(),
+        manifest.tags.clone(),
+        manifest.abi_version,
+    );
 
-        if enabled && !wasm_registry::module_body_loaded(&manifest.name) {
-            if let Err(e) = load_one(manifest.name.clone(), path) {
-                eprintln!("wasm-host: failed to load '{}': {e}", manifest.name);
-            }
+    if enabled && !wasm_registry::module_body_loaded(&manifest.name) {
+        if let Err(e) = load_one(manifest.name.clone(), wasm_path.to_path_buf()) {
+            eprintln!("wasm-host: failed to load '{}': {e}", manifest.name);
         }
     }
 }
@@ -88,7 +108,8 @@ pub fn load_one(stub_id: String, path: PathBuf) -> Result<String, String> {
     let bytes = std::fs::read(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
     let manifest = wasm_manifest::parse(&bytes)?;
 
-    let loaded = LoadedModule::instantiate(&bytes, &manifest.name)?;
+    let loaded =
+        LoadedModule::instantiate(&bytes, &manifest.name, &manifest.required_permissions)?;
     // Per-module Mutex: a wasmi Store is not Sync, and dispatch must be serialized per module.
     let shared = Arc::new(Mutex::new(loaded));
 

@@ -12,10 +12,14 @@ use wasmi::{Caller, Engine, Extern, Instance, Linker, Memory, Module, Store, Typ
 /// ABI version this host speaks. A module declaring a different version is rejected.
 pub const HOST_ABI_VERSION: i32 = 1;
 
-/// Per-store host state. MVP carries only the module id (for log prefixing); permission
-/// gating adds `granted_permissions` here post-MVP.
+/// Per-store host state, available to every host function via `Caller::data`.
 pub struct HostState {
     pub module_id: String,
+    /// Permissions the module declared *and* that are effectively granted to
+    /// `wasm:<module_id>`. Resolved once at instantiation. Host functions may consult
+    /// this; command dispatch through `host_execute_command` is additionally gated by
+    /// `execute_command`'s own per-command permission check.
+    pub granted_permissions: Vec<String>,
 }
 
 /// A single instantiated WASM module. Not `Sync` — callers wrap it in a `Mutex`.
@@ -29,14 +33,21 @@ pub struct LoadedModule {
 
 impl LoadedModule {
     /// Instantiate a module from its wasm bytes. Verifies the ABI version and runs the
-    /// optional `arcadia_init` export.
-    pub fn instantiate(bytes: &[u8], module_id: &str) -> Result<LoadedModule, String> {
+    /// optional `arcadia_init` export. `required_permissions` is the manifest's declared
+    /// set — each one effectively granted to `wasm:<module_id>` is recorded in `HostState`.
+    pub fn instantiate(
+        bytes: &[u8],
+        module_id: &str,
+        required_permissions: &[String],
+    ) -> Result<LoadedModule, String> {
         let engine = Engine::default();
         let module = Module::new(&engine, bytes).map_err(|e| format!("invalid wasm: {e}"))?;
+        let granted = resolve_granted_permissions(module_id, required_permissions);
         let mut store = Store::new(
             &engine,
             HostState {
                 module_id: module_id.to_string(),
+                granted_permissions: granted,
             },
         );
         let mut linker: Linker<HostState> = Linker::new(&engine);
@@ -144,7 +155,7 @@ where
         .map_err(|e| format!("module is missing required export '{name}': {e}"))
 }
 
-/// Register the `arcadia` host import module. MVP: `host_log` only.
+/// Register the `arcadia` host import module: `host_log` and `host_execute_command`.
 fn register_host_functions(linker: &mut Linker<HostState>) -> Result<(), String> {
     linker
         .func_wrap(
@@ -157,7 +168,103 @@ fn register_host_functions(linker: &mut Linker<HostState>) -> Result<(), String>
             },
         )
         .map_err(|e| format!("failed to register host_log: {e}"))?;
+
+    linker
+        .func_wrap(
+            "arcadia",
+            "host_has_permission",
+            |caller: Caller<'_, HostState>, ptr: i32, len: i32| -> i32 {
+                let perm = read_caller_str(&caller, ptr, len);
+                i32::from(
+                    caller
+                        .data()
+                        .granted_permissions
+                        .iter()
+                        .any(|p| *p == perm),
+                )
+            },
+        )
+        .map_err(|e| format!("failed to register host_has_permission: {e}"))?;
+
+    linker
+        .func_wrap(
+            "arcadia",
+            "host_execute_command",
+            |mut caller: Caller<'_, HostState>,
+             tok_ptr: i32,
+             tok_len: i32,
+             args_ptr: i32,
+             args_len: i32|
+             -> i64 {
+                let token = read_caller_str(&caller, tok_ptr, tok_len);
+                let args_json = read_caller_str(&caller, args_ptr, args_len);
+                let module_id = caller.data().module_id.clone();
+                let result = host_execute_command(&module_id, &token, &args_json);
+                write_caller_str(&mut caller, &result)
+            },
+        )
+        .map_err(|e| format!("failed to register host_execute_command: {e}"))?;
     Ok(())
+}
+
+/// Resolve which of a module's declared permissions are effectively granted to
+/// `wasm:<module_id>`. Done once at instantiation.
+fn resolve_granted_permissions(module_id: &str, declared: &[String]) -> Vec<String> {
+    use arcadia_core::config::permissions::{PermissionSubject, PermissionsConfig};
+    use arcadia_core::config::ConfigFile;
+
+    let Ok(cfg) = PermissionsConfig::load_or_create() else {
+        return Vec::new();
+    };
+    let subject = PermissionSubject::wasm(module_id.to_string());
+    declared
+        .iter()
+        .filter(|p| cfg.effective_allowed(&subject, p))
+        .cloned()
+        .collect()
+}
+
+/// Re-enter Arcadia's command dispatch on behalf of a WASM module. `args_json` is the
+/// JSON string array the module passed; the result is the command output or an error
+/// string. The `invoking_wasm_module` context lets nested permission checks accept
+/// grants on `wasm:<module_id>`.
+fn host_execute_command(module_id: &str, token: &str, args_json: &str) -> String {
+    use arcadia_core::modules::{execute_command, ExecutionContext};
+
+    let args: Vec<String> = serde_json::from_str(args_json).unwrap_or_default();
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    let ctx = ExecutionContext {
+        invoking_wasm_module: Some(module_id.to_string()),
+        ..ExecutionContext::default()
+    };
+    match execute_command(token, &arg_refs, &ctx) {
+        Ok(Some(s)) => s,
+        Ok(None) => format!("error: unknown command '{token}'"),
+        Err(e) => format!("error: {e}"),
+    }
+}
+
+/// Allocate guest memory via `arcadia_alloc`, copy `s` into it, and return the packed
+/// `(ptr << 32) | len` the guest unpacks. Returns 0 on any failure.
+fn write_caller_str(caller: &mut Caller<'_, HostState>, s: &str) -> i64 {
+    let bytes = s.as_bytes();
+    let len = bytes.len() as i32;
+    let Some(Extern::Func(alloc)) = caller.get_export("arcadia_alloc") else {
+        return 0;
+    };
+    let Ok(alloc) = alloc.typed::<i32, i32>(&*caller) else {
+        return 0;
+    };
+    let Ok(ptr) = alloc.call(&mut *caller, len) else {
+        return 0;
+    };
+    let Some(Extern::Memory(mem)) = caller.get_export("memory") else {
+        return 0;
+    };
+    if mem.write(&mut *caller, ptr as usize, bytes).is_err() {
+        return 0;
+    }
+    ((ptr as i64) << 32) | (len as i64)
 }
 
 /// Read a guest string during a host-function call.

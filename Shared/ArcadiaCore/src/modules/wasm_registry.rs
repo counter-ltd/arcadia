@@ -72,6 +72,15 @@ fn registry() -> &'static Mutex<WasmRegistry> {
     REGISTRY.get_or_init(|| Mutex::new(WasmRegistry::new()))
 }
 
+thread_local! {
+    /// Module ids currently mid-dispatch on this thread. A module re-entering its own
+    /// dispatch (via `host_execute_command`) would deadlock its per-module `Mutex`, so
+    /// same-module recursion is rejected. Cross-module chains (A→B→A) are allowed —
+    /// distinct ids, distinct `Mutex`es.
+    static DISPATCH_STACK: std::cell::RefCell<Vec<String>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
 /// Pre-register a module discovered on disk before it has been instantiated. The host calls
 /// this for every `.wasm` it finds (manifest read from the `arcadia.manifest` custom section)
 /// so the settings page can list and toggle modules without instantiating them.
@@ -185,6 +194,52 @@ pub fn module_path(name: &str) -> Option<PathBuf> {
         .iter()
         .find(|m| m.name == name)
         .and_then(|m| m.path.clone())
+}
+
+/// Bundle root for a module: the directory containing its `.wasm`. For a folder bundle
+/// (`Modules/<name>/module.wasm`) this is `Modules/<name>`; for a loose `.wasm` it is
+/// `Modules/` itself. Mirrors `python_registry::extension_bundle_root`.
+pub fn module_bundle_root(name: &str) -> Option<PathBuf> {
+    module_path(name)?.parent().map(|p| p.to_path_buf())
+}
+
+/// Asset directory for a module: `<bundle_root>/Assets`.
+pub fn module_assets_dir(name: &str) -> Option<PathBuf> {
+    Some(module_bundle_root(name)?.join("Assets"))
+}
+
+fn validate_asset_relative(relative: &str) -> Result<(), String> {
+    use std::path::{Component, Path};
+    let s = relative.trim();
+    if s.is_empty() {
+        return Err("empty relative asset path".into());
+    }
+    let p = Path::new(s);
+    if p.is_absolute() {
+        return Err("absolute asset paths are not allowed".into());
+    }
+    for c in p.components() {
+        match c {
+            Component::Normal(os) => {
+                if os.to_str().is_none() {
+                    return Err("asset path must be UTF-8".into());
+                }
+            }
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err("invalid asset path".into());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Resolve a safe relative path (no `..`, not absolute) under a module's `Assets/` dir.
+pub fn resolve_module_asset_path(name: &str, relative_under_assets: &str) -> Result<PathBuf, String> {
+    validate_asset_relative(relative_under_assets)?;
+    let base = module_assets_dir(name)
+        .ok_or_else(|| format!("no on-disk path for WASM module '{name}'"))?;
+    Ok(base.join(relative_under_assets.trim_start_matches(['/', '\\'])))
 }
 
 /// Forget the command closures contributed by a module — used on disable so stale handlers
@@ -338,8 +393,30 @@ pub fn try_dispatch(token: &str, args: &[&str]) -> Result<Option<String>, String
         }
     }
 
+    // Re-entrancy guard — see DISPATCH_STACK.
+    let already_dispatching = DISPATCH_STACK.with(|stack| {
+        let mut stack = stack.borrow_mut();
+        if stack.iter().any(|m| m == module_id) {
+            true
+        } else {
+            stack.push(module_id.to_string());
+            false
+        }
+    });
+    if already_dispatching {
+        return Err(format!(
+            "WASM module '{module_id}' tried to call one of its own commands \
+             (same-module recursion is not allowed)"
+        ));
+    }
+
     let args_vec: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-    Ok(Some(handler(args_vec)))
+    let result = handler(args_vec);
+
+    DISPATCH_STACK.with(|stack| {
+        stack.borrow_mut().pop();
+    });
+    Ok(Some(result))
 }
 
 /// Drop all registry state — used by `reload` before a rescan.
