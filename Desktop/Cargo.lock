@@ -110,6 +110,7 @@ dependencies = [
 name = "arcadia-core"
 version = "0.1.0"
 dependencies = [
+ "inventory",
  "notify-rust",
  "serde",
  "serde_json",

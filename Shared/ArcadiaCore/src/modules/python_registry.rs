@@ -1064,6 +1064,7 @@ mod extension_asset_path_tests {
             false,
             vec![],
             vec![],
+            vec![],
         );
         assert_eq!(
             extension_bundle_root("asset-test-a").unwrap(),
@@ -1088,6 +1089,7 @@ mod extension_asset_path_tests {
             false,
             vec![],
             vec![],
+            vec![],
         );
         assert_eq!(
             extension_assets_dir("asset-test-b").unwrap(),
@@ -1102,6 +1104,7 @@ mod extension_asset_path_tests {
             "asset-test-c".into(),
             PathBuf::from("/fake/Arcadia/Extensions/z/main.py"),
             false,
+            vec![],
             vec![],
             vec![],
         );

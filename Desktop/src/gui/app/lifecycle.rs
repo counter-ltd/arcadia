@@ -36,8 +36,10 @@ use openframe::{point, px, Context, RenderStyle, Rgba, Timer, UpdateGlobal, Wind
 #[cfg(feature = "gui")]
 use super::super::tui;
 use super::ArcadiaRoot;
+#[cfg(feature = "gui-any")]
+use super::{AiUiState, CodeEditorTab, CodeEditorUiState, LateUiState, VisualEditorTab, VisualEditorUiState};
 #[cfg(feature = "gui")]
-use super::{AiUiState, CodeEditorTab, CodeEditorUiState, LateUiState, ShellMode, TerminalInstance, VisualEditorTab, VisualEditorUiState};
+use super::{ShellMode, TerminalInstance};
 
 /// Merge author-declared tags with auto-derived platform display tags.
 /// Platform strings from `supported_platforms` become human-readable chips ("macOS", "Linux", …)

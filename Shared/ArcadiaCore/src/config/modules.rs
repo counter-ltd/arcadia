@@ -461,6 +461,12 @@ pub struct ModulesConfig {
     /// permission prompts do not fire) until the user opts in.
     #[serde(default)]
     pub extension_state: BTreeMap<String, bool>,
+    /// Persistent enable state for runtime modules discovered under `~/Arcadia/Modules/`.
+    /// Parallels [`extension_state`](Self::extension_state) for the Rust-extension system.
+    /// Keyed by module name. Defaults to `false` — like Python extensions, a runtime
+    /// module's body does not run until the user explicitly opts in.
+    #[serde(default)]
+    pub module_state: BTreeMap<String, bool>,
 }
 
 fn required_modules(module_name: &str) -> &'static [&'static str] {
@@ -491,6 +497,7 @@ impl Default for ModulesConfig {
         Self {
             modules,
             extension_state: BTreeMap::new(),
+            module_state: BTreeMap::new(),
         }
     }
 }
@@ -572,6 +579,23 @@ impl ModulesConfig {
         }
         self.extension_state
             .insert(extension_id.to_string(), enabled);
+    }
+
+    /// Persistent enable state for a runtime module loaded from `~/Arcadia/Modules/`.
+    /// Unknown names resolve to `false` — newly-discovered modules start disabled
+    /// until the user opts in (mirrors [`python_extension_enabled`](Self::python_extension_enabled)).
+    pub fn runtime_module_enabled(&self, module_name: &str) -> bool {
+        self.module_state
+            .get(module_name)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub fn set_runtime_module_enabled(&mut self, module_name: &str, enabled: bool) {
+        if module_name.is_empty() {
+            return;
+        }
+        self.module_state.insert(module_name.to_string(), enabled);
     }
 
     pub fn set_module_state(&mut self, module_name: &str, enabled: bool) -> Result<(), String> {
@@ -789,6 +813,7 @@ mod tests {
                 m
             },
             extension_state: std::collections::BTreeMap::new(),
+            module_state: std::collections::BTreeMap::new(),
         };
         let changed = cfg.merge_defaults();
         assert!(changed);
@@ -801,6 +826,7 @@ mod tests {
         let mut cfg = ModulesConfig {
             modules: std::collections::BTreeMap::new(),
             extension_state: std::collections::BTreeMap::new(),
+            module_state: std::collections::BTreeMap::new(),
         };
         let changed = cfg.merge_defaults();
         assert!(changed);
