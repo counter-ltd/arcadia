@@ -294,3 +294,37 @@ mod tests {
         assert!(rows.iter().any(|(n, e)| n == "shell" && *e));
     }
 }
+
+#[derive(Default)]
+pub struct SurfaceExtension;
+
+impl crate::extension::Extension for SurfaceExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "surface".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Generic UI snapshot (surface.snapshot) and patches (surface.patch); extend patches for new surfaces."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec![
+                "surface.read".to_string(),
+                "surface.control".to_string(),
+            ],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(SurfaceExtension);

@@ -199,3 +199,34 @@ fn timestamp_now() -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or(0)
 }
+
+#[derive(Default)]
+pub struct NotificationExtension;
+
+impl crate::extension::Extension for NotificationExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "notification".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "In-app notification centre. Modules and extensions can post alerts; each source requires an explicit notifications.send grant."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(NotificationExtension);

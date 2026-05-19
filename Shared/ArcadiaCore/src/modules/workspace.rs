@@ -159,3 +159,54 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+#[derive(Default)]
+pub struct WorkspaceExtension;
+
+impl crate::extension::Extension for WorkspaceExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        use crate::extension::OwnedWorkspacePermissionDef;
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "workspaces".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Workspace directory registry with scoped file and execution permissions."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: vec![
+                OwnedWorkspacePermissionDef {
+                    id: "workspace.read".to_string(),
+                    title: "File read".to_string(),
+                    description: "Read files within this workspace.".to_string(),
+                    default_granted: true,
+                },
+                OwnedWorkspacePermissionDef {
+                    id: "workspace.write".to_string(),
+                    title: "File write".to_string(),
+                    description: "Create, modify, and delete files.".to_string(),
+                    default_granted: false,
+                },
+                OwnedWorkspacePermissionDef {
+                    id: "workspace.execute".to_string(),
+                    title: "Command execution".to_string(),
+                    description: "Run commands scoped to this workspace.".to_string(),
+                    default_granted: false,
+                },
+            ],
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(WorkspaceExtension);

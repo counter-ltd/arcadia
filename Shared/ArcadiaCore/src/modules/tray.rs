@@ -457,3 +457,38 @@ mod tests {
         assert!(get_item(&id).is_none());
     }
 }
+
+#[derive(Default)]
+pub struct TrayExtension;
+
+impl crate::extension::Extension for TrayExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "tray".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Menu-bar (macOS) and system-tray (Windows/Linux) icons with dynamic images and menus."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["tray.create".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: vec![
+                crate::platform::PLATFORM_MACOS.to_string(),
+                crate::platform::PLATFORM_WINDOWS.to_string(),
+                crate::platform::PLATFORM_LINUX.to_string(),
+            ],
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(TrayExtension);

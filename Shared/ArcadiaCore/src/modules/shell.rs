@@ -114,3 +114,35 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+/// Interactive terminal module. Registry name is `terminal`; its commands
+/// dispatch under the `shell.` prefix.
+#[derive(Default)]
+pub struct TerminalExtension;
+
+impl crate::extension::Extension for TerminalExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: crate::config::modules::TERMINAL_MODULE_NAME.to_string(),
+            glyph: "terminal".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Interactive terminal command execution for Arcadia surfaces."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["shell.run".to_string(), "shell.bridge".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(TerminalExtension);

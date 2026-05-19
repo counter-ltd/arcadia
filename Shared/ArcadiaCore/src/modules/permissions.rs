@@ -164,3 +164,33 @@ pub fn list_unknown_permission_ids(ids: &[&str]) -> Vec<String> {
         .map(str::to_string)
         .collect()
 }
+
+#[derive(Default)]
+pub struct PermissionsExtension;
+
+impl crate::extension::Extension for PermissionsExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "permissions".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Permission catalog, grants, and headless permit/list commands."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(PermissionsExtension);

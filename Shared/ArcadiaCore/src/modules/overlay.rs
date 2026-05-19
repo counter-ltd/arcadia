@@ -224,3 +224,38 @@ mod tests {
         );
     }
 }
+
+#[derive(Default)]
+pub struct OverlayExtension;
+
+impl crate::extension::Extension for OverlayExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "overlay".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Single always-on-top transparent HUD window for overlays (pointer pass-through v1)."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["overlay.hud".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: vec![
+                crate::platform::PLATFORM_MACOS.to_string(),
+                crate::platform::PLATFORM_WINDOWS.to_string(),
+                crate::platform::PLATFORM_LINUX.to_string(),
+            ],
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> Vec<crate::extension::OwnedModuleCommand> {
+        commands()
+            .iter()
+            .map(crate::extension::OwnedModuleCommand::from_static)
+            .collect()
+    }
+}
+
+crate::register_extension!(OverlayExtension);
