@@ -1,5 +1,17 @@
 Arcadia Community License (ACL) v1.6
-Copyright (c) 2026 stackno.de
+Copyright (c) 2026 anti.ltd
+
+Canonical Version
+
+The copy of this license distributed inside any project may be outdated.
+The authoritative, source-of-truth version of this license is maintained
+at:
+
+  https://github.com/anti-limited/licenses
+
+If you are reading a bundled copy, consult the repository above for the
+current text. Prior versions remain valid for distributions made under
+them — see "Reservation of Rights".
 
 Preamble
 
@@ -178,7 +190,7 @@ of the Software:
 1. Attribution
 
    You must preserve this license and retain appropriate attribution to
-   the original Arcadia project and stackno.de in all substantial
+   the original Arcadia project and anti.ltd in all substantial
    redistributions of the Software.
 
    Attribution must be:
@@ -258,7 +270,7 @@ of the Software:
    behalf of a Large Corporation, constitutes willful infringement and
    will be pursued to the fullest extent available under applicable law.
 
-   To request permission: whitehouse@stackno.de
+   To request permission: contact@counter.ltd or contact@anti.ltd
 
 4. Commercial Use and Profit Restriction
 
@@ -831,8 +843,9 @@ Contact and Permissions
 For permission requests, special license negotiations, or any other
 matter requiring direct contact:
 
-  whitehouse@stackno.de
-  https://stackno.de
+  contact@counter.ltd
+  contact@anti.ltd
+  https://anti.ltd
 
 Responses are not guaranteed within any specific timeframe. The copyright
 holder reserves the right to decline any request without explanation.
