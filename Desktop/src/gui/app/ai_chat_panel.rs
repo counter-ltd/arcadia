@@ -9,7 +9,7 @@ use arcadia_core::config::ollama::OllamaConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::ai::is_ai_provider_available;
 use arcadia_core::modules::ai_exec_cli::cli_for_module;
-use arcadia_core::modules::ai_types::{AiWorkspaceContext, TextGenerationRequest};
+use arcadia_core::ai_types::{AiWorkspaceContext, TextGenerationRequest};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
     div, px, rgb, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,

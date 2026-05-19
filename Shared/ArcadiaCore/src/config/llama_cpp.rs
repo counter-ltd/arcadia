@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::ConfigFile;
-use crate::modules::ai_types::AiModelKind;
+use crate::ai_types::AiModelKind;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

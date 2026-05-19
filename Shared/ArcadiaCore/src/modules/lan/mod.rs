@@ -185,3 +185,103 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+#[derive(Default)]
+pub struct LanExtension;
+
+impl crate::extension::Extension for LanExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "network".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Local network discovery and peer communication.".to_string(),
+            accent: String::new(),
+            required_modules: vec![crate::config::modules::NET_MODULE_NAME.to_string()],
+            required_permissions: vec!["network.lan".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn services(&self) -> &'static [crate::services::ServiceDefinition] {
+        LAN_SERVICES
+    }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "network.nodes",
+            title: "Nodes",
+            description: "Discover LAN peers and manage pairing with lan.scan / lan.node.",
+            glyph: "nodes",
+            system_image: "wifi",
+            accent: "cyan",
+            required_module: Some(NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "network.lan",
+            title: "LAN access",
+            description: "Discovery, peer I/O, and LAN module commands (multicast, pairing, etc.).",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
+}
+
+crate::register_extension!(LanExtension);
+
+// ─── Service registration ───────────────────────────────────────────────────
+
+fn svc_status() -> crate::services::ServiceRuntimeStatus {
+    let info = lan_service_info();
+    let detail = if info.running {
+        format!("UDP :{} · {}", info.port, info.hostname)
+    } else {
+        format!("UDP :{} · stopped", info.port)
+    };
+    crate::services::ServiceRuntimeStatus {
+        running: Some(info.running),
+        detail,
+    }
+}
+
+fn svc_start() -> Result<(), String> {
+    start_service()
+}
+
+fn svc_stop() {
+    stop_service();
+}
+
+/// LAN discovery service, advertised on the Services page.
+static LAN_SERVICES: &[crate::services::ServiceDefinition] =
+    &[crate::services::ServiceDefinition {
+        id: "lan.discovery",
+        page_id: "utility.services",
+        title: "LAN Discovery",
+        description: "Auto-advertises this node and discovers Arcadia peers on UDP broadcast.",
+        required_module: NAME,
+        glyph: "nodes",
+        system_image: "wifi",
+        accent: "cyan",
+        controls: crate::services::ServiceControls {
+            status_detail: Some(svc_status),
+            start: Some(svc_start),
+            stop: Some(svc_stop),
+            port_for_collision: Some(|| lan_service_info().port),
+        },
+    }];

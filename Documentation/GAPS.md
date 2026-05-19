@@ -29,6 +29,32 @@ Multi-writer LWW on `modules.toml`, discrete LAN transport, attribution-only `cl
 
 ---
 
+## WASM module loader
+
+The dynamic WASM module loader (`Modules/` directory, branch
+`development-modularity-loader`) is **feature-complete**:
+
+- **SDK** — `ModuleSDK/arcadia-module-sdk`: a `register_module!` macro emits the whole
+  host/guest ABI. Authoring guide in `ModuleSDK/README.md`.
+- **Host callbacks** — `host_execute_command` (re-enters Arcadia dispatch),
+  `host_has_permission`. `ExecutionContext::invoking_wasm_module` carries `wasm:<id>` for
+  nested permission checks. A thread-local dispatch stack rejects same-module recursion.
+- **Permission gating** — `HostState.granted_permissions` resolved at instantiation;
+  GUI first-enable permission modal.
+- **Folder bundles** — loose `Modules/<name>.wasm` and `Modules/<name>/module.wasm` +
+  `Assets/`; per-module GUI icons via the `module-icon/<name>` asset prefix.
+- **GUI** — `wasm-modules.settings` page (search, toggles, modal); host starts from the
+  GUI lifecycle.
+- **iOS** — `wasm-modules` in `ios-gui`; `wasmi` staticlib builds for `aarch64-apple-ios`.
+- **Tests** — `arcadia-wasm` (instantiate / dispatch / ABI-mismatch / memory-ABI
+  hardening), `wasm_registry` (lifecycle + recursion guard), `wasm_manifest`.
+
+Remaining: **iOS on-device dispatch** is verified on desktop only — a simulator/device
+run is a manual follow-up. Per-module dispatch is serialized (per-module `Mutex` around
+the non-`Sync` `wasmi` Store) — an accepted tradeoff, not a defect.
+
+---
+
 ## Contributing
 
 When extending mirrored host state, keep **`surface.*`** as the protocol surface (`SurfaceSnapshot.extra`, `SurfacePatch`). Follow **`CLAUDE.md`** registry-driven rules.

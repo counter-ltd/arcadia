@@ -1,5 +1,7 @@
+pub mod ai_types;
 pub mod capabilities;
 pub mod config;
+pub mod extension;
 pub mod modules;
 pub mod navigation;
 pub mod platform;

@@ -224,3 +224,56 @@ mod tests {
         );
     }
 }
+
+#[derive(Default)]
+pub struct OverlayExtension;
+
+impl crate::extension::Extension for OverlayExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "overlay".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Single always-on-top transparent HUD window for overlays (pointer pass-through v1)."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["overlay.hud".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: vec![
+                crate::platform::PLATFORM_MACOS.to_string(),
+                crate::platform::PLATFORM_WINDOWS.to_string(),
+                crate::platform::PLATFORM_LINUX.to_string(),
+            ],
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "overlay.hud",
+                title: "HUD overlay window",
+                description: "Create and control the shared always-on-top transparent overlay window (non-interactive / pass-through in v1).",
+                default_global: false,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "overlay.system_ui",
+                title: "Overlay system-UI tier",
+                description: "Allow overlay.set-stacking system_ui (higher stacking tier; best-effort per OS).",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
+}
+
+crate::register_extension!(OverlayExtension);

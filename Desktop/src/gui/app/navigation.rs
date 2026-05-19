@@ -198,7 +198,7 @@ impl ArcadiaRoot {
                 .settings_hub_page_ids_effective()
                 .iter()
                 .any(|p| *p == active.as_str());
-        for &pill_id in navigation::TOP_BAR_PAGE_IDS {
+        for &pill_id in navigation::TOP_BAR_PAGE_IDS.iter() {
             let should_expand = on_settings || active.as_str() == pill_id;
             let current = self.pill_expanded.get(pill_id).copied().unwrap_or(false);
             if should_expand != current {
@@ -229,7 +229,7 @@ impl ArcadiaRoot {
                 if self.remote_navigation_required() {
                     "__thin.nav_waiting__"
                 } else {
-                    navigation::DEFAULT_PAGE_ID
+                    *navigation::DEFAULT_PAGE_ID
                 }
             })
     }
@@ -332,6 +332,10 @@ impl ArcadiaRoot {
                     ),
                     "extensions.settings" => Some(
                         self.python_settings_panel(window, cx, is_dark)
+                            .into_any_element(),
+                    ),
+                    "wasm-modules.settings" => Some(
+                        self.wasm_settings_panel(window, cx, is_dark)
                             .into_any_element(),
                     ),
                     "global.appearance" => Some(

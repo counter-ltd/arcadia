@@ -294,3 +294,55 @@ mod tests {
         assert!(rows.iter().any(|(n, e)| n == "shell" && *e));
     }
 }
+
+#[derive(Default)]
+pub struct SurfaceExtension;
+
+impl crate::extension::Extension for SurfaceExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "surface".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Generic UI snapshot (surface.snapshot) and patches (surface.patch); extend patches for new surfaces."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec![
+                "surface.read".to_string(),
+                "surface.control".to_string(),
+            ],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "surface.read",
+                title: "Surface read",
+                description: "Read UI mirror state (surface.snapshot, surface.revision).",
+                default_global: true,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "surface.control",
+                title: "Surface control",
+                description: "Mutate mirrored UI / module toggles (surface.patch).",
+                default_global: true,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
+}
+
+crate::register_extension!(SurfaceExtension);

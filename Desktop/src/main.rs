@@ -32,6 +32,29 @@ fn main() {
         }
     }
 
+    // WASM module host — desktop-first, headless path only for now. The GUI start path
+    // (lifecycle.rs, paralleling the Python host) is a post-MVP follow-up.
+    #[cfg(all(feature = "wasm-modules", not(feature = "gui")))]
+    {
+        use arcadia_core::config::modules::WASM_HOST_MODULE_NAME;
+        use arcadia_core::config::{modules::ModulesConfig, ConfigFile};
+        let wasm_host_on = ModulesConfig::load_or_create()
+            .map(|cfg| {
+                cfg.modules
+                    .get(WASM_HOST_MODULE_NAME)
+                    .copied()
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+        if wasm_host_on {
+            let mod_dir = arcadia_core::config::config_root_dir()
+                .ok()
+                .and_then(|d| d.parent().map(|p| p.join("Modules")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Modules"));
+            arcadia_wasm::start(mod_dir);
+        }
+    }
+
     #[cfg(feature = "gui")]
     {
         gui::run();

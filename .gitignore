@@ -5,6 +5,7 @@ build/
 **/*.rs.bk
 /Models/
 /Configuration/
+/Modules/
 /Mobile/iOS/.xcode/
 **/xcuserdata/
 .DS_Store

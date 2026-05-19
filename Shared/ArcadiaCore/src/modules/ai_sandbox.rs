@@ -1,4 +1,4 @@
-use crate::modules::ai_types::AiWorkspaceContext;
+use crate::ai_types::AiWorkspaceContext;
 
 pub enum SandboxOp<'a> {
     Read(&'a str),

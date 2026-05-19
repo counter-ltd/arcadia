@@ -1336,3 +1336,82 @@ fn cmd_login(args: &[&str], _ctx: &ExecutionContext) -> String {
         Err(e) => format!("error: token received but failed to save late.toml: {e}"),
     }
 }
+
+#[derive(Default)]
+pub struct LateExtension;
+
+impl crate::extension::Extension for LateExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "coffee".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Real-time chat rooms, music stream, reactions, and social features."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["late.outbound".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[
+            NavigationPageDefinition {
+                id: "late.now_playing",
+                title: "Social",
+                description: "Live chat, now playing, votes, visualizer, and bonsai in one view.",
+                glyph: "coffee",
+                system_image: "cup.and.saucer.fill",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::FullHeight,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "late.experimental",
+                title: "Experimental",
+                description: "Profile, notifications, RSS, articles, showcase, games, artboard, work profiles, DMs, and chips.",
+                glyph: "flask",
+                system_image: "flask.fill",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "late.settings",
+                title: "Social Settings",
+                description: "Configure server URL, credentials, and connection preferences.",
+                glyph: "coffee",
+                system_image: "cup.and.saucer.fill",
+                accent: "violet",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+        ];
+        PAGES
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "late.outbound",
+            title: "Late.sh network",
+            description: "Connect and interact with late.sh (WebSocket, credentials, chat).",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
+}
+
+crate::register_extension!(LateExtension);

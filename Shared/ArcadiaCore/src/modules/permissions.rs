@@ -22,7 +22,7 @@ fn list_cmd(_args: &[&str], _ctx: &ExecutionContext) -> String {
     };
     let mut lines = Vec::new();
     lines.push("permissions (catalog):".to_string());
-    for p in PERMISSION_REGISTRY {
+    for p in PERMISSION_REGISTRY.iter() {
         lines.push(format!(
             "  {} — {} [default_global={}]",
             p.id, p.title, p.default_global
@@ -30,7 +30,7 @@ fn list_cmd(_args: &[&str], _ctx: &ExecutionContext) -> String {
     }
     lines.push(String::new());
     lines.push("globals (effective):".to_string());
-    for p in PERMISSION_REGISTRY {
+    for p in PERMISSION_REGISTRY.iter() {
         let on = cfg.global_allowed(p.id);
         lines.push(format!("  {} = {on}", p.id));
     }
@@ -164,3 +164,30 @@ pub fn list_unknown_permission_ids(ids: &[&str]) -> Vec<String> {
         .map(str::to_string)
         .collect()
 }
+
+#[derive(Default)]
+pub struct PermissionsExtension;
+
+impl crate::extension::Extension for PermissionsExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "permissions".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Permission catalog, grants, and headless permit/list commands."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+}
+
+crate::register_extension!(PermissionsExtension);

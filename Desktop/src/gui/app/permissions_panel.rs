@@ -139,7 +139,7 @@ impl ArcadiaRoot {
 
         // ── Global permissions ──────────────────────────────────────────────
         let mut global_children: Vec<AnyElement> = Vec::new();
-        for def in PERMISSION_REGISTRY {
+        for def in PERMISSION_REGISTRY.iter() {
             if !list_panel_row_matches(&q, def.id, &[def.title, def.description]) {
                 continue;
             }

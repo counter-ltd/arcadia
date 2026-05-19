@@ -35,7 +35,7 @@ impl ArcadiaRoot {
             .collect();
 
         let mut perm_rows: Vec<AnyElement> = Vec::new();
-        for manifest in MODULE_REGISTRY {
+        for manifest in MODULE_REGISTRY.iter() {
             if manifest.workspace_permissions.is_empty() {
                 continue;
             }

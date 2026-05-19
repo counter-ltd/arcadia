@@ -43,6 +43,16 @@ impl AssetSource for EmbeddedAssets {
                 Err(_) => Ok(None),
             };
         }
+        if let Some(module_id) = path.strip_prefix("module-icon/") {
+            use arcadia_core::modules::wasm_registry;
+            return match wasm_registry::resolve_module_asset_path(module_id, "icon.svg") {
+                Ok(p) => match std::fs::read(&p) {
+                    Ok(bytes) => Ok(Some(Cow::Owned(bytes))),
+                    Err(_) => Ok(None),
+                },
+                Err(_) => Ok(None),
+            };
+        }
         Ok(ASSETS.get_file(path).map(|f| Cow::Borrowed(f.contents())))
     }
 

@@ -457,3 +457,47 @@ mod tests {
         assert!(get_item(&id).is_none());
     }
 }
+
+#[derive(Default)]
+pub struct TrayExtension;
+
+impl crate::extension::Extension for TrayExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "tray".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Menu-bar (macOS) and system-tray (Windows/Linux) icons with dynamic images and menus."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["tray.create".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: vec![
+                crate::platform::PLATFORM_MACOS.to_string(),
+                crate::platform::PLATFORM_WINDOWS.to_string(),
+                crate::platform::PLATFORM_LINUX.to_string(),
+            ],
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[PermissionDefinition {
+            id: "tray.create",
+            title: "Tray / menu-bar icons",
+            description: "Create and update menu-bar (macOS) or system-tray (Windows/Linux) icons.",
+            default_global: false,
+            system_grant: None,
+        }];
+        PERMS
+    }
+}
+
+crate::register_extension!(TrayExtension);

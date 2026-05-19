@@ -7,11 +7,12 @@ license = "MIT"
 
 [features]
 default = ["headless"]
-headless = []
+headless = ["wasm-modules"]
 gui-any = ["dep:openframe", "dep:image"]
-gui     = ["gui-any", "dep:libc", "dep:portable-pty", "dep:vt100", "dep:global-hotkey", "dep:tray-icon", "dep:device_query", "dep:display-info", "python-extensions", "llama-cpp"]
-ios-gui = ["gui-any"]
+gui     = ["gui-any", "dep:libc", "dep:portable-pty", "dep:vt100", "dep:global-hotkey", "dep:tray-icon", "dep:device_query", "dep:display-info", "python-extensions", "llama-cpp", "wasm-modules"]
+ios-gui = ["gui-any", "wasm-modules"]
 python-extensions = ["dep:arcadia-python"]
+wasm-modules = ["dep:arcadia-wasm"]
 llama-cpp = ["dep:llama-cpp-2"]
 
 [[bin]]
@@ -26,6 +27,7 @@ path = "src/ios_lib.rs"
 [dependencies]
 arcadia-core     = { path = "../Shared/ArcadiaCore" }
 arcadia-python   = { path = "../Shared/ArcadiaPython", optional = true }
+arcadia-wasm     = { path = "../Shared/ArcadiaWasm", optional = true }
 serde_json       = "1"
 openframe        = { path = "../Libraries/OpenFrame", optional = true }
 image            = { version = "0.25.1", optional = true }

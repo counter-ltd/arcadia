@@ -204,3 +204,71 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+#[derive(Default)]
+pub struct PythonHostExtension;
+
+impl crate::extension::Extension for PythonHostExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "python".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "Python extension loader. Scans ~/Arcadia/Extensions/ for .py files and registers their commands."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec![
+                "python.host".to_string(),
+                "python.extension_toggle".to_string(),
+            ],
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[NavigationPageDefinition {
+            id: "extensions.settings",
+            title: "Extensions",
+            description: "Enable or disable Python extensions loaded from ~/Arcadia/Extensions/.",
+            glyph: "extensions",
+            system_image: "flask.fill",
+            accent: "indigo",
+            required_module: Some(NAME),
+            layout_kind: PageLayoutKind::Standard,
+            blocks_platform_goto: false,
+        }];
+        PAGES
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "python.host",
+                title: "Python host",
+                description: "Load or reload extensions from disk (python-host.reload).",
+                default_global: false,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "python.extension_toggle",
+                title: "Extension enable",
+                description: "Enable or disable Python extensions.",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
+}
+
+crate::register_extension!(PythonHostExtension);

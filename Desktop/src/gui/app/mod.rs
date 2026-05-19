@@ -30,6 +30,7 @@ mod notification_panel;
 mod notification_settings_panel;
 mod permissions_panel;
 mod python_settings;
+mod wasm_settings;
 mod root;
 mod services;
 #[cfg(feature = "gui")]
@@ -391,6 +392,10 @@ pub enum PendingPermissionGrant {
         extension: String,
         missing: Vec<String>,
     },
+    WasmModule {
+        module: String,
+        missing: Vec<String>,
+    },
 }
 
 pub struct CodeEditorUiState {
@@ -607,6 +612,17 @@ pub struct ArcadiaRoot {
     /// the next toggle attempt so the panel can show "couldn't load: …" inline instead of
     /// swallowing the result of `python-host.extension-enable`.
     pub python_extension_action_error: Option<String>,
+    /// (name, version, description, enabled, perms, platforms, tags, loaded) — refreshed
+    /// after the WASM host loads modules.
+    pub wasm_module_rows:
+        Vec<(String, String, String, bool, Vec<String>, Vec<String>, Vec<String>, bool)>,
+    /// Set once `arcadia_wasm::start` has been called.
+    pub wasm_host_started: bool,
+    /// UI-only filter for the WASM Modules settings page.
+    pub wasm_search_query: String,
+    pub wasm_search_focus: FocusHandle,
+    /// Most recent error surfaced by a WASM module toggle. Cleared on the next attempt.
+    pub wasm_action_error: Option<String>,
     #[cfg(feature = "gui")]
     pub terminals: Vec<TerminalInstance>,
     #[cfg(feature = "gui")]
@@ -728,7 +744,7 @@ pub struct ArcadiaRoot {
     pub notification_preview_bg_alpha: f32,
     /// Drives the multi-phase notification badge preview animation.
     pub notification_preview_anim: Option<NotificationPreviewAnim>,
-    /// Raw progress 0.0→1.0 for the bell icon shake. Fed into `animation::shake_offset`.
+    /// Raw progress 0.0→1.0 for the bell icon shake. Fed into `openframe::tween::shake_offset`.
     pub notification_shake_t: f32,
     /// CaretAnim that drives `notification_shake_t` from 0→1 over the shake duration.
     pub notification_shake_anim: Option<CaretAnim>,

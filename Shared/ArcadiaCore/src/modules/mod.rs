@@ -3,8 +3,8 @@ pub mod ai_chat_store;
 pub mod ai_context;
 pub mod ai_exec_cli;
 pub mod ai_sandbox;
+pub mod ai_submodules;
 pub mod ai_tools;
-pub mod ai_types;
 pub mod animation;
 pub mod code_editor;
 pub mod goto;
@@ -22,6 +22,8 @@ pub mod permissions;
 pub mod platform;
 pub mod python_host;
 pub mod python_registry;
+pub mod wasm_host;
+pub mod wasm_registry;
 pub mod remote_mirror;
 pub mod remote_session;
 pub mod shell;
@@ -33,11 +35,8 @@ pub mod visual_editor;
 pub mod workspace;
 
 use crate::config::modules::{
-    supports_runtime_platform, ModulesConfig, AI_LLAMA_CPP_MODULE_NAME, AI_MODULE_NAME,
-    AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, CURSOR_MODULE_NAME,
-    GOTO_MODULE_NAME, LAN_MODULE_NAME, NET_MODULE_NAME, NOTIFICATION_MODULE_NAME,
-    OVERLAY_MODULE_NAME, REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME,
-    TERMINAL_MOTD_MODULE_NAME, TRAY_MODULE_NAME, VISUAL_EDITOR_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    supports_runtime_platform, ModulesConfig, LAN_MODULE_NAME, NET_MODULE_NAME,
+    REMOTE_SESSION_MODULE_NAME, TERMINAL_MODULE_NAME, TERMINAL_MOTD_MODULE_NAME,
 };
 use crate::config::permissions::{self as perm_cfg, PermissionSubject, PermissionsConfig};
 use crate::config::ConfigFile;
@@ -49,6 +48,9 @@ pub struct ExecutionContext {
     /// When set (e.g. Python extension on the stack), native command permission checks also
     /// accept matching grants on `python:<this id>` for the same permission ids.
     pub invoking_python_extension: Option<String>,
+    /// When set (a WASM module called `host_execute_command`), native command permission
+    /// checks also accept matching grants on `wasm:<this id>`.
+    pub invoking_wasm_module: Option<String>,
 }
 
 pub struct ModuleCommand {
@@ -59,32 +61,33 @@ pub struct ModuleCommand {
     pub run: fn(&[&str], &ExecutionContext) -> String,
 }
 
+/// Command dispatch table — built once from the extension collector, keyed by
+/// command-token namespace (e.g. `shell` for the `terminal` module). Replaces
+/// the former hand-written match: a new module self-registers its commands.
+static COMMAND_REGISTRY: std::sync::LazyLock<
+    std::collections::HashMap<String, &'static [ModuleCommand]>,
+> = std::sync::LazyLock::new(|| {
+    let providers = crate::extension::provider::default_providers();
+    let collected = crate::extension::collector::collect(&providers)
+        .expect("extension collector must produce a valid command set");
+    collected
+        .command_sets()
+        .into_iter()
+        .map(|(registry_name, cmds)| {
+            (
+                command_token_prefix_for_registry(&registry_name).to_string(),
+                cmds,
+            )
+        })
+        .collect()
+});
+
+/// Commands for a module, accepting either a registry key (`terminal`) or a
+/// command-token namespace (`shell`) — both normalize to the namespace.
 fn module_commands(module_key: &str) -> Option<&'static [ModuleCommand]> {
-    match module_key {
-        animation::NAME => Some(animation::commands()),
-        TERMINAL_MODULE_NAME | shell::NAME => Some(shell::commands()),
-        TERMINAL_MOTD_MODULE_NAME | shell_motd::NAME => Some(shell_motd::commands()),
-        CURSOR_MODULE_NAME => Some(cursor::commands()),
-        lan::NAME => Some(lan::commands()),
-        late::NAME => Some(late::commands()),
-        net::NAME => Some(net::commands()),
-        permissions::NAME => Some(permissions::commands()),
-        python_host::NAME => Some(python_host::commands()),
-        remote_session::NAME => Some(remote_session::commands()),
-        surface::NAME => Some(surface::commands()),
-        TRAY_MODULE_NAME => Some(tray::commands()),
-        OVERLAY_MODULE_NAME => Some(overlay::commands()),
-        WORKSPACE_MODULE_NAME => Some(workspace::commands()),
-        CODE_EDITOR_MODULE_NAME => Some(code_editor::commands()),
-        VISUAL_EDITOR_MODULE_NAME => Some(visual_editor::commands()),
-        AI_MODULE_NAME => Some(ai::commands()),
-        AI_LLAMA_CPP_MODULE_NAME => Some(llama_cpp::commands()),
-        AI_OLLAMA_MODULE_NAME => Some(ollama::commands()),
-        AI_OPENAI_MODULE_NAME => Some(openai::commands()),
-        NOTIFICATION_MODULE_NAME => Some(notification::commands()),
-        GOTO_MODULE_NAME => Some(goto::commands()),
-        _ => None,
-    }
+    COMMAND_REGISTRY
+        .get(command_token_prefix_for_registry(module_key))
+        .copied()
 }
 
 fn registry_key_for_module_namespace(ns: &str) -> &str {
@@ -148,6 +151,12 @@ fn ensure_command_permissions(
                 continue;
             }
         }
+        if let Some(module) = context.invoking_wasm_module.as_deref() {
+            let wasm = PermissionSubject::wasm(module.to_string());
+            if cfg.effective_allowed(&wasm, pid) {
+                continue;
+            }
+        }
         return Err(format!(
             "Permission denied: {pid} (subject {}, global or per-module grant missing)",
             subject.storage_key()
@@ -195,6 +204,9 @@ pub fn enabled_command_tokens() -> Vec<String> {
         if python_registry::extension_command_supported_at_runtime(&token) {
             tokens.push(token);
         }
+    }
+    for (token, _) in wasm_registry::list_commands() {
+        tokens.push(token);
     }
     tokens
 }
@@ -305,7 +317,11 @@ pub fn execute_command(
         return Ok(Some((command.run)(args, context)));
     }
 
-    match python_registry::try_dispatch(token, args)? {
+    // Dispatch order: native modules → Python extensions → WASM modules.
+    if let Some(s) = python_registry::try_dispatch(token, args)? {
+        return Ok(Some(s));
+    }
+    match wasm_registry::try_dispatch(token, args)? {
         Some(s) => Ok(Some(s)),
         None => Ok(None),
     }
@@ -361,6 +377,9 @@ pub fn all_command_entries() -> Vec<(String, String)> {
         if python_registry::extension_command_supported_at_runtime(token.as_str()) {
             entries.push((token, description));
         }
+    }
+    for (token, description) in wasm_registry::list_commands() {
+        entries.push((token, description));
     }
     entries
 }

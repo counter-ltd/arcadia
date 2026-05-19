@@ -59,218 +59,16 @@ pub struct PermissionDefinition {
     pub system_grant: Option<SystemGrant>,
 }
 
-pub const PERMISSION_REGISTRY: &[PermissionDefinition] = &[
-    PermissionDefinition {
-        id: "network.lan",
-        title: "LAN access",
-        description: "Discovery, peer I/O, and LAN module commands (multicast, pairing, etc.).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "session.remote_route",
-        title: "Remote routing",
-        description: "Run commands on a peer host via --net:as lan:… (Arcadia remote control).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "shell.run",
-        title: "Shell commands",
-        description: "Spawn local subprocesses (shell.execute).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "shell.bridge",
-        title: "Shell bridge",
-        description: "Host/runtime bridge (shell.internal).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "surface.read",
-        title: "Surface read",
-        description: "Read UI mirror state (surface.snapshot, surface.revision).",
-        default_global: true,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "surface.control",
-        title: "Surface control",
-        description: "Mutate mirrored UI / module toggles (surface.patch).",
-        default_global: true,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "late.outbound",
-        title: "Late.sh network",
-        description: "Connect and interact with late.sh (WebSocket, credentials, chat).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "python.host",
-        title: "Python host",
-        description: "Load or reload extensions from disk (python-host.reload).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "python.extension_toggle",
-        title: "Extension enable",
-        description: "Enable or disable Python extensions.",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "input.capture",
-        title: "Input capture",
-        description: "Reserved for future input capture / injection policy (global gate).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "tray.create",
-        title: "Tray / menu-bar icons",
-        description: "Create and update menu-bar (macOS) or system-tray (Windows/Linux) icons.",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "cursor.global_position",
-        title: "Global cursor position",
-        description: "Read the OS-global mouse cursor position even when Arcadia is not focused (macOS: Accessibility; same device-query gate as global mouse buttons).",
-        default_global: false,
-        system_grant: Some(SystemGrant::Accessibility),
-    },
-    PermissionDefinition {
-        id: "cursor.global_mouse_buttons",
-        title: "Global mouse buttons",
-        description: "Read whether the primary mouse buttons are pressed anywhere on the OS, even when Arcadia is not focused (macOS: Accessibility; same gate as global cursor position).",
-        default_global: false,
-        system_grant: Some(SystemGrant::Accessibility),
-    },
-    PermissionDefinition {
-        id: "system.accessibility",
-        title: "Accessibility (AX)",
-        description: "Read and drive other apps' UI via the macOS Accessibility API — focused-app menu extent, status-item boundaries, assistive control. Needs the OS Accessibility grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Accessibility),
-    },
-    PermissionDefinition {
-        id: "system.screen_recording",
-        title: "Screen Recording",
-        description: "Capture screen contents and other apps' window geometry. Needs the OS Screen Recording grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::ScreenRecording),
-    },
-    PermissionDefinition {
-        id: "system.camera",
-        title: "Camera",
-        description: "Capture video from the camera. Needs the OS Camera grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Camera),
-    },
-    PermissionDefinition {
-        id: "system.microphone",
-        title: "Microphone",
-        description: "Capture audio from the microphone. Needs the OS Microphone grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Microphone),
-    },
-    PermissionDefinition {
-        id: "system.input_monitoring",
-        title: "Input Monitoring",
-        description: "Observe keyboard and mouse input system-wide. Needs the OS Input Monitoring grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::InputMonitoring),
-    },
-    PermissionDefinition {
-        id: "system.location",
-        title: "Location",
-        description: "Read the device's location. Needs the OS Location Services grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Location),
-    },
-    PermissionDefinition {
-        id: "system.automation",
-        title: "Automation",
-        description: "Send Apple Events to control other applications. Needs the OS Automation grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Automation),
-    },
-    PermissionDefinition {
-        id: "system.full_disk_access",
-        title: "Full Disk Access",
-        description: "Read files in OS-protected locations system-wide. Needs the OS Full Disk Access grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::FullDiskAccess),
-    },
-    PermissionDefinition {
-        id: "system.contacts",
-        title: "Contacts",
-        description: "Read the system address book. Needs the OS Contacts grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Contacts),
-    },
-    PermissionDefinition {
-        id: "system.calendars",
-        title: "Calendars",
-        description: "Read and write calendar events. Needs the OS Calendars grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Calendars),
-    },
-    PermissionDefinition {
-        id: "system.photos",
-        title: "Photos",
-        description: "Read the system photo library. Needs the OS Photos grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Photos),
-    },
-    PermissionDefinition {
-        id: "system.reminders",
-        title: "Reminders",
-        description: "Read and write reminders. Needs the OS Reminders grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Reminders),
-    },
-    PermissionDefinition {
-        id: "system.bluetooth",
-        title: "Bluetooth",
-        description: "Communicate with Bluetooth devices. Needs the OS Bluetooth grant.",
-        default_global: false,
-        system_grant: Some(SystemGrant::Bluetooth),
-    },
-    PermissionDefinition {
-        id: "overlay.hud",
-        title: "HUD overlay window",
-        description: "Create and control the shared always-on-top transparent overlay window (non-interactive / pass-through in v1).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "overlay.system_ui",
-        title: "Overlay system-UI tier",
-        description: "Allow overlay.set-stacking system_ui (higher stacking tier; best-effort per OS).",
-        default_global: false,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "notifications.receive",
-        title: "Receive notifications",
-        description: "Allow the notification module to store and display in-app notifications.",
-        default_global: true,
-        system_grant: None,
-    },
-    PermissionDefinition {
-        id: "notifications.send",
-        title: "Send notifications",
-        description: "Allow a module or extension to post notifications via notification.post. Grant per-source in the Notifications settings.",
-        default_global: false,
-        system_grant: None,
-    },
-];
+/// The permission catalog — built once from every extension's `permissions()`.
+/// Replaces the former hand-written array; each module declares the permissions
+/// it owns.
+pub static PERMISSION_REGISTRY: std::sync::LazyLock<Vec<PermissionDefinition>> =
+    std::sync::LazyLock::new(|| {
+        let providers = crate::extension::provider::default_providers();
+        let collected = crate::extension::collector::collect(&providers)
+            .expect("extension collector must produce a valid permission set");
+        collected.permissions().iter().map(|p| **p).collect()
+    });
 
 pub fn permission_definition(id: &str) -> Option<&'static PermissionDefinition> {
     PERMISSION_REGISTRY.iter().find(|p| p.id == id)
@@ -285,6 +83,8 @@ pub fn is_known_permission_id(id: &str) -> bool {
 pub enum PermissionSubject {
     Module { name: String },
     Python { extension_id: String },
+    /// A runtime WASM module loaded from `~/Arcadia/Modules/`.
+    Wasm { module_id: String },
 }
 
 impl PermissionSubject {
@@ -298,11 +98,18 @@ impl PermissionSubject {
         }
     }
 
+    pub fn wasm(module_id: impl Into<String>) -> Self {
+        Self::Wasm {
+            module_id: module_id.into(),
+        }
+    }
+
     /// Serialize key for `permissions.toml` (`module:terminal`, `python:foo`).
     pub fn storage_key(&self) -> String {
         match self {
             PermissionSubject::Module { name } => format!("module:{name}"),
             PermissionSubject::Python { extension_id } => format!("python:{extension_id}"),
+            PermissionSubject::Wasm { module_id } => format!("wasm:{module_id}"),
         }
     }
 
@@ -321,6 +128,14 @@ impl PermissionSubject {
             }
             return Some(Self::Python {
                 extension_id: id.to_string(),
+            });
+        }
+        if let Some(id) = key.strip_prefix("wasm:") {
+            if id.is_empty() {
+                return None;
+            }
+            return Some(Self::Wasm {
+                module_id: id.to_string(),
             });
         }
         None
@@ -539,7 +354,7 @@ impl ConfigFile for PermissionsConfig {
             changed = true;
         }
 
-        for p in PERMISSION_REGISTRY {
+        for p in PERMISSION_REGISTRY.iter() {
             if !self.globals.contains_key(p.id) {
                 self.globals.insert(p.id.to_string(), p.default_global);
                 changed = true;

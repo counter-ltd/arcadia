@@ -17,11 +17,7 @@ pub enum PageLayoutKind {
     SettingsHub,
 }
 
-use crate::config::modules::{
-    AI_MODULE_NAME, CODE_EDITOR_MODULE_NAME, LAN_MODULE_NAME, LATE_MODULE_NAME,
-    NOTIFICATION_MODULE_NAME, PYTHON_HOST_MODULE_NAME, TERMINAL_MODULE_NAME,
-    VISUAL_EDITOR_MODULE_NAME, WORKSPACE_MODULE_NAME,
-};
+use crate::config::modules::PYTHON_HOST_MODULE_NAME;
 use crate::modules::python_registry;
 use crate::services::{self, ServiceOwned, SERVICE_DEFINITIONS};
 
@@ -230,337 +226,61 @@ impl From<&NavigationGroupDefinition> for NavigationGroupOwned {
     }
 }
 
-pub const PAGE_DEFINITIONS: &[NavigationPageDefinition] = &[
-    NavigationPageDefinition {
-        id: "utility.shell",
-        title: "Terminal",
-        description: "Run and manage terminal commands.",
-        glyph: "terminal",
-        system_image: "terminal",
-        accent: "emerald",
-        required_module: Some(TERMINAL_MODULE_NAME),
-        layout_kind: PageLayoutKind::FullHeight,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "utility.services",
-        title: "Services",
-        description: "Long-running module services advertised by Arcadia (LAN discovery, etc.).",
-        glyph: "services",
-        system_image: "antenna.radiowaves.left.and.right",
-        accent: "amber",
-        // Visibility is service-driven: page is shown iff at least one entry in
-        // `SERVICE_DEFINITIONS` targets this page id and has its required module enabled.
-        required_module: None,
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.logs",
-        title: "Logs",
-        description: "Recent logs and activity stream appear here.",
-        glyph: "logs",
-        system_image: "doc.text.magnifyingglass",
-        accent: "sky",
-        required_module: None,
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.settings",
-        title: "Settings",
-        description: "App preferences and configuration controls appear here.",
-        glyph: "settings",
-        system_image: "gearshape",
-        accent: "indigo",
-        required_module: None,
-        layout_kind: PageLayoutKind::SettingsHub,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.modules",
-        title: "Modules",
-        description: "Manage global module availability and dependency requirements.",
-        glyph: "modules",
-        system_image: "switch.2",
-        accent: "fuchsia",
-        required_module: None,
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.appearance",
-        title: "Appearance",
-        description: "Theme and display preferences. Placeholder — detailed controls will land here.",
-        glyph: "appearance",
-        system_image: "paintpalette",
-        accent: "indigo",
-        required_module: None,
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.permissions",
-        title: "Permissions",
-        description: "Global capability toggles and per-module or per-extension grants.",
-        glyph: "permissions",
-        system_image: "lock.shield",
-        accent: "indigo",
-        required_module: None,
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.shortcuts",
-        title: "Shortcuts",
-        description: "Keyboard, pointer, and OS-global shortcuts; conflicts and overrides.",
-        glyph: "shortcuts",
-        system_image: "keyboard",
-        accent: "indigo",
-        required_module: None,
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "global.workspaces",
-        title: "Workspaces",
-        description: "Register project directories and grant scoped file and execution permissions.",
-        glyph: "workspaces",
-        system_image: "folder",
-        accent: "emerald",
-        required_module: Some(WORKSPACE_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "network.nodes",
-        title: "Nodes",
-        description: "Discover LAN peers and manage pairing with lan.scan / lan.node.",
-        glyph: "nodes",
-        system_image: "wifi",
-        accent: "cyan",
-        required_module: Some(LAN_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "late.now_playing",
-        title: "Social",
-        description: "Live chat, now playing, votes, visualizer, and bonsai in one view.",
-        glyph: "coffee",
-        system_image: "cup.and.saucer.fill",
-        accent: "violet",
-        required_module: Some(LATE_MODULE_NAME),
-        layout_kind: PageLayoutKind::FullHeight,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "late.experimental",
-        title: "Experimental",
-        description: "Profile, notifications, RSS, articles, showcase, games, artboard, work profiles, DMs, and chips.",
-        glyph: "flask",
-        system_image: "flask.fill",
-        accent: "violet",
-        required_module: Some(LATE_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "late.settings",
-        title: "Social Settings",
-        description: "Configure server URL, credentials, and connection preferences.",
-        glyph: "coffee",
-        system_image: "cup.and.saucer.fill",
-        accent: "violet",
-        required_module: Some(LATE_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "extensions.settings",
-        title: "Extensions",
-        description: "Enable or disable Python extensions loaded from ~/Arcadia/Extensions/.",
-        glyph: "extensions",
-        system_image: "flask.fill",
-        accent: "indigo",
-        required_module: Some(PYTHON_HOST_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "editor.main",
-        title: "Editor",
-        description: "Open and edit files. Each open file appears as a tab in the sidebar.",
-        glyph: "file-code",
-        system_image: "doc.text",
-        accent: "sky",
-        required_module: Some(CODE_EDITOR_MODULE_NAME),
-        layout_kind: PageLayoutKind::FullHeight,
-        blocks_platform_goto: true,
-    },
-    NavigationPageDefinition {
-        id: "editor.settings",
-        title: "Editor",
-        description: "Code editor preferences — indentation, display, and formatting options.",
-        glyph: "file-code",
-        system_image: "doc.text",
-        accent: "sky",
-        required_module: Some(CODE_EDITOR_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "editor.visual",
-        title: "Blocks",
-        description: "Scratch-style visual block editor for Python. Each open file appears as a tab in the sidebar.",
-        glyph: "blocks",
-        system_image: "square.grid.2x2",
-        accent: "sky",
-        required_module: Some(VISUAL_EDITOR_MODULE_NAME),
-        layout_kind: PageLayoutKind::FullHeight,
-        blocks_platform_goto: true,
-    },
-    NavigationPageDefinition {
-        id: "ai.chat",
-        title: "Chat",
-        description: "AI chat sessions. Each conversation appears as a sub-item in the sidebar.",
-        glyph: "message",
-        system_image: "message",
-        accent: "violet",
-        required_module: Some(AI_MODULE_NAME),
-        layout_kind: PageLayoutKind::FullHeight,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "ai.settings",
-        title: "AI",
-        description: "AI module preferences — default system prompt and provider configuration.",
-        glyph: "ai-provider",
-        system_image: "message",
-        accent: "violet",
-        required_module: Some(AI_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "ai.models",
-        title: "Models",
-        description: "Configure and manage AI model providers.",
-        glyph: "ai-model",
-        system_image: "cpu",
-        accent: "violet",
-        required_module: Some(AI_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "ai.rules",
-        title: "Rules",
-        description: "Configure AI rules — per-chat constraints, forbidden tools, response format.",
-        glyph: "ai-rule",
-        system_image: "wrench.and.screwdriver",
-        accent: "violet",
-        required_module: Some("ai-rules"),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "ai.skills",
-        title: "Skills",
-        description: "Configure AI skills — named behaviours with system prompt fragments and tool allowlists.",
-        glyph: "ai-skill",
-        system_image: "flask",
-        accent: "violet",
-        required_module: Some("ai-skills"),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "notification.main",
-        title: "Notifications",
-        description: "In-app notification centre. View and dismiss alerts from modules and extensions.",
-        glyph: "notification",
-        system_image: "bell",
-        accent: "amber",
-        required_module: Some(NOTIFICATION_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-    NavigationPageDefinition {
-        id: "notification.settings",
-        title: "Notifications",
-        description: "Configure notification storage, per-source send permissions, and display preferences.",
-        glyph: "notification",
-        system_image: "bell.badge",
-        accent: "amber",
-        required_module: Some(NOTIFICATION_MODULE_NAME),
-        layout_kind: PageLayoutKind::Standard,
-        blocks_platform_goto: false,
-    },
-];
 
-pub const GROUP_DEFINITIONS: &[NavigationGroupDefinition] = &[
-    NavigationGroupDefinition {
-        id: "utilities",
-        label: "Utilities",
-        glyph: "tools",
-        system_image: "wrench.and.screwdriver",
-        pages: &["utility.shell", "utility.services"],
-        accent: "amber",
-    },
-    NavigationGroupDefinition {
-        id: "network",
-        label: "Network",
-        glyph: "network",
-        system_image: "network",
-        pages: &["network.nodes"],
-        accent: "cyan",
-    },
-    NavigationGroupDefinition {
-        id: "social",
-        label: "Social",
-        glyph: "chat",
-        system_image: "bubble.left.and.bubble.right.fill",
-        pages: &["late.now_playing", "late.experimental"],
-        accent: "teal",
-    },
-    NavigationGroupDefinition {
-        id: "code",
-        label: "Code",
-        glyph: "file-code",
-        system_image: "doc.text",
-        pages: &["editor.main", "editor.visual"],
-        accent: "sky",
-    },
-    NavigationGroupDefinition {
-        id: "ai",
-        label: "AI",
-        glyph: "ai-provider",
-        system_image: "sparkles",
-        pages: &["ai.chat", "ai.models", "ai.rules", "ai.skills"],
-        accent: "violet",
-    },
-];
+// ─── Navigation registry ────────────────────────────────────────────────────
+//
+// Pages, groups, and the placement frame are built from the extension
+// collector: each module declares its pages via `Extension::nav_pages`; the
+// app shell supplies the groups and placement frame. The collector returns
+// `&'static` data (module statics), so no leaking is needed.
 
-pub const GLOBAL_PAGE_IDS: &[&str] = &["global.settings"];
+use std::sync::LazyLock;
+
+struct NavData {
+    pages: Vec<NavigationPageDefinition>,
+    groups: Vec<NavigationGroupDefinition>,
+    placement: crate::extension::NavPlacement,
+}
+
+static NAV_DATA: LazyLock<NavData> = LazyLock::new(|| {
+    let providers = crate::extension::provider::default_providers();
+    let collected = crate::extension::collector::collect(&providers)
+        .expect("extension collector must produce a valid navigation set");
+    NavData {
+        pages: collected.nav_pages().iter().map(|p| **p).collect(),
+        groups: collected.nav_groups().iter().map(|g| **g).collect(),
+        placement: collected
+            .nav_placement()
+            .expect("the app shell must supply a navigation placement"),
+    }
+});
+
+/// All navigation pages — contributed by every extension's `nav_pages()`.
+pub static PAGE_DEFINITIONS: LazyLock<&'static [NavigationPageDefinition]> =
+    LazyLock::new(|| NAV_DATA.pages.as_slice());
+
+/// All navigation groups — contributed by the app shell.
+pub static GROUP_DEFINITIONS: LazyLock<&'static [NavigationGroupDefinition]> =
+    LazyLock::new(|| NAV_DATA.groups.as_slice());
+
+/// Pages shown in the sidebar's global section.
+pub static GLOBAL_PAGE_IDS: LazyLock<&'static [&'static str]> =
+    LazyLock::new(|| NAV_DATA.placement.global_pages);
 pub const LOGS_PAGE_ID: &str = "global.logs";
-pub const TOP_BAR_PAGE_IDS: &[&str] = &["extensions.settings", "global.modules", "notification.main"];
-/// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; these are **nested only**
-/// (not the hub header). Omit [`SETTINGS_HUB_ROOT_PAGE_ID`] — the header row is that page.
-/// Extensions (`extensions.settings`) and Modules live in [`TOP_BAR_PAGE_IDS`]. Logs is opened from the app-title context menu on Desktop, not the top bar.
+/// Pages rendered as compact top-bar controls.
+pub static TOP_BAR_PAGE_IDS: LazyLock<&'static [&'static str]> =
+    LazyLock::new(|| NAV_DATA.placement.top_bar_pages);
+/// Parent row in the global sidebar is [`SETTINGS_HUB_ROOT_PAGE_ID`]; the
+/// settings-hub pages nest under it. Logs is opened from the app-title context
+/// menu on Desktop, not the top bar.
 pub const SETTINGS_HUB_ROOT_PAGE_ID: &str = "global.settings";
-pub const SETTINGS_HUB_PAGE_IDS: &[&str] = &[
-    "global.permissions",
-    "global.shortcuts",
-    "global.appearance",
-    "global.workspaces",
-    "late.settings",
-    "editor.settings",
-    "ai.settings",
-    "notification.settings",
-];
-pub const DEFAULT_GROUP_ID: &str = "utilities";
-pub const DEFAULT_PAGE_ID: &str = "global.settings";
+/// Pages nested under the sidebar Settings hub.
+pub static SETTINGS_HUB_PAGE_IDS: LazyLock<&'static [&'static str]> =
+    LazyLock::new(|| NAV_DATA.placement.settings_hub_pages);
+pub static DEFAULT_GROUP_ID: LazyLock<&'static str> =
+    LazyLock::new(|| NAV_DATA.placement.default_group);
+pub static DEFAULT_PAGE_ID: LazyLock<&'static str> =
+    LazyLock::new(|| NAV_DATA.placement.default_page);
 
 /// Settings hub pages for extensions with standalone `register_tokens`.
 pub const EXTENSION_TOKEN_SETTINGS_PAGE_PREFIX: &str = "extension.tokens|";
@@ -662,8 +382,8 @@ pub fn default_navigation_registry() -> NavigationRegistry {
         top_bar_pages: TOP_BAR_PAGE_IDS.to_vec(),
         settings_hub_pages: SETTINGS_HUB_PAGE_IDS.to_vec(),
         services: SERVICE_DEFINITIONS.to_vec(),
-        default_group: DEFAULT_GROUP_ID,
-        default_page: DEFAULT_PAGE_ID,
+        default_group: *DEFAULT_GROUP_ID,
+        default_page: *DEFAULT_PAGE_ID,
     }
 }
 
@@ -784,7 +504,7 @@ mod tests {
     #[test]
     fn all_pages_with_required_module_exist_in_registry() {
         use crate::config::modules::ModulesConfig;
-        for page in PAGE_DEFINITIONS {
+        for page in PAGE_DEFINITIONS.iter() {
             if let Some(module_name) = page.required_module {
                 assert!(
                     ModulesConfig::manifest_for(module_name).is_some(),
@@ -798,7 +518,7 @@ mod tests {
 
     #[test]
     fn all_group_pages_exist_in_page_definitions() {
-        for group in GROUP_DEFINITIONS {
+        for group in GROUP_DEFINITIONS.iter() {
             for page_id in group.pages {
                 assert!(
                     page_by_id(page_id).is_some(),
@@ -813,22 +533,24 @@ mod tests {
     #[test]
     fn default_page_exists() {
         assert!(
-            page_by_id(DEFAULT_PAGE_ID).is_some(),
-            "DEFAULT_PAGE_ID '{DEFAULT_PAGE_ID}' not in PAGE_DEFINITIONS"
+            page_by_id(*DEFAULT_PAGE_ID).is_some(),
+            "DEFAULT_PAGE_ID '{}' not in PAGE_DEFINITIONS",
+            *DEFAULT_PAGE_ID
         );
     }
 
     #[test]
     fn default_group_exists() {
         assert!(
-            group_by_id(DEFAULT_GROUP_ID).is_some(),
-            "DEFAULT_GROUP_ID '{DEFAULT_GROUP_ID}' not in GROUP_DEFINITIONS"
+            group_by_id(*DEFAULT_GROUP_ID).is_some(),
+            "DEFAULT_GROUP_ID '{}' not in GROUP_DEFINITIONS",
+            *DEFAULT_GROUP_ID
         );
     }
 
     #[test]
     fn all_global_page_ids_exist_in_definitions() {
-        for page_id in GLOBAL_PAGE_IDS {
+        for page_id in GLOBAL_PAGE_IDS.iter() {
             assert!(
                 page_by_id(page_id).is_some(),
                 "GLOBAL_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"
@@ -838,7 +560,7 @@ mod tests {
 
     #[test]
     fn all_top_bar_page_ids_exist_in_definitions() {
-        for page_id in TOP_BAR_PAGE_IDS {
+        for page_id in TOP_BAR_PAGE_IDS.iter() {
             assert!(
                 page_by_id(page_id).is_some(),
                 "TOP_BAR_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"
@@ -848,7 +570,7 @@ mod tests {
 
     #[test]
     fn top_bar_pages_disjoint_from_global_pages() {
-        for page_id in TOP_BAR_PAGE_IDS {
+        for page_id in TOP_BAR_PAGE_IDS.iter() {
             assert!(
                 !GLOBAL_PAGE_IDS.contains(page_id),
                 "page '{page_id}' is in both TOP_BAR_PAGE_IDS and GLOBAL_PAGE_IDS"
@@ -876,7 +598,7 @@ mod tests {
 
     #[test]
     fn all_settings_hub_page_ids_exist_in_definitions() {
-        for page_id in SETTINGS_HUB_PAGE_IDS {
+        for page_id in SETTINGS_HUB_PAGE_IDS.iter() {
             assert!(
                 page_by_id(page_id).is_some(),
                 "SETTINGS_HUB_PAGE_IDS contains '{page_id}' not in PAGE_DEFINITIONS"

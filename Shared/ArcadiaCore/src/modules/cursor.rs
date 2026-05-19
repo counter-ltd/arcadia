@@ -90,3 +90,56 @@ pub fn commands() -> &'static [ModuleCommand] {
         },
     ]
 }
+
+#[derive(Default)]
+pub struct CursorExtension;
+
+impl crate::extension::Extension for CursorExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "cursor".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "OS-global cursor position and primary display size for extensions that track input."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: vec!["cursor.global_position".to_string()],
+            workspace_permissions: Vec::new(),
+            supported_platforms: vec![
+                crate::platform::PLATFORM_MACOS.to_string(),
+                crate::platform::PLATFORM_WINDOWS.to_string(),
+                crate::platform::PLATFORM_LINUX.to_string(),
+            ],
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::{PermissionDefinition, SystemGrant};
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "cursor.global_position",
+                title: "Global cursor position",
+                description: "Read the OS-global mouse cursor position even when Arcadia is not focused (macOS: Accessibility; same device-query gate as global mouse buttons).",
+                default_global: false,
+                system_grant: Some(SystemGrant::Accessibility),
+            },
+            PermissionDefinition {
+                id: "cursor.global_mouse_buttons",
+                title: "Global mouse buttons",
+                description: "Read whether the primary mouse buttons are pressed anywhere on the OS, even when Arcadia is not focused (macOS: Accessibility; same gate as global cursor position).",
+                default_global: false,
+                system_grant: Some(SystemGrant::Accessibility),
+            },
+        ];
+        PERMS
+    }
+}
+
+crate::register_extension!(CursorExtension);

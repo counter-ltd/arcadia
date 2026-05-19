@@ -1,5 +1,5 @@
 use crate::modules::ai_sandbox;
-use crate::modules::ai_types::{AiToolCall, AiToolDefinition, AiToolResult, AiWorkspaceContext};
+use crate::ai_types::{AiToolCall, AiToolDefinition, AiToolResult, AiWorkspaceContext};
 
 pub const TOOL_READ_FILE: AiToolDefinition = AiToolDefinition {
     name: "read_file",

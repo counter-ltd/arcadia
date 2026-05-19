@@ -54,7 +54,7 @@ fn nav_radius(g: Option<GlyphStyleConfig>) -> f32 {
 }
 
 pub fn lerp_color(a: Rgba, b: Rgba, t: f32) -> Rgba {
-    use arcadia_core::modules::animation::lerp_f32;
+    use openframe::tween::lerp_f32;
     Rgba {
         r: lerp_f32(a.r, b.r, t),
         g: lerp_f32(a.g, b.g, t),

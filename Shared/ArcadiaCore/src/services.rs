@@ -6,8 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::config::modules::LAN_MODULE_NAME;
-use crate::modules::lan;
 
 /// Status snapshot returned by [`ServiceControls::status_detail`]: drives the badge + detail line.
 #[derive(Clone, Debug)]
@@ -99,45 +97,15 @@ impl From<&ServiceDefinition> for ServiceOwned {
     }
 }
 
-fn lan_status_detail() -> ServiceRuntimeStatus {
-    let info = lan::lan_service_info();
-    let detail = if info.running {
-        format!("UDP :{} · {}", info.port, info.hostname)
-    } else {
-        format!("UDP :{} · stopped", info.port)
-    };
-    ServiceRuntimeStatus {
-        running: Some(info.running),
-        detail,
-    }
-}
-
-fn lan_start() -> Result<(), String> {
-    lan::start_service()
-}
-
-fn lan_stop() {
-    lan::stop_service();
-}
-
-/// Single source of truth for advertised services. Add entries here when a module exposes a
-/// long-running service that should show up on the Services page.
-pub const SERVICE_DEFINITIONS: &[ServiceDefinition] = &[ServiceDefinition {
-    id: "lan.discovery",
-    page_id: "utility.services",
-    title: "LAN Discovery",
-    description: "Auto-advertises this node and discovers Arcadia peers on UDP broadcast.",
-    required_module: LAN_MODULE_NAME,
-    glyph: "nodes",
-    system_image: "wifi",
-    accent: "cyan",
-    controls: ServiceControls {
-        status_detail: Some(lan_status_detail),
-        start: Some(lan_start),
-        stop: Some(lan_stop),
-        port_for_collision: Some(|| lan::lan_service_info().port),
-    },
-}];
+/// Advertised services — built once from every extension's `services()`.
+/// Replaces the former hand-written array; each module declares its own.
+pub static SERVICE_DEFINITIONS: std::sync::LazyLock<Vec<ServiceDefinition>> =
+    std::sync::LazyLock::new(|| {
+        let providers = crate::extension::provider::default_providers();
+        let collected = crate::extension::collector::collect(&providers)
+            .expect("extension collector must produce a valid service set");
+        collected.services().iter().map(|s| **s).collect()
+    });
 
 pub fn services_for_page(page_id: &str) -> Vec<&'static ServiceDefinition> {
     SERVICE_DEFINITIONS
@@ -153,11 +121,11 @@ pub fn page_has_services(page_id: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::modules::ModulesConfig;
+    use crate::config::modules::{ModulesConfig, LAN_MODULE_NAME};
 
     #[test]
     fn services_target_known_modules() {
-        for service in SERVICE_DEFINITIONS {
+        for service in SERVICE_DEFINITIONS.iter() {
             assert!(
                 ModulesConfig::manifest_for(service.required_module).is_some(),
                 "service '{}' requires module '{}' which is not in MODULE_REGISTRY",

@@ -1,3 +1,4 @@
+use crate::extension::{Extension, OwnedModuleManifest};
 use crate::modules::{ExecutionContext, ModuleCommand};
 
 pub const NAME: &str = "net";
@@ -25,3 +26,30 @@ pub fn commands() -> &'static [ModuleCommand] {
         run: help,
     }]
 }
+
+#[derive(Default)]
+pub struct NetExtension;
+
+impl Extension for NetExtension {
+    fn manifest(&self) -> OwnedModuleManifest {
+        OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "network".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Shared networking foundation for routed module commands."
+                .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [ModuleCommand] {
+        commands()
+    }
+}
+
+crate::register_extension!(NetExtension);

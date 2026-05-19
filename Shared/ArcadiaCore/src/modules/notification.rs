@@ -199,3 +199,81 @@ fn timestamp_now() -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or(0)
 }
+
+#[derive(Default)]
+pub struct NotificationExtension;
+
+impl crate::extension::Extension for NotificationExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: NAME.to_string(),
+            glyph: "notification".to_string(),
+            version: "0.1.0".to_string(),
+            description:
+                "In-app notification centre. Modules and extensions can post alerts; each source requires an explicit notifications.send grant."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: Vec::new(),
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+
+    fn nav_pages(&self) -> &'static [crate::navigation::NavigationPageDefinition] {
+        use crate::navigation::{NavigationPageDefinition, PageLayoutKind};
+        static PAGES: &[NavigationPageDefinition] = &[
+            NavigationPageDefinition {
+                id: "notification.main",
+                title: "Notifications",
+                description: "In-app notification centre. View and dismiss alerts from modules and extensions.",
+                glyph: "notification",
+                system_image: "bell",
+                accent: "amber",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+            NavigationPageDefinition {
+                id: "notification.settings",
+                title: "Notifications",
+                description: "Configure notification storage, per-source send permissions, and display preferences.",
+                glyph: "notification",
+                system_image: "bell.badge",
+                accent: "amber",
+                required_module: Some(NAME),
+                layout_kind: PageLayoutKind::Standard,
+                blocks_platform_goto: false,
+            },
+        ];
+        PAGES
+    }
+
+    fn permissions(&self) -> &'static [crate::config::permissions::PermissionDefinition] {
+        use crate::config::permissions::PermissionDefinition;
+        static PERMS: &[PermissionDefinition] = &[
+            PermissionDefinition {
+                id: "notifications.receive",
+                title: "Receive notifications",
+                description: "Allow the notification module to store and display in-app notifications.",
+                default_global: true,
+                system_grant: None,
+            },
+            PermissionDefinition {
+                id: "notifications.send",
+                title: "Send notifications",
+                description: "Allow a module or extension to post notifications via notification.post. Grant per-source in the Notifications settings.",
+                default_global: false,
+                system_grant: None,
+            },
+        ];
+        PERMS
+    }
+}
+
+crate::register_extension!(NotificationExtension);

@@ -686,3 +686,32 @@ pub fn motd_lines_for_scheme(is_dark: bool) -> Vec<String> {
     let pal = motd_palette(is_dark);
     merge_ansi(&arch_art_lines(), &gather_right_column(&pal))
 }
+
+/// Terminal MOTD banner module. Registry name is `terminal-motd`.
+#[derive(Default)]
+pub struct TerminalMotdExtension;
+
+impl crate::extension::Extension for TerminalMotdExtension {
+    fn manifest(&self) -> crate::extension::OwnedModuleManifest {
+        crate::extension::OwnedModuleManifest {
+            name: crate::config::modules::TERMINAL_MOTD_MODULE_NAME.to_string(),
+            glyph: "terminal".to_string(),
+            version: "1.0.0".to_string(),
+            description:
+                "Fastfetch-style banner when opening the Arcadia terminal (requires terminal)."
+                    .to_string(),
+            accent: String::new(),
+            required_modules: vec![crate::config::modules::TERMINAL_MODULE_NAME.to_string()],
+            required_permissions: Vec::new(),
+            workspace_permissions: Vec::new(),
+            supported_platforms: Vec::new(),
+            api_exports: Vec::new(),
+        }
+    }
+
+    fn commands(&self) -> &'static [crate::modules::ModuleCommand] {
+        commands()
+    }
+}
+
+crate::register_extension!(TerminalMotdExtension);
