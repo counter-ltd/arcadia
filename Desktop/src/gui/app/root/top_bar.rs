@@ -292,7 +292,7 @@ impl ArcadiaRoot {
                                 }
                             })
                             .child({
-                                if self.active_page_id.as_str() == "extensions.settings" {
+                                if self.active_page_id.as_str() == "global.modules" {
                                     div()
                                         .px_2()
                                         .py_0p5()
@@ -1079,9 +1079,7 @@ impl ArcadiaRoot {
                                     let page = self.page_ref(page_id)?;
                                     let is_animated_pill = matches!(
                                         page.id(),
-                                        "notification.main"
-                                            | "extensions.settings"
-                                            | "global.modules"
+                                        "notification.main" | "global.modules"
                                     );
                                     let pill_expand_alpha = is_animated_pill.then(|| {
                                         *self

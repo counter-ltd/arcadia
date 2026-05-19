@@ -161,7 +161,7 @@ impl ArcadiaRoot {
         }
     }
 
-    fn python_extension_row(
+    pub(crate) fn python_extension_row(
         cx: &mut Context<Self>,
         name: String,
         version: String,

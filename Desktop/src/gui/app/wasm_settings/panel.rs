@@ -162,7 +162,7 @@ impl ArcadiaRoot {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn wasm_module_row(
+    pub(crate) fn wasm_module_row(
         cx: &mut Context<Self>,
         name: String,
         version: String,

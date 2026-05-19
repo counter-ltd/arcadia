@@ -76,7 +76,7 @@ impl ArcadiaRoot {
                                     &ctx,
                                 );
                                 this.reload_extension_state(cx);
-                                this.active_page_id = "extensions.settings".into();
+                                this.active_page_id = "global.modules".into();
                                 this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
                             }),
@@ -140,7 +140,7 @@ impl ArcadiaRoot {
                         .on_mouse_down(
                             MouseButton::Left,
                             cx.listener(|this, _, _, cx| {
-                                this.active_page_id = "extensions.settings".into();
+                                this.active_page_id = "global.modules".into();
                                 this.sync_settings_hub_expanded_from_active_page();
                                 cx.notify();
                             }),

@@ -178,8 +178,6 @@ impl Extension for ShellExtension {
         Some(NavPlacement {
             global_pages: &["global.settings"],
             top_bar_pages: &[
-                "extensions.settings",
-                "wasm-modules.settings",
                 "global.modules",
                 "notification.main",
             ],

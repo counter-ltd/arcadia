@@ -19,6 +19,7 @@ impl ArcadiaRoot {
         manifest: Option<&'static ModuleManifest>,
         is_dark: bool,
         runtime_supported: bool,
+        tags: &[String],
     ) -> AnyElement {
         let version = manifest.map(|m| m.version).unwrap_or("unknown");
         let description = manifest
@@ -28,6 +29,7 @@ impl ArcadiaRoot {
         let g_snap = theme::glyph_snapshot(cx);
         let is_glyph = g_snap.is_some();
         let radius = g_snap.map(|g| g.border_radius).unwrap_or(p.radius_md);
+        let tags: Vec<String> = tags.to_vec();
 
         let title_c = p.content_title;
         let meta_c = p.content_meta;
@@ -74,7 +76,18 @@ impl ArcadiaRoot {
                                             .text_xs()
                                             .text_color(meta_c)
                                             .child(format!("v{version}")),
-                                    ),
+                                    )
+                                    .children(tags.iter().map(|tag| {
+                                        div()
+                                            .px_2()
+                                            .py_0p5()
+                                            .when(!is_glyph, |d| d.rounded_full())
+                                            .rounded(px(radius.min(12.0)))
+                                            .text_xs()
+                                            .bg(p.surface_elevated)
+                                            .text_color(p.ui_subtext)
+                                            .child(tag.clone())
+                                    })),
                             )
                             .child(div().text_xs().text_color(desc_c).child(description))
                             .when(!runtime_supported, |col| {

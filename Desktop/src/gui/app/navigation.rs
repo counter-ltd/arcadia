@@ -321,21 +321,13 @@ impl ArcadiaRoot {
             }
             PageLayoutKind::Standard => {
                 let panel: Option<openframe::AnyElement> = match active.as_str() {
-                    "global.modules" => {
+                    "global.modules" | "extensions.settings" | "wasm-modules.settings" => {
                         Some(self.modules_panel(window, cx, is_dark).into_any_element())
                     }
                     "network.nodes" => Some(self.lan_nodes_panel(cx, is_dark).into_any_element()),
                     "utility.services" => Some(self.services_panel(cx, is_dark).into_any_element()),
                     "late.settings" => Some(
                         self.late_settings_panel(window, cx, is_dark)
-                            .into_any_element(),
-                    ),
-                    "extensions.settings" => Some(
-                        self.python_settings_panel(window, cx, is_dark)
-                            .into_any_element(),
-                    ),
-                    "wasm-modules.settings" => Some(
-                        self.wasm_settings_panel(window, cx, is_dark)
                             .into_any_element(),
                     ),
                     "global.appearance" => Some(
