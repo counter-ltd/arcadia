@@ -1593,7 +1593,7 @@ impl ArcadiaRoot {
     /// functions. Returns `true` while any animation is still running (caller should request
     /// another animation frame).
     pub fn tick_caret_anims(&mut self, can_left: bool, can_right: bool) -> bool {
-        use arcadia_core::modules::animation::{apply_easing, Easing};
+        use openframe::tween::{apply_easing, Easing};
         use std::time::Instant;
         const DURATION_S: f32 = 0.18;
 
@@ -1814,7 +1814,7 @@ impl ArcadiaRoot {
 
     /// Tick the notification badge preview animation. Returns true while still running.
     pub fn tick_notification_preview(&mut self, now: std::time::Instant) -> bool {
-        use arcadia_core::modules::animation::{apply_easing, Easing};
+        use openframe::tween::{apply_easing, Easing};
         use super::{NotificationPreviewAnim, NotificationPreviewPhase};
 
         const PILL_FADE_S: f32 = 0.30;

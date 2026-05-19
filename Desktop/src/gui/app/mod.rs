@@ -728,7 +728,7 @@ pub struct ArcadiaRoot {
     pub notification_preview_bg_alpha: f32,
     /// Drives the multi-phase notification badge preview animation.
     pub notification_preview_anim: Option<NotificationPreviewAnim>,
-    /// Raw progress 0.0→1.0 for the bell icon shake. Fed into `animation::shake_offset`.
+    /// Raw progress 0.0→1.0 for the bell icon shake. Fed into `openframe::tween::shake_offset`.
     pub notification_shake_t: f32,
     /// CaretAnim that drives `notification_shake_t` from 0→1 over the shake duration.
     pub notification_shake_anim: Option<CaretAnim>,

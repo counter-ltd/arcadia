@@ -1115,7 +1115,7 @@ impl ArcadiaRoot {
                                         page.glyph().to_string()
                                     };
                                     let shake_off = if page.id() == "notification.main" {
-                                        arcadia_core::modules::animation::shake_offset(
+                                        openframe::tween::shake_offset(
                                             self.notification_shake_t,
                                             3.0,
                                             3.0,
