@@ -22,7 +22,7 @@ fn list_cmd(_args: &[&str], _ctx: &ExecutionContext) -> String {
     };
     let mut lines = Vec::new();
     lines.push("permissions (catalog):".to_string());
-    for p in PERMISSION_REGISTRY {
+    for p in PERMISSION_REGISTRY.iter() {
         lines.push(format!(
             "  {} — {} [default_global={}]",
             p.id, p.title, p.default_global
@@ -30,7 +30,7 @@ fn list_cmd(_args: &[&str], _ctx: &ExecutionContext) -> String {
     }
     lines.push(String::new());
     lines.push("globals (effective):".to_string());
-    for p in PERMISSION_REGISTRY {
+    for p in PERMISSION_REGISTRY.iter() {
         let on = cfg.global_allowed(p.id);
         lines.push(format!("  {} = {on}", p.id));
     }
