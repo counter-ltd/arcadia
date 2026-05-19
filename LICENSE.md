@@ -1,5 +1,42 @@
-Arcadia Community License (ACL) v1.6
-Copyright (c) 2026 stackno.de
+Arcadia Community License (ACL) v1.8
+Copyright (c) 2026 anti.ltd
+
+Canonical Version
+
+The copy of this license distributed inside any project may be outdated.
+The authoritative, source-of-truth version of this license is maintained
+at:
+
+  https://github.com/anti-limited/licenses
+
+If you are reading a bundled copy, consult the repository above for the
+current text. Prior versions remain valid for distributions made under
+them — see "Reservation of Rights".
+
+Project-Specific Addenda
+
+A distributed copy of this license may include one or more clearly
+labelled addenda — for example, an "Excluded Entity Restriction
+Addendum" — appearing below the standard license text under a heading
+that identifies them as an addendum.
+
+Such addenda are deliberate, project-specific terms added by the
+copyright holder for that particular distribution. They are a binding,
+enforceable part of the license as applied to that distribution, even
+though they do not appear in the canonical version maintained at the
+repository above. Their absence from the canonical version is expected
+and does not weaken them.
+
+The canonical version is the source of truth for the standard license
+text only. It does not override, remove, supersede, or invalidate any
+addendum present in a distributed copy.
+
+An addendum may only add restrictions or withhold permissions — for
+example, excluding a named entity from all rights under this license. An
+addendum may not grant rights beyond those in the standard license text
+unless explicitly signed in writing by the copyright holder. Where an
+addendum conflicts with the standard license text, the addendum controls
+for that distribution.
 
 Preamble
 
@@ -178,7 +215,7 @@ of the Software:
 1. Attribution
 
    You must preserve this license and retain appropriate attribution to
-   the original Arcadia project and stackno.de in all substantial
+   the original Arcadia project and anti.ltd in all substantial
    redistributions of the Software.
 
    Attribution must be:
@@ -258,7 +295,7 @@ of the Software:
    behalf of a Large Corporation, constitutes willful infringement and
    will be pursued to the fullest extent available under applicable law.
 
-   To request permission: whitehouse@stackno.de
+   To request permission: contact@counter.ltd or contact@anti.ltd
 
 4. Commercial Use and Profit Restriction
 
@@ -625,6 +662,48 @@ of the Software:
     explanation must be specific to the decision and sufficient for the
     affected user to understand why it was made.
 
+19. Anti-Appropriation and Competitive Replication
+
+    You may not use the Software, its source code, architecture,
+    interfaces, behavior, documentation, assets, or implementation
+    details for the purpose of recreating, reproducing, or developing a
+    substantially similar closed-source, proprietary, or commercial
+    product or service that competes with the Software or with projects
+    developed by the copyright holder.
+
+    This restriction applies regardless of:
+    - whether copying is literal, modified, translated, restructured, or
+      partially rewritten;
+    - whether the resulting work is source-compatible, behaviorally
+      similar, API-compatible, or functionally equivalent;
+    - whether the Software is used directly, indirectly, as reference
+      material, or as a basis for reverse engineering or implementation
+      guidance; or
+    - whether the resulting work incorporates portions of the Software's
+      code.
+
+    Access to the Software does not grant permission to appropriate its
+    design, implementation strategy, internal architecture, or creative
+    expression for use in proprietary or commercial systems.
+
+    Any use of the Software as a reference implementation for a
+    proprietary, closed-source, or revenue-generating competing system
+    constitutes a material breach of this license. Breach of this
+    condition carries no cure window. Rights terminate immediately.
+
+    Creators of proprietary or paid software products that substantially
+    inspired, motivated, or were recreated by this Software receive no
+    special exemption, implied permission, or equitable consideration
+    under this license. Retaliatory appropriation, source copying, or
+    competitive reuse is expressly prohibited.
+
+    If You have legal concerns regarding this condition, contact:
+      junk@anti.ltd
+      spam@anti.ltd
+
+    The copyright holder reserves all rights to pursue enforcement to
+    the maximum extent permitted under applicable law.
+
 Interpretation and Spirit
 
 This license is to be interpreted in accordance with its stated
@@ -676,6 +755,8 @@ automatic termination of all rights:
 - breach of the Commercial Use and Profit Restriction (Condition 4);
 - breach of the No Sale of Derivatives condition (Condition 4a);
 - breach of the Anti-Evasion clause (Condition 5);
+- breach of the Anti-Appropriation and Competitive Replication clause
+  (Condition 19);
 - initiation of patent litigation in violation of Condition 11;
 - any willful or deliberate breach of any condition.
 
@@ -831,8 +912,9 @@ Contact and Permissions
 For permission requests, special license negotiations, or any other
 matter requiring direct contact:
 
-  whitehouse@stackno.de
-  https://stackno.de
+  contact@counter.ltd
+  contact@anti.ltd
+  https://anti.ltd
 
 Responses are not guaranteed within any specific timeframe. The copyright
 holder reserves the right to decline any request without explanation.

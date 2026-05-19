@@ -1,0 +1,12 @@
+[package]
+name = "arcadia-module-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "SDK for authoring Arcadia WASM modules — register_module! macro + host bindings"
+license = "MIT"
+
+# Standalone crate: authors build their module (which depends on this) to
+# wasm32-unknown-unknown. Deliberately NOT a member of the Shared workspace.
+
+[lib]
+crate-type = ["rlib"]

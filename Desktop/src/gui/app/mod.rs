@@ -30,6 +30,7 @@ mod notification_panel;
 mod notification_settings_panel;
 mod permissions_panel;
 mod python_settings;
+mod wasm_settings;
 mod root;
 mod services;
 #[cfg(feature = "gui")]
@@ -391,6 +392,10 @@ pub enum PendingPermissionGrant {
         extension: String,
         missing: Vec<String>,
     },
+    WasmModule {
+        module: String,
+        missing: Vec<String>,
+    },
 }
 
 pub struct CodeEditorUiState {
@@ -607,6 +612,17 @@ pub struct ArcadiaRoot {
     /// the next toggle attempt so the panel can show "couldn't load: …" inline instead of
     /// swallowing the result of `python-host.extension-enable`.
     pub python_extension_action_error: Option<String>,
+    /// (name, version, description, enabled, perms, platforms, tags, loaded) — refreshed
+    /// after the WASM host loads modules.
+    pub wasm_module_rows:
+        Vec<(String, String, String, bool, Vec<String>, Vec<String>, Vec<String>, bool)>,
+    /// Set once `arcadia_wasm::start` has been called.
+    pub wasm_host_started: bool,
+    /// UI-only filter for the WASM Modules settings page.
+    pub wasm_search_query: String,
+    pub wasm_search_focus: FocusHandle,
+    /// Most recent error surfaced by a WASM module toggle. Cleared on the next attempt.
+    pub wasm_action_error: Option<String>,
     #[cfg(feature = "gui")]
     pub terminals: Vec<TerminalInstance>,
     #[cfg(feature = "gui")]

@@ -17,6 +17,7 @@ pub mod collector;
 pub mod provider;
 pub mod shell;
 pub mod types;
+pub mod wasm_manifest;
 
 pub use types::{
     ApiContract, ModuleSource, NavPlacement, OwnedIcon, OwnedModuleManifest,

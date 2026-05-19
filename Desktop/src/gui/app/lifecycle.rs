@@ -62,6 +62,15 @@ fn display_tags_for(declared: &[String], platforms: &[String]) -> Vec<String> {
     tags
 }
 
+/// WASM module rows for the settings page, sorted by name. The registry already returns
+/// the `(name, version, description, enabled, perms, platforms, tags, loaded)` tuple.
+fn sorted_wasm_module_rows(
+) -> Vec<(String, String, String, bool, Vec<String>, Vec<String>, Vec<String>, bool)> {
+    let mut rows = arcadia_core::modules::wasm_registry::list_modules();
+    rows.sort_by(|a, b| a.0.cmp(&b.0));
+    rows
+}
+
 /// Blocking call to Ollama /api/tags. Returns a vec of discovered models with default
 /// TextGeneration kind. Called from a background thread in `discover_ollama_models`.
 fn fetch_ollama_tags(
@@ -249,6 +258,7 @@ impl ArcadiaRoot {
         let extension_token_focus = cx.focus_handle();
         let modules_search_focus = cx.focus_handle();
         let extensions_search_focus = cx.focus_handle();
+        let wasm_search_focus = cx.focus_handle();
         let permissions_search_focus = cx.focus_handle();
         let shortcuts_search_focus = cx.focus_handle();
         let shortcut_listen_focus = cx.focus_handle();
@@ -584,6 +594,11 @@ impl ArcadiaRoot {
             module_rows,
             python_extension_rows: Vec::new(),
             python_host_started: false,
+            wasm_module_rows: Vec::new(),
+            wasm_host_started: false,
+            wasm_search_query: String::new(),
+            wasm_search_focus,
+            wasm_action_error: None,
             active_style,
             available_styles,
             pending_module_enable: None,
@@ -779,6 +794,17 @@ impl ArcadiaRoot {
             root.available_styles = merged_available_styles();
         }
 
+        #[cfg(feature = "wasm-modules")]
+        if root.is_module_enabled(arcadia_core::config::modules::WASM_HOST_MODULE_NAME) {
+            let mod_dir = arcadia_core::config::config_root_dir()
+                .ok()
+                .and_then(|d| d.parent().map(|p| p.join("Modules")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Modules"));
+            arcadia_wasm::start(mod_dir);
+            root.wasm_host_started = true;
+            root.wasm_module_rows = sorted_wasm_module_rows();
+        }
+
         root.refresh_local_navigation_registry();
         root.refresh_extension_token_cache();
 
@@ -854,6 +880,13 @@ impl ArcadiaRoot {
             }
             Err(_) => {}
         }
+    }
+
+    /// Refresh the WASM module list after a toggle. Mirrors `reload_extension_state`.
+    pub fn reload_wasm_state(&mut self, cx: &mut Context<Self>) {
+        self.wasm_module_rows = sorted_wasm_module_rows();
+        self.refresh_local_navigation_registry();
+        cx.notify();
     }
 
     pub fn reload_extension_state(&mut self, cx: &mut Context<Self>) {
@@ -1015,6 +1048,18 @@ impl ArcadiaRoot {
                 rows
             };
             self.available_styles = merged_available_styles();
+        }
+        #[cfg(feature = "wasm-modules")]
+        if !self.wasm_host_started
+            && self.is_module_enabled(arcadia_core::config::modules::WASM_HOST_MODULE_NAME)
+        {
+            let mod_dir = arcadia_core::config::config_root_dir()
+                .ok()
+                .and_then(|d| d.parent().map(|p| p.join("Modules")))
+                .unwrap_or_else(|| std::path::PathBuf::from("Modules"));
+            arcadia_wasm::start(mod_dir);
+            self.wasm_host_started = true;
+            self.wasm_module_rows = sorted_wasm_module_rows();
         }
         self.refresh_local_navigation_registry();
         self.ensure_valid_navigation_selection();

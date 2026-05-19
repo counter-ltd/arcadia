@@ -83,6 +83,8 @@ pub fn is_known_permission_id(id: &str) -> bool {
 pub enum PermissionSubject {
     Module { name: String },
     Python { extension_id: String },
+    /// A runtime WASM module loaded from `~/Arcadia/Modules/`.
+    Wasm { module_id: String },
 }
 
 impl PermissionSubject {
@@ -96,11 +98,18 @@ impl PermissionSubject {
         }
     }
 
+    pub fn wasm(module_id: impl Into<String>) -> Self {
+        Self::Wasm {
+            module_id: module_id.into(),
+        }
+    }
+
     /// Serialize key for `permissions.toml` (`module:terminal`, `python:foo`).
     pub fn storage_key(&self) -> String {
         match self {
             PermissionSubject::Module { name } => format!("module:{name}"),
             PermissionSubject::Python { extension_id } => format!("python:{extension_id}"),
+            PermissionSubject::Wasm { module_id } => format!("wasm:{module_id}"),
         }
     }
 
@@ -119,6 +128,14 @@ impl PermissionSubject {
             }
             return Some(Self::Python {
                 extension_id: id.to_string(),
+            });
+        }
+        if let Some(id) = key.strip_prefix("wasm:") {
+            if id.is_empty() {
+                return None;
+            }
+            return Some(Self::Wasm {
+                module_id: id.to_string(),
             });
         }
         None
