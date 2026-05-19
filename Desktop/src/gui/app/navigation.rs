@@ -10,7 +10,7 @@ use openframe::{
     SharedString, StatefulInteractiveElement, Styled, Tooltip, Window,
 };
 
-use super::ArcadiaRoot;
+use super::{ActionBarId, ArcadiaRoot};
 use crate::gui::theme::{self, render_icon};
 
 #[derive(Clone, Copy)]
@@ -1092,6 +1092,101 @@ impl ArcadiaRoot {
                 .collect()
         };
         pages
+    }
+
+    pub fn command_suggestions(&self, input: &str) -> Vec<(String, String)> {
+        use arcadia_core::modules;
+        let q = input.to_lowercase();
+        let tokens = modules::enabled_command_tokens();
+        let mut results: Vec<(String, String)> = tokens
+            .into_iter()
+            .filter(|tok| q.is_empty() || tok.to_lowercase().contains(&q))
+            .map(|tok| {
+                let desc = modules::command_description(&tok).unwrap_or_default().to_string();
+                (tok, desc)
+            })
+            .collect();
+        results.sort_by(|a, b| a.0.cmp(&b.0));
+        results.truncate(12);
+        results
+    }
+
+    pub fn action_bar(&self, id: ActionBarId) -> &crate::gui::app::ActionBarState {
+        match id {
+            ActionBarId::Goto => &self.goto_bar,
+            ActionBarId::Command => &self.command_bar,
+        }
+    }
+
+    pub fn action_bar_mut(&mut self, id: ActionBarId) -> &mut crate::gui::app::ActionBarState {
+        match id {
+            ActionBarId::Goto => &mut self.goto_bar,
+            ActionBarId::Command => &mut self.command_bar,
+        }
+    }
+
+    /// Returns `Some("goto.page")` style prefix string, or `None` for bars with no prefix.
+    pub fn action_bar_prefix(&self, id: ActionBarId) -> Option<String> {
+        match id {
+            ActionBarId::Goto => Some(format!("goto.{}", self.goto_bar.command)),
+            ActionBarId::Command => None,
+        }
+    }
+
+    pub fn action_bar_placeholder(&self, id: ActionBarId) -> &'static str {
+        match id {
+            ActionBarId::Goto => "page id…",
+            ActionBarId::Command => "module.command…",
+        }
+    }
+
+    pub fn action_bar_elem_id(&self, id: ActionBarId) -> &'static str {
+        match id {
+            ActionBarId::Goto => "goto-bar-input",
+            ActionBarId::Command => "command-bar-input",
+        }
+    }
+
+    /// Suggestions for the overlay dropdown.
+    pub fn action_bar_suggestions(&self, id: ActionBarId) -> Vec<(String, String)> {
+        match id {
+            ActionBarId::Goto => self.goto_page_suggestions(&self.goto_bar.input.clone()),
+            ActionBarId::Command => self.command_suggestions(&self.command_bar.input.clone()),
+        }
+    }
+
+    /// Called when the user confirms (Enter or click) a selection.
+    /// `token` is either the selected suggestion's key or the raw typed input.
+    pub fn on_action_bar_execute(
+        &mut self,
+        id: ActionBarId,
+        token: String,
+        _window: &mut openframe::Window,
+        cx: &mut openframe::Context<Self>,
+    ) {
+        self.action_bar_mut(id).open = false;
+        self.action_bar_mut(id).input.clear();
+        self.action_bar_mut(id).selected_idx = None;
+        match id {
+            ActionBarId::Goto => {
+                if self.is_page_visible(&token) {
+                    self.active_page_id = token;
+                    self.sync_settings_hub_expanded_from_active_page();
+                    self.ensure_valid_navigation_selection();
+                }
+            }
+            ActionBarId::Command => {
+                if !token.is_empty() {
+                    let ctx = self.execution_context();
+                    let _ = arcadia_core::modules::execute_command(
+                        "shell.internal",
+                        &[token.as_str()],
+                        &ctx,
+                    );
+                }
+            }
+        }
+        cx.notify();
     }
 
     pub fn ensure_valid_navigation_selection(&mut self) {

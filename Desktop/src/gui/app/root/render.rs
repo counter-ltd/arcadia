@@ -15,7 +15,7 @@ use openframe::{
 
 use crate::gui::app::navigation::NavGroupRef;
 use crate::gui::app::splash::SPLASH_TOTAL_MS;
-use crate::gui::app::{window_controls_top_padding, AiChat, ArcadiaRoot, CodeEditorTab};
+use crate::gui::app::{window_controls_top_padding, ActionBarId, AiChat, ArcadiaRoot, CodeEditorTab};
 #[cfg(feature = "gui")]
 use crate::gui::theme::render_icon;
 
@@ -421,7 +421,8 @@ impl Render for ArcadiaRoot {
                     div().into_any_element()
                 }
             })
-            .child(self.render_goto_suggestions_overlay(cx, is_dark))
+            .child(self.render_action_bar_overlay(cx, is_dark, ActionBarId::Goto))
+            .child(self.render_action_bar_overlay(cx, is_dark, ActionBarId::Command))
     }
 }
 
@@ -1879,20 +1880,24 @@ impl ArcadiaRoot {
 }
 
 impl ArcadiaRoot {
-    fn render_goto_suggestions_overlay(
+    fn render_action_bar_overlay(
         &self,
         cx: &mut Context<Self>,
         is_dark: bool,
+        bar_id: ActionBarId,
     ) -> impl IntoElement {
-        if !self.goto_bar_open {
+        let bar = self.action_bar(bar_id);
+        if !bar.open {
             return div().into_any_element();
         }
-        let suggestions = self.goto_page_suggestions(&self.goto_bar_input);
+        let suggestions = self.action_bar_suggestions(bar_id);
         if suggestions.is_empty() {
             return div().into_any_element();
         }
 
-        let pos = self.goto_bar_anchor;
+        let pos = bar.anchor;
+        let pill_w = bar.pill_width;
+        let sel = bar.selected_idx;
         let radius = crate::gui::theme::ui_radius(cx);
         let bg = crate::gui::theme::action_pill_bg(cx, is_dark);
         let border_c = crate::gui::theme::ui_accent(cx);
@@ -1901,13 +1906,12 @@ impl ArcadiaRoot {
         let hover_bg = crate::gui::theme::action_pill_hover_bg(cx, is_dark);
         let accent_c = crate::gui::theme::ui_accent(cx);
         let accent_fg = crate::gui::theme::ui_accent_fg(cx);
-        let sel = self.goto_bar_selected_idx;
 
         let rows: Vec<_> = suggestions
             .into_iter()
             .enumerate()
-            .map(|(i, (id, title))| {
-                let id_c = id.clone();
+            .map(|(i, (token, desc))| {
+                let token_c = token.clone();
                 let is_selected = sel == Some(i);
                 let row_bg = if is_selected { accent_c } else { bg };
                 let row_fg = if is_selected { accent_fg } else { tc };
@@ -1922,20 +1926,14 @@ impl ArcadiaRoot {
                     .flex_col()
                     .cursor_pointer()
                     .hover(move |s| if !is_selected { s.bg(hover_bg) } else { s })
-                    .child(div().text_xs().text_color(row_fg).child(title))
-                    .child(div().text_xs().text_color(row_meta).child(id))
+                    .child(div().text_xs().text_color(row_fg).child(token))
+                    .when(!desc.is_empty(), |d| {
+                        d.child(div().text_xs().text_color(row_meta).child(desc))
+                    })
                     .on_mouse_down(
                         MouseButton::Left,
-                        cx.listener(move |this, _, _, cx| {
-                            this.goto_bar_open = false;
-                            this.goto_bar_input.clear();
-                            this.goto_bar_selected_idx = None;
-                            if this.is_page_visible(&id_c) {
-                                this.active_page_id = id_c.clone();
-                                this.sync_settings_hub_expanded_from_active_page();
-                                this.ensure_valid_navigation_selection();
-                            }
-                            cx.notify();
+                        cx.listener(move |this, _, window, cx| {
+                            this.on_action_bar_execute(bar_id, token_c.clone(), window, cx);
                         }),
                     )
             })
@@ -1948,8 +1946,7 @@ impl ArcadiaRoot {
             .snap_to_window_with_margin(px(8.0))
             .child(
                 div()
-                    .min_w(px(220.0))
-                    .max_w(px(320.0))
+                    .w(pill_w)
                     .rounded(px(radius))
                     .bg(bg)
                     .border_1()
@@ -1961,7 +1958,7 @@ impl ArcadiaRoot {
                     )
                     .child(
                         div()
-                            .id("goto-suggestions-scroll")
+                            .id("action-bar-suggestions-scroll")
                             .p_1()
                             .flex()
                             .flex_col()

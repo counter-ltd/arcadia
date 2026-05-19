@@ -199,6 +199,12 @@ pub fn enabled_command_tokens() -> Vec<String> {
     tokens
 }
 
+pub fn command_description(token: &str) -> Option<&'static str> {
+    let (module_name, command_name) = token.split_once('.')?;
+    let commands = module_commands(module_name)?;
+    commands.iter().find(|c| c.name == command_name).map(|c| c.description)
+}
+
 pub fn enabled_module_names() -> Vec<String> {
     let Ok(cfg) = ModulesConfig::load_or_create() else {
         return Vec::new();

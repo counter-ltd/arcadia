@@ -103,10 +103,10 @@ fn text_like_focus_blocks(this: &ArcadiaRoot, window: &Window, cx: &Context<Arca
     if this.shortcuts_search_focus.contains_focused(window, cx) {
         return true;
     }
-    if this.command_bar_focus.contains_focused(window, cx) {
+    if this.command_bar.focus.contains_focused(window, cx) {
         return true;
     }
-    if this.goto_bar_focus.contains_focused(window, cx) {
+    if this.goto_bar.focus.contains_focused(window, cx) {
         return true;
     }
     if this
@@ -310,13 +310,13 @@ impl ArcadiaRoot {
     ) {
         match control_id {
             "arcadia.toggle_command_bar" => {
-                if self.command_bar_open {
-                    self.command_bar_open = false;
-                    self.command_bar_input.clear();
+                if self.command_bar.open {
+                    self.command_bar.open = false;
+                    self.command_bar.input.clear();
                 } else {
-                    self.command_bar_open = true;
-                    self.command_bar_input.clear();
-                    self.command_bar_focus.focus(window);
+                    self.command_bar.open = true;
+                    self.command_bar.input.clear();
+                    self.command_bar.focus.focus(window);
                 }
             }
             "goto.open_page" => {
@@ -325,30 +325,30 @@ impl ArcadiaRoot {
                     .map(|p| p.blocks_platform_goto())
                     .unwrap_or(false);
                 if !blocks {
-                    if self.goto_bar_open {
-                        self.goto_bar_open = false;
-                        self.goto_bar_input.clear();
+                    if self.goto_bar.open {
+                        self.goto_bar.open = false;
+                        self.goto_bar.input.clear();
                     } else {
-                        self.goto_bar_open = true;
-                        self.goto_bar_command = "page".to_string();
-                        self.goto_bar_input.clear();
-                        // Initial rough estimate; canvas prepaint in render_top_bar_goto_bar
+                        self.goto_bar.open = true;
+                        self.goto_bar.command = "page".to_string();
+                        self.goto_bar.input.clear();
+                        // Initial rough estimate; canvas prepaint in render_action_bar_pill
                         // refines this to the pill's exact x on the next frame.
                         let sz = window.viewport_size();
                         let vw = f32::from(sz.width);
-                        self.goto_bar_anchor = openframe::point(
+                        self.goto_bar.anchor = openframe::point(
                             openframe::px(vw / 2.0 - 110.0),
                             openframe::px(42.0),
                         );
-                        self.goto_bar_focus.focus(window);
+                        self.goto_bar.focus.focus(window);
                     }
                 }
             }
             "arcadia.dismiss_overlays" => {
-                self.command_bar_open = false;
-                self.command_bar_input.clear();
-                self.goto_bar_open = false;
-                self.goto_bar_input.clear();
+                self.command_bar.open = false;
+                self.command_bar.input.clear();
+                self.goto_bar.open = false;
+                self.goto_bar.input.clear();
                 self.app_menu_open = false;
                 self.session_route_menu_open = false;
                 #[cfg(feature = "gui")]

@@ -283,8 +283,6 @@ impl ArcadiaRoot {
         let openai_create_name_focus = cx.focus_handle();
         let openai_create_api_key_focus = cx.focus_handle();
         let openai_create_base_url_focus = cx.focus_handle();
-        let command_bar_focus = cx.focus_handle();
-        let goto_bar_focus = cx.focus_handle();
         let notification_max_count_focus = cx.focus_handle();
         let notification_unread_count =
             arcadia_core::config::notifications::NotificationsConfig::load_or_create()
@@ -694,15 +692,24 @@ impl ArcadiaRoot {
             shortcut_edge_drag_start: None,
             #[cfg(any(feature = "gui", feature = "ios-gui"))]
             shortcut_hot_corner_dwell: std::collections::HashMap::new(),
-            command_bar_open: false,
-            command_bar_input: String::new(),
-            command_bar_focus,
-            goto_bar_open: false,
-            goto_bar_command: "page".to_string(),
-            goto_bar_input: String::new(),
-            goto_bar_focus,
-            goto_bar_selected_idx: None,
-            goto_bar_anchor: openframe::Point::default(),
+            command_bar: crate::gui::app::ActionBarState {
+                open: false,
+                input: String::new(),
+                focus: cx.focus_handle(),
+                selected_idx: None,
+                anchor: openframe::Point::default(),
+                pill_width: openframe::px(200.0),
+                command: String::new(),
+            },
+            goto_bar: crate::gui::app::ActionBarState {
+                open: false,
+                input: String::new(),
+                focus: cx.focus_handle(),
+                selected_idx: None,
+                anchor: openframe::Point::default(),
+                pill_width: openframe::px(280.0),
+                command: "page".to_string(),
+            },
             notification_unread_count,
             notification_settings_feedback: String::new(),
             notification_max_count_draft: String::new(),

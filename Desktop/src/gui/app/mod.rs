@@ -330,6 +330,26 @@ pub struct TabScrollAnim {
     pub to_x: f32,
 }
 
+/// Which action bar to operate on.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ActionBarId {
+    Goto,
+    Command,
+}
+
+/// Shared state for all top-bar action bars (goto, command, and future bars).
+pub struct ActionBarState {
+    pub open: bool,
+    pub input: String,
+    pub focus: FocusHandle,
+    pub selected_idx: Option<usize>,
+    pub anchor: Point<Pixels>,
+    pub pill_width: Pixels,
+    /// Subcommand suffix shown in the pill prefix label (e.g. "page" → renders "goto.page").
+    /// Empty string = no prefix label shown.
+    pub command: String,
+}
+
 /// Phase of the notification badge preview animation.
 #[derive(Clone, PartialEq)]
 pub enum NotificationPreviewPhase {
@@ -687,20 +707,8 @@ pub struct ArcadiaRoot {
     pub ios_shell_focus: FocusHandle,
     #[cfg(feature = "ios-gui")]
     pub ios_shell_scroll: ScrollHandle,
-    /// When true, the tilde command bar is open and focused in the top bar.
-    pub command_bar_open: bool,
-    pub command_bar_input: String,
-    pub command_bar_focus: FocusHandle,
-    /// When true, the goto bar is open in the top bar (Cmd+G).
-    pub goto_bar_open: bool,
-    /// Active goto subcommand — "page" for goto.page, extensible for future subcommands.
-    pub goto_bar_command: String,
-    pub goto_bar_input: String,
-    pub goto_bar_focus: FocusHandle,
-    /// Index of the highlighted suggestion in the dropdown (None = no selection).
-    pub goto_bar_selected_idx: Option<usize>,
-    /// Window-space anchor for the goto suggestions overlay — set when the bar opens.
-    pub goto_bar_anchor: Point<Pixels>,
+    pub command_bar: ActionBarState,
+    pub goto_bar: ActionBarState,
     /// Cached unread notification count for badge display on the Notifications pill.
     pub notification_unread_count: usize,
     /// Feedback line displayed at the bottom of the notification settings panel.
