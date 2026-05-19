@@ -191,12 +191,23 @@ impl ArcadiaRoot {
                     .flex()
                     .items_start()
                     .gap_3()
-                    .child(
-                        render_icon("modules")
+                    .child({
+                        let has_icon =
+                            arcadia_core::modules::wasm_registry::resolve_module_asset_path(
+                                &name, "icon.svg",
+                            )
+                            .map(|path| path.exists())
+                            .unwrap_or(false);
+                        let icon_key = if has_icon {
+                            format!("module-icon/{name}")
+                        } else {
+                            "modules".to_string()
+                        };
+                        render_icon(&icon_key)
                             .size_8()
                             .flex_shrink_0()
-                            .text_color(p.content_title),
-                    )
+                            .text_color(p.content_title)
+                    })
                     .child(
                         div()
                             .flex()

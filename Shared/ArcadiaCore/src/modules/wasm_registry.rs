@@ -426,3 +426,109 @@ pub fn clear() {
         reg.commands.clear();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex as StdMutex;
+
+    static TEST_LOCK: StdMutex<()> = StdMutex::new(());
+
+    /// Serialize tests (the registry is a process-global) and start each from empty.
+    fn guard() -> std::sync::MutexGuard<'static, ()> {
+        let g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        clear();
+        g
+    }
+
+    fn discover(name: &str, enabled: bool) {
+        register_discovered(
+            name.to_string(),
+            PathBuf::from(format!("/fake/Modules/{name}.wasm")),
+            enabled,
+            "1.0.0".to_string(),
+            "test module".to_string(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            1,
+        );
+    }
+
+    #[test]
+    fn discover_then_list() {
+        let _g = guard();
+        discover("alpha", false);
+        let mods = list_modules();
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].0, "alpha");
+        assert!(!mods[0].3, "freshly discovered module is disabled");
+        assert!(!mods[0].7, "freshly discovered module is not loaded");
+    }
+
+    #[test]
+    fn enable_disable_toggle() {
+        let _g = guard();
+        discover("beta", false);
+        set_module_enabled("beta", true);
+        assert!(module_enabled("beta"));
+        set_module_enabled("beta", false);
+        assert!(!module_enabled("beta"));
+    }
+
+    #[test]
+    fn clear_empties_registry() {
+        let _g = guard();
+        discover("gamma", true);
+        register_command("gamma.x".to_string(), String::new(), Arc::new(|_| String::new()), Vec::new());
+        clear();
+        assert!(list_modules().is_empty());
+        assert!(list_commands().is_empty());
+    }
+
+    #[test]
+    fn reload_without_handler_errors() {
+        let _g = guard();
+        assert!(reload().is_err(), "reload before the host installs a handler must error");
+    }
+
+    #[test]
+    fn unregister_drops_module_commands() {
+        let _g = guard();
+        discover("delta", true);
+        register_command("delta.a".to_string(), String::new(), Arc::new(|_| String::new()), Vec::new());
+        register_command("other.a".to_string(), String::new(), Arc::new(|_| String::new()), Vec::new());
+        unregister_module_contributions("delta");
+        let tokens: Vec<String> = list_commands().into_iter().map(|(t, _)| t).collect();
+        assert!(!tokens.contains(&"delta.a".to_string()));
+        assert!(tokens.contains(&"other.a".to_string()));
+    }
+
+    #[test]
+    fn same_module_recursion_is_rejected() {
+        let _g = guard();
+        discover("rec", true);
+        register_command(
+            "rec.inner".to_string(),
+            String::new(),
+            Arc::new(|_| "inner-ran".to_string()),
+            Vec::new(),
+        );
+        // The outer handler re-enters dispatch for one of its own module's commands.
+        register_command(
+            "rec.outer".to_string(),
+            String::new(),
+            Arc::new(|_| match try_dispatch("rec.inner", &[]) {
+                Ok(Some(s)) => s,
+                Ok(None) => "none".to_string(),
+                Err(e) => format!("ERR:{e}"),
+            }),
+            Vec::new(),
+        );
+        let out = try_dispatch("rec.outer", &[])
+            .expect("dispatch must not fail")
+            .expect("outer command exists");
+        assert!(out.starts_with("ERR:"), "same-module recursion must be rejected, got: {out}");
+        assert!(out.contains("recursion"), "got: {out}");
+    }
+}

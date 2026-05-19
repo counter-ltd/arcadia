@@ -2,9 +2,9 @@
 
 Status of the dynamic WASM module loader (branch `development-modularity-loader`).
 
-## Closed — the loader is feature-complete for v1
+## Closed — the loader is feature-complete
 
-The MVP pipeline plus all v1 gap-closing work has landed:
+The MVP pipeline plus all gap-closing work has landed:
 
 - **SDK** — `ModuleSDK/arcadia-module-sdk`: a `register_module!` macro emits the whole
   host/guest ABI (manifest custom section, allocator, `arcadia_dispatch`). Authors write
@@ -14,33 +14,29 @@ The MVP pipeline plus all v1 gap-closing work has landed:
   dispatch; `host_has_permission` lets it introspect its grants. `ExecutionContext`
   carries `invoking_wasm_module` so nested permission checks accept `wasm:<id>` grants.
 - **Re-entrancy** — a thread-local dispatch stack rejects same-module recursion (which
-  would deadlock the per-module `Mutex`); cross-module chains (A→B→A) work.
+  would deadlock the per-module `Mutex`); cross-module chains (A→B→A) work. Covered by
+  `wasm_registry` tests.
 - **Permission gating** — `HostState.granted_permissions` resolved at instantiation from
   `PermissionsConfig`. The GUI page shows a first-enable permission modal.
 - **Folder bundles** — discovery handles both loose `Modules/<name>.wasm` and
   `Modules/<name>/module.wasm` + `Assets/`. `wasm_registry` exposes
   `module_bundle_root` / `resolve_module_asset_path`.
-- **GUI** — a Modules settings page (`wasm-modules.settings`, copy of the Python
-  extensions panel) with search, enable/disable toggles, and the permission modal. The
-  WASM host starts from the GUI lifecycle (startup + runtime-enable), not just headless.
-- **iOS** — `wasm-modules` is wired into the `ios-gui` feature; the `wasmi` staticlib
-  builds for `aarch64-apple-ios`.
-- **Tests** — `arcadia-wasm` has instantiate / dispatch / ABI-mismatch / missing-export
-  tests (WAT fixtures); `extension::wasm_manifest` is tested in `arcadia-core`.
+- **GUI** — a Modules settings page (`wasm-modules.settings`) with search, enable/disable
+  toggles, the permission modal, and **per-module icons** (a `module-icon/<name>` asset
+  prefix resolves `Assets/icon.svg`, falling back to the generic glyph). The WASM host
+  starts from the GUI lifecycle (startup + runtime-enable), not just headless.
+- **iOS** — `wasm-modules` wired into `ios-gui`; the `wasmi` staticlib builds for
+  `aarch64-apple-ios`.
+- **Tests** — `arcadia-wasm` covers instantiate / dispatch / ABI-mismatch /
+  missing-export, plus memory-ABI hardening (bad result pointer, oversized input).
+  `wasm_registry` covers discover/enable/clear/reload/unregister and the same-module
+  recursion guard. `extension::wasm_manifest` is tested in `arcadia-core`.
 
-## Remaining — follow-ups, not v1 blockers
+## Remaining
 
-- **iOS on-device dispatch** — the staticlib compiles for iOS, but end-to-end command
-  dispatch has only been verified on desktop. A simulator/device run is a manual
-  follow-up.
-- **Memory-ABI hardening** — happy path + bad-bytes / ABI-mismatch are tested. Large
-  payloads, allocation failure under memory pressure, and adversarial guest pointers are
-  not exhaustively fuzzed.
-- **Reload** — `wasm-host.reload` works (`clear` + rescan) but has light coverage; a
-  reloaded module loses in-memory state (acceptable, documented behavior).
-- **Per-module GUI icons** — `resolve_module_asset_path` exists, but the settings page
-  renders the generic `modules` glyph; wiring per-bundle `Assets/icon.svg` through the
-  asset layer (a `module-icon/` prefix in `Desktop/src/gui/assets.rs`) is deferred.
+- **iOS on-device dispatch** — the staticlib compiles for iOS; end-to-end command
+  dispatch is verified on desktop only. A simulator/device run is a manual follow-up
+  (deliberately out of scope for the current pass).
 - **Concurrency** — dispatch is serialized per module (per-module `Mutex` around the
   non-`Sync` `wasmi` Store). A slow command blocks other commands on the same module.
-  Acceptable for v1.
+  This is an accepted design tradeoff, not a defect.

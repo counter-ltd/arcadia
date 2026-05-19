@@ -353,4 +353,40 @@ mod tests {
         let wasm = wat::parse_str(wat).expect("WAT must compile");
         assert!(LoadedModule::instantiate(&wasm, "incomplete", &[]).is_err());
     }
+
+    /// `arcadia_dispatch` returns -1 — an invalid packed `(ptr, len)`.
+    const BAD_PTR_WAT: &str = r#"
+        (module
+          (memory (export "memory") 1)
+          (func (export "arcadia_abi_version") (result i32) (i32.const 1))
+          (func (export "arcadia_alloc") (param i32) (result i32) (i32.const 1024))
+          (func (export "arcadia_dealloc") (param i32 i32))
+          (func (export "arcadia_dispatch") (param i32 i32 i32 i32) (result i64)
+            (i64.const -1)))
+    "#;
+
+    #[test]
+    fn dispatch_rejects_bad_result_pointer() {
+        let wasm = wat::parse_str(BAD_PTR_WAT).expect("WAT must compile");
+        let mut module = match LoadedModule::instantiate(&wasm, "badptr", &[]) {
+            Ok(m) => m,
+            Err(e) => panic!("module must instantiate: {e}"),
+        };
+        // The module returns a negative packed pointer; the host must reject it,
+        // not panic or read out of bounds.
+        assert!(module.dispatch("verb", &[]).is_err());
+    }
+
+    #[test]
+    fn dispatch_rejects_oversized_input() {
+        let wasm = wat::parse_str(OK_MODULE_WAT).expect("WAT must compile");
+        let mut module = match LoadedModule::instantiate(&wasm, "ok", &[]) {
+            Ok(m) => m,
+            Err(e) => panic!("module must instantiate: {e}"),
+        };
+        // The module exports a single 64 KiB memory page; a payload larger than that
+        // must fail the guest-memory write gracefully.
+        let huge = "x".repeat(200_000);
+        assert!(module.dispatch("verb", &[huge]).is_err());
+    }
 }
