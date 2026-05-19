@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opensourcevillain/resources/bc6072cd7f49dc155b47c88e79daa9d49ece9b7e/OpenSourceVillain/Banner.png" alt="Arcadia" />
+</p>
+
 # Arcadia
 
 **One Rust core. One Python SDK. An infinite extension surface. Zero rent.**
