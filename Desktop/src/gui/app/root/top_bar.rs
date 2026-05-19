@@ -1221,8 +1221,14 @@ impl ArcadiaRoot {
                     tc,
                     meta_c,
                     |this, new_text, cx| {
-                        this.goto_bar_input = new_text;
-                        this.goto_bar_selected_idx = None;
+                        // Strip newlines produced by text_input when Enter is pressed,
+                        // so that Enter does not corrupt the input or clear the selection.
+                        let clean: String =
+                            new_text.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+                        if clean != this.goto_bar_input {
+                            this.goto_bar_selected_idx = None;
+                            this.goto_bar_input = clean;
+                        }
                         cx.notify();
                     },
                 )

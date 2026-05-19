@@ -1950,21 +1950,27 @@ impl ArcadiaRoot {
                 div()
                     .min_w(px(220.0))
                     .max_w(px(320.0))
-                    .p_1()
                     .rounded(px(radius))
                     .bg(bg)
                     .border_1()
                     .border_color(border_c)
                     .occlude()
-                    .flex()
-                    .flex_col()
-                    .gap_0p5()
-                    .text_xs()
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|_, _, _, cx| cx.stop_propagation()),
                     )
-                    .children(rows),
+                    .child(
+                        div()
+                            .id("goto-suggestions-scroll")
+                            .p_1()
+                            .flex()
+                            .flex_col()
+                            .gap_0p5()
+                            .text_xs()
+                            .max_h(px(280.0))
+                            .overflow_y_scroll()
+                            .children(rows),
+                    ),
             )
             .into_any_element()
     }
