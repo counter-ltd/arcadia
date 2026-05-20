@@ -56,6 +56,8 @@ pub struct ModuleManifest {
 | `permissions` | — | all | Permission catalog + `permit`/`list` CLI commands |
 | `tray` | — | macOS, Windows, Linux | Menu-bar / system-tray icon |
 | `cursor` | — | macOS, Windows, Linux | OS-global cursor position + screen size |
+| `keyboard` | — | macOS | OS-global key / mouse / scroll event stream for extensions |
+| `audio` | — | macOS, Windows, Linux | Low-latency audio output with DSP node graphs and sample playback |
 | `overlay` | — | macOS, Windows, Linux | Always-on-top transparent HUD window |
 | `workspace` | — | all | Workspace directory registry + scoped permissions |
 | `code-editor` | — | all | Code editor panel |

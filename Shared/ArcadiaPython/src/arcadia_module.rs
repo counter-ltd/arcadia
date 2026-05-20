@@ -11,8 +11,8 @@ use arcadia_core::modules::visual_editor::palette::BlockDef;
 use arcadia_core::modules::overlay::parse_overlay_stacking_token;
 use arcadia_core::modules::overlay_hud_sprite::{self as overlay_hud_sprite, SpriteAnchor};
 use arcadia_core::modules::{
-    animation, cursor as core_cursor, platform as core_platform, python_registry, tray as core_tray,
-    ExecutionContext,
+    animation, audio as core_audio, cursor as core_cursor, keyboard as core_keyboard,
+    platform as core_platform, python_registry, tray as core_tray, ExecutionContext,
 };
 use arcadia_core::scheduling;
 use arcadia_core::shortcuts::ShortcutRegistrationOwned;
@@ -1163,6 +1163,198 @@ fn register_nav_page(
     });
 }
 
+// ─── Keyboard module ─────────────────────────────────────────────────────────
+
+fn keyboard_event_to_dict<'py>(
+    py: Python<'py>,
+    ev: core_keyboard::KeyboardEvent,
+) -> PyResult<Bound<'py, PyDict>> {
+    let d = PyDict::new_bound(py);
+    match ev {
+        core_keyboard::KeyboardEvent::KeyDown {
+            keycode,
+            modifiers,
+            repeat,
+            timestamp_ns,
+        } => {
+            d.set_item("kind", "KeyDown")?;
+            d.set_item("keycode", keycode)?;
+            d.set_item("modifiers", modifiers)?;
+            d.set_item("repeat", repeat)?;
+            d.set_item("timestamp_ns", timestamp_ns)?;
+        }
+        core_keyboard::KeyboardEvent::KeyUp {
+            keycode,
+            modifiers,
+            timestamp_ns,
+        } => {
+            d.set_item("kind", "KeyUp")?;
+            d.set_item("keycode", keycode)?;
+            d.set_item("modifiers", modifiers)?;
+            d.set_item("timestamp_ns", timestamp_ns)?;
+        }
+        core_keyboard::KeyboardEvent::MouseDown {
+            button,
+            timestamp_ns,
+        } => {
+            d.set_item("kind", "MouseDown")?;
+            d.set_item("button", button)?;
+            d.set_item("timestamp_ns", timestamp_ns)?;
+        }
+        core_keyboard::KeyboardEvent::MouseUp {
+            button,
+            timestamp_ns,
+        } => {
+            d.set_item("kind", "MouseUp")?;
+            d.set_item("button", button)?;
+            d.set_item("timestamp_ns", timestamp_ns)?;
+        }
+        core_keyboard::KeyboardEvent::ScrollWheel {
+            dx,
+            dy,
+            timestamp_ns,
+        } => {
+            d.set_item("kind", "ScrollWheel")?;
+            d.set_item("dx", dx)?;
+            d.set_item("dy", dy)?;
+            d.set_item("timestamp_ns", timestamp_ns)?;
+        }
+    }
+    Ok(d)
+}
+
+/// Register a handler for OS-global key/mouse/scroll events. `handler(event_dict)` is
+/// called on a background thread; do not block. Replaces any prior handler for the
+/// same extension. Also starts the OS observer (best effort; errors swallowed since
+/// startup is platform-dependent — extensions can call `execute("keyboard.state", [])`
+/// to check).
+#[pyfunction]
+fn keyboard_on_event(extension_id: String, handler: PyObject) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "keyboard.global_events")?;
+    let ext_id = extension_id.clone();
+    let handler = Arc::new(handler);
+    let cb: core_keyboard::Handler = Arc::new(move |ev| {
+        if !python_registry::extension_enabled(&ext_id) {
+            return;
+        }
+        let scope_id = ext_id.clone();
+        let _scope = python_scope::PythonExtensionScope::enter(scope_id);
+        let h = Arc::clone(&handler);
+        let ext_for_err = ext_id.clone();
+        Python::with_gil(|py| {
+            match keyboard_event_to_dict(py, ev) {
+                Ok(d) => {
+                    if let Err(e) = h.call1(py, (d,)) {
+                        eprintln!("keyboard_on_event({ext_for_err}) callback error: {e}");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("keyboard_on_event({ext_for_err}) dict build error: {e}");
+                }
+            }
+        });
+    });
+    core_keyboard::register_handler(extension_id.clone(), cb);
+    // Best-effort start. A backend may legitimately return Err if permission flow
+    // hasn't been completed; the user will see the prompt and can retry.
+    let _ = core_keyboard::start_observer();
+    Ok(())
+}
+
+#[pyfunction]
+fn keyboard_off_event(extension_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "keyboard.global_events")?;
+    core_keyboard::unregister_handler(&extension_id);
+    Ok(())
+}
+
+// ─── Audio module ────────────────────────────────────────────────────────────
+
+fn audio_owner(extension_id: &str) -> String {
+    format!("python:{extension_id}")
+}
+
+#[pyfunction]
+fn audio_register_voice(extension_id: String, graph_json: String) -> PyResult<String> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    let spec = core_audio::VoiceSpec::from_json(&graph_json)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))?;
+    core_audio::register_voice(&audio_owner(&extension_id), spec)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn audio_unregister_voice(extension_id: String, voice_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    core_audio::unregister_voice(&audio_owner(&extension_id), &voice_id)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+#[pyo3(signature = (extension_id, voice_id, velocity=1.0, seed=0))]
+fn audio_play_voice(
+    extension_id: String,
+    voice_id: String,
+    velocity: f32,
+    seed: u32,
+) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    // Best-effort start: if the desktop backend hasn't been initialised yet, the
+    // engine is idle and play_voice just queues a voice that no one will mix.
+    let _ = core_audio::start_engine();
+    core_audio::play_voice(&audio_owner(&extension_id), &voice_id, velocity, seed)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn audio_load_sample(extension_id: String, path: String) -> PyResult<String> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    let p = std::path::PathBuf::from(&path);
+    core_audio::load_sample(&audio_owner(&extension_id), &p)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn audio_unload_sample(extension_id: String, sample_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    core_audio::unload_sample(&audio_owner(&extension_id), &sample_id)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+#[pyo3(signature = (extension_id, sample_id, gain=1.0, pitch=1.0))]
+fn audio_play_sample(
+    extension_id: String,
+    sample_id: String,
+    gain: f32,
+    pitch: f32,
+) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    let _ = core_audio::start_engine();
+    core_audio::play_sample(&audio_owner(&extension_id), &sample_id, gain, pitch)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e))
+}
+
+#[pyfunction]
+fn audio_set_master_gain(extension_id: String, gain: f32) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    core_audio::set_master_gain(gain);
+    Ok(())
+}
+
+#[pyfunction]
+fn audio_panic(extension_id: String) -> PyResult<()> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    core_audio::panic(Some(&audio_owner(&extension_id)));
+    Ok(())
+}
+
+#[pyfunction]
+fn audio_active_voice_count(extension_id: String) -> PyResult<usize> {
+    ensure_python_permission(&extension_id, "audio.output")?;
+    Ok(core_audio::active_voice_count(Some(&audio_owner(&extension_id))))
+}
+
 #[pymodule]
 pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(register_module, m)?)?;
@@ -1209,5 +1401,16 @@ pub fn arcadia(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(list_highlight_providers, m)?)?;
     m.add_function(wrap_pyfunction!(register_file_icon_provider, m)?)?;
     m.add_function(wrap_pyfunction!(register_nav_page, m)?)?;
+    m.add_function(wrap_pyfunction!(keyboard_on_event, m)?)?;
+    m.add_function(wrap_pyfunction!(keyboard_off_event, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_register_voice, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_unregister_voice, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_play_voice, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_load_sample, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_unload_sample, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_play_sample, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_set_master_gain, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_panic, m)?)?;
+    m.add_function(wrap_pyfunction!(audio_active_voice_count, m)?)?;
     Ok(())
 }

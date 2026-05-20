@@ -2,7 +2,11 @@
 pub mod app;
 mod assets;
 #[cfg(feature = "gui")]
+pub mod audio_backend;
+#[cfg(feature = "gui")]
 pub mod cursor_backend;
+#[cfg(feature = "gui")]
+pub mod keyboard_backend;
 #[cfg(feature = "gui")]
 mod overlay_backend;
 #[cfg(feature = "gui")]

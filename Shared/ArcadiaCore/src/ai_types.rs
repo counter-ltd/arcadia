@@ -120,6 +120,9 @@ pub struct ImageGenerationRequest {
     pub width: u32,
     pub height: u32,
     pub workspace_context: Option<AiWorkspaceContext>,
+    /// Provider-specific style token (e.g. `"animation"`, `"illustration"`, `"sketch"`
+    /// for ImagePlayground). `None` lets the provider pick its default.
+    pub style: Option<String>,
 }
 
 #[derive(Clone, Debug)]

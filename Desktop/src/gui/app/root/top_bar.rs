@@ -82,6 +82,7 @@ impl ArcadiaRoot {
                                             AI_APFEL_MODULE_NAME, AI_EXEC_AIDER_MODULE_NAME,
                                             AI_EXEC_CLAUDE_MODULE_NAME, AI_EXEC_CODEX_MODULE_NAME,
                                             AI_EXEC_GEMINI_MODULE_NAME,
+                                            AI_IMAGE_PLAYGROUND_MODULE_NAME,
                                         };
                                         use arcadia_core::modules::ai::provider_display_name;
                                         let provider = self.ai.active_provider_module.as_str();
@@ -91,7 +92,8 @@ impl ArcadiaRoot {
                                             || p == AI_EXEC_CODEX_MODULE_NAME
                                             || p == AI_EXEC_GEMINI_MODULE_NAME
                                             || p == AI_EXEC_AIDER_MODULE_NAME
-                                            || p == AI_APFEL_MODULE_NAME)
+                                            || p == AI_APFEL_MODULE_NAME
+                                            || p == AI_IMAGE_PLAYGROUND_MODULE_NAME)
                                         {
                                             self.ai.detected_cli_providers.iter()
                                                 .find(|c| c.id == provider)

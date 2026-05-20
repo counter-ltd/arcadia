@@ -10,7 +10,10 @@ use super::super::overlay_hud::OverlayHudRoot;
 use super::ArcadiaRoot;
 
 use crate::cli;
-use crate::gui::{cursor_backend, overlay_backend, platform_backend, tray_backend};
+use crate::gui::{
+    audio_backend, cursor_backend, keyboard_backend, overlay_backend, platform_backend,
+    tray_backend,
+};
 use arcadia_core::modules::overlay::OverlayStackingToken;
 use arcadia_core::scheduling;
 
@@ -42,6 +45,8 @@ pub fn run() {
         tray_backend::install();
         cursor_backend::install();
         platform_backend::install();
+        keyboard_backend::install();
+        audio_backend::install();
 
         app.open_window(
             WindowOptions {

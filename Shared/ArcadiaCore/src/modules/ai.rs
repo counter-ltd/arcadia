@@ -54,6 +54,12 @@ pub const AI_PROVIDER_REGISTRY: &[AiProviderManifest] = &[
         description:
             "On-device inference via macOS Foundation Models. No API key or network required.",
     },
+    AiProviderManifest {
+        module_name: "ai-provider-image-playground",
+        display_name: "ImagePlayground",
+        description:
+            "On-device image generation via macOS ImagePlayground (macOS 15.2+). No API key or network required.",
+    },
 ];
 
 pub fn enabled_ai_providers(module_rows: &[(String, bool)]) -> Vec<&'static AiProviderManifest> {

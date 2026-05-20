@@ -83,7 +83,7 @@ The registry ships a `system.*` entry for every standard macOS privacy capabilit
 | `system.reminders` | `Reminders` | Reminders |
 | `system.bluetooth` | `Bluetooth` | Bluetooth |
 
-`cursor.global_position` and `cursor.global_mouse_buttons` also carry `SystemGrant::Accessibility`.
+`cursor.global_position`, `cursor.global_mouse_buttons`, and `keyboard.global_events` all carry `SystemGrant::Accessibility` — flipping any of them in Permissions opens the same macOS Accessibility pane. `audio.output` has no OS-level gate — Arcadia's own toggle is the only check.
 
 When a permission has a `system_grant`, the permissions panel renders a button (macOS only) next to its toggle. The label depends on `platform::is_system_grant_active`: **Grant** when the OS grant is missing, **Revoke** when active. Both call `platform::prompt_system_grant`, which opens the matching Privacy & Security settings pane (and, for Accessibility, also shows the consent dialog). State checks are wired for Accessibility (`AXIsProcessTrusted`) and Screen Recording (`CGPreflightScreenCaptureAccess`); the rest report inactive until a feature consuming them wires the per-capability check. Arcadia's toggle and the OS grant are independent gates — both must be satisfied.
 

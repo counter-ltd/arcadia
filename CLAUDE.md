@@ -149,6 +149,7 @@ All modules live in `MODULE_REGISTRY` (`config/modules.rs`). Commands follow `mo
 | `cursor` | `CURSOR_MODULE_NAME` | — | OS-global cursor position + display size (desktop only) |
 | `overlay` | `OVERLAY_MODULE_NAME` | — | Always-on-top transparent HUD (desktop only) |
 | `workspace` | `WORKSPACE_MODULE_NAME` | — | `workspace.add/remove/list/grant/revoke/check` — directory registry + permissions |
+| `ai-provider-image-playground` | `AI_IMAGE_PLAYGROUND_MODULE_NAME` | `ai` | Apple ImagePlayground — on-device image generation (macOS 15.2+) |
 
 ---
 

@@ -1014,7 +1014,7 @@ impl ArcadiaRoot {
                                                                 } else {
                                                                     crate::gui::app::AiMessageRole::Assistant
                                                                 };
-                                                                crate::gui::app::AiMessage { role, content: m.content.clone(), provider: stored.provider.clone() }
+                                                                crate::gui::app::AiMessage { role, content: m.content.clone(), provider: stored.provider.clone(), images: Vec::new() }
                                                             }).collect();
                                                             this.ai.chats.push(crate::gui::app::AiChat {
                                                                 id,

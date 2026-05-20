@@ -1,7 +1,7 @@
 # AI
 
 Module name: `ai` (base)  
-Provider modules: `ai-provider-ollama`, `ai-provider-llama-cpp`, `ai-provider-openai`  
+Provider modules: `ai-provider-ollama`, `ai-provider-llama-cpp`, `ai-provider-openai`, `ai-provider-apfel`, `ai-provider-image-playground`, plus CLI providers  
 Platform: desktop (inference threads); iOS routes to a desktop host
 
 ---
@@ -33,6 +33,8 @@ ai_types.rs        — shared types (requests, responses, workspace context)
 | `ai-provider-llama-cpp` | llama.cpp | Local inference — runs `.gguf` models directly on-device |
 | `ai-provider-ollama` | Ollama | Local inference via Ollama HTTP API (`http://localhost:11434`) |
 | `ai-provider-openai` | OpenAI | Cloud inference via OpenAI-compatible HTTP API |
+| `ai-provider-apfel` | Apple Intelligence | On-device text inference via macOS Foundation Models (macOS 26+) |
+| `ai-provider-image-playground` | ImagePlayground | On-device image generation via macOS ImagePlayground (macOS 15.2+) |
 
 ### Ollama (`ollama.toml`)
 
@@ -64,6 +66,15 @@ The settings panel includes an auto-discovery button that queries `GET /api/tags
 | `models` | `[]` | Registered models: `id`, `name`, `model_id`, `model_kind` |
 
 **Security note:** API key is stored in `openai.toml` in the config root. It is never put in an enum variant, struct field crossing a thread boundary, or message payload. The inference thread loads it directly from config at call time via `OpenAiConfig::load_or_create()`.
+
+### Apple ImagePlayground (`image_playground.toml`)
+
+| Field | Default | Purpose |
+|-------|---------|---------|
+| `default_style` | `animation` | One of `animation`, `illustration`, `sketch`. Sets the visual style. |
+| `cache_dir` | `None` | Override for the PNG output directory. `None` resolves to `<config_root>/image_playground/cache`. |
+
+macOS-only (15.2+); requires Apple Intelligence enabled. The runtime spawns `swift` with an embedded runner script that drives `ImageCreator` and writes a PNG to the cache directory. The chat panel renders the PNG inline via OpenFrame's `img()` element.
 
 ### General AI config (`ai.toml`)
 

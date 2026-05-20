@@ -1,5 +1,5 @@
 [package]
-name = "arcadia-module-sdk"
+name = "arcadia-wasm-sdk"
 version = "0.1.0"
 edition = "2021"
 description = "SDK for authoring Arcadia WASM modules — register_module! macro + host bindings"

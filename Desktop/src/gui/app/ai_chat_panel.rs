@@ -2,22 +2,24 @@ use arcadia_core::config::ai_rules::{all_rules, AiRulesConfig};
 use arcadia_core::config::ai_skills::{all_skills, AiSkillsConfig};
 use arcadia_core::config::modules::{
     AI_APFEL_MODULE_NAME, AI_EXEC_AIDER_MODULE_NAME, AI_EXEC_CLAUDE_MODULE_NAME,
-    AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME, AI_LLAMA_CPP_MODULE_NAME,
-    AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
+    AI_EXEC_CODEX_MODULE_NAME, AI_EXEC_GEMINI_MODULE_NAME, AI_IMAGE_PLAYGROUND_MODULE_NAME,
+    AI_LLAMA_CPP_MODULE_NAME, AI_OLLAMA_MODULE_NAME, AI_OPENAI_MODULE_NAME, WORKSPACE_MODULE_NAME,
 };
 use arcadia_core::config::ollama::OllamaConfig;
 use arcadia_core::config::ConfigFile;
 use arcadia_core::modules::ai::is_ai_provider_available;
 use arcadia_core::modules::ai_exec_cli::cli_for_module;
-use arcadia_core::ai_types::{AiWorkspaceContext, TextGenerationRequest};
+use arcadia_core::ai_types::{AiWorkspaceContext, ImageGenerationRequest, TextGenerationRequest};
 use openframe::prelude::FluentBuilder as _;
 use openframe::{
-    div, px, rgb, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
-    KeyDownEvent, MouseButton, ParentElement, SharedString, StatefulInteractiveElement, Styled,
-    Window,
+    div, img, px, rgb, text_input, AnyElement, Context, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, ObjectFit, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, StyledImage, Window,
 };
 
-use crate::gui::app::ai_runtime::{AiRuntimeHandle, AiRuntimeRequest, ProviderRouting};
+use crate::gui::app::ai_runtime::{
+    AiRuntimeHandle, AiRuntimeRequest, ImageProviderRouting, ProviderRouting,
+};
 use crate::gui::app::{AiMessage, AiMessageRole, ArcadiaRoot};
 use crate::gui::theme;
 
@@ -308,6 +310,7 @@ impl ArcadiaRoot {
                                             role,
                                             content: m.content.clone(),
                                             provider: stored.provider.clone(),
+                                            images: Vec::new(),
                                         }
                                     })
                                     .collect();
@@ -743,6 +746,32 @@ impl ArcadiaRoot {
                         .child(row_el),
                 );
             }
+
+            // Attached images (e.g. ImagePlayground output). Rendered after text segments
+            // so a provider can stream a caption and then attach the generated PNG.
+            for image_path in &msg.images {
+                let img_bubble = div()
+                    .p_1()
+                    .rounded(px(radius.min(12.0)))
+                    .bg(bubble_bg)
+                    .border_1()
+                    .border_color(bubble_border)
+                    .flex()
+                    .child(
+                        img(image_path.clone())
+                            .w(px(384.))
+                            .h(px(384.))
+                            .object_fit(ObjectFit::Contain),
+                    );
+                msg_col = msg_col.child(
+                    div()
+                        .w_full()
+                        .flex()
+                        .flex_row()
+                        .when(is_user, |d| d.justify_end())
+                        .child(img_bubble),
+                );
+            }
         }
 
         // Loading indicator: distinguish model-load phase (empty assistant placeholder)
@@ -1166,6 +1195,17 @@ impl ArcadiaRoot {
         // Build provider routing from active provider + selected model.
         let provider = self.ai.active_provider_module.clone();
         let model_id = self.ai.chat_model_id.clone();
+
+        // Image-generation providers fan out to a separate dispatch path. They take
+        // a single prompt rather than a chat history and emit an `Image(path)` event
+        // instead of streaming text tokens.
+        if provider.as_str() == AI_IMAGE_PLAYGROUND_MODULE_NAME {
+            self.dispatch_image_playground(active_id, &input, &provider, cx);
+            self.ensure_ai_poll_task(window, cx);
+            cx.notify();
+            return;
+        }
+
         let routing_result: Result<ProviderRouting, String> = match provider.as_str() {
             AI_LLAMA_CPP_MODULE_NAME => match model_id.as_deref() {
                 None => Err("No model selected. Choose a model from the top bar.".to_string()),
@@ -1244,6 +1284,7 @@ impl ArcadiaRoot {
                 role: AiMessageRole::User,
                 content: input.clone(),
                 provider: String::new(),
+                images: Vec::new(),
             });
             chat.input_draft.clear();
             chat.session_provider = provider.clone();
@@ -1260,6 +1301,7 @@ impl ArcadiaRoot {
                         role: AiMessageRole::Assistant,
                         content: msg,
                         provider: provider.clone(),
+                        images: Vec::new(),
                     });
                 }
                 cx.notify();
@@ -1293,6 +1335,7 @@ impl ArcadiaRoot {
                 role: AiMessageRole::Assistant,
                 content: String::new(),
                 provider: provider.clone(),
+                images: Vec::new(),
             });
             chat.is_loading = true;
         }
@@ -1322,5 +1365,74 @@ impl ArcadiaRoot {
 
         self.ensure_ai_poll_task(window, cx);
         cx.notify();
+    }
+
+    /// Dispatch path for image-generation providers. Pushes the user prompt + an
+    /// empty assistant placeholder, then sends an `AiRuntimeRequest::GenerateImage`
+    /// to the inference thread. The resulting PNG path arrives via
+    /// `RuntimeEvent::Image` and is appended to the placeholder's `images` vec.
+    fn dispatch_image_playground(
+        &mut self,
+        active_id: usize,
+        input: &str,
+        provider: &str,
+        _cx: &mut Context<Self>,
+    ) {
+        use arcadia_core::config::image_playground::ImagePlaygroundConfig;
+        use arcadia_core::config::ConfigFile;
+
+        // Push user message + clear draft.
+        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == active_id) {
+            chat.messages.push(AiMessage {
+                role: AiMessageRole::User,
+                content: input.to_string(),
+                provider: String::new(),
+                images: Vec::new(),
+            });
+            chat.input_draft.clear();
+            chat.session_provider = provider.to_string();
+        }
+
+        // Placeholder assistant message — the generated image attaches here.
+        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == active_id) {
+            chat.messages.push(AiMessage {
+                role: AiMessageRole::Assistant,
+                content: String::new(),
+                provider: provider.to_string(),
+                images: Vec::new(),
+            });
+            chat.is_loading = true;
+        }
+
+        self.ai.stream_chat_id = Some(active_id);
+
+        let style = ImagePlaygroundConfig::load_or_create()
+            .map(|c| c.default_style.as_swift_token().to_string())
+            .ok();
+
+        let workspace_context: Option<AiWorkspaceContext> =
+            if self.is_module_enabled(WORKSPACE_MODULE_NAME) {
+                self.ai.chat_workspace_id.as_deref().and_then(|ws_id| {
+                    self.workspace_entries
+                        .iter()
+                        .find(|w| w.id == ws_id)
+                        .map(AiWorkspaceContext::from_workspace_entry)
+                })
+            } else {
+                None
+            };
+
+        let runtime = self.ai.runtime.get_or_insert_with(AiRuntimeHandle::start);
+        let _ = runtime.request_tx.try_send(AiRuntimeRequest::GenerateImage {
+            routing: ImageProviderRouting::ImagePlayground,
+            request: ImageGenerationRequest {
+                prompt: input.to_string(),
+                negative_prompt: None,
+                width: 0,
+                height: 0,
+                workspace_context,
+                style,
+            },
+        });
     }
 }

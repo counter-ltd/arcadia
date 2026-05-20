@@ -1,20 +1,20 @@
-//! Example Arcadia WASM module, built with `arcadia-module-sdk`.
+//! Example Arcadia WASM module, built with `arcadia-wasm-sdk`.
 //!
 //! The `register_module!` macro emits the entire ABI (manifest custom section, allocator,
 //! `arcadia_dispatch`); the author writes only handler functions.
 //!
 //! ```sh
 //! cargo build --release --target wasm32-unknown-unknown \
-//!   --manifest-path ModuleSDK/examples/hello/Cargo.toml
+//!   --manifest-path WASMSDK/examples/hello/Cargo.toml
 //! ```
 //!
 //! then drop the resulting `hello_wasm.wasm` into `~/Arcadia/Modules/`.
 
-use arcadia_module_sdk::register_module;
+use arcadia_wasm_sdk::register_module;
 
 fn greet(args: Vec<String>) -> String {
     let who = args.first().map(String::as_str).unwrap_or("world");
-    arcadia_module_sdk::log(&format!("hello-wasm: greeting {who}"));
+    arcadia_wasm_sdk::log(&format!("hello-wasm: greeting {who}"));
     format!("Hello, {who}")
 }
 

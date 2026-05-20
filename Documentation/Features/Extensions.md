@@ -122,6 +122,62 @@ Shows:
 
 ---
 
+## Keyboard event API
+
+Extensions can subscribe to OS-global key, mouse, and scroll events when the `keyboard` core module is enabled and the user has granted `keyboard.global_events` (macOS: Input Monitoring).
+
+```python
+def on_event(ev):
+    # ev = {"kind": "KeyDown" | "KeyUp" | "MouseDown" | "MouseUp" | "ScrollWheel",
+    #       "keycode": int (Key*), "modifiers": int (Key*), "repeat": bool (KeyDown),
+    #       "button": int (Mouse*), "dx": float (Scroll), "dy": float (Scroll),
+    #       "timestamp_ns": int}
+    ...
+
+arcadia.keyboard_on_event(EXTENSION_ID, on_event)
+arcadia.keyboard_off_event(EXTENSION_ID)  # to stop
+```
+
+The handler runs on a background thread; do not block. One handler per extension; re-calling replaces.
+
+---
+
+## Audio API
+
+When the `audio` core module is enabled and `audio.output` is granted, extensions can register parametric DSP voices, load WAV samples, and trigger playback.
+
+```python
+# Voice graph: JSON describing a DAG of generic DSP nodes.
+graph = {
+  "nodes": [
+    {"id": "n",   "kind": "noise_burst", "duration_ms": 4.0, "shape": "exp"},
+    {"id": "bp",  "kind": "biquad", "mode": "bandpass", "freq_hz": 420.0, "q": 12.0},
+    {"id": "env", "kind": "env_ar", "attack_ms": 0.1, "release_ms": 80.0},
+  ],
+  "edges": [["n", "bp"], ["bp", "env"]],
+  "output": "env",
+  "variations": {"freq_jitter_pct": 2.5, "gain_jitter_pct": 6.0},
+}
+
+import json
+vid = arcadia.audio_register_voice(EXTENSION_ID, json.dumps(graph))
+arcadia.audio_play_voice(EXTENSION_ID, vid, velocity=0.85, seed=42)
+arcadia.audio_unregister_voice(EXTENSION_ID, vid)
+
+# Samples
+sid = arcadia.audio_load_sample(EXTENSION_ID, "/path/to/sound.wav")
+arcadia.audio_play_sample(EXTENSION_ID, sid, gain=1.0, pitch=1.0)
+arcadia.audio_unload_sample(EXTENSION_ID, sid)
+
+arcadia.audio_set_master_gain(EXTENSION_ID, 0.7)
+arcadia.audio_panic(EXTENSION_ID)               # stop all voices for this ext
+arcadia.audio_active_voice_count(EXTENSION_ID)  # → int
+```
+
+Node kinds: `noise_burst` (shape: exp|linear|flat), `biquad` (mode: bandpass|lowpass|highpass), `transient`, `env_ar`, `mix` (per-input `gains`), `gain`. Engine output is 48 kHz stereo on desktop (sample rate queried from the active backend). Voice pool: 64 concurrent voices, oldest-evict.
+
+---
+
 ## Platform filtering
 
 `supports_runtime_platform_owned(supported_platforms: &[String])` checks `supported_platforms` against the current platform ID (`macos`, `windows`, `linux`, `ios`, `unknown`). Empty list = all platforms. Filtered extensions are hidden from the Extensions page on incompatible platforms.

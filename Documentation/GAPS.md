@@ -34,8 +34,8 @@ Multi-writer LWW on `modules.toml`, discrete LAN transport, attribution-only `cl
 The dynamic WASM module loader (`Modules/` directory, branch
 `development-modularity-loader`) is **feature-complete**:
 
-- **SDK** — `ModuleSDK/arcadia-module-sdk`: a `register_module!` macro emits the whole
-  host/guest ABI. Authoring guide in `ModuleSDK/README.md`.
+- **SDK** — `Libraries/arcadia-wasm-sdk`: a `register_module!` macro emits the whole
+  host/guest ABI. Authoring guide in `WASMSDK/README.md`.
 - **Host callbacks** — `host_execute_command` (re-enters Arcadia dispatch),
   `host_has_permission`. `ExecutionContext::invoking_wasm_module` carries `wasm:<id>` for
   nested permission checks. A thread-local dispatch stack rejects same-module recursion.

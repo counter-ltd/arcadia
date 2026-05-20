@@ -6,6 +6,7 @@ pub mod appearance;
 pub mod code_editor;
 pub mod commandline;
 pub mod extension_tokens;
+pub mod image_playground;
 pub mod late;
 pub mod llama_cpp;
 pub mod modules;

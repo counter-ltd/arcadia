@@ -238,6 +238,9 @@ pub struct AiMessage {
     pub role: AiMessageRole,
     pub content: String,
     pub provider: String,
+    /// Attached image paths (PNG, absolute). Populated by image-generation providers
+    /// such as ImagePlayground. Rendered after the text content of the message.
+    pub images: Vec<std::path::PathBuf>,
 }
 
 pub struct AiChat {
@@ -669,6 +672,15 @@ pub struct ArcadiaRoot {
     pub settings_hub_expanded: bool,
     pub settings_expand_alpha: f32,
     pub settings_expand_anim: Option<CaretAnim>,
+    pub modules_builtin_alpha: f32,
+    pub modules_builtin_anim: Option<CaretAnim>,
+    pub modules_builtin_collapsed: bool,
+    pub modules_ext_alpha: f32,
+    pub modules_ext_anim: Option<CaretAnim>,
+    pub modules_ext_collapsed: bool,
+    pub modules_wasm_alpha: f32,
+    pub modules_wasm_anim: Option<CaretAnim>,
+    pub modules_wasm_collapsed: bool,
     pub pill_expanded: HashMap<String, bool>,
     pub pill_expand_alphas: HashMap<String, f32>,
     pub pill_expand_anims: HashMap<String, CaretAnim>,

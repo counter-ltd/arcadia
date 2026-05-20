@@ -1,4 +1,4 @@
-# Arcadia Module SDK
+# Arcadia WASM SDK
 
 Tools for authoring **WASM modules** for Arcadia — Rust code compiled to
 `wasm32-unknown-unknown`, dropped into `~/Arcadia/Modules/`, loaded and dispatched at
@@ -8,23 +8,23 @@ This directory is author-facing tooling. It is **not** part of the Arcadia build
 `Shared/` workspace does not include it.
 
 ```
-ModuleSDK/
-  arcadia-module-sdk/    the SDK crate — register_module! macro + host bindings
+Libraries/arcadia-wasm-sdk/    the SDK crate — register_module! macro + host bindings
+WASMSDK/
   examples/hello/        a minimal example module
 ```
 
 ## Writing a module
 
-A module is a `cdylib` crate that depends on `arcadia-module-sdk` and calls
+A module is a `cdylib` crate that depends on `arcadia-wasm-sdk` and calls
 `register_module!`. The macro emits the entire host/guest ABI; you write only handler
 functions.
 
 ```rust
-use arcadia_module_sdk::register_module;
+use arcadia_wasm_sdk::register_module;
 
 fn greet(args: Vec<String>) -> String {
     let who = args.first().map(String::as_str).unwrap_or("world");
-    arcadia_module_sdk::log(&format!("greeting {who}"));
+    arcadia_wasm_sdk::log(&format!("greeting {who}"));
     format!("Hello, {who}")
 }
 
@@ -45,14 +45,14 @@ register_module! {
 crate-type = ["cdylib"]
 
 [dependencies]
-arcadia-module-sdk = { path = "../../arcadia-module-sdk" }
+arcadia-wasm-sdk = { path = "../../arcadia-wasm-sdk" }
 ```
 
 ## Building
 
 ```sh
 cargo build --release --target wasm32-unknown-unknown \
-  --manifest-path ModuleSDK/examples/hello/Cargo.toml
+  --manifest-path WASMSDK/examples/hello/Cargo.toml
 ```
 
 The resulting `<name>.wasm` goes into `~/Arcadia/Modules/`, either loose or as a folder
@@ -66,11 +66,11 @@ bundle `~/Arcadia/Modules/<name>/module.wasm` (with an optional `Assets/` direct
 
 The SDK exposes functions the module calls back into Arcadia with:
 
-- `arcadia_module_sdk::log(msg)` / `log_at(level, msg)` — write to the host log.
-- `arcadia_module_sdk::execute_command(token, args)` — run an Arcadia command
+- `arcadia_wasm_sdk::log(msg)` / `log_at(level, msg)` — write to the host log.
+- `arcadia_wasm_sdk::execute_command(token, args)` — run an Arcadia command
   (`module.verb`) and get its result. Subject to the permissions the module declared.
   A module calling one of *its own* commands is rejected (same-module recursion).
-- `arcadia_module_sdk::has_permission(id)` — whether the module was granted a permission
+- `arcadia_wasm_sdk::has_permission(id)` — whether the module was granted a permission
   it declared.
 
 ## ABI version

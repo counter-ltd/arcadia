@@ -157,3 +157,12 @@ ai_submodule!(
     vec![PLATFORM_MACOS.to_string()],
     "Apple Intelligence provider — on-device inference via the macOS Foundation Models framework. No API key, no network required."
 );
+
+ai_submodule!(
+    AiImagePlaygroundExtension,
+    crate::config::modules::AI_IMAGE_PLAYGROUND_MODULE_NAME,
+    "type-image",
+    "pink",
+    vec![PLATFORM_MACOS.to_string()],
+    "Apple ImagePlayground provider — on-device image generation via the macOS ImagePlayground framework (macOS 15.2+). Three styles: animation, illustration, sketch. No API key, no network required."
+);

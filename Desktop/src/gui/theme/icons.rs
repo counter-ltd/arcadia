@@ -3,6 +3,8 @@ use openframe::{svg, Svg};
 pub fn icon_path(glyph_key: &str) -> &'static str {
     match glyph_key {
         "terminal" => "icons/terminal.svg",
+        "keyboard" => "icons/keyboard.svg",
+        "audio" => "icons/audio.svg",
         "home" => "icons/home.svg",
         "logs" => "icons/logs.svg",
         "log-out" => "icons/log-out.svg",

@@ -6,7 +6,7 @@
 //! and `arcadia_dispatch` — so authors write only command handler functions.
 //!
 //! ```ignore
-//! use arcadia_module_sdk::register_module;
+//! use arcadia_wasm_sdk::register_module;
 //!
 //! fn greet(args: Vec<String>) -> String {
 //!     format!("Hello, {}", args.first().map(String::as_str).unwrap_or("world"))

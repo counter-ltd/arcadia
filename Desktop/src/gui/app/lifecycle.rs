@@ -660,6 +660,15 @@ impl ArcadiaRoot {
             settings_hub_expanded: false,
             settings_expand_alpha: 0.0,
             settings_expand_anim: None,
+            modules_builtin_alpha: 1.0,
+            modules_builtin_anim: None,
+            modules_builtin_collapsed: false,
+            modules_ext_alpha: 1.0,
+            modules_ext_anim: None,
+            modules_ext_collapsed: false,
+            modules_wasm_alpha: 1.0,
+            modules_wasm_anim: None,
+            modules_wasm_collapsed: false,
             pill_expanded: std::collections::HashMap::new(),
             pill_expand_alphas: std::collections::HashMap::new(),
             pill_expand_anims: std::collections::HashMap::new(),
@@ -1197,6 +1206,7 @@ impl ArcadiaRoot {
                                         role: AiMessageRole::Assistant,
                                         content: format!("Error: {e}"),
                                         provider: chat_provider,
+                                        images: Vec::new(),
                                     });
                                 }
                             }
@@ -1221,6 +1231,18 @@ impl ArcadiaRoot {
                         rejected: std::collections::BTreeSet::new(),
                     });
                     self.ai.diff_panel_open = true;
+                }
+                Ok(RuntimeEvent::Image(path)) => {
+                    any = true;
+                    if let Some(chat_id) = self.ai.stream_chat_id {
+                        if let Some(chat) = self.ai.chats.iter_mut().find(|c| c.id == chat_id) {
+                            if let Some(last) = chat.messages.last_mut() {
+                                if last.role == AiMessageRole::Assistant {
+                                    last.images.push(path);
+                                }
+                            }
+                        }
+                    }
                 }
                 Err(_) => break,
             }
@@ -1802,6 +1824,26 @@ impl ArcadiaRoot {
             }
         }
 
+        // Tick modules section collapse/expand animations.
+        const SECTION_DURATION_S: f32 = 0.20;
+        macro_rules! tick_section_anim {
+            ($anim:expr, $alpha:expr) => {
+                if let Some(anim) = $anim.clone() {
+                    let raw_t = (now - anim.start).as_secs_f32() / SECTION_DURATION_S;
+                    let t = apply_easing(Easing::EaseOutCubic, raw_t.min(1.0));
+                    $alpha = anim.from + (anim.to - anim.from) * t;
+                    if raw_t >= 1.0 {
+                        $anim = None;
+                    } else {
+                        running = true;
+                    }
+                }
+            };
+        }
+        tick_section_anim!(self.modules_builtin_anim, self.modules_builtin_alpha);
+        tick_section_anim!(self.modules_ext_anim, self.modules_ext_alpha);
+        tick_section_anim!(self.modules_wasm_anim, self.modules_wasm_alpha);
+
         // Tick top-bar pill expand/collapse animations.
         const PILL_DURATION_S: f32 = 0.18;
         let pill_keys: Vec<String> = self.pill_expand_anims.keys().cloned().collect();
@@ -1845,6 +1887,27 @@ impl ArcadiaRoot {
         let from = self.settings_expand_alpha;
         let to   = if expanding { 1.0_f32 } else { 0.0_f32 };
         self.settings_expand_anim = Some(super::CaretAnim { start: Instant::now(), from, to });
+    }
+
+    pub fn toggle_modules_builtin(&mut self) {
+        use std::time::Instant;
+        self.modules_builtin_collapsed = !self.modules_builtin_collapsed;
+        let to = if self.modules_builtin_collapsed { 0.0_f32 } else { 1.0_f32 };
+        self.modules_builtin_anim = Some(super::CaretAnim { start: Instant::now(), from: self.modules_builtin_alpha, to });
+    }
+
+    pub fn toggle_modules_ext(&mut self) {
+        use std::time::Instant;
+        self.modules_ext_collapsed = !self.modules_ext_collapsed;
+        let to = if self.modules_ext_collapsed { 0.0_f32 } else { 1.0_f32 };
+        self.modules_ext_anim = Some(super::CaretAnim { start: Instant::now(), from: self.modules_ext_alpha, to });
+    }
+
+    pub fn toggle_modules_wasm(&mut self) {
+        use std::time::Instant;
+        self.modules_wasm_collapsed = !self.modules_wasm_collapsed;
+        let to = if self.modules_wasm_collapsed { 0.0_f32 } else { 1.0_f32 };
+        self.modules_wasm_anim = Some(super::CaretAnim { start: Instant::now(), from: self.modules_wasm_alpha, to });
     }
 
     pub fn start_pill_expand_anim(&mut self, page_id: &str, expand: bool) {

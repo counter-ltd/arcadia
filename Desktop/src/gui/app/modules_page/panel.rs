@@ -4,7 +4,7 @@ use arcadia_core::config::modules::{
 };
 use arcadia_core::modules;
 use openframe::prelude::FluentBuilder as _;
-use openframe::{div, px, AnyElement, Window};
+use openframe::{div, px, radians, AnyElement, Transformation, Window};
 use openframe::{Context, FontWeight, InteractiveElement, IntoElement, MouseButton, ParentElement, Styled};
 
 use crate::gui::app::list_panel_search::{list_panel_row_matches, ListPanelSearchKind};
@@ -55,6 +55,7 @@ impl ArcadiaRoot {
             })
             .collect();
 
+        let builtin_row_count = builtin_rows_src.len();
         let builtin_rows: Vec<_> = builtin_rows_src
             .into_iter()
             .map(|(module_name, enabled)| {
@@ -78,11 +79,28 @@ impl ArcadiaRoot {
             && !self.module_rows.is_empty()
             && !self.modules_search_query.trim().is_empty();
 
+        let builtin_alpha = self.modules_builtin_alpha;
         let builtin_header = div()
             .w_full()
             .flex()
             .items_center()
             .gap_2()
+            .cursor_pointer()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.toggle_modules_builtin();
+                    cx.notify();
+                }),
+            )
+            .child(
+                theme::render_icon("chevron-right")
+                    .size_3()
+                    .text_color(p.content_meta)
+                    .with_transformation(Transformation::rotate(radians(
+                        builtin_alpha * std::f32::consts::FRAC_PI_2,
+                    ))),
+            )
             .child(
                 div()
                     .text_xs()
@@ -117,6 +135,7 @@ impl ArcadiaRoot {
         };
 
         // ── Section 2: Extensions ────────────────────────────────────────────
+        let ext_alpha = self.modules_ext_alpha;
         let ext_header = div()
             .w_full()
             .flex()
@@ -124,10 +143,32 @@ impl ArcadiaRoot {
             .justify_between()
             .child(
                 div()
-                    .text_xs()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(p.content_meta)
-                    .child("EXTENSIONS"),
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.toggle_modules_ext();
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        theme::render_icon("chevron-right")
+                            .size_3()
+                            .text_color(p.content_meta)
+                            .with_transformation(Transformation::rotate(radians(
+                                ext_alpha * std::f32::consts::FRAC_PI_2,
+                            ))),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(p.content_meta)
+                            .child("EXTENSIONS"),
+                    ),
             )
             .when(python_host_enabled, |d| {
                 d.child(
@@ -172,6 +213,7 @@ impl ArcadiaRoot {
                     .into_any_element()
             });
 
+        let mut ext_row_count: usize = 0;
         let ext_body: AnyElement = if !python_host_enabled {
             div()
                 .w_full()
@@ -199,6 +241,7 @@ impl ArcadiaRoot {
                     list_panel_row_matches(&q, name, &extras)
                 })
                 .collect();
+            ext_row_count = ext_filtered.len();
 
             if ext_none_loaded {
                 div()
@@ -263,6 +306,7 @@ impl ArcadiaRoot {
         };
 
         // ── Section 3: WASM Modules ──────────────────────────────────────────
+        let wasm_alpha = self.modules_wasm_alpha;
         let wasm_header = div()
             .w_full()
             .flex()
@@ -270,10 +314,32 @@ impl ArcadiaRoot {
             .justify_between()
             .child(
                 div()
-                    .text_xs()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(p.content_meta)
-                    .child("WASM MODULES"),
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, cx| {
+                            this.toggle_modules_wasm();
+                            cx.notify();
+                        }),
+                    )
+                    .child(
+                        theme::render_icon("chevron-right")
+                            .size_3()
+                            .text_color(p.content_meta)
+                            .with_transformation(Transformation::rotate(radians(
+                                wasm_alpha * std::f32::consts::FRAC_PI_2,
+                            ))),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(p.content_meta)
+                            .child("WASM MODULES"),
+                    ),
             )
             .when(wasm_host_enabled, |d| {
                 d.child(
@@ -318,6 +384,7 @@ impl ArcadiaRoot {
                     .into_any_element()
             });
 
+        let mut wasm_row_count: usize = 0;
         let wasm_body: AnyElement = if !wasm_host_enabled {
             div()
                 .w_full()
@@ -345,6 +412,7 @@ impl ArcadiaRoot {
                     list_panel_row_matches(&q, name, &extras)
                 })
                 .collect();
+            wasm_row_count = wasm_filtered.len();
 
             if wasm_none_found {
                 div()
@@ -410,23 +478,57 @@ impl ArcadiaRoot {
         };
 
         // ── Assemble body ────────────────────────────────────────────────────
+        // Row height estimate: icon(32) + title(20) + meta(18) + desc(18) + padding/gaps ≈ 108px.
+        // Used only during animation (alpha < 0.999); at alpha=1.0 no height is applied so
+        // content sizes naturally with no gap.
+        const ROW_H: f32 = 120.0;
+        const MSG_H: f32 = 100.0;
+        let builtin_est_h = if builtin_row_count == 0 { MSG_H } else { builtin_row_count as f32 * ROW_H };
+        let ext_est_h = if ext_row_count == 0 { MSG_H } else { ext_row_count as f32 * ROW_H };
+        let wasm_est_h = if wasm_row_count == 0 { MSG_H } else { wasm_row_count as f32 * ROW_H };
+
         let mut full_body = div().flex().flex_col().gap_4();
         // Built-in section
         full_body = full_body
             .child(builtin_header)
-            .child(builtin_body);
+            .child(
+                div()
+                    .overflow_hidden()
+                    .when(builtin_alpha < 0.999, |d| {
+                        d.h(px(builtin_alpha * builtin_est_h)).opacity(builtin_alpha)
+                    })
+                    .child(builtin_body),
+            );
         // Extensions section
         full_body = full_body.child(ext_header);
         if let Some(banner) = ext_error_banner {
-            full_body = full_body.child(banner);
+            if ext_alpha > 0.01 {
+                full_body = full_body.child(banner);
+            }
         }
-        full_body = full_body.child(ext_body);
+        full_body = full_body.child(
+            div()
+                .overflow_hidden()
+                .when(ext_alpha < 0.999, |d| {
+                    d.h(px(ext_alpha * ext_est_h)).opacity(ext_alpha)
+                })
+                .child(ext_body),
+        );
         // WASM section
         full_body = full_body.child(wasm_header);
         if let Some(banner) = wasm_error_banner {
-            full_body = full_body.child(banner);
+            if wasm_alpha > 0.01 {
+                full_body = full_body.child(banner);
+            }
         }
-        full_body = full_body.child(wasm_body);
+        full_body = full_body.child(
+            div()
+                .overflow_hidden()
+                .when(wasm_alpha < 0.999, |d| {
+                    d.h(px(wasm_alpha * wasm_est_h)).opacity(wasm_alpha)
+                })
+                .child(wasm_body),
+        );
 
         if let Some(ref g) = glyph_cfg {
             let r = g.border_radius.min(12.0);

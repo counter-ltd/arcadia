@@ -9,7 +9,8 @@ use arcadia_core::config::{
 };
 use arcadia_core::modules::ai_context;
 use arcadia_core::modules::ai_tools;
-use arcadia_core::ai_types::TextGenerationRequest;
+use arcadia_core::ai_types::{ImageGenerationRequest, TextGenerationRequest};
+use std::path::PathBuf;
 
 const HTTP_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -23,12 +24,18 @@ pub enum RuntimeEvent {
         original: String,
         proposed: String,
     },
+    /// Image generation produced a PNG at the given absolute path.
+    Image(PathBuf),
 }
 
 pub enum AiRuntimeRequest {
     Generate {
         request: TextGenerationRequest,
         routing: ProviderRouting,
+    },
+    GenerateImage {
+        request: ImageGenerationRequest,
+        routing: ImageProviderRouting,
     },
     Shutdown,
 }
@@ -57,6 +64,12 @@ pub enum ProviderRouting {
     /// Apple Intelligence via macOS Foundation Models framework (macOS 26+).
     /// No model selection — the system model is used.
     Apfel,
+}
+
+pub enum ImageProviderRouting {
+    /// Apple ImagePlayground via macOS ImageCreator framework (macOS 15.2+).
+    /// On-device, no API key, no network.
+    ImagePlayground,
 }
 
 pub struct AiRuntimeHandle {
@@ -148,6 +161,11 @@ fn ai_thread_impl(rx: Receiver<AiRuntimeRequest>, tx: SyncSender<RuntimeEvent>) 
                 }
                 ProviderRouting::Apfel => {
                     run_apfel(request, &tx);
+                }
+            },
+            AiRuntimeRequest::GenerateImage { request, routing } => match routing {
+                ImageProviderRouting::ImagePlayground => {
+                    run_image_playground(request, &tx);
                 }
             },
         }
@@ -947,4 +965,231 @@ RunLoop.main.run()
             Some(text)
         }
     });
+}
+
+// ── Apple ImagePlayground provider (macOS ImageCreator) ───────────────────────
+
+fn run_image_playground(request: ImageGenerationRequest, tx: &SyncSender<RuntimeEvent>) {
+    use arcadia_core::config::image_playground::{ImagePlaygroundConfig, ImagePlaygroundStyle};
+    use std::process::{Command, Stdio};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    if request.prompt.trim().is_empty() {
+        let _ = tx.send(RuntimeEvent::Error(
+            "ImagePlayground prompt is empty.".to_string(),
+        ));
+        return;
+    }
+
+    // Resolve style: request override → config default → animation.
+    let cfg = ImagePlaygroundConfig::load_or_create().unwrap_or_default();
+    let style_token = request
+        .style
+        .as_deref()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| cfg.default_style.as_swift_token().to_string());
+    // Validate against the known set so the Swift runner never sees garbage.
+    let style_token = match style_token.as_str() {
+        "animation" => ImagePlaygroundStyle::Animation.as_swift_token(),
+        "illustration" => ImagePlaygroundStyle::Illustration.as_swift_token(),
+        "sketch" => ImagePlaygroundStyle::Sketch.as_swift_token(),
+        _ => ImagePlaygroundStyle::Animation.as_swift_token(),
+    };
+
+    // Resolve output path under the cache dir.
+    let cache_dir = match cfg.resolve_cache_dir() {
+        Ok(d) => d,
+        Err(e) => {
+            let _ = tx.send(RuntimeEvent::Error(format!(
+                "ImagePlayground cache dir: {e}"
+            )));
+            return;
+        }
+    };
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let pid = std::process::id();
+    let out_path = cache_dir.join(format!("ip_{stamp}_{pid}.png"));
+
+    // The Swift runner reads the prompt from stdin, takes style + output path
+    // via argv. It exits 0 with the output path on stdout on success, or with
+    // a non-zero status and an error on stderr.
+    let swift_src = r#"
+import Foundation
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
+
+#if canImport(ImagePlayground)
+import ImagePlayground
+
+@available(macOS 15.2, *)
+func run(prompt: String, styleToken: String, outPath: String) async -> Int32 {
+    let style: ImagePlaygroundStyle
+    switch styleToken {
+    case "illustration": style = .illustration
+    case "sketch":       style = .sketch
+    default:             style = .animation
+    }
+    do {
+        let creator = try await ImageCreator()
+        let concepts: [ImagePlaygroundConcept] = [.text(prompt)]
+        let stream = creator.images(for: concepts, style: style, limit: 1)
+        for try await image in stream {
+            let cg = image.cgImage
+            let url = URL(fileURLWithPath: outPath)
+            guard let dest = CGImageDestinationCreateWithURL(
+                url as CFURL,
+                UTType.png.identifier as CFString,
+                1,
+                nil
+            ) else {
+                FileHandle.standardError.write(Data("Failed to create PNG destination\n".utf8))
+                return 2
+            }
+            CGImageDestinationAddImage(dest, cg, nil)
+            if !CGImageDestinationFinalize(dest) {
+                FileHandle.standardError.write(Data("Failed to finalize PNG\n".utf8))
+                return 2
+            }
+            print(outPath)
+            return 0
+        }
+        FileHandle.standardError.write(Data("ImagePlayground produced no image\n".utf8))
+        return 3
+    } catch {
+        FileHandle.standardError.write(Data("ImagePlayground error: \(error)\n".utf8))
+        return 4
+    }
+}
+
+let args = CommandLine.arguments
+guard args.count >= 3 else {
+    FileHandle.standardError.write(Data("usage: runner <style> <out_path>\n".utf8))
+    exit(64)
+}
+let styleToken = args[1]
+let outPath = args[2]
+let promptData = FileHandle.standardInput.readDataToEndOfFile()
+let prompt = String(data: promptData, encoding: .utf8) ?? ""
+
+if #available(macOS 15.2, *) {
+    let sem = DispatchSemaphore(value: 0)
+    var status: Int32 = 1
+    Task {
+        status = await run(prompt: prompt, styleToken: styleToken, outPath: outPath)
+        sem.signal()
+    }
+    sem.wait()
+    exit(status)
+} else {
+    FileHandle.standardError.write(Data("ImagePlayground requires macOS 15.2 or later\n".utf8))
+    exit(5)
+}
+
+#else
+FileHandle.standardError.write(Data("ImagePlayground framework not available on this system\n".utf8))
+exit(6)
+#endif
+"#;
+
+    let tmp_path = std::env::temp_dir().join("arcadia_image_playground_runner.swift");
+    if let Err(e) = std::fs::write(&tmp_path, swift_src) {
+        let _ = tx.send(RuntimeEvent::Error(format!(
+            "Failed to write ImagePlayground runner: {e}"
+        )));
+        return;
+    }
+
+    let mut child = match Command::new("swift")
+        .arg(tmp_path.as_os_str())
+        .arg(style_token)
+        .arg(&out_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = tx.send(RuntimeEvent::Error(format!("Failed to spawn swift: {e}")));
+            return;
+        }
+    };
+
+    // Send the user prompt over stdin in a background thread.
+    let prompt_bytes = request.prompt.clone().into_bytes();
+    let stdin_handle = {
+        use std::io::Write;
+        let mut stdin = child.stdin.take();
+        std::thread::spawn(move || {
+            if let Some(ref mut s) = stdin {
+                let _ = s.write_all(&prompt_bytes);
+            }
+        })
+    };
+
+    // Deadline guard. ImageCreator typically returns within ~10 s on M-series hardware.
+    let deadline = std::time::Instant::now() + HTTP_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => {
+                if std::time::Instant::now() > deadline {
+                    let _ = child.kill();
+                    let _ = stdin_handle.join();
+                    let _ = tx.send(RuntimeEvent::Error(
+                        "ImagePlayground timed out after 120 s.".to_string(),
+                    ));
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => {
+                let _ = tx.send(RuntimeEvent::Error(format!(
+                    "ImagePlayground runner wait: {e}"
+                )));
+                return;
+            }
+        }
+    }
+    let _ = stdin_handle.join();
+
+    let output = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(e) => {
+            let _ = tx.send(RuntimeEvent::Error(format!(
+                "ImagePlayground runner output: {e}"
+            )));
+            return;
+        }
+    };
+
+    if !output.status.success() {
+        let stderr_text = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let msg = if stderr_text.is_empty() {
+            format!(
+                "ImagePlayground runner failed (exit {}). \
+                 Requires macOS 15.2 or later with Apple Intelligence enabled.",
+                output.status.code().unwrap_or(-1),
+            )
+        } else {
+            stderr_text
+        };
+        let _ = tx.send(RuntimeEvent::Error(msg));
+        return;
+    }
+
+    // Sanity-check the file actually exists.
+    if !out_path.exists() {
+        let _ = tx.send(RuntimeEvent::Error(
+            "ImagePlayground reported success but no PNG was written.".to_string(),
+        ));
+        return;
+    }
+
+    let _ = tx.send(RuntimeEvent::Image(out_path));
+    let _ = tx.send(RuntimeEvent::Done);
 }

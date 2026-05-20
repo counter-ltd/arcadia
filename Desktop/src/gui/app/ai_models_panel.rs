@@ -25,6 +25,7 @@ pub(crate) fn provider_accent(module_name: &str) -> &'static str {
         AI_LLAMA_CPP_MODULE_NAME => "amber",
         AI_OLLAMA_MODULE_NAME => "cyan",
         AI_APFEL_MODULE_NAME => "indigo",
+        AI_IMAGE_PLAYGROUND_MODULE_NAME => "pink",
         _ => "violet",
     }
 }

@@ -9,7 +9,7 @@ license = "MIT"
 crate-type = ["cdylib"]
 
 [dependencies]
-arcadia-module-sdk = { path = "../../arcadia-module-sdk" }
+arcadia-wasm-sdk = { path = "../../../Libraries/arcadia-wasm-sdk" }
 
 [profile.release]
 opt-level = "s"
